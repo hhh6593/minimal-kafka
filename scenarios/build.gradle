@@ -1,0 +1,4 @@
+dependencies {
+    testImplementation project(':broker')
+    testImplementation project(':clients')
+}

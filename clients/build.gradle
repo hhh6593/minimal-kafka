@@ -1,0 +1,27 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':broker')
+}
+
+application {
+    mainClass = 'mk.clients.ProducerMain'
+}
+
+tasks.register('runConsumer', JavaExec) {
+    group = 'application'
+    description = 'Run the minimal consumer CLI'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'mk.clients.ConsumerMain'
+    standardInput = System.in
+}
+
+tasks.register('runProducer', JavaExec) {
+    group = 'application'
+    description = 'Run the minimal producer CLI'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'mk.clients.ProducerMain'
+    standardInput = System.in
+}

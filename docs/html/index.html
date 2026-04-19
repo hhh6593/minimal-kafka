@@ -1,0 +1,1837 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#721FE5">
+<title>minimal-kafka · 학습 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───────── toss theme tokens ───────── */
+:root {
+  color-scheme: light;
+  --brand: #721FE5;
+  --brand-tint: #F0E8FF;
+  --primary: #030213;
+  --background: #ffffff;
+  --surface-page: #FAFAFA;
+  --surface-subtle: #FAFAF9;
+  --surface-muted: #E8E6E1;
+  --card: #ffffff;
+  --text-primary: #3C3C3C;
+  --text-secondary: #6A6A6A;
+  --text-tertiary: #7A7A7A;
+  --text-disabled: #9B9B9B;
+  --icon-default: #4A5568;
+  --border: rgba(0,0,0,0.08);
+  --input-bg: #f3f3f5;
+  --destructive: #d4183d;
+  --success: #6B9B7A;
+  --warning: #D97706;
+  --info: #3B82F6;
+  --urgent: #C85A54;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 2px 4px rgba(0,0,0,0.08);
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.08);
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --font-sans: Pretendard, -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+html.dark {
+  color-scheme: dark;
+  --brand: #9B5FFF;
+  --brand-tint: rgba(155, 95, 255, 0.12);
+  --primary: #E0E0E0;
+  --background: #121212;
+  --surface-page: #121212;
+  --surface-subtle: #1E1E1E;
+  --surface-muted: rgba(255,255,255,0.08);
+  --card: #1E1E1E;
+  --text-primary: #E0E0E0;
+  --text-secondary: #A0A0A0;
+  --text-tertiary: #808080;
+  --text-disabled: #555555;
+  --icon-default: #909090;
+  --border: rgba(255,255,255,0.08);
+  --input-bg: #252525;
+  --destructive: #FF5C5C;
+  --success: #8FBF9A;
+  --warning: #FFB347;
+  --info: #64B5F6;
+  --urgent: #E08B86;
+  --shadow-card: none;
+  --shadow-card-hover: none;
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* ───────── reset ───────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+code, pre { font-family: var(--font-mono); }
+
+/* ───────── app shell ───────── */
+.app {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.main { min-width: 0; }
+.card { min-width: 0; }
+pre { max-width: 100%; }
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 100%; }
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 24px 20px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 4px 6px;
+}
+.sidebar-brand .logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+}
+.sidebar-brand .name {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.sidebar-brand .tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+.sidebar-section {
+  margin-bottom: 20px;
+}
+.sidebar-section h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin: 0 6px 8px;
+  font-weight: 600;
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+  cursor: pointer;
+  min-height: 36px;
+}
+.nav-link:hover { background: var(--surface-muted); color: var(--text-primary); text-decoration: none; }
+.nav-link.active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
+.nav-link .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  flex-shrink: 0;
+}
+.nav-link.active .dot { background: var(--brand); }
+.nav-link.ok .dot { background: var(--success); }
+
+/* ───────── main content ───────── */
+.main {
+  padding: 32px 40px 120px;
+  max-width: 920px;
+  width: 100%;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 12px;
+}
+.topbar-title {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.chip.brand { background: var(--brand-tint); color: var(--brand); border: none; }
+.chip.success { background: rgba(107, 155, 122, 0.14); color: var(--success); border: none; }
+.chip.warning { background: rgba(217, 119, 6, 0.12); color: var(--warning); border: none; }
+.chip.urgent { background: rgba(200, 90, 84, 0.12); color: var(--urgent); border: none; }
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+.theme-toggle:hover { color: var(--text-primary); background: var(--surface-muted); }
+
+/* ───────── hero ───────── */
+.hero {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, var(--brand-tint) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+.hero .sub {
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin: 0 0 24px;
+  max-width: 560px;
+}
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat .label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.stat .value {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stat .value .unit {
+  font-size: 18px;
+  margin-left: 2px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.stat .hint { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+
+/* ───────── card ───────── */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+  transition: box-shadow var(--duration-normal) var(--ease-default);
+}
+.card:hover { box-shadow: var(--shadow-card-hover); }
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.card-head h2 {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.card-head h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+.card .desc {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 8px 0 20px;
+}
+
+h2.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+  letter-spacing: -0.005em;
+}
+h3.sub {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 20px 0 10px;
+  letter-spacing: -0.005em;
+}
+h4.mini {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+
+p { margin: 0 0 10px; }
+
+/* ───────── tables / lists ───────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  color: var(--text-tertiary);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { transition: background var(--duration-fast) var(--ease-default); }
+tbody tr:hover { background: var(--surface-subtle); }
+
+ul, ol { margin: 8px 0 14px; padding-left: 22px; }
+li { margin-bottom: 4px; color: var(--text-primary); font-size: 14px; }
+li::marker { color: var(--text-disabled); }
+
+code {
+  font-size: 13px;
+  padding: 2px 6px;
+  background: var(--surface-muted);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+p, li, td, th, .desc { overflow-wrap: anywhere; word-break: break-word; }
+pre {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 6px 16px;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.kv .k { color: var(--text-tertiary); font-weight: 500; }
+.kv .v { color: var(--text-primary); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.mini-card {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  transition: border-color var(--duration-normal) var(--ease-default);
+}
+.mini-card:hover { border-color: var(--brand); }
+.mini-card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.mini-card h3 a { color: var(--text-primary); }
+.mini-card h3 a:hover { color: var(--brand); text-decoration: none; }
+.mini-card p { margin: 0; font-size: 13px; color: var(--text-secondary); }
+
+.callout {
+  background: var(--brand-tint);
+  border-left: 3px solid var(--brand);
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  color: var(--text-primary);
+  margin: 14px 0;
+}
+.callout.warn {
+  background: rgba(217, 119, 6, 0.08);
+  border-left-color: var(--warning);
+}
+.callout.bad {
+  background: rgba(200, 90, 84, 0.08);
+  border-left-color: var(--urgent);
+}
+
+.runbox {
+  margin: 16px 0 4px;
+  padding: 16px 18px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius);
+}
+.runbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand);
+  margin-bottom: 8px;
+}
+.runbox pre { margin: 6px 0; background: var(--card); }
+.runbox h4.step {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin: 14px 0 4px;
+}
+.runbox p { font-size: 13px; margin: 6px 0; color: var(--text-primary); }
+.runbox ul { margin: 6px 0 4px; padding-left: 20px; }
+.runbox li { font-size: 13px; color: var(--text-primary); }
+
+.sources {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 13px;
+}
+.sources .lab {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  display: block;
+  margin-bottom: 6px;
+}
+.sources ul { margin: 0; padding-left: 18px; }
+.sources li { font-size: 13px; margin-bottom: 3px; }
+
+.mobile-nav {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.mobile-nav-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  gap: 12px;
+}
+.mobile-nav-top .brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mobile-nav-top .brand-row .logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+}
+.mobile-nav-top .name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.hamburger {
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-height: 36px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mobile-menu {
+  max-height: 0;
+  overflow: hidden;
+  background: var(--card);
+  transition: max-height var(--duration-normal) var(--ease-default);
+  border-top: 1px solid transparent;
+}
+.mobile-menu.open {
+  max-height: 70vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.mobile-menu-inner { padding: 8px 12px 16px; }
+
+/* ───────── responsive ───────── */
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .mobile-nav { display: block; }
+  .main { padding: 20px 18px 80px; }
+  .hero { padding: 24px; border-radius: var(--radius-lg); }
+  .hero h1 { font-size: 22px; }
+  .hero-stats { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hero-stats .stat:nth-child(3) { grid-column: 1 / -1; }
+  .hero-stats .value { font-size: 28px; }
+  .hero-stats .value .unit { font-size: 14px; }
+  .card { padding: 22px 20px; border-radius: var(--radius-lg); margin-bottom: 18px; }
+  .card-head h2 { font-size: 17px; }
+  .kv { grid-template-columns: 120px 1fr; font-size: 12.5px; }
+  pre { font-size: 11.5px; }
+  table { font-size: 12px; }
+  th, td { padding: 8px 8px; }
+}
+@media (max-width: 430px) {
+  .hero-stats { grid-template-columns: 1fr; }
+  .hero-stats .stat:nth-child(3) { grid-column: auto; }
+}
+
+/* ───────── focus ───────── */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.nav-link:focus-visible,
+.theme-toggle:focus-visible,
+.hamburger:focus-visible { outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- mobile top bar -->
+<div class="mobile-nav">
+  <div class="mobile-nav-top">
+    <div class="brand-row">
+      <div class="logo">mk</div>
+      <div>
+        <div class="name">minimal-kafka</div>
+        <div style="font-size:11px;color:var(--text-tertiary)">Kafka 4.2.0 학습</div>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-expanded="false" aria-controls="mobile-menu">
+      <span id="hamburger-text">메뉴</span>
+    </button>
+  </div>
+  <div class="mobile-menu" id="mobile-menu"></div>
+</div>
+
+<div class="app">
+
+<!-- desktop sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">mk</div>
+    <div>
+      <div class="name">minimal-kafka</div>
+      <div class="tag">Kafka 4.2.0 학습 프로젝트</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>시작하기</h4>
+    <a class="nav-link" href="#overview" data-target="overview"><span class="dot"></span>개요</a>
+    <a class="nav-link" href="#run" data-target="run"><span class="dot"></span>실행 방법</a>
+    <a class="nav-link" href="code-guide.html"><span class="dot"></span>📘 코드 딥다이브</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>핵심 버전 (v1–v5)</h4>
+    <a class="nav-link" href="#v01" data-target="v01"><span class="dot"></span>v01 퀵스타트</a>
+    <a class="nav-link" href="#v02" data-target="v02"><span class="dot"></span>v02 디스크 + fsync</a>
+    <a class="nav-link" href="#v03" data-target="v03"><span class="dot"></span>v03 파티셔닝</a>
+    <a class="nav-link" href="#v04" data-target="v04"><span class="dot"></span>v04 배칭 / acks</a>
+    <a class="nav-link" href="#v05" data-target="v05"><span class="dot"></span>v05 멱등 프로듀서</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>컨슈머 (v6–v9)</h4>
+    <a class="nav-link" href="#v06" data-target="v06"><span class="dot"></span>v06 poll 루프</a>
+    <a class="nav-link" href="#v07" data-target="v07"><span class="dot"></span>v07 리밸런스 스톰</a>
+    <a class="nav-link" href="#v08" data-target="v08"><span class="dot"></span>v08 assignor</a>
+    <a class="nav-link" href="#v09" data-target="v09"><span class="dot"></span>v09 오프셋 커밋</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>클러스터 / 운영 (v10–v14)</h4>
+    <a class="nav-link" href="#v10" data-target="v10"><span class="dot"></span>v10 리플리케이션</a>
+    <a class="nav-link" href="#v11" data-target="v11"><span class="dot"></span>v11 unclean leader</a>
+    <a class="nav-link" href="#v12" data-target="v12"><span class="dot"></span>v12 컨트롤러</a>
+    <a class="nav-link" href="#v13" data-target="v13"><span class="dot"></span>v13 리텐션</a>
+    <a class="nav-link" href="#v14" data-target="v14"><span class="dot"></span>v14 운영 트러블</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>v15 희귀 케이스</h4>
+    <a class="nav-link" href="#v15-1" data-target="v15-1"><span class="dot"></span>v15-1 좀비 트랜잭션</a>
+    <a class="nav-link" href="#v15-2" data-target="v15-2"><span class="dot"></span>v15-2 좀비 컨트롤러</a>
+    <a class="nav-link" href="#v15-3" data-target="v15-3"><span class="dot"></span>v15-3 stale broker epoch</a>
+    <a class="nav-link" href="#v15-4" data-target="v15-4"><span class="dot"></span>v15-4 seq 리셋 갭</a>
+    <a class="nav-link" href="#v15-5" data-target="v15-5"><span class="dot"></span>v15-5 cold read</a>
+    <a class="nav-link" href="#v15-6" data-target="v15-6"><span class="dot"></span>v15-6 fetch session</a>
+  </div>
+</aside>
+
+<!-- main content -->
+<main class="main">
+
+  <div class="topbar">
+    <span class="topbar-title">Kafka 4.2.0 · 51 테스트 · 15 버전</span>
+    <button class="theme-toggle" id="theme-toggle" aria-label="테마 전환">
+      <span id="theme-icon">🌙</span>
+      <span id="theme-label">다크</span>
+    </button>
+  </div>
+
+  <!-- overview -->
+  <section id="overview" class="hero">
+    <h1>minimal-kafka — Kafka 4.2.0 학습 프로젝트</h1>
+    <p class="sub">Kafka 라이프사이클을 코드 레벨에서 이해하고, 현업에서 발생하는 트러블을 직접 재현하며 배우는 단일 JVM 교육용 구현.</p>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="label">버전</span>
+        <span class="value">15<span class="unit">개</span></span>
+        <span class="hint">v1 → v15 누적 진화</span>
+      </div>
+      <div class="stat">
+        <span class="label">테스트</span>
+        <span class="value">51<span class="unit">개</span></span>
+        <span class="hint">전부 PASS</span>
+      </div>
+      <div class="stat">
+        <span class="label">소스 파일</span>
+        <span class="value">58<span class="unit">개</span></span>
+        <span class="hint">broker / clients / scenarios</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- code guide link -->
+  <a href="code-guide.html" class="card" style="display:block;background:linear-gradient(135deg, var(--brand-tint) 0%, var(--card) 60%);text-decoration:none;color:inherit;">
+    <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+      <div style="width:44px;height:44px;border-radius:12px;background:var(--brand);display:grid;place-items:center;color:#fff;font-family:var(--font-mono);font-weight:600;font-size:18px;flex-shrink:0;">📘</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:2px;letter-spacing:-0.01em;">코드 딥다이브 문서</div>
+        <div style="font-size:13px;color:var(--text-secondary);">각 컴포넌트를 왜 이렇게 구현했고, 실제 Kafka에서 무엇이 단순화됐고 무엇이 유지됐는지 읽기 전용 가이드</div>
+      </div>
+      <div style="color:var(--brand);font-weight:600;font-size:13px;">열기 →</div>
+    </div>
+  </a>
+
+  <!-- run -->
+  <section id="run" class="card">
+    <div class="card-head"><h2>실행 방법</h2><span class="chip brand">Java 17 · Gradle 8.10</span></div>
+    <p class="desc">Gradle 래퍼 포함. 추가 설치 없이 바로 실행 가능.</p>
+<pre><code># 빌드 + 전 테스트
+./gradlew build
+
+# 특정 버전 시나리오
+./gradlew :scenarios:test --tests 'mk.scenarios.V07_*'
+
+# 단독 브로커
+./gradlew :broker:run
+
+# 프로듀서 / 컨슈머 CLI
+./gradlew :clients:runProducer --args="127.0.0.1 9092 demo"
+./gradlew :clients:runConsumer --args="127.0.0.1 9092 demo"</code></pre>
+
+    <h3 class="sub">모듈 구성</h3>
+    <div class="grid">
+      <div class="mini-card"><h3>broker</h3><p>JVM 내 미니 브로커. network, log, api, config, coordinator, replication.</p></div>
+      <div class="mini-card"><h3>clients</h3><p>Producer / Consumer / GroupConsumer + CLI mains.</p></div>
+      <div class="mini-card"><h3>scenarios</h3><p>버전별 JUnit 재현 테스트 22개.</p></div>
+    </div>
+  </section>
+
+  <!-- v01 -->
+  <section id="v01" class="card">
+    <div class="card-head"><h2>v01 — 퀵스타트</h2><span class="chip success">3 PASS</span></div>
+    <p class="desc">단일 브로커에 인메모리 로그 하나. Produce → Fetch 왕복 baseline.</p>
+
+    <h3 class="sub">구성 요소</h3>
+    <table><thead><tr><th>레이어</th><th>파일</th><th>실제 Kafka 대응</th></tr></thead><tbody>
+<tr><td>파사드</td><td><code>Broker</code></td><td><code>kafka.server.KafkaBroker</code></td></tr>
+<tr><td>수락자</td><td><code>Acceptor</code></td><td><code>SocketServer</code></td></tr>
+<tr><td>API 라우터</td><td><code>ApiHandler</code></td><td><code>KafkaApis</code></td></tr>
+<tr><td>로그</td><td><code>InMemoryLog</code></td><td><code>UnifiedLog</code></td></tr>
+<tr><td>프레이밍</td><td><code>Wire</code></td><td>Kafka binary protocol</td></tr>
+</tbody></table>
+
+    <h3 class="sub">와이어 포맷</h3>
+<pre><code>// PRODUCE
+{ "api":"PRODUCE", "topic":"demo", "partition":0,
+  "records":[ { "key":"&lt;b64&gt;", "value":"&lt;b64&gt;" } ] }
+
+// FETCH
+{ "api":"FETCH", "topic":"demo", "partition":0, "offset":0 }</code></pre>
+
+    <div class="callout"><strong>핵심:</strong> 오프셋은 (topic, partition) 지역 변수. 파티션 경계 넘으면 공유 안 됨.</div>
+
+    <h4 class="mini">시나리오</h4>
+    <ul>
+      <li><code>produceAndConsumeRoundTrip</code> — 3건 produce → 3건 consume</li>
+      <li><code>consumerStartingFromMiddleOffset</code> — 5건 produce 후 offset 3부터</li>
+      <li><code>fetchFromEmptyTopicReturnsEmpty</code> — 미생성 토픽 빈 배열</li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V01_*'</code></pre>
+      <h4 class="step">기대 출력</h4>
+<pre><code>V01_QuickstartTest &gt; produceAndConsumeRoundTrip() PASSED
+V01_QuickstartTest &gt; consumerStartingFromMiddleOffset() PASSED
+V01_QuickstartTest &gt; fetchFromEmptyTopicReturnsEmpty() PASSED
+BUILD SUCCESSFUL</code></pre>
+
+      <h4 class="step">2. 수동 CLI (3 터미널)</h4>
+<pre><code># T1: 브로커 기동
+./gradlew :broker:run
+
+# T2: 컨슈머 (대기 상태로 유지)
+./gradlew --quiet :clients:runConsumer --args="127.0.0.1 9092 demo"
+
+# T3: 프로듀서 (stdin 입력, Ctrl+D로 종료)
+./gradlew --quiet :clients:runProducer --args="127.0.0.1 9092 demo"
+&gt; hello
+&gt; world</code></pre>
+      <p>컨슈머 T2에 즉시 <code>offset=0 value=hello</code>, <code>offset=1 value=world</code> 출력.</p>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>브로커(T1) <code>Ctrl+C</code>로 종료 후 재기동 → 인메모리 로그라 데이터 증발 확인.</li>
+        <li><code>tcpdump -i lo0 -A port 9092</code>로 JSON 프레임 평문 관찰.</li>
+        <li>컨슈머 start offset을 2로 바꿔 실행: <code>--args="127.0.0.1 9092 demo 2"</code></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v02 -->
+  <section id="v02" class="card">
+    <div class="card-head"><h2>v02 — 디스크 로그 + fsync</h2><span class="chip urgent">유실 재현</span></div>
+    <p class="desc">브로커 kill 시 page cache에만 있던 레코드 유실.</p>
+
+    <h3 class="sub">추가된 것</h3>
+    <ul>
+      <li><code>Log</code> 인터페이스 · <code>SegmentedLog</code> 파일 세그먼트 + sparse offset index</li>
+      <li><code>LogConfig</code> — <code>flushEveryNMessages</code>, <code>flushOnClose</code></li>
+      <li><code>Broker.kill()</code> — flush 생략 모사</li>
+    </ul>
+
+    <div class="callout bad"><strong>1분 요약:</strong> 디스크에 write했다 ≠ 디스크에 도달했다. <code>write()</code>는 page cache까지. <code>fsync()</code>만 저장 매체까지.</div>
+
+    <h3 class="sub">실제 Kafka 대응</h3>
+    <div class="kv">
+      <div class="k">설정</div><div class="v"><code>log.flush.interval.messages</code>, <code>log.flush.interval.ms</code></div>
+      <div class="k">기본값</div><div class="v">거의 무한대 — OS page cache + 리플리케이션 의존</div>
+      <div class="k">안전망</div><div class="v">리플리케이션 + <code>acks=all</code> + <code>min.insync.replicas</code> (v10)</div>
+    </div>
+
+    <h4 class="mini">시나리오</h4>
+    <ul>
+      <li><code>restartAfterCleanShutdown_retainsAllRecords</code></li>
+      <li><code>uncleanKillWithoutFsync_losesRecentRecords</code></li>
+      <li><code>flushEveryMessage_retainsEverythingEvenOnKill</code></li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V02_*'</code></pre>
+
+      <h4 class="step">2. 유실 시나리오 상세</h4>
+      <p>테스트 내부 핵심:</p>
+<pre><code>LogConfig lc = LogConfig.segmented(data, 4096)
+        .withFlushEvery(Integer.MAX_VALUE)   // fsync 사실상 안 함
+        .withFlushOnClose(false);            // 종료 시에도 fsync 없음
+Broker broker = new Broker(cfg.withLogConfig(lc));
+broker.start();
+// ... produce 100건 ...
+broker.kill();                                // SIGKILL 시뮬 = uncleanClose
+
+// 재기동 후 읽기 → produced 이하만 보임</code></pre>
+
+      <h4 class="step">3. 직접 실험</h4>
+      <ul>
+        <li><code>flushEvery=1</code>로 바꾸고 같은 <code>kill()</code> 수행 → 전 건 보존 확인.</li>
+        <li><code>BrokerMain</code>을 수정해 스토리지를 SEGMENTED로 바꾸고 실제 <code>kill -9</code>로 죽여보기. <code>build/tmp/</code> 경로에 <code>.log</code> / <code>.idx</code> 파일 생성 확인.</li>
+        <li>세그먼트 파일을 hex dump: <code>xxd build/tmp/.../0000000000.log | head</code> — 우리 record format 관찰.</li>
+      </ul>
+
+      <h4 class="step">운영 연결</h4>
+      <p>실 Kafka: <code>log.flush.interval.messages</code>, <code>log.flush.interval.ms</code>. 기본값은 거의 무한대 — fsync가 아닌 <strong>리플리케이션</strong>이 내구성 보증이다 (v10).</p>
+    </div>
+  </section>
+
+  <!-- v03 -->
+  <section id="v03" class="card">
+    <div class="card-head"><h2>v03 — 멀티 파티션 + 파티셔너</h2><span class="chip urgent">핫 파티션</span></div>
+    <p class="desc">키 편중으로 한 파티션만 바쁨. 나머지 컨슈머 idle.</p>
+
+    <h3 class="sub">추가</h3>
+    <ul>
+      <li><code>TopicConfig.partitionCount</code></li>
+      <li>클라이언트 <code>Partitioner</code> — Hash / RoundRobin / Sticky / Default</li>
+    </ul>
+
+    <div class="callout"><strong>핵심:</strong> 파티션 = 병렬 단위. 키 설계가 곧 병렬성 설계. 키 종류가 부족하면 파티션을 늘려도 소용 없음.</div>
+
+    <h3 class="sub">Kafka 대응</h3>
+    <div class="kv">
+      <div class="k">기본 (2.4+)</div><div class="v">키 있으면 murmur2 hash, 없으면 sticky (KIP-480)</div>
+      <div class="k">설정</div><div class="v"><code>partitioner.class</code>, <code>partitioner.adaptive.partitioning.enable</code></div>
+    </div>
+
+    <h4 class="mini">흔한 실수</h4>
+    <ul>
+      <li>파티션 수 증가 시 키→파티션 매핑 바뀜 → 순서 보장 깨짐</li>
+      <li>null 키 + round-robin으로 배칭 효율 저하 → sticky 전환 (2.4+)</li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V03_*'</code></pre>
+      <h4 class="step">기대 출력</h4>
+<pre><code>V03_PartitioningTest &gt; hashPartitioner_sameKeyAlwaysSamePartition() PASSED
+V03_PartitioningTest &gt; roundRobin_distributesAcrossPartitions() PASSED
+V03_PartitioningTest &gt; sticky_batchesUntilRotated() PASSED
+V03_PartitioningTest &gt; hotPartitionConsumerLag() PASSED</code></pre>
+
+      <h4 class="step">2. 핫 파티션 직접 재현</h4>
+<pre><code>ProducerConfig cfg = new ProducerConfig()
+        .host("127.0.0.1").port(port)
+        .partitions(4)
+        .partitioner(new Partitioner.Hash());
+
+try (Producer p = new Producer(cfg)) {
+    for (int i = 0; i &lt; 1000; i++) {
+        String key = (i % 10 == 0) ? "rare" : "hot";
+        p.send(ProducerRecord.of("t", key, "v" + i));
+    }
+}
+// 파티션별 consume → 키 2종 → 파티션 2개에 전량 쏠림</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>파티셔너를 <code>Partitioner.RoundRobin</code>으로 바꾸고 <strong>키를 유지</strong>한 채 재실행 → 균등 분배 확인.</li>
+        <li><code>Partitioner.Sticky</code>로 실행 후 <code>sticky.rotate(4)</code> 호출 빈도 조정 → 배치 크기와의 트레이드오프 관찰.</li>
+        <li>파티션 수를 4 → 8로 늘리고 같은 키로 재배포 → 일부 키가 다른 파티션에 배정되며 순서 보장이 깨지는 현상.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v04 -->
+  <section id="v04" class="card">
+    <div class="card-head"><h2>v04 — 프로듀서 배칭 + acks</h2><span class="chip warning">게챠</span></div>
+    <p class="desc"><code>linger.ms</code> 켜면 <code>send()</code>가 돌려주는 offset은 <code>-1</code>. 흔한 혼동 지점.</p>
+
+    <h3 class="sub">트레이드오프</h3>
+    <table><thead><tr><th>knob</th><th>작게</th><th>크게</th></tr></thead><tbody>
+<tr><td><code>linger.ms</code></td><td>저지연</td><td>고처리량, 지연 ↑</td></tr>
+<tr><td><code>batch.size</code></td><td>작은 배치 다수</td><td>적은 배치, 개당 큼</td></tr>
+<tr><td><code>acks</code></td><td><code>0/1</code> 빠름, 위험</td><td><code>all</code> 안전, 지연</td></tr>
+<tr><td><code>retries</code></td><td>빠른 실패</td><td>복원력 ↑, 순서 리스크</td></tr>
+</tbody></table>
+
+    <div class="callout warn"><strong>주의:</strong> <code>max.in.flight.requests.per.connection &gt; 1</code> + retries → 순서 역전 가능.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V04_*'</code></pre>
+
+      <h4 class="step">2. sentinel offset 게챠 관찰</h4>
+<pre><code>ProducerConfig cfg = new ProducerConfig().host("127.0.0.1").port(port)
+        .lingerMs(50).batchSize(1024);         // linger ON
+try (Producer p = new Producer(cfg)) {
+    var md = p.send(ProducerRecord.of("t", "m0"));
+    System.out.println(md.offset());           // -1  ← 아직 flush 전, 실제 offset 미확정
+    p.flush();
+    // 이 시점 이후에야 broker에 도달
+}</code></pre>
+      <p>실 Kafka도 linger/배칭으로 <code>send()</code>는 <code>Future&lt;RecordMetadata&gt;</code>를 반환해 flush 전에 offset을 알 수 없다 — 동일한 게챠.</p>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li><code>lingerMs=1000000</code>, <code>batchSize=64</code>로 설정 → size 기반 flush만 작동. 작은 레코드를 많이 보내면 size 초과 시점에 덩어리로 flush.</li>
+        <li><code>retries=3</code> 상태에서 브로커 다운시키고 send → 재시도 백오프 로그 확인.</li>
+        <li>배칭 켠 상태로 produce → broker 로그에서 <code>baseOffset</code>이 여러 건씩 묶여 찍히는 것 확인 (<code>logEndOffset - baseOffset</code> = 배치 크기).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v05 -->
+  <section id="v05" class="card">
+    <div class="card-head"><h2>v05 — 멱등 프로듀서</h2><span class="chip urgent">OUT_OF_ORDER</span></div>
+    <p class="desc">PID + epoch + 파티션별 seq. 재시도 중 중복 또는 <code>OUT_OF_ORDER_SEQUENCE_NUMBER</code>.</p>
+
+    <h3 class="sub">추가</h3>
+    <ul>
+      <li><code>INIT_PRODUCER_ID</code> API</li>
+      <li><code>ProducerStateManager</code> — (pid, topic, partition) → lastSeq</li>
+      <li>PRODUCE 요청에 <code>producerId</code>, <code>producerEpoch</code>, <code>baseSequence</code> 동봉</li>
+    </ul>
+
+    <h3 class="sub">자주 혼동</h3>
+    <ul>
+      <li>"멱등 = exactly-once" — 아니오. 멱등은 프로듀서→브로커 구간만. EOS는 트랜잭션 필요.</li>
+      <li>프로듀서 재시작 시 새 PID → 과거 seq와 무관</li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V05_*'</code></pre>
+
+      <h4 class="step">2. OUT_OF_ORDER 직접 터뜨리기</h4>
+<pre><code>ProducerConfig cfg = new ProducerConfig().host("127.0.0.1").port(port).idempotence(true);
+try (Producer p = new Producer(cfg)) {
+    p.send(ProducerRecord.of("t", "m0"));        // seq=0 accepted
+
+    // broker 측 seq를 인위적으로 5로 점프시킨 뒤 send
+    broker.api().producerState()
+        .advance(p.producerId(), "t", 0, /*baseSeq*/ 5, /*count*/ 1);
+
+    p.send(ProducerRecord.of("t", "m1"));
+    // → broker error: OUT_OF_ORDER_SEQUENCE_NUMBER expected=1 got=6
+}</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>idempotence 끄고 retries=3 설정 + 브로커를 중간에 killing으로 재시도 유도 → 같은 레코드가 <strong>두 번</strong> 기록되는지 consumer로 확인.</li>
+        <li>idempotence 켜고 같은 상황 재현 → 브로커가 duplicate를 거부하는 모습. (현재 구현상 broker는 seq gap만 감지, 완전한 중복 거부는 실 Kafka에서만)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v06 -->
+  <section id="v06" class="card">
+    <div class="card-head"><h2>v06 — 컨슈머 poll 루프</h2><span class="chip urgent">리밸런스 루프</span></div>
+    <p class="desc">처리 느려서 강퇴 → 재조인 → 또 강퇴. 무한 리밸런스.</p>
+
+    <div class="callout warn"><strong>GC pause 함정:</strong> JVM full GC 3s → 하트비트 빠짐. session.timeout 45s면 안전. 그러나 <code>max.poll.interval</code>은 메인 스레드 기준이라 GC 영향 받음.</div>
+
+    <h3 class="sub">수정 전략</h3>
+    <ol>
+      <li>처리를 <code>max.poll.records</code>로 쪼개기</li>
+      <li>실제 처리 로직을 별도 스레드로 분리</li>
+      <li>long-running 처리 불가피하면 <code>max.poll.interval.ms</code>를 늘리되, 리밸런스 회복 지연 수용</li>
+    </ol>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V06_*'</code></pre>
+
+      <h4 class="step">2. 강퇴 상황 재현</h4>
+<pre><code>ConsumerConfig cfg = new ConsumerConfig().host("127.0.0.1").port(port)
+        .group("g").subscribe("t")
+        .sessionTimeout(100).heartbeat(30);     // 매우 짧게
+
+try (GroupConsumer c = new GroupConsumer(cfg)) {
+    int genBefore = c.generation();            // e.g. 1
+    c.poll(100);
+
+    Thread.sleep(250);                          // sessionTimeout 초과 처리
+    broker.api().coordinator()
+          .expireDeadMembers(System.currentTimeMillis());   // 코디네이터가 강퇴
+
+    c.poll(100);                                // 다음 poll에서 UNKNOWN_MEMBER_ID
+    System.out.println(c.generation());         // 2+ — rejoin 발생
+}</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>sessionTimeout을 넉넉히(5000ms) 두고 같은 sleep(250) → rejoin 없음.</li>
+        <li>poll 사이 sleep을 점진적으로 늘리며 "리밸런스 임계점" 탐색.</li>
+        <li>현재 <code>GroupConsumer</code>는 싱글 스레드. 실제 Kafka처럼 백그라운드 heartbeat 스레드를 추가하면 어떤 문제가 완화되고 어떤 문제는 그대로인지 생각해보기 (답: <code>max.poll.interval.ms</code>는 여전히 메인 스레드 기준).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v07 -->
+  <section id="v07" class="card">
+    <div class="card-head"><h2>v07 — k8s 롤링 리스타트 리밸런스 스톰</h2><span class="chip urgent">전체 멈춤</span></div>
+    <p class="desc">10 pod 롤링 → 매번 리밸런스 → 전체 소비 멈춤.</p>
+
+    <h3 class="sub">해결: static membership (KIP-345)</h3>
+    <div class="kv">
+      <div class="k">설정</div><div class="v"><code>group.instance.id=&lt;id&gt;</code></div>
+      <div class="k">효과</div><div class="v">close + 재기동이 session.timeout 안이면 리밸런스 없이 동일 assignment 유지</div>
+      <div class="k">함정</div><div class="v">static id 중복 → <code>FENCED_INSTANCE_ID</code></div>
+      <div class="k">대안</div><div class="v">cooperative sticky (KIP-429) — 리밸런스를 2단계로 분할</div>
+    </div>
+
+    <h4 class="mini">재현 결과</h4>
+    <ul>
+      <li><code>rollingRestartWithoutStaticMembership_rebalancesEveryTime</code> — 제너레이션 20+ 번 bump</li>
+      <li><code>rollingRestartWithStaticMembership_avoidsRebalance</code> — 4 미만 bump</li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V07_*'</code></pre>
+
+      <h4 class="step">2. 스톰 직접 관찰</h4>
+<pre><code>int n = 10;
+List&lt;GroupConsumer&gt; pods = new ArrayList&lt;&gt;();
+for (int i = 0; i &lt; n; i++) {
+    pods.add(new GroupConsumer(new ConsumerConfig().host("127.0.0.1").port(port)
+            .group("g").subscribe("t")));
+}
+int gen0 = pods.get(n - 1).generation();
+
+// 롤링 리스타트 시뮬
+for (int i = 0; i &lt; n; i++) {
+    pods.get(i).close();                                       // LEAVE → gen++
+    pods.set(i, new GroupConsumer(new ConsumerConfig()...));   // JOIN → gen++
+}
+int gen1 = pods.get(n - 1).generation();
+System.out.println("bumps = " + (gen1 - gen0));                // ≥20</code></pre>
+
+      <h4 class="step">3. static membership로 완화</h4>
+<pre><code>new ConsumerConfig()...
+    .staticId("pod-" + i)            // ← 이것만 바꾸면
+    .subscribe("t")
+// close()에서 LEAVE를 안 보내고, JOIN은 같은 member로 재사용 → 리밸런스 &lt;= 3</code></pre>
+
+      <h4 class="step">4. 실험</h4>
+      <ul>
+        <li>pod 수를 50으로 늘려 bump 폭증 관찰.</li>
+        <li>절반만 static, 절반은 일반 → 부분 스톰 관찰 (실 운영에서 흔한 하이브리드).</li>
+        <li>두 번째 static instance를 같은 id로 시작 → <code>FENCED_INSTANCE_ID</code> 에러 재현은 본 구현 범위 밖.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v08 -->
+  <section id="v08" class="card">
+    <div class="card-head"><h2>v08 — 파티션 assignor 비교</h2><span class="chip success">4 PASS</span></div>
+
+    <table><thead><tr><th>assignor</th><th>장점</th><th>단점</th></tr></thead><tbody>
+<tr><td>range</td><td>토픽 내 키 범위 직관</td><td>파티션 수 홀수일 때 skew</td></tr>
+<tr><td>roundrobin</td><td>다수 토픽 균등</td><td>리밸런스 시 재배치 범위 큼</td></tr>
+<tr><td>sticky</td><td>리밸런스 최소화</td><td>구현 복잡</td></tr>
+<tr><td>cooperative-sticky</td><td>2단계 리밸런스</td><td>이전 assignor 혼용 불가</td></tr>
+</tbody></table>
+
+    <div class="callout"><strong>새 프로토콜:</strong> KIP-848 — broker-side assignment, Kafka 4.x 기본.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V08_*'</code></pre>
+
+      <h4 class="step">2. assignor 직접 비교</h4>
+<pre><code>Map&lt;String,Integer&gt; topics = Map.of("t1", 7);
+List&lt;String&gt; members = List.of("c1", "c2", "c3");
+Map&lt;String,List&lt;String&gt;&gt; subs = Map.of("c1",List.of("t1"),"c2",List.of("t1"),"c3",List.of("t1"));
+
+Assignors.range      (topics, members, subs);        // c1=3, c2=2, c3=2 (skew)
+Assignors.roundRobin (topics, members, subs);        // 균등
+Assignors.sticky     (topics, members, subs, prev);  // 이전 유지 + 균형</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>파티션 수를 11로, 멤버를 3으로 해 range skew 최대화.</li>
+        <li>sticky에 previousPlan 넘기고 한 멤버 제거 → 제거되지 않은 멤버의 assignment 얼마나 유지되는지 측정.</li>
+        <li>cooperative-sticky 2단계 리밸런스(revoke → assign)는 본 구현에서 단일 패스로 접혀 있음. 실 Kafka 로그에서 두 번의 JoinGroup이 어떻게 찍히는지 비교.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v09 -->
+  <section id="v09" class="card">
+    <div class="card-head"><h2>v09 — 오프셋 커밋 시멘틱</h2><span class="chip urgent">skip / 중복</span></div>
+    <p class="desc">auto commit 중 예외 → skip. 또는 수동 커밋 타이밍 틀려 중복.</p>
+
+    <h3 class="sub">시멘틱 결정 매트릭스</h3>
+    <table><thead><tr><th>보장</th><th>커밋 전략</th></tr></thead><tbody>
+<tr><td>at-most-once</td><td>처리 전 커밋 → 실패 시 skip</td></tr>
+<tr><td>at-least-once</td><td>처리 후 커밋 → 실패 시 재처리</td></tr>
+<tr><td>exactly-once</td><td>트랜잭션 + <code>isolation.level=read_committed</code></td></tr>
+</tbody></table>
+
+    <div class="callout warn">커밋 실패 로그가 소음으로만 보이면, 끔찍한 데이터 스킵 원인이 될 수 있음.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V09_*'</code></pre>
+
+      <h4 class="step">2. auto commit skip 재현</h4>
+<pre><code>ConsumerConfig cfg = new ConsumerConfig().host("127.0.0.1").port(port)
+        .group("g").subscribe("t").autoCommit(true);
+
+try (GroupConsumer c = new GroupConsumer(cfg)) {
+    var batch = c.poll(200);                   // auto commit이 poll 직후 실행됨
+    throw new RuntimeException("processing failed");  // 처리 실패했다고 치자
+}
+// 새 consumer: offset이 이미 5로 커밋되어 있어 처리 안 한 레코드 건너뜀
+Long committed = broker.api().offsetStore().read("g", "t", 0);   // 5</code></pre>
+
+      <h4 class="step">3. 수동 커밋으로 교정</h4>
+<pre><code>cfg.autoCommit(false);
+try (GroupConsumer c = new GroupConsumer(cfg)) {
+    var batch = c.poll(200);
+    processAll(batch);                         // 성공적으로 처리
+    c.commitSync();                            // 이 시점 후에만 커밋
+}</code></pre>
+
+      <h4 class="step">4. 실험</h4>
+      <ul>
+        <li><code>processAll</code> 중간에 예외를 던지도록 만들고 상태 머신 관찰 → 재시작 시 중복 처리 (at-least-once).</li>
+        <li><code>__consumer_offsets</code>가 없는 우리 환경에서 offsetStore를 직접 읽어 확인: <code>broker.api().offsetStore().read("g", "t", 0)</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v10 -->
+  <section id="v10" class="card">
+    <div class="card-head"><h2>v10 — 리플리케이션 / ISR</h2><span class="chip urgent">NotEnoughReplicas</span></div>
+    <p class="desc">follower 지연으로 ISR shrink → <code>min.insync.replicas</code> 미달 → 프로듀서 거부.</p>
+
+    <h3 class="sub">실제 Kafka</h3>
+    <div class="kv">
+      <div class="k">ISR 판단</div><div class="v"><code>replica.lag.time.max.ms</code> 기본 30s</div>
+      <div class="k">min.isr</div><div class="v"><code>min.insync.replicas</code> (토픽 레벨)</div>
+      <div class="k">acks=all 의미</div><div class="v">ISR 모두 확인 — 단 <code>|ISR| ≥ min.isr</code>일 때만</div>
+    </div>
+
+    <div class="callout bad"><strong>자주 틀리는 오진:</strong> "리플리카 3개면 안전" — min.isr=2 보장 없으면 ISR=1일 때 acks=all 거부.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V10_*'</code></pre>
+
+      <h4 class="step">2. ISR state 직접 조작</h4>
+<pre><code>ReplicaManager rm = new ReplicaManager();
+TopicPartition tp = new TopicPartition("t", 0);
+State s = rm.ensure(tp, /*leader=*/1, List.of(1, 2, 3));
+
+rm.onAppend(tp, 100);              // leader LEO=100, followers LEO=0 → HWM=0
+rm.advanceFollower(tp, 2, 100);    // f2 따라잡음
+rm.advanceFollower(tp, 3, 40);     // f3 뒤쳐짐 → HWM = min(100, 100, 40) = 40
+
+// min.insync.replicas=2 체크
+rm.canAppendWithAcksAll(tp, 2);    // true (ISR=3)
+rm.shrinkIsrDueToLag(tp, 2);
+rm.shrinkIsrDueToLag(tp, 3);
+rm.canAppendWithAcksAll(tp, 2);    // false (ISR=1) → acks=all 거부</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>follower 2개를 다시 복구 (<code>rm.growIsr</code>) → HWM 전진 재개.</li>
+        <li><code>recomputeHwm</code> 호출 순서를 바꾸며 HWM 진동을 시뮬.</li>
+        <li>실 Kafka의 <code>replica.lag.time.max.ms</code> 원리: "일정 시간 이상 fetch 못 따라잡으면 ISR 탈락"를 우리 API <code>shrinkIsrDueToLag</code>로 직접 호출.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v11 -->
+  <section id="v11" class="card">
+    <div class="card-head"><h2>v11 — Unclean leader election</h2><span class="chip urgent">HWM 되감김</span></div>
+    <p class="desc">ISR 전멸 후 stale 브로커가 리더로 승격 → HWM 되감기 → 이미 커밋된 메시지 사라짐.</p>
+
+    <table><thead><tr><th>설정</th><th>장점</th><th>단점</th></tr></thead><tbody>
+<tr><td><code>unclean=false</code></td><td>데이터 유실 없음</td><td>파티션 오프라인</td></tr>
+<tr><td><code>unclean=true</code></td><td>가용성 유지</td><td>커밋된 데이터 유실</td></tr>
+</tbody></table>
+
+    <div class="callout">2.0부터 기본 <code>false</code>. 금융/로그 인덱싱 등은 true 쓰기도.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V11_*'</code></pre>
+
+      <h4 class="step">2. 되감김 재현</h4>
+<pre><code>ReplicaManager rm = new ReplicaManager();
+State s = rm.ensure(tp, 1, List.of(1, 2, 3));
+rm.onAppend(tp, 100);
+rm.advanceFollower(tp, 2, 100);
+rm.advanceFollower(tp, 3, 40);     // 3번은 뒤쳐져 있음
+
+// ISR 전멸
+for (int b : List.of(1, 2, 3)) rm.shrinkIsrDueToLag(tp, b);
+
+// unclean=true → 가장 LEO 낮은 3번이 리더 승격 (최악 선택)
+boolean ok = rm.electUncleanLeader(tp, /*uncleanEnabled=*/ true);
+System.out.println(s.highWatermark);   // 40 — 60건 분량 되감김</code></pre>
+
+      <h4 class="step">3. unclean=false</h4>
+<pre><code>boolean ok = rm.electUncleanLeader(tp, /*uncleanEnabled=*/ false);
+// ok == false → 파티션 오프라인. 프로듀서/컨슈머 모두 NOT_LEADER_OR_FOLLOWER</code></pre>
+
+      <h4 class="step">4. 실험</h4>
+      <ul>
+        <li>ISR에 복수 replica가 남아 있을 때 unclean election이 어떻게 동작하는지 (clean 경로) 확인.</li>
+        <li>follower LEO 차이를 5, 50, 500으로 바꿔가며 데이터 손실 범위 측정.</li>
+        <li>운영 판단 연습: 이 파티션에 들어있는 데이터가 (a) 결제 (b) 로그 일 때 각각 어느 정책을 쓸지.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v12 -->
+  <section id="v12" class="card">
+    <div class="card-head"><h2>v12 — 컨트롤러 / 메타데이터</h2><span class="chip success">2 PASS</span></div>
+
+    <div class="kv">
+      <div class="k">ZK 시대</div><div class="v">단일 Controller broker, <code>/controller</code> znode</div>
+      <div class="k">KRaft</div><div class="v">Raft quorum. KIP-500 / 595. 4.x부터 ZK 완전 제거</div>
+      <div class="k">metadata 전파</div><div class="v">UpdateMetadata → MetadataFetch / Delta</div>
+    </div>
+
+    <h4 class="mini">자주 보는 증상</h4>
+    <ul>
+      <li>컨트롤러 장애 후 클라이언트 metadata cache stale → <code>NOT_LEADER_OR_FOLLOWER</code></li>
+      <li>metadata refresh 폭주</li>
+    </ul>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V12_*'</code></pre>
+
+      <h4 class="step">2. epoch 관찰</h4>
+<pre><code>Controller c = new Controller();
+int e1 = c.electLeader("t", 0, 1);   // epoch 1
+int e2 = c.electLeader("t", 0, 2);   // epoch 2 — leader 교체
+System.out.println(c.leaderOf("t", 0));    // 2
+System.out.println(c.epoch());              // 2</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>epoch 숫자가 무엇을 보호하는가? (예: 옛 epoch을 든 프로듀서가 새 리더에 요청 시 거부할 근거)</li>
+        <li>v15-2와의 차이: v12는 단일 컨트롤러, v15-2는 두 개 병존을 시뮬.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v13 -->
+  <section id="v13" class="card">
+    <div class="card-head"><h2>v13 — 리텐션 + 컴팩션</h2><span class="chip urgent">디스크 풀</span></div>
+
+    <div class="kv">
+      <div class="k">DELETE 기준</div><div class="v"><code>retention.ms</code>, <code>retention.bytes</code>, <code>segment.bytes</code></div>
+      <div class="k">COMPACT 기준</div><div class="v"><code>min.cleanable.dirty.ratio</code> 기본 0.5</div>
+      <div class="k">tombstone 삭제</div><div class="v"><code>delete.retention.ms</code> 기본 1일</div>
+    </div>
+
+    <div class="callout warn"><strong>주의:</strong> <code>__consumer_offsets</code> 컴팩션 지연 → 오프셋 복원 시간 증가.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V13_*'</code></pre>
+
+      <h4 class="step">2. 컴팩션 효과 직접 확인</h4>
+<pre><code>broker.logs().createTopic(new TopicConfig("t", 1, 1, -1L, -1L,
+        TopicConfig.CleanupPolicy.COMPACT, 1));
+
+try (Producer p = new Producer(cfg)) {
+    for (int i = 0; i &lt; 5; i++) {
+        p.send(ProducerRecord.of("t", "k1", "v" + i));    // 같은 키 5번
+        p.send(ProducerRecord.of("t", "k2", "v" + i));
+    }
+}
+Retention r = new Retention(broker.logs());
+Map&lt;String,Integer&gt; removed = r.enforce();   // {t=8}  5+5 중 각 키 1건만 남김 → 8건이 중복</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>retentionBytes를 작게 잡고 대량 produce → DELETE 정책이 몇 건을 버릴 수 있는지 카운트.</li>
+        <li>키 종류를 점점 늘려 컴팩션 효율 변화 관찰.</li>
+        <li>본 구현은 <strong>세지기만</strong> 할 뿐 실제 삭제를 수행하지 않음. 실 Kafka는 LogCleaner가 세그먼트 재작성.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v14 -->
+  <section id="v14" class="card">
+    <div class="card-head"><h2>v14 — 운영 트러블</h2><span class="chip urgent">lag 계단 상승</span></div>
+    <p class="desc">CPU/네트워크 여유인데 consumer lag 계단식 상승. 원인은 여럿.</p>
+
+    <h3 class="sub">증상 카탈로그</h3>
+    <table><thead><tr><th>증상</th><th>진단</th><th>해결</th></tr></thead><tbody>
+<tr><td>fetch 지연 튐</td><td>큰 메시지 head-of-line</td><td><code>fetch.max.bytes</code></td></tr>
+<tr><td><code>Too many open files</code></td><td>FD 고갈</td><td>ulimit 증가</td></tr>
+<tr><td>지연만 늘고 에러 없음</td><td>쿼터 스로틀 (침묵)</td><td>JMX produce-throttle-time</td></tr>
+<tr><td>request queue 포화</td><td>IO 스레드 부족</td><td><code>num.io.threads</code></td></tr>
+</tbody></table>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V14_*'</code></pre>
+
+      <h4 class="step">2. 쿼터 스로틀 시뮬</h4>
+<pre><code>broker.api().toggles().coldReadDelayMs = 10;               // 10ms 주입
+broker.api().toggles().coldReadBoundaryOffset = Long.MAX_VALUE;  // 모든 fetch 지연
+
+try (Consumer c = new Consumer("127.0.0.1", port, "t", 0, 0L)) {
+    long t0 = System.currentTimeMillis();
+    c.poll(10);
+    System.out.println(System.currentTimeMillis() - t0);   // ≥10ms
+}</code></pre>
+      <p>클라이언트는 "브로커가 그냥 느리다"고 밖에 느끼지 못함 = 쿼터가 무통보로 스로틀할 때의 운영 시야.</p>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>poll의 <code>maxRecords</code>를 1로 두고 큰 메시지 앞에 두기 — head-of-line 블락 모사.</li>
+        <li>IO 스레드를 2로 낮추고(<code>cfg.withNumIoThreads(2)</code>) 10 consumer 동시 접속 → 시나리오 첫 빌드에서 발견한 데드락 재현.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15 separator -->
+  <section class="card" style="background:linear-gradient(135deg, var(--brand-tint) 0%, var(--card) 70%);">
+    <h2 class="section-title">v15 — 드문 실전 케이스 6종</h2>
+    <p class="desc">검증된 KIP / JIRA / 공식 블로그 출처 기반. 각 케이스 실제 브로커에서 마주치기 어렵지만, 만났을 때 카프카 이해도가 낮으면 원인 규명이 극히 어려움.</p>
+  </section>
+
+  <!-- v15-1 -->
+  <section id="v15-1" class="card">
+    <div class="card-head"><h2>v15-1 — 좀비 트랜잭션 (KIP-890)</h2><span class="chip urgent">희귀</span></div>
+    <p class="desc">트랜잭션 commit 후 지연된 send가 같은 PID/epoch로 수락돼 다음 트랜잭션에 섞임.</p>
+
+    <h4 class="mini">근본 원인</h4>
+    <p>4.0 이전 프로토콜은 commit/abort마다 producer epoch를 bump하지 않음. 동일 PID+epoch 좀비 write가 fence되지 않음.</p>
+
+    <h4 class="mini">수정</h4>
+    <ul>
+      <li><code>transaction.version=2</code> (4.0+ 자동 활성)</li>
+      <li>매 commit/abort 시 epoch bump → 이전 epoch write 거부</li>
+      <li>4.0+ 클라이언트 필요</li>
+    </ul>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-890:+Transactions+Server-Side+Defense" rel="noopener">KIP-890: Transactions Server-Side Defense</a></li>
+        <li>Umbrella JIRA: KAFKA-14402</li>
+        <li><a href="https://current.confluent.io/2024-sessions/fortifying-your-transactions-with-kip-890" rel="noopener">Current 2024 — Fortifying Your Transactions with KIP-890</a></li>
+      </ul>
+    </div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_1_*'</code></pre>
+
+      <h4 class="step">2. 좀비 write 직접 확인</h4>
+<pre><code>TransactionalProducer tp = new TransactionalProducer();
+tp.bumpEpochOnCommit = false;                    // 4.0 이전 동작
+State s = tp.initProducerId();
+
+tp.beginTxn(s);
+int delayedSenderEpoch = s.epoch;
+tp.commit(s);                                    // epoch 그대로 유지
+
+boolean accepted = tp.send(s, delayedSenderEpoch, "t", 0);
+System.out.println(accepted);                    // false (txnState) 이지만
+System.out.println(s.sentPerPartition);          // {t:0=1}  ← 파티션 기록 남음 = 좀비</code></pre>
+
+      <h4 class="step">3. fix 토글</h4>
+<pre><code>tp.bumpEpochOnCommit = true;                     // KIP-890
+// 같은 흐름 → sentPerPartition empty: 좀비 send가 epoch fence로 거부</code></pre>
+
+      <h4 class="step">실험</h4>
+      <ul>
+        <li>두 개의 트랜잭션을 연속으로 실행, 첫 번째의 지연된 send가 두 번째 사이에 끼어드는 시나리오 구성.</li>
+        <li>실 Kafka 로그: <code>InvalidProducerEpochException</code>으로 찍히는지.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15-2 -->
+  <section id="v15-2" class="card">
+    <div class="card-head"><h2>v15-2 — KRaft 좀비 컨트롤러 (KAFKA-15489)</h2><span class="chip urgent">희귀</span></div>
+    <p class="desc">네트워크 파티션 중 고립된 컨트롤러 리더가 stale metadata를 계속 응답. 두 리더 동시 존재.</p>
+
+    <h4 class="mini">근본 원인</h4>
+    <p>pull 기반 Raft. 고립된 리더에 외부 step-down 트리거 없음. Fetch heartbeat 없이 리더 지위 유지.</p>
+
+    <h4 class="mini">수정 (3.7.0)</h4>
+    <p><code>quorum.fetch.timeout.ms</code> 내 majority fetch 미수신이면 신규 election 시작. 고립 리더는 election 실패 반복하며 epoch bump.</p>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://issues.apache.org/jira/browse/KAFKA-15489" rel="noopener">KAFKA-15489 — Stale KRaft metadata during network partition</a></li>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-595:+A+Raft+Protocol+for+the+Metadata+Quorum" rel="noopener">KIP-595 — A Raft Protocol for the Metadata Quorum</a></li>
+      </ul>
+    </div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_2_*'</code></pre>
+
+      <h4 class="step">2. 두 컨트롤러 분기 시뮬</h4>
+<pre><code>Controller isolated = new Controller();
+Controller fresh    = new Controller();
+
+isolated.electLeader("t", 0, /*broker=*/1);       // 파티션 시작, 고립 직후
+// 네트워크 파티션 발생
+fresh.electLeader("t", 0, 1);                     // 새 majority의 신규 기록
+fresh.electLeader("t", 0, 2);                     // leader 교체
+
+// 한 클라이언트가 isolated에 물어보면:
+System.out.println(isolated.leaderOf("t", 0));    // 1  (stale)
+// 다른 클라이언트가 fresh에 물어보면:
+System.out.println(fresh.leaderOf("t", 0));       // 2</code></pre>
+
+      <h4 class="step">3. quorum.fetch.timeout.ms fix 개념</h4>
+<pre><code>long lastFetch = System.currentTimeMillis() - 10_000;
+long timeout   = 5_000;
+if (System.currentTimeMillis() - lastFetch &gt; timeout) {
+    // isolated controller가 스스로 election을 재시작 → stale metadata 응답 중단
+}</code></pre>
+
+      <h4 class="step">실험</h4>
+      <ul>
+        <li>교차 질문이 가능한 "two-leader window"의 지속 시간을 조정하며 클라이언트 에러 양상 변화.</li>
+        <li>운영: 네트워크 파티션 발생 시 어떤 지표(ActiveControllerCount, QuorumFetchLatencyMax 등)가 튀는지 상상해보기.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15-3 -->
+  <section id="v15-3" class="card">
+    <div class="card-head"><h2>v15-3 — Stale broker epoch ISR (KIP-903)</h2><span class="chip urgent">데이터 손실</span></div>
+    <p class="desc">unclean shutdown 후 재기동 브로커가 stale epoch로 ISR 재합류 → 빈 로그 HWM 전파 → 이미 커밋된 데이터 소실.</p>
+
+    <h4 class="mini">수정</h4>
+    <ul>
+      <li>follower가 Fetch에 자신의 broker epoch 포함</li>
+      <li>leader는 metadata cache 일치할 때만 ISR 합류 허용</li>
+      <li>3.5.0, KRaft 모드 한정</li>
+    </ul>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-903:+Replicas+with+stale+broker+epoch+should+not+be+allowed+to+join+the+ISR" rel="noopener">KIP-903 — Replicas with stale broker epoch</a></li>
+        <li><a href="https://issues.apache.org/jira/browse/KAFKA-14617" rel="noopener">KAFKA-14617</a></li>
+        <li><a href="https://kafka.apache.org/blog/2023/06/15/apache-kafka-3.5.0-release-announcement/" rel="noopener">Apache Kafka 3.5.0 Release Announcement</a></li>
+      </ul>
+    </div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_3_*'</code></pre>
+
+      <h4 class="step">2. stale follower 재합류 재현</h4>
+<pre><code>ReplicaManager rm = new ReplicaManager();
+State s = rm.ensure(tp, 1, List.of(1, 2, 3));
+rm.onAppend(tp, 100);
+rm.advanceFollower(tp, 2, 100);
+rm.advanceFollower(tp, 3, 100);              // HWM=100
+
+rm.shrinkIsrDueToLag(tp, 3);                 // 3번 장애
+s.brokerEpoch.put(3, 5);                     // leader가 기억하는 최신 epoch
+
+// 3번이 옛 epoch으로 돌아와 합류 시도 (KIP-903 OFF)
+rm.growIsr(tp, 3, /*stale=*/ 1, /*enforceEpochCheck=*/ false);
+rm.advanceFollower(tp, 3, 0);                // LEO=0 (로그 비어있음)
+System.out.println(s.highWatermark);         // 0 — 커밋된 데이터 손실</code></pre>
+
+      <h4 class="step">3. fix ON</h4>
+<pre><code>rm.growIsr(tp, 3, 1, /*enforceEpochCheck=*/ true);
+System.out.println(s.isr.contains(3));       // false — 거부됨
+System.out.println(s.highWatermark);         // 100 유지</code></pre>
+
+      <h4 class="step">실험</h4>
+      <ul>
+        <li>epoch을 동일하게 두고 LEO만 다르게 합류 시도 → 구현이 어느 지점에서 "stale"을 판단하는지 읽기.</li>
+        <li>KIP-903 이전에 왜 이 조건이 놓쳐졌는지: FetchRequest에 broker epoch가 실려오지 않아 leader가 구분할 수 없었음.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15-4 -->
+  <section id="v15-4" class="card">
+    <div class="card-head"><h2>v15-4 — 멱등 프로듀서 seq 리셋 갭 (KAFKA-12152)</h2><span class="chip urgent">fatal</span></div>
+    <p class="desc">리더 교체 중 epoch bump 시 <strong>in-flight 배치가 없던 파티션의 seq는 리셋 안 됨</strong>. 이후 send가 영구 <code>OUT_OF_ORDER</code> fatal. 프로듀서 재생성 필요.</p>
+
+    <h4 class="mini">수정</h4>
+    <p>epoch bump 시 해당 PID의 모든 파티션 seq 리셋. librdkafka / Java client 양쪽 수정.</p>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://github.com/apache/kafka/pull/9832" rel="noopener">KAFKA-12152 PR #9832</a></li>
+        <li><a href="https://github.com/edenhill/librdkafka/issues/3584" rel="noopener">librdkafka #3584 — fatal out of order sequence number</a></li>
+      </ul>
+    </div>
+
+    <div class="callout bad"><strong>애플리케이션 레벨:</strong> 이 예외는 "프로듀서 객체 버리고 재생성" 로직 필수.</div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_4_*'</code></pre>
+
+      <h4 class="step">2. 버그 재현</h4>
+<pre><code>ProducerConfig cfg = new ProducerConfig()...
+        .partitions(2).idempotence(true);
+try (Producer p = new Producer(cfg)) {
+    p.send(new ProducerRecord("t", 0, null, "A".getBytes()));
+    p.send(new ProducerRecord("t", 1, null, "B".getBytes()));
+
+    // pre-fix: 파티션 0에만 in-flight 있었다고 가정하고 epoch bump
+    broker.api().producerState().bumpEpoch(
+            p.producerId(),
+            Set.of("t:0"),
+            /*resetAll=*/ false);        // 버그 동작
+
+    var state = broker.api().producerState();
+    System.out.println(state.lastSeq(p.producerId(), "t", 0));   // null  (리셋됨)
+    System.out.println(state.lastSeq(p.producerId(), "t", 1));   // 0     (남음!)
+}</code></pre>
+
+      <h4 class="step">3. fix 적용</h4>
+<pre><code>broker.api().producerState().bumpEpoch(
+        p.producerId(), Set.of("t:0"), /*resetAll=*/ true);
+// 두 파티션 모두 null → OUT_OF_ORDER 영구 발생 회피</code></pre>
+
+      <h4 class="step">실험</h4>
+      <ul>
+        <li>resetAll=false 상태에서 파티션 1로 send 시도 → expected=1 got=0이 아니라 expected=1 got=2 같은 불일치 관찰.</li>
+        <li>실 클라이언트는 이 상태를 "fatal"로 판단하고 close() → 프로듀서 재생성이 유일한 복구.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15-5 -->
+  <section id="v15-5" class="card">
+    <div class="card-head"><h2>v15-5 — 티어드 스토리지 cold read (KIP-405)</h2><span class="chip urgent">p99 튐</span></div>
+    <p class="desc">평소 p99 2ms 컨슈머가, 누군가 과거 리플레이 시작하자마자 p99 수백ms로 튐. 브로커 CPU/네트워크 여유.</p>
+
+    <h4 class="mini">근본 원인</h4>
+    <p>원격 티어(S3/HDFS)에서 오래된 세그먼트 페치. 첫 바이트 레이턴시 50–500ms. 원격 fetch가 공용 request handler를 잡으면 tail read에도 레이턴시 전이.</p>
+
+    <h4 class="mini">수정 방향</h4>
+    <ul>
+      <li>원격 fetch용 별도 스레드풀, read-ahead 캐시</li>
+      <li>KIP-1176 (active segment tiering), KIP-1255 (remote read replicas) 후속 개선</li>
+    </ul>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-405:+Kafka+Tiered+Storage" rel="noopener">KIP-405: Kafka Tiered Storage</a></li>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-1176:+Tiered+Storage+for+Active+Log+Segment" rel="noopener">KIP-1176</a></li>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-1255:+Remote+Read+Replicas+for+Kafka+Tiered+Storage" rel="noopener">KIP-1255</a></li>
+      </ul>
+    </div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_5_*'</code></pre>
+
+      <h4 class="step">2. cold vs tail 비교</h4>
+<pre><code>broker.api().toggles().coldReadBoundaryOffset = 80;    // offset &lt; 80 = cold
+broker.api().toggles().coldReadDelayMs        = 50;    // 50ms 주입
+
+// cold read
+long t0 = System.currentTimeMillis();
+try (Consumer c = new Consumer("127.0.0.1", port, "t", 0, 0L)) { c.poll(5); }
+System.out.println("cold: " + (System.currentTimeMillis() - t0) + "ms");  // ≥50
+
+// tail read
+t0 = System.currentTimeMillis();
+try (Consumer c = new Consumer("127.0.0.1", port, "t", 0, 90L)) { c.poll(5); }
+System.out.println("tail: " + (System.currentTimeMillis() - t0) + "ms");  // &lt;10</code></pre>
+
+      <h4 class="step">실험</h4>
+      <ul>
+        <li>tail consumer와 cold consumer를 동시에 돌려 "이웃 영향"을 관찰. 브로커가 같은 스레드풀을 공유하면 tail의 p99이 튐.</li>
+        <li>cold 지연을 500ms로 올려 S3 수준 모사 → 운영에서 왜 "backfill 분리 클러스터"를 쓰는지 감 얻기.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- v15-6 -->
+  <section id="v15-6" class="card">
+    <div class="card-head"><h2>v15-6 — Fetch session eviction 스톰 (KIP-227)</h2><span class="chip urgent">CPU 폭증</span></div>
+    <p class="desc">컨슈머 수가 캐시 슬롯 초과 → 일부가 매 fetch마다 전체 파티션 리스트 재전송. 브로커 CPU/네트워크 폭증.</p>
+
+    <h4 class="mini">수정</h4>
+    <ul>
+      <li>브로커 <code>max.incremental.fetch.session.cache.slots</code> 증가 (기본 1000)</li>
+      <li>follower fetch 세션 privileged 비트로 우선 보장</li>
+      <li>KAFKA-17182: AsyncKafkaConsumer 축출 빈발 버그 수정 진행</li>
+    </ul>
+
+    <div class="sources">
+      <span class="lab">검증된 출처</span>
+      <ul>
+        <li><a href="https://cwiki.apache.org/confluence/display/KAFKA/KIP-227:+Introduce+Incremental+FetchRequests+to+Increase+Partition+Scalability" rel="noopener">KIP-227</a></li>
+        <li><a href="https://github.com/apache/kafka/pull/17700" rel="noopener">KAFKA-17182 PR #17700</a></li>
+        <li><a href="https://phabricator.wikimedia.org/T303324" rel="noopener">Wikimedia T303324 — 실제 운영 사례</a></li>
+      </ul>
+    </div>
+
+    <div class="runbox">
+      <span class="runbox-label">▶ 실행해보기</span>
+      <h4 class="step">1. 자동 테스트</h4>
+<pre><code>./gradlew :scenarios:test --tests 'mk.scenarios.V15_6_*'</code></pre>
+
+      <h4 class="step">2. LRU 축출 직접 관찰</h4>
+<pre><code>FetchSessionCache cache = new FetchSessionCache(4);      // 슬롯 4개
+
+for (int i = 0; i &lt; 4; i++) cache.touch("fetcher-" + i);  // 모두 miss (처음)
+System.out.println(cache.evictions());   // 0
+
+cache.touch("fetcher-4");                                  // LRU(fetcher-0) 축출
+System.out.println(cache.evictions());   // 1
+
+cache.touch("fetcher-0");                                  // miss — full fetch 회귀
+System.out.println(cache.evictions());   // 2  (thrashing)</code></pre>
+
+      <h4 class="step">3. 실험</h4>
+      <ul>
+        <li>capacity를 1000으로 늘리고 100 fetcher로 돌림 → evictions=0.</li>
+        <li>capacity=50, fetcher=60으로 설정 → 지속적 thrashing. 현업에서 JMX <code>IncrementalFetchSessionEvictionsPerSec</code>이 지속 증가하면 이 상태.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-tertiary);font-size:12px;text-align:center;">
+    minimal-kafka · Kafka 4.2.0 학습 · Java 17 · Toss design system
+  </footer>
+</main>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ───── auto-wrap tables for horizontal scroll on narrow screens ─────
+  document.querySelectorAll('table').forEach(function (t) {
+    if (t.parentElement && t.parentElement.classList.contains('table-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+
+  // ───── theme toggle ─────
+  var html = document.documentElement;
+  var toggleBtn = document.getElementById('theme-toggle');
+  var themeIcon = document.getElementById('theme-icon');
+  var themeLabel = document.getElementById('theme-label');
+
+  function applyTheme(mode) {
+    if (mode === 'dark') {
+      html.classList.add('dark');
+      themeIcon.textContent = '☀️';
+      themeLabel.textContent = '라이트';
+    } else {
+      html.classList.remove('dark');
+      themeIcon.textContent = '🌙';
+      themeLabel.textContent = '다크';
+    }
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('mk-theme'); } catch (e) {}
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+
+  toggleBtn.addEventListener('click', function () {
+    var next = html.classList.contains('dark') ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('mk-theme', next); } catch (e) {}
+  });
+
+  // ───── active nav sync via IntersectionObserver ─────
+  var links = document.querySelectorAll('.nav-link');
+  var linkById = {};
+  links.forEach(function (l) {
+    var id = l.getAttribute('data-target');
+    if (id) linkById[id] = l;
+  });
+
+  var sections = document.querySelectorAll('section[id]');
+  var activeId = null;
+  function setActive(id) {
+    if (id === activeId) return;
+    activeId = id;
+    links.forEach(function (l) { l.classList.remove('active'); });
+    var target = linkById[id];
+    if (target) target.classList.add('active');
+  }
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      // pick the first entry that is intersecting, preferring the one closest to top
+      var best = null;
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          if (!best || e.boundingClientRect.top < best.boundingClientRect.top) best = e;
+        }
+      });
+      if (best) setActive(best.target.id);
+    }, { rootMargin: '-20% 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  // ───── mobile hamburger: clone sidebar nav into menu ─────
+  var menu = document.getElementById('mobile-menu');
+  var inner = document.createElement('div');
+  inner.className = 'mobile-menu-inner';
+  document.querySelectorAll('.sidebar .sidebar-section').forEach(function (sec) {
+    inner.appendChild(sec.cloneNode(true));
+  });
+  menu.appendChild(inner);
+
+  var hamburger = document.getElementById('hamburger');
+  var hamText = document.getElementById('hamburger-text');
+  function closeMenu() {
+    menu.classList.remove('open');
+    hamburger.setAttribute('aria-expanded', 'false');
+    hamText.textContent = '메뉴';
+  }
+  function openMenu() {
+    menu.classList.add('open');
+    hamburger.setAttribute('aria-expanded', 'true');
+    hamText.textContent = '닫기';
+  }
+  hamburger.addEventListener('click', function () {
+    if (menu.classList.contains('open')) closeMenu();
+    else openMenu();
+  });
+  menu.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a.nav-link');
+    if (a) closeMenu();
+  });
+})();
+</script>
+</body>
+</html>

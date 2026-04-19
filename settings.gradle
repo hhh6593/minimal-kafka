@@ -1,0 +1,5 @@
+rootProject.name = 'minimal-kafka'
+
+include 'broker'
+include 'clients'
+include 'scenarios'

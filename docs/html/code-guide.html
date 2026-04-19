@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#721FE5">
+<title>코드 딥다이브 · minimal-kafka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --brand: #721FE5; --brand-tint: #F0E8FF;
+  --primary: #030213;
+  --background: #ffffff; --surface-page: #FAFAFA; --surface-subtle: #FAFAF9; --surface-muted: #E8E6E1;
+  --card: #ffffff;
+  --text-primary: #3C3C3C; --text-secondary: #6A6A6A; --text-tertiary: #7A7A7A; --text-disabled: #9B9B9B;
+  --icon-default: #4A5568;
+  --border: rgba(0,0,0,0.08);
+  --destructive: #d4183d; --success: #6B9B7A; --warning: #D97706; --info: #3B82F6; --urgent: #C85A54;
+  --radius: 10px; --radius-lg: 16px; --radius-xl: 20px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 2px 4px rgba(0,0,0,0.08);
+  --duration-fast: 100ms; --duration-normal: 200ms;
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --font-sans: Pretendard, -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+html.dark {
+  color-scheme: dark;
+  --brand: #9B5FFF; --brand-tint: rgba(155, 95, 255, 0.12);
+  --background: #121212; --surface-page: #121212; --surface-subtle: #1E1E1E; --surface-muted: rgba(255,255,255,0.08);
+  --card: #1E1E1E;
+  --text-primary: #E0E0E0; --text-secondary: #A0A0A0; --text-tertiary: #808080; --text-disabled: #555555;
+  --icon-default: #909090;
+  --border: rgba(255,255,255,0.08);
+  --destructive: #FF5C5C; --success: #8FBF9A; --warning: #FFB347; --info: #64B5F6; --urgent: #E08B86;
+  --shadow-card: none; --shadow-card-hover: none;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: var(--font-sans); font-size: 15px; line-height: 1.6; color: var(--text-primary); background: var(--surface-page); -webkit-font-smoothing: antialiased; }
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+code, pre { font-family: var(--font-mono); }
+
+.app { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+.main { min-width: 0; padding: 32px 40px 120px; max-width: 900px; width: 100%; }
+.card { min-width: 0; background: var(--card); border-radius: var(--radius-xl); padding: 28px; box-shadow: var(--shadow-card); margin-bottom: 24px; transition: box-shadow var(--duration-normal) var(--ease-default); }
+.card:hover { box-shadow: var(--shadow-card-hover); }
+pre { max-width: 100%; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: 12px 0; }
+pre code { background: none; padding: 0; font-size: inherit; color: var(--text-primary); font-weight: 500; }
+
+.sidebar { position: sticky; top: 0; height: 100vh; background: var(--card); border-right: 1px solid var(--border); padding: 24px 18px; overflow-y: auto; z-index: 20; }
+.sidebar-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 4px 6px; }
+.sidebar-brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; color: #fff; font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+.sidebar-brand .name { font-weight: 700; font-size: 15px; color: var(--text-primary); letter-spacing: -0.01em; }
+.sidebar-brand .tag { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+.sidebar-section { margin-bottom: 18px; }
+.sidebar-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin: 0 6px 6px; font-weight: 600; }
+.nav-link { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); transition: background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default); cursor: pointer; min-height: 32px; }
+.nav-link:hover { background: var(--surface-muted); color: var(--text-primary); text-decoration: none; }
+.nav-link.active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
+.nav-link .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-disabled); flex-shrink: 0; }
+.nav-link.active .dot { background: var(--brand); }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; }
+.topbar-title { font-size: 13px; color: var(--text-tertiary); font-weight: 500; }
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text-secondary); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; min-height: 36px; transition: all var(--duration-fast) var(--ease-default); }
+.theme-toggle:hover { color: var(--text-primary); background: var(--surface-muted); }
+.backlink { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text-secondary); font-size: 12px; font-weight: 600; min-height: 36px; }
+.backlink:hover { color: var(--brand); text-decoration: none; }
+
+h1, h2, h3, h4 { margin: 0; color: var(--text-primary); letter-spacing: -0.01em; }
+h1 { font-size: 28px; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+h2 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
+h3 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; }
+h4.mini { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); font-weight: 600; margin: 18px 0 8px; }
+p { margin: 0 0 10px; }
+p, li, td, th { overflow-wrap: anywhere; word-break: break-word; }
+
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 6px; flex-wrap: wrap; }
+.desc { color: var(--text-secondary); font-size: 14px; margin: 8px 0 16px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-muted); color: var(--text-secondary); border: 1px solid var(--border); }
+.chip.brand { background: var(--brand-tint); color: var(--brand); border: none; }
+.chip.mono { font-family: var(--font-mono); font-size: 10px; background: var(--surface-subtle); color: var(--text-tertiary); }
+
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+th { color: var(--text-tertiary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+tbody tr:last-child td { border-bottom: 0; }
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+ul, ol { margin: 8px 0 14px; padding-left: 22px; }
+li { margin-bottom: 4px; color: var(--text-primary); font-size: 14px; }
+li::marker { color: var(--text-disabled); }
+
+code { font-size: 13px; padding: 2px 6px; background: var(--surface-muted); border-radius: 4px; color: var(--text-primary); font-weight: 500; overflow-wrap: anywhere; word-break: break-word; }
+
+.kv { display: grid; grid-template-columns: 160px 1fr; gap: 6px 16px; font-size: 13px; padding: 10px 0; }
+.kv .k { color: var(--text-tertiary); font-weight: 500; }
+.kv .v { color: var(--text-primary); }
+
+.callout { background: var(--brand-tint); border-left: 3px solid var(--brand); padding: 14px 18px; border-radius: var(--radius); font-size: 13.5px; color: var(--text-primary); margin: 14px 0; }
+.callout.warn { background: rgba(217, 119, 6, 0.08); border-left-color: var(--warning); }
+.callout.bad { background: rgba(200, 90, 84, 0.08); border-left-color: var(--urgent); }
+
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.trio .panel { background: var(--surface-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.trio .panel h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin: 0 0 8px; color: var(--text-tertiary); }
+.trio .panel.simp h4 { color: var(--urgent); }
+.trio .panel.keep h4 { color: var(--success); }
+.trio .panel.real h4 { color: var(--brand); }
+.trio .panel p { font-size: 12.5px; color: var(--text-primary); margin: 0; line-height: 1.55; }
+
+.filepath { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); padding: 4px 0; }
+
+.mobile-nav { display: none; position: sticky; top: 0; z-index: 30; background: var(--card); border-bottom: 1px solid var(--border); }
+.mobile-nav-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; gap: 12px; }
+.mobile-nav-top .brand-row { display: flex; align-items: center; gap: 10px; }
+.mobile-nav-top .brand-row .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; color: #fff; font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+.mobile-nav-top .name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.hamburger { border: 1px solid var(--border); background: transparent; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; min-height: 36px; min-width: 44px; }
+.mobile-menu { max-height: 0; overflow: hidden; background: var(--card); transition: max-height var(--duration-normal) var(--ease-default); border-top: 1px solid transparent; }
+.mobile-menu.open { max-height: 70vh; overflow-y: auto; border-top: 1px solid var(--border); }
+.mobile-menu-inner { padding: 8px 12px 16px; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .mobile-nav { display: block; }
+  .main { padding: 20px 18px 80px; }
+  .card { padding: 22px 20px; border-radius: var(--radius-lg); margin-bottom: 18px; }
+  .card-head h2 { font-size: 17px; }
+  h1 { font-size: 22px; }
+  .kv { grid-template-columns: 120px 1fr; font-size: 12.5px; }
+  pre { font-size: 11.5px; }
+  table { font-size: 12px; }
+  th, td { padding: 8px; }
+  .trio { grid-template-columns: 1fr; }
+}
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="mobile-nav">
+  <div class="mobile-nav-top">
+    <div class="brand-row">
+      <div class="logo">mk</div>
+      <div>
+        <div class="name">코드 딥다이브</div>
+        <div style="font-size:11px;color:var(--text-tertiary)">minimal-kafka 구현 가이드</div>
+      </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-expanded="false" aria-controls="mobile-menu">메뉴</button>
+  </div>
+  <div class="mobile-menu" id="mobile-menu"></div>
+</div>
+
+<div class="app">
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">mk</div>
+    <div>
+      <div class="name">코드 딥다이브</div>
+      <div class="tag">minimal-kafka 구현 가이드</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>시작</h4>
+    <a class="nav-link" href="index.html"><span class="dot"></span>← 메인으로</a>
+    <a class="nav-link" href="#lifecycle" data-target="lifecycle"><span class="dot"></span>전체 라이프사이클</a>
+    <a class="nav-link" href="#reading-guide" data-target="reading-guide"><span class="dot"></span>이 문서 읽는 법</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>브로커</h4>
+    <a class="nav-link" href="#broker" data-target="broker"><span class="dot"></span>Broker 파사드</a>
+    <a class="nav-link" href="#network" data-target="network"><span class="dot"></span>네트워크 계층</a>
+    <a class="nav-link" href="#wire" data-target="wire"><span class="dot"></span>와이어 프로토콜</a>
+    <a class="nav-link" href="#api" data-target="api"><span class="dot"></span>API 라우터</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>로그 스토리지</h4>
+    <a class="nav-link" href="#log-iface" data-target="log-iface"><span class="dot"></span>Log 인터페이스</a>
+    <a class="nav-link" href="#in-memory" data-target="in-memory"><span class="dot"></span>InMemoryLog</a>
+    <a class="nav-link" href="#segmented" data-target="segmented"><span class="dot"></span>SegmentedLog</a>
+    <a class="nav-link" href="#log-manager" data-target="log-manager"><span class="dot"></span>LogManager</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>클라이언트</h4>
+    <a class="nav-link" href="#producer" data-target="producer"><span class="dot"></span>Producer</a>
+    <a class="nav-link" href="#partitioner" data-target="partitioner"><span class="dot"></span>Partitioner</a>
+    <a class="nav-link" href="#consumer" data-target="consumer"><span class="dot"></span>GroupConsumer</a>
+    <a class="nav-link" href="#assignors" data-target="assignors"><span class="dot"></span>Assignors</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>서버사이드 상태</h4>
+    <a class="nav-link" href="#coordinator" data-target="coordinator"><span class="dot"></span>GroupCoordinator</a>
+    <a class="nav-link" href="#offset-store" data-target="offset-store"><span class="dot"></span>OffsetStore</a>
+    <a class="nav-link" href="#producer-state" data-target="producer-state"><span class="dot"></span>ProducerStateManager</a>
+    <a class="nav-link" href="#txn" data-target="txn"><span class="dot"></span>TransactionalProducer</a>
+    <a class="nav-link" href="#replica" data-target="replica"><span class="dot"></span>ReplicaManager</a>
+    <a class="nav-link" href="#controller" data-target="controller"><span class="dot"></span>Controller</a>
+    <a class="nav-link" href="#retention" data-target="retention"><span class="dot"></span>Retention</a>
+    <a class="nav-link" href="#fetch-session" data-target="fetch-session"><span class="dot"></span>FetchSessionCache</a>
+  </div>
+
+  <div class="sidebar-section">
+    <h4>테스트 전략</h4>
+    <a class="nav-link" href="#toggles" data-target="toggles"><span class="dot"></span>시나리오 + 토글</a>
+    <a class="nav-link" href="#evolution" data-target="evolution"><span class="dot"></span>버전 간 진화 규칙</a>
+  </div>
+</aside>
+
+<main class="main">
+
+  <div class="topbar">
+    <span class="topbar-title">코드 딥다이브 · 58 Java 파일 · 51 테스트</span>
+    <div style="display:flex;gap:8px;">
+      <a class="backlink" href="index.html">← 메인</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="테마 전환">
+        <span id="theme-icon">🌙</span><span id="theme-label">다크</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- lifecycle -->
+  <section id="lifecycle" class="card">
+    <div class="card-head"><h1>minimal-kafka 전체 라이프사이클</h1></div>
+    <p class="desc">한 번의 Produce → Fetch 왕복이 시스템을 어떻게 통과하는지부터 본다. 이 흐름이 모든 버전의 공통 baseline이며, 이후 각 버전은 이 경로의 특정 구간을 확장하거나 고장 낸다.</p>
+
+    <h3>1) 브로커 기동</h3>
+<pre><code>new Broker(KafkaConfig.defaults().withPort(0)).start();
+// 내부에서 벌어지는 일:
+// - LogManager 생성 (스토리지 엔진 선택, 디스크 스캔 v2+)
+// - ApiHandler 생성 (GroupCoordinator, OffsetStore, ProducerStateManager 동봉)
+// - Acceptor.start()
+//   - ServerSocketChannel bind
+//   - accept 전용 1 스레드 + IO ThreadPool (기본 64) 시작
+//   - boundPort 확정 (port=0이면 OS 할당)</code></pre>
+
+    <h3>2) Produce 요청의 여정</h3>
+<pre><code>// client 측
+Producer p = new Producer(cfg);
+p.send(ProducerRecord.of("demo", "k1", "hello"));
+// 1. Partitioner → 파티션 결정
+// 2. (idempotence on이면) PID/epoch/baseSequence 첨부
+// 3. JSON 프레임 = 4B big-endian length + JSON payload
+// 4. 블로킹 소켓으로 1 요청 전송
+
+// broker 측
+// 5. Acceptor.accept() → SocketChannel → IO ThreadPool.submit(ConnectionHandler)
+// 6. ConnectionHandler.run():
+//    - Wire.readFrameBlocking(channel) → JsonNode
+//    - ApiHandler.handle(req)
+//      → switch("PRODUCE") → handleProduce()
+//      → (idempotence) ProducerStateManager.check()
+//      → LogManager.getOrCreate(topic, partition) → Log
+//      → log.append(batch) → baseOffset
+//      → (v10+) ReplicaManager.onAppend(tp, newLeo) → HWM 재계산
+//    - Wire.writeFrameBlocking(response)
+//    - 연결 유지, 다음 요청 읽기</code></pre>
+
+    <h3>3) Consumer 그룹의 여정 (v7+)</h3>
+<pre><code>GroupConsumer c = new GroupConsumer(cfg);
+// 생성자 내부:
+// - JOIN_GROUP → GroupCoordinator.handleJoinGroup()
+//   - memberId 할당, generation++
+//   - leader 지정 (memberId 사전순 첫 번째)
+// - (leader만) METADATA → 파티션 수 조회 → Assignors.X(...) 호출 → plan
+// - SYNC_GROUP (leader의 plan, 또는 빈 요청)
+//   → GroupCoordinator가 멤버별 assignment 반환
+//
+// 각 poll():
+// - HEARTBEAT (실패 시 rejoin)
+// - 할당 파티션별 FETCH
+// - autoCommit=true면 OFFSET_COMMIT</code></pre>
+
+    <h3>4) 종료</h3>
+<pre><code>broker.close()  → Acceptor 중지 + LogManager.close (fsync)
+broker.kill()   → Acceptor 중지 + LogManager.uncleanClose (fsync 생략, SIGKILL 시뮬)</code></pre>
+
+    <div class="callout"><strong>이 라이프사이클의 핵심:</strong> Produce/Fetch가 블로킹 JSON RPC 하나씩 처리되며 모든 서버사이드 상태가 in-proc 객체에 저장된다. 실제 Kafka도 같은 계층 구분을 갖지만 각 레이어가 훨씬 더 깊고 비동기/파이프라인화되어 있다.</div>
+  </section>
+
+  <!-- reading guide -->
+  <section id="reading-guide" class="card">
+    <div class="card-head"><h2>이 문서 읽는 법</h2></div>
+    <p class="desc">각 컴포넌트 섹션은 4개 블록으로 구성된다.</p>
+    <div class="trio">
+      <div class="panel real"><h4>우리 구현</h4><p>실제 코드 스니펫과 파일 경로. 클래스/메서드/필드가 왜 존재하는지.</p></div>
+      <div class="panel"><h4>실제 Kafka</h4><p>대응되는 Apache Kafka 4.2.0 클래스 / 설정키.</p></div>
+      <div class="panel simp"><h4>단순화한 것</h4><p>학습 목적에 안 필요해 의도적으로 잘라낸 부분.</p></div>
+    </div>
+    <div class="trio">
+      <div class="panel keep"><h4>유지한 핵심</h4><p>잘라내도 <em>이것은 남겨야</em> 시나리오가 교육적 가치를 갖는 부분. 핵심 "판단 포인트".</p></div>
+      <div class="panel"><h4>코드 포인트</h4><p>관심 있는 동작을 찾으려면 어느 파일 어느 줄을 보라.</p></div>
+      <div class="panel"><h4>자주 틀리는 오진</h4><p>이 구조를 본 사람이 현업에서 헷갈리는 지점.</p></div>
+    </div>
+    <p>처음 읽는다면 위에서 아래로 순서대로 따라가면 자연스럽게 Kafka 라이프사이클을 훑게 된다. 특정 시나리오가 궁금하면 해당 컴포넌트 섹션으로 점프.</p>
+  </section>
+
+  <!-- ========================================================= broker ==== -->
+  <section id="broker" class="card">
+    <div class="card-head"><h2>Broker 파사드</h2><span class="chip mono">broker/Broker.java</span></div>
+    <p class="desc">브로커의 "얼굴". 내부 컴포넌트를 조립하고 외부에는 <code>start() / close() / kill()</code>만 노출한다.</p>
+
+    <h4 class="mini">우리 구현</h4>
+<pre><code>public final class Broker implements AutoCloseable {
+    private final KafkaConfig config;
+    private final LogManager logs;
+    private final ApiHandler api;
+    private final Acceptor acceptor;
+
+    public Broker(KafkaConfig config) {
+        this.config   = config;
+        this.logs     = new LogManager(config.logConfig());
+        this.api      = new ApiHandler(logs);
+        this.acceptor = new Acceptor(config, api);
+    }
+    public void start() throws IOException { acceptor.start(); }
+    public void close() { acceptor.close(); logs.close(); }
+    /** v2 scenario hook: SIGKILL-like unclean shutdown. */
+    public void kill()  { acceptor.close(); logs.uncleanClose(); }
+}</code></pre>
+
+    <h4 class="mini">설계 이유</h4>
+    <ul>
+      <li><strong>생성자에서 전부 와이어링</strong>: DI 프레임워크 없이 new로 조립. 어떤 객체가 어떤 객체를 소유하는지 즉시 보임.</li>
+      <li><strong><code>kill()</code>은 교육용 훅</strong>: v2 시나리오에서 unclean shutdown을 재현하려면 fsync를 건너뛰고 close해야 함. 실제 프로세스 SIGKILL을 JVM 내에서 테스트하기 어려우므로 "의도된 뒷문"을 설치.</li>
+      <li><strong><code>api()</code> / <code>logs()</code> 게터 공개</strong>: 시나리오 테스트가 브로커 내부 상태(토글, 프로듀서 상태, 오프셋 저장소)를 직접 조작하기 위해 필요. 프로덕션이라면 감추어야 할 것을 일부러 뚫어둠.</li>
+    </ul>
+
+    <h4 class="mini">실제 Kafka 대응</h4>
+    <p><code>kafka.server.KafkaBroker</code> (KRaft) / <code>KafkaServer</code> (ZK legacy). 실 구현은 SocketServer, KafkaRequestHandlerPool, ReplicaManager, GroupCoordinator, TransactionCoordinator, DelegationTokenManager, QuotaManagers, LogManager, KafkaController, KafkaScheduler 등을 조립하고 AdminManager, AutoTopicCreationManager, MetadataCache, BrokerTopicStats, HealthCheck까지 와이어링.</p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>Scheduler, Quota, TxnCoordinator, AdminManager, MetadataCache 등 10+ 서브시스템 제거. close 절차도 graceful shutdown timer 없이 즉시 중단.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"브로커 = 네트워크 + 로그 + API 핸들러"라는 3층 구조와 start/close 수명 주기의 명시성.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>KafkaBroker#startup()</code> 순서와 동일한 방향: 로그 → 메타데이터 → 네트워크.</p></div>
+    </div>
+  </section>
+
+  <!-- network -->
+  <section id="network" class="card">
+    <div class="card-head"><h2>네트워크 계층: Acceptor + ConnectionHandler</h2><span class="chip mono">broker/network/*</span></div>
+    <p class="desc">블로킹 NIO. 1 acceptor 스레드 + N IO 스레드 풀. 실제 Kafka의 SocketServer 구조를 단일 단계로 축약.</p>
+
+    <h4 class="mini">Acceptor.start() 핵심</h4>
+<pre><code>server = ServerSocketChannel.open();
+server.socket().setReuseAddress(true);
+server.bind(new InetSocketAddress(config.host(), config.port()));
+boundPort = server.socket().getLocalPort();
+server.configureBlocking(true);
+
+ioPool     = Executors.newFixedThreadPool(config.numIoThreads(), namedFactory("mk-io"));
+acceptLoop = Executors.newSingleThreadExecutor(namedFactory("mk-acceptor"));
+acceptLoop.submit(this::loop);
+
+// loop():
+while (running.get()) {
+    SocketChannel ch = server.accept();   // 블로킹
+    ioPool.submit(new ConnectionHandler(ch, api));
+}</code></pre>
+
+    <h4 class="mini">ConnectionHandler.run() 핵심</h4>
+<pre><code>try (SocketChannel ch = channel) {
+    ch.configureBlocking(true);
+    while (ch.isOpen()) {
+        JsonNode req;
+        try { req = Wire.readFrameBlocking(ch); }
+        catch (EOFException eof) { break; }       // 클라이언트 close
+        JsonNode resp = api.handle(req);
+        Wire.writeFrameBlocking(ch, resp);
+    }
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>파이프라인 / 셀렉터 / non-blocking IO 전부 제거. 연결당 1 스레드가 read→handle→write를 순차 반복.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"accept 전담 스레드 + IO 작업용 스레드풀" 분리는 유지. <code>queued.max.requests</code>·<code>num.io.threads</code>의 개념적 출발점.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.network.SocketServer</code>의 Acceptor + N Processor (네트워크 스레드) + KafkaRequestHandlerPool (M IO 스레드) 3층 구조.</p></div>
+    </div>
+
+    <h4 class="mini">왜 연결당 스레드?</h4>
+    <p>교육적 명료성. 연결 수 &times; 스레드 수로 O(N) 자원을 쓰지만, 한 스레드의 스택만 읽으면 "이 커넥션에서 무슨 일이 벌어지는지" 완전히 파악된다. 실제 Kafka는 셀렉터 기반이라 스택 트레이스만으로 흐름 추적이 훨씬 어렵다.</p>
+
+    <div class="callout warn"><strong>시나리오 함정:</strong> 기본 IO 스레드 64개. v7(10 consumers)에서 2로 두었더니 데드락(블로킹 핸들러가 풀을 독점). 이 때문에 <code>KafkaConfig.defaults().numIoThreads=64</code>로 올렸다. 실제 Kafka는 이런 이유로 <code>num.io.threads</code> 튜닝이 운영 주제가 된다.</div>
+  </section>
+
+  <!-- wire -->
+  <section id="wire" class="card">
+    <div class="card-head"><h2>와이어 프로토콜</h2><span class="chip mono">broker/protocol/Wire.java</span></div>
+    <p class="desc">4B big-endian length prefix + JSON payload. <code>tcpdump -A</code>로 평문 확인 가능.</p>
+
+<pre><code>public static JsonNode readFrameBlocking(SocketChannel ch) throws IOException {
+    ByteBuffer header = ByteBuffer.allocate(4);
+    readFully(ch, header);
+    int len = header.flip().getInt();
+    if (len &lt;= 0 || len &gt; MAX_FRAME_BYTES) throw new IOException("bad frame length " + len);
+    ByteBuffer body = ByteBuffer.allocate(len);
+    readFully(ch, body);
+    return JSON.readTree(body.flip().array());
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>ApiKey short, ApiVersion short, correlationId int, clientId string 제거. schema-per-version 시스템 없음. 바이너리 struct 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>길이 prefix + 구조화된 바디. 실제 Kafka 와이어 프레이밍과 동일한 "Length-delimited messaging" 골격.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>org.apache.kafka.common.protocol.Protocol</code>, <code>RequestHeader</code>, <code>ApiMessageType</code>. 각 Api마다 버전별 Schema 정의.</p></div>
+    </div>
+
+    <h4 class="mini">v4에서 바이너리로 전환 예정이었던 이유</h4>
+    <p>계획: 실 <code>kafka-clients</code> 4.2.0이 우리 브로커에 붙어 들어올 수 있도록 Produce v9, Fetch v13 등을 서브셋 구현. 본 저장소에서는 교육 효과 대비 구현 비용이 커서 JSON 유지. 바이너리 전환은 <em>어떻게</em>와 <em>왜</em>의 탐구 포인트로만 남긴다.</p>
+  </section>
+
+  <!-- api -->
+  <section id="api" class="card">
+    <div class="card-head"><h2>ApiHandler — 단일 라우터</h2><span class="chip mono">broker/api/ApiHandler.java</span></div>
+    <p class="desc">들어오는 요청의 <code>"api"</code> 필드로 switch. 각 케이스에서 담당 서브시스템에 위임.</p>
+
+<pre><code>public JsonNode handle(JsonNode req) {
+    String api = req.path("api").asText("");
+    try {
+        return switch (api) {
+            case ApiKeys.PRODUCE          -&gt; handleProduce(req);
+            case ApiKeys.FETCH            -&gt; handleFetch(req);
+            case ApiKeys.METADATA         -&gt; handleMetadata();
+            case ApiKeys.CREATE_TOPIC     -&gt; handleCreateTopic(req);
+            case ApiKeys.INIT_PRODUCER_ID -&gt; producers.handleInitProducerId(req);
+            case ApiKeys.FIND_COORDINATOR -&gt; coordinator.handleFindCoordinator(req);
+            case ApiKeys.JOIN_GROUP       -&gt; coordinator.handleJoinGroup(req);
+            case ApiKeys.SYNC_GROUP       -&gt; coordinator.handleSyncGroup(req);
+            case ApiKeys.HEARTBEAT        -&gt; coordinator.handleHeartbeat(req);
+            case ApiKeys.LEAVE_GROUP      -&gt; coordinator.handleLeaveGroup(req);
+            case ApiKeys.OFFSET_COMMIT    -&gt; offsets.handleCommit(req);
+            case ApiKeys.OFFSET_FETCH     -&gt; offsets.handleFetch(req);
+            default -&gt; error("unknown api: " + api);
+        };
+    } catch (Exception ex) {
+        LOG.error("handler failed for api={}", api, ex);
+        return error(ex.getClass().getSimpleName() + ": " + ex.getMessage());
+    }
+}</code></pre>
+
+    <h4 class="mini">handleProduce 내부 순서</h4>
+    <ol>
+      <li>(v5+) <code>ProducerStateManager.check(pid, epoch, topic, partition, baseSeq, count)</code> — 멱등성 검증</li>
+      <li>records 디코드 (base64 → <code>Batch.Entry</code>)</li>
+      <li><code>LogManager.getOrCreate(topic, partition)</code> — 로그 얻기</li>
+      <li><code>log.append(entries)</code> — baseOffset 반환</li>
+      <li>(v5+) <code>producers.advance(...)</code> — seq 전진</li>
+      <li>응답: <code>{ok, topic, partition, baseOffset, logEndOffset}</code></li>
+    </ol>
+
+    <h4 class="mini">handleFetch 내부 순서</h4>
+    <ol>
+      <li>(v15-5) <code>coldReadDelayMs</code> 토글 검사 → <code>Thread.sleep()</code> 주입</li>
+      <li><code>LogManager.get(topic, partition)</code> — 없으면 빈 응답</li>
+      <li><code>log.read(offset, maxRecords)</code></li>
+      <li>records 인코드 + highWatermark 반환</li>
+    </ol>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>ApiVersions 네고, 권한 검사, 쿼터, 버전별 schema 분기 전부 제거. switch 분기 10개가 전부.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"단일 진입점에서 api 태그로 서브시스템 dispatch" — 실 Kafka의 <code>KafkaApis</code>와 동일한 설계 원칙.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.server.KafkaApis#handle(RequestChannel.Request)</code> — 60+ api 처리.</p></div>
+    </div>
+  </section>
+
+  <!-- log-iface -->
+  <section id="log-iface" class="card">
+    <div class="card-head"><h2>Log 인터페이스</h2><span class="chip mono">broker/log/Log.java</span></div>
+    <p class="desc">스토리지 엔진 교체 포인트. v1 InMemory / v2+ Segmented.</p>
+
+<pre><code>public interface Log extends AutoCloseable {
+    record LogRecord(long offset, long timestamp, byte[] key, byte[] value) {}
+
+    long append(List&lt;Batch.Entry&gt; batch) throws IOException;
+    List&lt;LogRecord&gt; read(long fromOffset, int maxRecords) throws IOException;
+    long logEndOffset();
+    default void flush() throws IOException {}
+    default void uncleanClose() throws IOException { close(); }
+}</code></pre>
+
+    <h4 class="mini">왜 인터페이스?</h4>
+    <p>v2에서 디스크 세그먼트 도입 시 v1 테스트를 깨뜨리지 않으려면 치환 가능한 경계가 필요했다. <code>LogConfig.Storage</code> enum이 이 선택을 결정하고, <code>LogManager</code>가 공장 역할.</p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>Transactional markers, abort index, leader epoch cache, time index 없음. record format은 단순 encode/decode.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>append-only + monotonic offset + 인덱스로 position 찾기 + flush/uncleanClose 분리. 4개 개념이 실 Kafka 로그 엔진의 뼈대와 동일.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.log.UnifiedLog</code> / <code>LogSegment</code> / <code>OffsetIndex</code>. LogRecord 대응은 <code>RecordBatch</code> / <code>Record</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- in-memory -->
+  <section id="in-memory" class="card">
+    <div class="card-head"><h2>InMemoryLog — v1 기본</h2><span class="chip mono">broker/log/InMemoryLog.java</span></div>
+    <p class="desc"><code>ArrayList&lt;LogRecord&gt;</code> + <code>ReentrantLock</code>. 가장 단순한 append-only 로그.</p>
+
+<pre><code>@Override
+public long append(List&lt;Batch.Entry&gt; batch) {
+    lock.lock();
+    try {
+        long base = records.size();
+        long now = System.currentTimeMillis();
+        for (Batch.Entry e : batch) {
+            records.add(new LogRecord(records.size(), now, e.key(), e.value()));
+        }
+        return base;
+    } finally { lock.unlock(); }
+}</code></pre>
+
+    <h4 class="mini">왜 ArrayList?</h4>
+    <p>오프셋 = 인덱스. O(1) read + 파일 I/O 없음으로 v1 시나리오에서 디스크 이슈로부터 격리. 프로세스 종료 = 데이터 전량 증발. 이 "영속성 없음"이 v2의 출발 문제의식이 된다.</p>
+  </section>
+
+  <!-- segmented -->
+  <section id="segmented" class="card">
+    <div class="card-head"><h2>SegmentedLog + Segment</h2><span class="chip mono">broker/log/SegmentedLog.java</span></div>
+    <p class="desc">실 Kafka 로그 엔진의 축소판. 파일 세그먼트 + sparse offset index.</p>
+
+    <h4 class="mini">디스크 레이아웃</h4>
+<pre><code>data/&lt;topic&gt;-&lt;partition&gt;/
+  0000000000.log   record stream, base offset이 파일명
+  0000000000.idx   sparse index { relOffset(int) | fileOffset(int) } 엔트리
+  0000000512.log   세그먼트 롤 후 다음 파일
+  0000000512.idx</code></pre>
+
+    <h4 class="mini">append 경로</h4>
+<pre><code>// SegmentedLog.append()
+Segment active = activeSegment();
+for (Batch.Entry e : batch) {
+    byte[] buf = encode(logEnd, now, e.key(), e.value());
+    if (active.size() + buf.length &gt; segmentBytes &amp;&amp; active.size() &gt; 0) {
+        Segment rolled = Segment.create(dir, logEnd);     // 롤링
+        segments.add(rolled);
+        active = rolled;
+    }
+    active.append(logEnd, buf);
+    logEnd++;
+    pendingSinceFlush++;
+}
+if (pendingSinceFlush &gt;= flushEveryNMessages) {
+    active.flush();                                       // fsync
+    pendingSinceFlush = 0;
+}</code></pre>
+
+    <h4 class="mini">sparse index (v2의 핵심 교훈)</h4>
+    <p>레코드마다 인덱스 엔트리를 만들지 않는다. 대략 4KB (<code>INDEX_INTERVAL_BYTES</code>) 단위로 "이 오프셋은 파일의 이 위치에 있다"를 찍는다. <code>positionFor(offset)</code>은 인덱스에서 가장 가까운 하한을 찾아 해당 위치부터 순차 스캔.</p>
+<pre><code>int positionFor(long offset) {
+    int pos = 0;
+    int relOff = (int)(offset - baseOffset);
+    for (int[] e : index) {
+        if (e[0] &lt;= relOff) pos = e[1];
+        else break;
+    }
+    return pos;
+}</code></pre>
+
+    <h4 class="mini">flush vs uncleanClose</h4>
+<pre><code>public void close() throws IOException {
+    if (flushOnClose) for (Segment s : segments) s.flush();
+    for (Segment s : segments) s.close();
+}
+public void uncleanClose() throws IOException {
+    // 의도적으로 flush 생략 — SIGKILL / 크래시 시뮬
+    for (Segment s : segments) s.close();
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>mmap 없이 FileChannel positional read. TimeIndex 없음. 레코드 배치 압축 없음. producer state snapshot / leader epoch checkpoint 없음. 세그먼트 삭제 / 컴팩션은 <code>Retention</code>에 위임.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>(1) 세그먼트 롤링 기준, (2) sparse index 전략, (3) fsync 정책 토글, (4) 재기동 시 스캔으로 logEnd 복원 — 4가지가 실 Kafka의 <em>진짜 위험 지점</em>과 정확히 같다.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>LogSegment</code>, <code>OffsetIndex</code> (memory-mapped), <code>UnifiedLog</code>의 flush 정책 (<code>log.flush.interval.messages/ms</code>).</p></div>
+    </div>
+
+    <div class="callout bad"><strong>v15-3 연결:</strong> <code>scanLogEnd()</code>가 있기에 재기동 시 logEnd를 복원한다. 하지만 unclean shutdown으로 페이지 캐시 미플러시 상태면 scan 결과가 실제 커밋됐던 오프셋보다 뒤처질 수 있고, 이 상태의 브로커가 다시 ISR에 합류하면 HWM이 되감긴다 — 바로 KIP-903이 해결한 문제.</div>
+  </section>
+
+  <!-- log-manager -->
+  <section id="log-manager" class="card">
+    <div class="card-head"><h2>LogManager + TopicConfig</h2><span class="chip mono">broker/log/LogManager.java</span></div>
+    <p class="desc">토픽/파티션 → Log 매핑. 디스크 스캔으로 재기동 시 기존 로그를 연다.</p>
+
+    <h4 class="mini">핵심 자료구조</h4>
+<pre><code>private final LogConfig logConfig;
+private final Map&lt;String, TopicConfig&gt; topics = new ConcurrentHashMap&lt;&gt;();
+private final Map&lt;TopicPartition, Log&gt; logs = new ConcurrentHashMap&lt;&gt;();
+
+public Log getOrCreate(String topic, int partition) {
+    TopicConfig cfg = topics.computeIfAbsent(topic, n -&gt; TopicConfig.defaults(n, 1));
+    if (partition &gt;= cfg.partitionCount()) {
+        // v1 호환: 자동 파티션 확장
+        TopicConfig grown = TopicConfig.defaults(topic, partition + 1);
+        topics.put(topic, grown);
+    }
+    return logs.computeIfAbsent(new TopicPartition(topic, partition), k -&gt; newLog(k));
+}</code></pre>
+
+    <h4 class="mini">재기동 스캔</h4>
+<pre><code>private void loadFromDisk() {
+    Path root = logConfig.dataDir();
+    if (root == null || !Files.isDirectory(root)) return;
+    try (var stream = Files.list(root)) {
+        stream.filter(Files::isDirectory).forEach(dir -&gt; {
+            String name = dir.getFileName().toString();
+            int dash = name.lastIndexOf('-');
+            if (dash &lt;= 0) return;
+            String topic = name.substring(0, dash);
+            int partition = Integer.parseInt(name.substring(dash + 1));
+            // topic-N 디렉터리를 찾아서 SegmentedLog로 자동 오픈
+            topics.put(topic, TopicConfig.defaults(topic, partition + 1));
+            logs.computeIfAbsent(new TopicPartition(topic, partition), k -&gt; newLog(k));
+        });
+    } catch (IOException e) { LOG.warn("failed to scan data dir {}", root, e); }
+}</code></pre>
+
+    <p>이 스캔을 빼먹었을 때 v2 시나리오가 "clean shutdown 후 재시작했는데 데이터 0건" 버그로 드러났다. 교훈: <strong>브로커의 재기동 경로는 첫 write 경로만큼 중요하다.</strong></p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>파티션 reassignment, topic deletion marker, log dir fail-over, leader/follower 역할 전환 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"디스크 레이아웃에서 메타데이터 재구축" — KRaft 없는 상태에서도 브로커가 자기 디스크만 보고 복구할 수 있는 최소 보증.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.log.LogManager</code> + <code>LogDirFailureChannel</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- producer -->
+  <section id="producer" class="card">
+    <div class="card-head"><h2>Producer</h2><span class="chip mono">clients/producer/Producer.java</span></div>
+    <p class="desc">단일 클래스로 v1 sync send → v3 partitioner → v4 batching/retries → v5 idempotence까지 기능 누적.</p>
+
+    <h4 class="mini">send 분기</h4>
+<pre><code>public RecordMetadata send(ProducerRecord record) throws IOException {
+    ProducerRecord resolved = resolvePartition(record);
+
+    if (cfg.lingerMs &lt;= 0) return doSendSingle(resolved);   // v1~v3 경로
+
+    // linger가 있으면 파티션별 버퍼에 쌓고
+    pendingByPartition.computeIfAbsent(resolved.partition(), k -&gt; new ArrayList&lt;&gt;()).add(resolved);
+    pendingBytes += approxSize;
+    if (firstPendingAt == 0) firstPendingAt = System.currentTimeMillis();
+    if (pendingBytes &gt;= cfg.batchSize
+            || System.currentTimeMillis() - firstPendingAt &gt;= cfg.lingerMs) {
+        flush();                                          // 크기 또는 시간으로 flush
+    }
+    return new RecordMetadata(resolved.topic(), resolved.partition(), -1L); // 오프셋 미확정
+}</code></pre>
+
+    <h4 class="mini">멱등성 (v5+)</h4>
+<pre><code>private RecordMetadata sendOnce(String topic, int partition, List&lt;ProducerRecord&gt; batch) {
+    ObjectNode req = ...;
+    if (cfg.enableIdempotence) {
+        String key = topic + ":" + partition;
+        int base = nextSeqByTopicPart.getOrDefault(key, 0);
+        req.put("producerId",    producerId);
+        req.put("producerEpoch", producerEpoch);
+        req.put("baseSequence",  base);
+        nextSeqByTopicPart.put(key, base + batch.size());
+    }
+    // 실패 시 roll back seq — 재시도 시 broker가 OUT_OF_ORDER로 거부하지 않도록
+    JsonNode resp = client.send(req);
+    if (!resp.path("ok").asBoolean() &amp;&amp; cfg.enableIdempotence) {
+        nextSeqByTopicPart.merge(key, -batch.size(), Integer::sum);
+    }
+    ...
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>Sender 백그라운드 스레드 없음 — 호출자가 직접 드레인. 압축 없음. 파이프라인 in-flight 없음 (<code>max.in.flight.requests.per.connection</code> 개념만 config에 존재, 실제 파이프라인은 없음).</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>(1) 파티션 결정, (2) 배치 집적, (3) 큐잉 기준 (size + time), (4) 재시도 + seq 롤백 — 이 4개가 실제 Kafka ProducerConfig 튜닝 토론의 골격.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>KafkaProducer</code> + <code>RecordAccumulator</code> + <code>Sender</code> (백그라운드 스레드). 우리 Producer는 이 셋을 단일 스레드로 접은 구조.</p></div>
+    </div>
+  </section>
+
+  <!-- partitioner -->
+  <section id="partitioner" class="card">
+    <div class="card-head"><h2>Partitioner</h2><span class="chip mono">clients/producer/Partitioner.java</span></div>
+    <p class="desc">4개 전략. 2.4+ 기본 동작(Default)까지 포함.</p>
+
+<pre><code>final class Default implements Partitioner {
+    private final Hash hash = new Hash();
+    private final Sticky sticky = new Sticky();
+    public int partition(String t, byte[] k, byte[] v, int n) {
+        return k != null ? hash.partition(t, k, v, n) : sticky.partition(t, k, v, n);
+    }
+}</code></pre>
+
+    <p><code>Hash</code>는 <code>Math.floorMod(Arrays.hashCode(key), n)</code>. 실 Kafka는 murmur2 사용. 균형 특성은 비슷하지만 해시 충돌 패턴이 다를 수 있다 — 현업에서 custom partitioner를 짜는 이유.</p>
+
+    <div class="callout"><strong>v3 시나리오 연결:</strong> 동일 키 500건이 단일 파티션에 쏠림을 시연. 키 2종만 사용하면 파티션 4개 중 2개만 쓰임 = 핫 파티션. "파티션 늘려도 키가 부족하면 소용 없다"의 증명.</div>
+  </section>
+
+  <!-- consumer -->
+  <section id="consumer" class="card">
+    <div class="card-head"><h2>GroupConsumer</h2><span class="chip mono">clients/consumer/GroupConsumer.java</span></div>
+    <p class="desc">싱글 스레드. JOIN/SYNC/HEARTBEAT/FETCH/COMMIT을 poll 호출 한 바퀴에 해결.</p>
+
+    <h4 class="mini">생성자 = JOIN + SYNC</h4>
+<pre><code>public GroupConsumer(ConsumerConfig cfg) throws IOException {
+    this.cfg    = cfg;
+    this.client = new WireClient(cfg.host, cfg.port);
+    joinAndSync();      // ctor에서 바로 그룹 합류
+}</code></pre>
+
+    <h4 class="mini">poll 루프 핵심</h4>
+<pre><code>public List&lt;ConsumerRecord&gt; poll(long timeoutMs) throws IOException {
+    long now = System.currentTimeMillis();
+    // v6 핵심: 이전 poll 이후 너무 오래 지났으면 브로커가 이미 강퇴했다고 간주, 재조인
+    if (now - lastPollAt &gt; cfg.maxPollIntervalMs) { rejoin(); }
+    lastPollAt = now;
+
+    heartbeat();        // 실패 시 rejoin
+    List&lt;ConsumerRecord&gt; out = new ArrayList&lt;&gt;();
+    for (String tp : assignment) {
+        // 각 (topic, partition)에 대해 FETCH 한 번씩
+        ...
+        cursors.put(key, rec.offset() + 1);
+        uncommitted.put(key, rec.offset() + 1);
+    }
+    if (cfg.enableAutoCommit &amp;&amp; !uncommitted.isEmpty()) commitSync();
+    return out;
+}</code></pre>
+
+    <h4 class="mini">rejoin — 왜 silent?</h4>
+    <p>heartbeat가 UNKNOWN_MEMBER_ID / REBALANCE_IN_PROGRESS로 실패하면 memberId를 비우고 <code>joinAndSync()</code>를 다시 호출한다. 실 Kafka는 훨씬 복잡한 상태머신을 돌리지만, 교육적 핵심은 "컨슈머가 자기 상태를 신뢰하지 못하게 되는 순간이 존재한다"이다.</p>
+
+    <h4 class="mini">static membership — close에서 LeaveGroup 생략</h4>
+<pre><code>@Override
+public void close() throws IOException {
+    if (cfg.groupInstanceId == null) {
+        // 보통은 LEAVE 전송 → 즉시 리밸런스
+        client.send(leaveReq);
+    }
+    // static 멤버는 LEAVE를 보내지 않음 → session.timeout 안에 재기동하면 같은 memberId 재사용
+    client.close();
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>백그라운드 하트비트 스레드 없음. cooperative rebalance 2단계 구조 없음. FetchSession 없음. offset reset 정책 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>(1) 제너레이션 기반 fencing, (2) session/pollInterval 타임아웃 2종류, (3) rejoin 경로, (4) static membership "LeaveGroup 생략" 트릭 — 이 4개가 현업 리밸런스 디버깅의 전부.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>KafkaConsumer</code> + <code>ConsumerCoordinator</code> + <code>HeartbeatThread</code> + <code>Fetcher</code>.</p></div>
+    </div>
+
+    <div class="callout warn"><strong>v6 시나리오 재현 트릭:</strong> 실제 Kafka는 session.timeout 초과를 서버 타이머가 자동 감지하지만, 우리는 시나리오 테스트에서 <code>broker.api().coordinator().expireDeadMembers(now)</code>를 명시적으로 호출해 강퇴 타이밍을 결정한다. 이로써 <em>테스트가 비결정적이지 않다</em>.</div>
+  </section>
+
+  <!-- assignors -->
+  <section id="assignors" class="card">
+    <div class="card-head"><h2>Assignors</h2><span class="chip mono">clients/consumer/Assignors.java</span></div>
+    <p class="desc">Range / RoundRobin / Sticky. 그룹 leader가 SyncGroup 전 호출해 plan을 계산.</p>
+
+    <h4 class="mini">Range — skew 발생지</h4>
+<pre><code>for (topic, partitions) {
+    int perMember = partitions / subs.size();
+    int extra     = partitions % subs.size();
+    for (int i = 0; i &lt; subs.size(); i++) {
+        int give = perMember + (i &lt; extra ? 1 : 0);     // 앞쪽 멤버에게 나머지 몰아줌
+        // 파티션 순서대로 give개씩 할당
+    }
+}</code></pre>
+
+    <h4 class="mini">Sticky — 2패스</h4>
+<pre><code>// pass 1: 이전 assignment 보존, 단 targetMax 초과분은 revoke
+for (var e : previous.entrySet()) {
+    int kept = 0;
+    for (String tp : e.getValue()) {
+        if (kept &lt; targetMax) { out.get(e.getKey()).add(tp); placed.add(tp); kept++; }
+        else revoked.add(tp);
+    }
+}
+// pass 2: 미배치 파티션 + revoked를 부하 최소 멤버에게 배분
+for (String tp : remaining) {
+    String pick = members에서 out.get(m).size() 최소인 것;
+    out.get(pick).add(tp);
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>CooperativeSticky의 2단계 리밸런스(revoke → assign) 없음. Rack awareness 없음. 구독 편차 있는 혼합 그룹 특수 처리 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"이전 상태 보존 + 목표 균형 + 나머지 재배분"의 3단계. 모든 sticky 계열 assignor가 공유하는 구조.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>RangeAssignor</code> / <code>RoundRobinAssignor</code> / <code>StickyAssignor</code> / <code>CooperativeStickyAssignor</code>. KIP-848 이후 broker-side assignment로 이동 중.</p></div>
+    </div>
+  </section>
+
+  <!-- coordinator -->
+  <section id="coordinator" class="card">
+    <div class="card-head"><h2>GroupCoordinator</h2><span class="chip mono">broker/coordinator/GroupCoordinator.java</span></div>
+    <p class="desc">그룹별 <code>{members, generation, leaderId, state}</code> 상태머신. synchronized 메서드로 동시성 관리.</p>
+
+    <h4 class="mini">상태 머신</h4>
+<pre><code>enum State { EMPTY, AWAITING_SYNC, STABLE }
+
+// JoinGroup이 들어올 때마다
+generation++;
+state = AWAITING_SYNC;
+leaderId = members.keySet().stream().sorted().findFirst().orElse(...);
+// 가장 사전순으로 앞서는 memberId가 leader</code></pre>
+
+    <h4 class="mini">static membership 지원</h4>
+<pre><code>// JOIN 시 같은 groupInstanceId를 들고 온 경우 기존 member를 그대로 반환
+if (staticId != null) {
+    for (Member m : g.members.values()) {
+        if (staticId.equals(m.groupInstanceId)) {
+            m.lastHeartbeat = System.currentTimeMillis();
+            return joinResponse(g, m.memberId, /*rebalanced*/ false);
+        }
+    }
+}</code></pre>
+
+    <h4 class="mini">SyncGroup — leader의 plan 브로드캐스트</h4>
+<pre><code>// leader가 동봉한 assignments object를 member별로 분배
+if (assignments != null &amp;&amp; assignments.isObject()) {
+    assignments.fields().forEachRemaining(ent -&gt; {
+        Member m = g.members.get(ent.getKey());
+        if (m != null) m.assignment = parts;   // 각 멤버에 저장
+    });
+    g.state = State.STABLE;
+}
+// follower는 SyncGroup 요청에 assignments 없이 와서 자기 것만 받아감
+return resp; // me.assignment</code></pre>
+
+    <h4 class="mini">expireDeadMembers — 시나리오 훅</h4>
+<pre><code>public synchronized int expireDeadMembers(long nowMs) {
+    for (Group g : groups.values()) {
+        List&lt;String&gt; dead = ...;
+        for (Member m : g.members.values())
+            if (nowMs - m.lastHeartbeat &gt; m.sessionTimeoutMs) dead.add(m.memberId);
+        // dead 제거 + generation++
+    }
+    return expired;
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>오프셋 토픽 기반 persistence 없음 (OffsetStore는 별도 in-mem). 코디네이터 이전 (replay) 없음. 트랜잭션 coordinator 별개 구현 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>EMPTY→AWAITING_SYNC→STABLE 전이. generation fencing. leader 멤버 지정. static membership = LeaveGroup 생략 트릭. 4개가 실 Kafka 상태머신의 심장.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.coordinator.group.GroupCoordinator</code>, <code>GroupMetadata</code>. KIP-848에서 상당부분 재설계.</p></div>
+    </div>
+  </section>
+
+  <!-- offset-store -->
+  <section id="offset-store" class="card">
+    <div class="card-head"><h2>OffsetStore</h2><span class="chip mono">broker/offset/OffsetStore.java</span></div>
+    <p class="desc"><code>Map&lt;(group, topic, partition), Long&gt;</code>. 실 Kafka의 <code>__consumer_offsets</code> compacted 토픽을 in-mem map으로 축약.</p>
+
+<pre><code>public record Key(String group, String topic, int partition) {}
+private final Map&lt;Key, Long&gt; offsets = new ConcurrentHashMap&lt;&gt;();
+
+// OFFSET_COMMIT: 들어오는 오프셋 리스트를 한 번에 put
+// OFFSET_FETCH : 요청 파티션별 조회, 없으면 -1 반환 (= 아직 커밋 안 됨)</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>컴팩션 토픽 없음. 브로커 재기동 시 persistence 없음. 오프셋 commit retention 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"컨슈머 진행 상태는 브로커에 기록되어 복구 가능" — at-least-once vs at-most-once 판단의 물리적 근거.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>__consumer_offsets</code> compacted topic, <code>GroupMetadataManager</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- producer-state -->
+  <section id="producer-state" class="card">
+    <div class="card-head"><h2>ProducerStateManager</h2><span class="chip mono">broker/producer/ProducerStateManager.java</span></div>
+    <p class="desc">PID 할당 + (pid, epoch) → lastSeq per (topic, partition). 멱등성의 모든 근거.</p>
+
+    <h4 class="mini">check — seq 검증</h4>
+<pre><code>public Check check(long pid, int epoch, String topic, int partition, int baseSeq, int count) {
+    Integer current = epochByPid.get(pid);
+    if (current == null) return Check.err("UNKNOWN_PRODUCER_ID");
+    if (!Objects.equals(current, epoch)) return Check.err("INVALID_PRODUCER_EPOCH");
+    Integer expected = lastSeq.get(new PartitionKey(pid, topic, partition));
+    int expect = (expected == null) ? 0 : expected + 1;
+    if (baseSeq != expect)
+        return Check.err("OUT_OF_ORDER_SEQUENCE_NUMBER expected=" + expect + " got=" + baseSeq);
+    return Check.pass();
+}</code></pre>
+
+    <h4 class="mini">bumpEpoch — v15-4 (KAFKA-12152) 모사</h4>
+<pre><code>public void bumpEpoch(long pid, Set&lt;String&gt; withInFlight, boolean resetAll) {
+    int e = epochByPid.getOrDefault(pid, 0) + 1;
+    epochByPid.put(pid, e);
+    if (resetAll) {
+        lastSeq.entrySet().removeIf(en -&gt; en.getKey().pid() == pid);   // 전체 리셋 (fix)
+    } else {
+        // 버그 재현: in-flight 있는 파티션만 리셋
+        lastSeq.entrySet().removeIf(en -&gt; en.getKey().pid() == pid
+                &amp;&amp; withInFlight.contains(en.getKey().topic() + ":" + en.getKey().partition()));
+    }
+}</code></pre>
+
+    <p>이 <code>resetAll</code> 불린이 실 Kafka 4.2.0과 버그 있던 과거 버전 사이의 <strong>단 한 줄 차이</strong>의 본질이다. 교육적으로 이보다 선명한 재현은 드물다.</p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>producer state snapshot 파일 없음. 재기동 시 persistence 없음. lastSeq는 long이 아닌 int.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>(PID, epoch, baseSeq) → 예상 다음 seq 계산. epoch bump 시 reset 범위. 두 가지가 멱등성의 전부.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>ProducerStateManager</code> + <code>ProducerAppendInfo</code> + snapshot files per log dir.</p></div>
+    </div>
+  </section>
+
+  <!-- txn -->
+  <section id="txn" class="card">
+    <div class="card-head"><h2>TransactionalProducer (v15-1)</h2><span class="chip mono">broker/producer/TransactionalProducer.java</span></div>
+    <p class="desc">KIP-890 before/after를 재현하는 토이 트랜잭션 시뮬레이터. 전체 트랜잭션 코디네이터는 구현하지 않는다.</p>
+
+    <h4 class="mini">핵심: bumpEpochOnCommit 토글</h4>
+<pre><code>public boolean bumpEpochOnCommit = true;  // KIP-890 fix (default)
+
+public synchronized void commit(State s) {
+    s.txnState = TxnState.COMMITTED;
+    if (bumpEpochOnCommit) s.epoch++;      // <- 이 줄이 있냐 없냐
+}</code></pre>
+
+    <h4 class="mini">fence 판정</h4>
+<pre><code>public synchronized boolean send(State s, int senderEpoch, String topic, int partition) {
+    if (senderEpoch != s.epoch) return false;    // fenced
+    s.sentPerPartition.merge(topic + ":" + partition, 1, Integer::sum);
+    return s.txnState == TxnState.IN_TRANSACTION;
+}</code></pre>
+
+    <p>v15-1 시나리오는 commit 후 지연된 send가 arriving → <code>senderEpoch != s.epoch</code>면 fence. Pre-fix에서는 epoch bump가 없으니 fence 실패, 과거 트랜잭션의 레코드가 다음 트랜잭션에 섞이는 좀비 write.</p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>TransactionCoordinator, transaction log, marker write, abort 처리, 2PC 없음. 로컬 in-memory state만.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"epoch bump 타이밍 1줄 차이" — KIP-890의 전부. 실 Kafka에서 좀비 트랜잭션이 왜 생기는지 코드 레벨에서 설명 가능.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.coordinator.transaction.TransactionCoordinator</code>, <code>TransactionMetadata</code>, <code>transaction.version=2</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- replica -->
+  <section id="replica" class="card">
+    <div class="card-head"><h2>ReplicaManager — 인프로세스 시뮬</h2><span class="chip mono">broker/replication/ReplicaManager.java</span></div>
+    <p class="desc">실제 두 브로커 사이 네트워크 리플리케이션은 구현하지 않는다. 대신 partition state(ISR, HWM, LEO, brokerEpoch)를 in-mem으로 가지고 시나리오가 직접 조작.</p>
+
+    <h4 class="mini">State 구조체</h4>
+<pre><code>public static final class State {
+    public volatile int leader = -1;
+    public final Set&lt;Integer&gt; replicas = new LinkedHashSet&lt;&gt;();
+    public final Set&lt;Integer&gt; isr      = new LinkedHashSet&lt;&gt;();
+    public final Map&lt;Integer, Long&gt;    followerLeo  = new ConcurrentHashMap&lt;&gt;();
+    public final Map&lt;Integer, Integer&gt; brokerEpoch  = new ConcurrentHashMap&lt;&gt;();
+    public volatile long highWatermark = 0;
+    public volatile long leo           = 0;
+
+    public synchronized void recomputeHwm() {
+        long min = leo;
+        for (int f : isr) min = Math.min(min, followerLeo.getOrDefault(f, 0L));
+        this.highWatermark = min;
+    }
+}</code></pre>
+
+    <h4 class="mini">growIsr — KIP-903 재현</h4>
+<pre><code>public synchronized void growIsr(TopicPartition tp, int brokerId, int brokerEpoch,
+                                 boolean enforceEpochCheck) {
+    State s = states.get(tp);
+    if (enforceEpochCheck) {
+        Integer known = s.brokerEpoch.get(brokerId);
+        if (known != null &amp;&amp; brokerEpoch &lt; known) {
+            return;  // KIP-903: stale-epoch follower 거부
+        }
+    }
+    s.brokerEpoch.put(brokerId, brokerEpoch);
+    s.isr.add(brokerId);
+    s.recomputeHwm();
+}</code></pre>
+
+    <h4 class="mini">electUncleanLeader — 최악 시나리오 선택</h4>
+<pre><code>public synchronized boolean electUncleanLeader(TopicPartition tp, boolean uncleanEnabled) {
+    if (!s.isr.isEmpty()) return true;            // clean 가능
+    if (!uncleanEnabled)  return false;           // 파티션 오프라인
+
+    // 교육 목적: 최악의 stale replica 선택 → HWM 최대 되감김 = unclean의 위험 최대화 시연
+    int pick = -1;
+    long pickLeo = Long.MAX_VALUE;
+    for (int r : s.replicas) {
+        long leo = s.followerLeo.getOrDefault(r, 0L);
+        if (leo &lt; pickLeo) { pick = r; pickLeo = leo; }
+    }
+    s.leader = pick;
+    s.isr.add(pick);
+    s.leo = pickLeo; s.highWatermark = pickLeo;
+    return true;
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>실 ReplicaFetcher 스레드 없음. 리더 선출 알고리즘 없음 (테스트가 직접 호출). leader epoch cache / truncation 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>(1) ISR = min(LEO) → HWM, (2) acks=all에 필요한 <code>|ISR| ≥ min.isr</code> 판정, (3) unclean leader가 HWM을 되감는다는 사실, (4) KIP-903 broker epoch 검증. 4가지가 내구성 토론의 골격.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>kafka.server.ReplicaManager</code>, <code>Partition</code>, <code>ReplicaFetcherThread</code>, <code>IsrChangeNotification</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- controller -->
+  <section id="controller" class="card">
+    <div class="card-head"><h2>Controller — 스텁</h2><span class="chip mono">broker/controller/Controller.java</span></div>
+    <p class="desc">epoch 단조 증가 + 파티션별 leader 매핑. v12·v15-2 시나리오에서 "옛 epoch이 무엇인지" 질문에만 답.</p>
+
+<pre><code>public synchronized int electLeader(String topic, int partition, int brokerId) {
+    leaderByPartition.computeIfAbsent(topic, k -&gt; new HashMap&lt;&gt;()).put(partition, brokerId);
+    return epoch.incrementAndGet();
+}</code></pre>
+
+    <p>v15-2에서는 <em>두 개의</em> Controller 인스턴스를 만들어 "네트워크 파티션 시점" 직전 상태를 공유하고, 이후 isolated 쪽과 fresh 쪽이 서로 다른 epoch으로 진화하는 모습을 보인다. "좀비 컨트롤러" = 같은 topic/partition에 서로 다른 리더를 기록한 두 컨트롤러.</p>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>KRaft 합의 구현 없음. 메타데이터 전파 없음. election 정책 없음.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>epoch 단조 증가와 리더 매핑. 두 개의 stale vs fresh 버전이 동시에 존재할 수 있다는 "관찰 가능한" 사실.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p>KRaft <code>QuorumController</code>, <code>MetadataCache</code>. KIP-595 / 500.</p></div>
+    </div>
+  </section>
+
+  <!-- retention -->
+  <section id="retention" class="card">
+    <div class="card-head"><h2>Retention — cleaner 한 사이클</h2><span class="chip mono">broker/retention/Retention.java</span></div>
+    <p class="desc">타이머 없음. <code>enforce()</code> 호출이 한 번의 cleaner cycle.</p>
+
+<pre><code>private int enforceDelete(Log log, TopicConfig cfg) throws Exception {
+    long end = log.logEndOffset();
+    if (cfg.retentionBytes() &lt;= 0) return 0;
+    long approxSize = end * 64L;                          // 간이 추정
+    if (approxSize &lt;= cfg.retentionBytes()) return 0;
+    long toKeep   = cfg.retentionBytes() / 64L;
+    long dropFrom = Math.max(0, end - toKeep);
+    return (int) dropFrom;                                // 실제 삭제는 안 함, 개수만 보고
+}
+
+private int enforceCompact(Log log) throws Exception {
+    var all = log.read(0, (int)Math.min(end, Integer.MAX_VALUE));
+    HashSet&lt;String&gt; seenKeys = new HashSet&lt;&gt;();
+    int removed = 0;
+    for (int i = all.size() - 1; i &gt;= 0; i--) {
+        byte[] k = all.get(i).key();
+        String ks = k == null ? "__null__" : new String(k);
+        if (!seenKeys.add(ks)) removed++;      // 같은 키의 구 버전 카운트
+    }
+    return removed;
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>OffsetMap/CleanerThread 없음. tombstone delete.retention.ms 없음. 실제 세그먼트 삭제 / 재쓰기 없음 — 카운트만.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"리텐션은 시간 기반(delete) 또는 키 기반(compact) 두 축" + "cleaner는 스케줄러가 도는 별도 프로세스"의 개념 이해.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>LogCleaner</code>, <code>LogCleanerManager</code>, <code>min.cleanable.dirty.ratio</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- fetch-session -->
+  <section id="fetch-session" class="card">
+    <div class="card-head"><h2>FetchSessionCache — v15-6</h2><span class="chip mono">broker/fetchsession/FetchSessionCache.java</span></div>
+    <p class="desc">LinkedHashMap LRU. 슬롯 초과 시 축출 카운트 증가.</p>
+
+<pre><code>this.lru = new LinkedHashMap&lt;&gt;(16, 0.75f, true) {     // access-order=true
+    @Override
+    protected boolean removeEldestEntry(Map.Entry&lt;String, Boolean&gt; eldest) {
+        if (size() &gt; FetchSessionCache.this.capacity) {
+            evictionCount++;
+            return true;
+        }
+        return false;
+    }
+};
+
+public synchronized boolean touch(String fetcherId) {
+    Boolean existing = lru.get(fetcherId);
+    if (existing != null) return true;      // hit = incremental fetch 가능
+    lru.put(fetcherId, true);
+    return false;                           // miss = 전체 리스트 재전송
+}</code></pre>
+
+    <div class="trio">
+      <div class="panel simp"><h4>단순화</h4><p>privileged bit (follower 우선) 없음. 실제 fetch 요청과 연결 없음 — 순수 관찰자.</p></div>
+      <div class="panel keep"><h4>핵심</h4><p>"LRU + 슬롯 제한 → oversubscribe 시 thrashing" 현상. 실 Kafka <code>IncrementalFetchSessionEvictionsPerSec</code> JMX의 출현 이유.</p></div>
+      <div class="panel real"><h4>Kafka 대응</h4><p><code>FetchSession</code>, <code>FetchManager</code>, <code>max.incremental.fetch.session.cache.slots</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- toggles -->
+  <section id="toggles" class="card">
+    <div class="card-head"><h2>시나리오 재현 패턴 — 토글 + 훅</h2><span class="chip mono">broker/api/BrokerToggles.java</span></div>
+    <p class="desc">"패치 전" vs "패치 후"를 하나의 코드베이스로 모두 재현하기 위해 <code>BrokerToggles</code>를 도입했다.</p>
+
+<pre><code>public final class BrokerToggles {
+    public volatile boolean zombieControllerStaleMetadata = false;
+    public volatile boolean enforceBrokerEpochOnIsrJoin   = false;   // v15-3 KIP-903
+    public volatile boolean resetSequenceOnEpochBumpForAllPartitions = true; // v15-4 fix ON
+    public volatile long    coldReadDelayMs        = 0;              // v15-5
+    public volatile long    coldReadBoundaryOffset = 0;
+    public volatile int     fetchSessionCacheSlots = 1024;           // v15-6
+    public volatile boolean uncleanLeaderElectionEnable = true;      // v11
+    public volatile long    producerQuotaBytesPerSec = -1L;          // v14
+    public volatile int     fetchMaxBytes = Integer.MAX_VALUE;
+    public volatile double  compactionMinDirtyRatio = 0.5;
+}</code></pre>
+
+    <h4 class="mini">왜 이 방식?</h4>
+    <ul>
+      <li><strong>단일 코드베이스 유지</strong>: 버전별 디렉터리 fork를 피하고, 시나리오 테스트가 <code>broker.api().toggles().X = Y</code>로 시작.</li>
+      <li><strong>"전/후" 대비가 명확</strong>: 한 테스트는 <code>false</code>로 버그 재현, 다른 테스트는 <code>true</code>로 수정 검증. 같은 코드, 다른 토글.</li>
+      <li><strong>프로덕션이라면 하지 말 것</strong>: mutable public volatile은 API가 아니다. 교육 목적 한정.</li>
+    </ul>
+
+    <p>다른 "뒷문" 훅들:</p>
+    <ul>
+      <li><code>Broker.kill()</code> — fsync 생략 close</li>
+      <li><code>LogManager.uncleanClose()</code> — 브로커 kill의 로그 측 위임</li>
+      <li><code>GroupCoordinator.expireDeadMembers(nowMs)</code> — 시간 의존성 제거</li>
+      <li><code>ProducerStateManager.bumpEpoch(pid, withInFlight, resetAll)</code> — 리더 교체 시뮬</li>
+      <li><code>ReplicaManager</code>의 수동 <code>shrinkIsrDueToLag</code> / <code>growIsr</code> / <code>electUncleanLeader</code></li>
+    </ul>
+  </section>
+
+  <!-- evolution -->
+  <section id="evolution" class="card">
+    <div class="card-head"><h2>버전 간 진화 규칙</h2></div>
+    <p class="desc">v1 → v15까지 한 코드베이스가 점진적으로 커졌다. 규칙 3개를 지켰다.</p>
+
+    <h3>규칙 1 — 인터페이스로 선 긋기</h3>
+    <p>v2에서 <code>Log</code>를 인터페이스로 만들고 <code>InMemoryLog</code>가 그것을 구현하도록 <em>역호환성 있게</em> 리팩토링. 이후 <code>SegmentedLog</code>가 동일 인터페이스로 붙음. v1 테스트는 그대로 통과.</p>
+
+    <h3>규칙 2 — 설정 토글로 과거 동작 유지</h3>
+    <p><code>LogConfig.inMemory()</code>가 v1 기본값이어서, v2 도입 후에도 <code>KafkaConfig.defaults()</code>는 여전히 인메모리 로그를 만든다. "과거 동작이 기본"이 핵심.</p>
+
+    <h3>규칙 3 — 시나리오가 서브시스템을 직접 호출</h3>
+    <p>v10 리플리케이션은 실제 두 브로커 간 네트워크 없이 <code>ReplicaManager</code> 시뮬만 존재. 시나리오가 "브로커 측에서 이런 상태가 되었다고 치자"라고 직접 메서드를 호출. 구현 비용 대비 교육 가치가 가장 높은 지점에만 실 컴포넌트를 두는 전략.</p>
+
+    <div class="callout"><strong>결과:</strong> 58개 Java 파일 / 51 테스트 / 15 버전이 단일 빌드로 동작한다. 어떤 버전의 테스트도 다른 버전을 깨뜨리지 않는다.</div>
+
+    <h3>한계와 열린 질문</h3>
+    <ul>
+      <li>실 <code>kafka-clients</code>가 이 브로커에 붙을 수 있게 하려면 Kafka 바이너리 프로토콜 서브셋 필요. 가치 있으나 양이 크다.</li>
+      <li>실 리플리케이션(두 JVM 프로세스 + 소켓 fetcher) 구현은 "in-proc 시뮬"보다 훨씬 더 많은 실제 이슈를 드러낼 것이다. 다음 큰 확장 포인트.</li>
+      <li>메트릭 시스템이 없다. JMX가 없어서 "운영자 관점 관찰"은 로그 출력에만 의존.</li>
+    </ul>
+  </section>
+
+  <footer style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-tertiary);font-size:12px;text-align:center;">
+    minimal-kafka · 코드 딥다이브 · 58 Java 파일 · Toss design system
+  </footer>
+</main>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // auto-wrap tables
+  document.querySelectorAll('table').forEach(function (t) {
+    if (t.parentElement && t.parentElement.classList.contains('table-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+
+  var html = document.documentElement;
+  var toggleBtn = document.getElementById('theme-toggle');
+  var themeIcon = document.getElementById('theme-icon');
+  var themeLabel = document.getElementById('theme-label');
+
+  function applyTheme(mode) {
+    if (mode === 'dark') {
+      html.classList.add('dark');
+      themeIcon.textContent = '☀️';
+      themeLabel.textContent = '라이트';
+    } else {
+      html.classList.remove('dark');
+      themeIcon.textContent = '🌙';
+      themeLabel.textContent = '다크';
+    }
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('mk-theme'); } catch (e) {}
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+
+  toggleBtn.addEventListener('click', function () {
+    var next = html.classList.contains('dark') ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('mk-theme', next); } catch (e) {}
+  });
+
+  var links = document.querySelectorAll('.nav-link[data-target]');
+  var linkById = {};
+  links.forEach(function (l) { linkById[l.getAttribute('data-target')] = l; });
+  var sections = document.querySelectorAll('section[id]');
+  function setActive(id) {
+    links.forEach(function (l) { l.classList.remove('active'); });
+    var target = linkById[id];
+    if (target) target.classList.add('active');
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      var best = null;
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          if (!best || e.boundingClientRect.top < best.boundingClientRect.top) best = e;
+        }
+      });
+      if (best) setActive(best.target.id);
+    }, { rootMargin: '-20% 0px -60% 0px', threshold: 0 });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  // mobile menu — clone sidebar
+  var menu = document.getElementById('mobile-menu');
+  var inner = document.createElement('div');
+  inner.className = 'mobile-menu-inner';
+  document.querySelectorAll('.sidebar .sidebar-section').forEach(function (sec) {
+    inner.appendChild(sec.cloneNode(true));
+  });
+  menu.appendChild(inner);
+
+  var hamburger = document.getElementById('hamburger');
+  function closeMenu() { menu.classList.remove('open'); hamburger.setAttribute('aria-expanded', 'false'); hamburger.textContent = '메뉴'; }
+  function openMenu()  { menu.classList.add('open');    hamburger.setAttribute('aria-expanded', 'true');  hamburger.textContent = '닫기'; }
+  hamburger.addEventListener('click', function () {
+    if (menu.classList.contains('open')) closeMenu(); else openMenu();
+  });
+  menu.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('a.nav-link')) closeMenu();
+  });
+})();
+</script>
+</body>
+</html>
