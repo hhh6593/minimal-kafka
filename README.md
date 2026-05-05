@@ -188,3 +188,5 @@ HTML 가이드 디자인은 [bitjaru/styleseed](https://github.com/bitjaru/style
 - 모든 시나리오는 검증된 공식 출처(JIRA, KIP, 공식 블로그) 필수
 - 테스트 통과 전제
 - 실제 Kafka와의 대응 관계를 주석에 명시
+
+> 실 Apache Kafka 컨트리뷰션을 노린다면 [`docs/CONTRIBUTING-TO-KAFKA.md`](docs/CONTRIBUTING-TO-KAFKA.md) 참고.
