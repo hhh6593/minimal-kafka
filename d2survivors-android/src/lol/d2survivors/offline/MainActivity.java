@@ -69,12 +69,14 @@ public class MainActivity extends Activity {
 
         web = new WebView(this);
         web.setBackgroundColor(Color.BLACK);
-        // A game, not a document: no text-selection popups, haptic buzz or
-        // overscroll glow when a finger holds or drags on the screen.
+        // A game, not a document: no haptic buzz or overscroll glow when a finger holds or
+        // drags. Long presses are answered inside the page (/__app/touch.js): handling them
+        // here made WebView cancel the touch that was steering the stick.
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setLongClickable(false);
-        web.setOnLongClickListener(v -> true);
         web.setHapticFeedbackEnabled(false);
+        if (Build.VERSION.SDK_INT >= 26) {
+            web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+        }
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);
         setContentView(web);
@@ -90,6 +92,8 @@ public class MainActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
         s.setSupportZoom(false);
+        // The phone's font size setting would scale the game's text and push its UI apart.
+        s.setTextZoom(100);
         s.setBuiltInZoomControls(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);

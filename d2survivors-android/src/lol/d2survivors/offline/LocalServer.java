@@ -71,7 +71,10 @@ final class LocalServer {
     private static final String APP_CSS_PATH = "/__app/mobile.css";
     private static final byte[] APP_CSS = (""
             // Taps should feel like a game's buttons, not a web page's links.
-            + "*{-webkit-tap-highlight-color:transparent}"
+            + "*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}"
+            // The life and mana globes and the bars only show numbers; on a touch screen they
+            // sat where the left thumb starts the stick, so let touches through to the game.
+            + "@media (pointer:coarse){#ctrlpnl .globe,#ctrlpnl .bar,#ctrlpnl .glass{pointer-events:none!important}}"
             + "button,a,[role=button]{-webkit-user-select:none;user-select:none;touch-action:manipulation}"
             // Offline the leaderboards, Discord and Ko-fi cannot load: keep them out of reach.
             + ".site-boards,.site-discord,.site-kofi,.site-footer a[href^=http],.site-footer a[href*=leaderboards]"
@@ -94,8 +97,22 @@ final class LocalServer {
             + "#lines{font-size:.9em!important}"
             + "#heading{font-size:1.4em!important}"
             + "}").getBytes(StandardCharsets.UTF_8);
+    /** Served at APP_JS_PATH and loaded before the game's modules: touch fixes for a phone. */
+    private static final String APP_JS_PATH = "/__app/touch.js";
+    private static final byte[] APP_JS = (""
+            + "(()=>{"
+            // The touch pointers on the screen now, for the game's stick (see patch_offline.py).
+            + "const down=new Set();window.__d2sTouch=down;"
+            + "addEventListener('pointerdown',e=>{if(e.pointerType==='touch')down.add(e.pointerId)},true);"
+            + "for(const t of['pointerup','pointercancel'])addEventListener(t,e=>down.delete(e.pointerId),true);"
+            + "for(const t of['touchend','touchcancel'])addEventListener(t,e=>{if(!e.touches.length)down.clear()},true);"
+            // A held finger is a held stick, not a request for a context menu: answering the
+            // long press here keeps WebView from cancelling the touch.
+            + "addEventListener('contextmenu',e=>{if(down.size)e.preventDefault()},true);"
+            + "})();").getBytes(StandardCharsets.UTF_8);
     private static final byte[] APP_CSS_LINK =
-            ("<link rel=\"stylesheet\" href=\"" + APP_CSS_PATH + "\">").getBytes(StandardCharsets.UTF_8);
+            ("<link rel=\"stylesheet\" href=\"" + APP_CSS_PATH + "\"><script src=\"" + APP_JS_PATH
+                    + "\"></script>").getBytes(StandardCharsets.UTF_8);
 
     // The site's own switch: the game streams its files from the server (here, GameFileCache).
     private static final byte[] SITE_JSON = "{ \"hostedFiles\": true }\n".getBytes(StandardCharsets.UTF_8);
@@ -193,6 +210,10 @@ final class LocalServer {
         }
         if (path.equals(APP_CSS_PATH)) {
             send(out, 200, "OK", "text/css; charset=utf-8", APP_CSS, head);
+            return;
+        }
+        if (path.equals(APP_JS_PATH)) {
+            send(out, 200, "OK", "text/javascript; charset=utf-8", APP_JS, head);
             return;
         }
         if (path.equals("/site.json")) {

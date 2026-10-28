@@ -56,7 +56,15 @@ patch("assets/setup-*.js",
       r"\1.webkitdirectory=!1",
       r"\.webkitdirectory=!1")
 
-# 4. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
+# 4. A stick whose finger has already lifted (its pointerup came late or never)
+#    made the game ignore the next touch. /__app/touch.js tracks the fingers on
+#    the screen; a new touch replaces a stick whose finger is gone.
+patch("assets/Game-*.js",
+      r"if\(([\w$]+)\.pointerType===`touch`\)\{if\(this\.stick\)return;",
+      r"if(\1.pointerType===`touch`){if(this.stick){if(window.__d2sTouch?.has(this.stick.id))return;this.dropStick()}",
+      r"window\.__d2sTouch\?\.has\(this\.stick\.id\)")
+
+# 5. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
 for path in glob.glob(os.path.join(root, "**", "*.html"), recursive=True):
     with open(path, encoding="utf-8") as f:
         text = f.read()

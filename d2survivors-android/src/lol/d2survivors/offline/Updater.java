@@ -81,6 +81,11 @@ final class Updater {
                     "([\\w$]+)\\.webkitdirectory=!0",
                     "$1.webkitdirectory=!1",
                     "\\.webkitdirectory=!1"),
+            new Patch("assets/Game-",
+                    "if\\(([\\w$]+)\\.pointerType===`touch`\\)\\{if\\(this\\.stick\\)return;",
+                    "if($1.pointerType===`touch`){if(this.stick){if(window.__d2sTouch?.has(this.stick.id))return;"
+                            + "this.dropStick()}",
+                    "window\\.__d2sTouch\\?\\.has\\(this\\.stick\\.id\\)"),
     };
     private static final Pattern BEACON = Pattern.compile(
             "<script[^>]*cloudflareinsights[^>]*></script>|<script[^>]*src=\"/cdn-cgi/[^\"]*\"[^>]*></script>");
