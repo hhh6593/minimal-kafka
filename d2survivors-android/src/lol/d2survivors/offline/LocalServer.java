@@ -72,6 +72,10 @@ final class LocalServer {
     private static final byte[] APP_CSS = (""
             // Taps should feel like a game's buttons, not a web page's links.
             + "*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}"
+            + "#d2s-app{position:fixed;z-index:100;top:calc(env(safe-area-inset-top) + 8px);"
+            + "left:calc(env(safe-area-inset-left) + 8px);width:44px;height:44px;padding:0;font-size:24px;"
+            + "line-height:42px;color:#c7b377;background:#000000a6;border:1px solid #6e5e3e;border-radius:6px}"
+            + "#d2s-app[hidden]{display:none}"
             // The life and mana globes and the bars only show numbers; on a touch screen they
             // sat where the left thumb starts the stick, so let touches through to the game.
             + "@media (pointer:coarse){#ctrlpnl .globe,#ctrlpnl .bar,#ctrlpnl .glass{pointer-events:none!important}}"
@@ -109,6 +113,22 @@ final class LocalServer {
             // A held finger is a held stick, not a request for a context menu: answering the
             // long press here keeps WebView from cancelling the touch.
             + "addEventListener('contextmenu',e=>{if(down.size)e.preventDefault()},true);"
+            // Every sound context, so the app can silence the game while it is in the background
+            // and bring back only the ones that were playing.
+            + "const AC=window.AudioContext,ctxs=new Set(),was=new Set();"
+            + "if(AC){window.AudioContext=class extends AC{constructor(...a){super(...a);ctxs.add(this)}};"
+            + "if(window.webkitAudioContext)window.webkitAudioContext=window.AudioContext}"
+            + "window.__d2sAudio=on=>{for(const c of ctxs){if(!on){if(c.state==='running'){was.add(c);"
+            + "c.suspend().catch(()=>{})}}else if(was.has(c)){was.delete(c);c.resume().catch(()=>{})}}};"
+            // The app's settings button, on the game's menus only.
+            + "if(location.pathname.startsWith('/play/')&&window.D2SApp)addEventListener('DOMContentLoaded',()=>{"
+            + "const b=document.createElement('button');b.id='d2s-app';b.type='button';b.textContent='\u2699';"
+            + "b.setAttribute('aria-label','App settings');b.tabIndex=-1;"
+            // Never take focus: a focused button kept the game's menus from hearing the next tap.
+            + "b.onpointerdown=e=>{e.preventDefault();e.stopPropagation()};"
+            + "b.onclick=e=>{e.preventDefault();e.stopPropagation();b.blur();D2SApp.openSettings()};"
+            + "document.body.append(b);const sync=()=>{b.hidden=!document.body.classList.contains('no-run')};"
+            + "new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['class']});sync()});"
             + "})();").getBytes(StandardCharsets.UTF_8);
     private static final byte[] APP_CSS_LINK =
             ("<link rel=\"stylesheet\" href=\"" + APP_CSS_PATH + "\"><script src=\"" + APP_JS_PATH
@@ -218,6 +238,12 @@ final class LocalServer {
         }
         if (path.equals("/site.json")) {
             send(out, 200, "OK", "application/json; charset=utf-8", SITE_JSON, head);
+            return;
+        }
+        if (path.startsWith("/api/")) {
+            // The leaderboard and the report form are off in the app.
+            send(out, 404, "Not Found", "text/plain; charset=utf-8",
+                    "Off in the offline app".getBytes(StandardCharsets.UTF_8), head);
             return;
         }
         if (path.startsWith("/d2/")) {

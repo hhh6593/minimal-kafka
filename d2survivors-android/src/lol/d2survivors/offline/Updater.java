@@ -86,6 +86,10 @@ final class Updater {
                     "if($1.pointerType===`touch`){if(this.stick){if(window.__d2sTouch?.has(this.stick.id))return;"
                             + "this.dropStick()}",
                     "window\\.__d2sTouch\\?\\.has\\(this\\.stick\\.id\\)"),
+            new Patch("assets/Game-",
+                    "let ([\\w$]+)=([\\w$]+)\\.board\\?([\\w$]+)\\[\\2\\.board\\.sheet\\]:void 0;",
+                    "let $1=void 0;",
+                    "let ([\\w$]+)=void 0;if\\(\\1\\)\\{let [\\w$]+=new [\\w$]+\\(\\1\\.frames\\[0\\]\\)"),
     };
     private static final Pattern BEACON = Pattern.compile(
             "<script[^>]*cloudflareinsights[^>]*></script>|<script[^>]*src=\"/cdn-cgi/[^\"]*\"[^>]*></script>");

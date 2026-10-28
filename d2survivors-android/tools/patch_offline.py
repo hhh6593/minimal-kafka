@@ -64,7 +64,14 @@ patch("assets/Game-*.js",
       r"if(\1.pointerType===`touch`){if(this.stick){if(window.__d2sTouch?.has(this.stick.id))return;this.dropStick()}",
       r"window\.__d2sTouch\?\.has\(this\.stick\.id\)")
 
-# 5. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
+# 5. No leaderboard in the app: the camp gets no leaderboard board, the only way
+#    into it in the game (LocalServer also refuses /api/).
+patch("assets/Game-*.js",
+      r"let ([\w$]+)=([\w$]+)\.board\?([\w$]+)\[\2\.board\.sheet\]:void 0;",
+      r"let \1=void 0;",
+      r"let ([\w$]+)=void 0;if\(\1\)\{let [\w$]+=new [\w$]+\(\1\.frames\[0\]\)")
+
+# 6. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
 for path in glob.glob(os.path.join(root, "**", "*.html"), recursive=True):
     with open(path, encoding="utf-8") as f:
         text = f.read()

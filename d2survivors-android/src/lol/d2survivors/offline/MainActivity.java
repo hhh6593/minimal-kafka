@@ -1,6 +1,18 @@
 package lol.d2survivors.offline;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.graphics.Typeface;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.os.Message;
+import android.webkit.JavascriptInterface;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.ScrollView;
+import android.widget.Switch;
+import android.widget.TextView;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.database.Cursor;
@@ -43,11 +55,21 @@ public class MainActivity extends Activity {
     private static final int PORT = 47811;
     private static final String HOST = "127.0.0.1:" + PORT;
     private static final String START_URL = "http://" + HOST + "/play/";
+    // The game's own test switches (see tn in the site's code): no damage taken, fifty times the
+    // damage dealt, and the game clock sped up so the acts go by fast while their files load.
+    // The game never ranks a run played with them.
+    private static final String STRONG_QUERY = "?god&power=50&speed=";
+    private static final int[] SPEEDS = {2, 4, 8, 16};
+    private static final String PREFS = "app";
+    private static final String PREF_STRONG = "strongMode";
+    private static final String PREF_SPEED = "strongSpeed";
     private static final int PICK_FOLDER = 1;
     // How deep under the picked folder to look for the .mpq files, as the setup page does.
     private static final int SEARCH_DEPTH = 3;
 
     private static LocalServer server;
+    private static GameFileCache gameFiles;
+    private static File gameFilesDir;
 
     private WebView web;
     private ValueCallback<Uri[]> pendingChooser;
@@ -98,22 +120,46 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
+        s.setSupportMultipleWindows(true);
+        s.setJavaScriptCanOpenWindowsAutomatically(true);
+        web.addJavascriptInterface(new AppBridge(), "D2SApp");
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (HOST.equals(u.getAuthority())) return false;
-                // Links to other sites (Discord, Ko-fi, ...) open in the browser when online.
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, u));
-                } catch (Exception e) {
-                    Log.w(TAG, "no handler for " + u);
+                if (HOST.equals(u.getAuthority())) {
+                    // The game's pages move between themselves without the strong mode's switches.
+                    if (strongMode() && isGamePage(u) && u.getQueryParameter("god") == null) {
+                        view.loadUrl(startUrl());
+                        return true;
+                    }
+                    return false;
                 }
+                openOutside(u);
                 return true;
             }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                // window.open(): the game's WEBSITE, DISCORD and NEWS buttons. Catch the address
+                // with a throwaway view and hand it to the browser.
+                WebView probe = new WebView(MainActivity.this);
+                probe.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                        openOutside(r.getUrl());
+                        v.destroy();
+                        return true;
+                    }
+                });
+                ((WebView.WebViewTransport) resultMsg.obj).setWebView(probe);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
                                              FileChooserParams params) {
@@ -146,8 +192,123 @@ public class MainActivity extends Activity {
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState);
         } else {
-            web.loadUrl(START_URL);
+            web.loadUrl(startUrl());
         }
+    }
+
+    private String startUrl() {
+        return strongMode() ? START_URL + STRONG_QUERY + strongSpeed() : START_URL;
+    }
+
+    private int strongSpeed() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getInt(PREF_SPEED, 4);
+    }
+
+    private static boolean isGamePage(Uri u) {
+        String p = u.getPath();
+        return "/play/".equals(p) || "/play/index.html".equals(p);
+    }
+
+    private boolean strongMode() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_STRONG, false);
+    }
+
+    private boolean online() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
+        NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+    }
+
+    /** Other sites open in the browser; offline there is nothing to open them with. */
+    private void openOutside(Uri u) {
+        if (!online()) {
+            Toast.makeText(this, "오프라인에서는 열 수 없습니다", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, u));
+        } catch (Exception e) {
+            Log.w(TAG, "no handler for " + u);
+        }
+    }
+
+    /** What the page may ask of the app. */
+    private final class AppBridge {
+        @JavascriptInterface
+        public void openSettings() {
+            runOnUiThread(MainActivity.this::showSettings);
+        }
+    }
+
+    private void showSettings() {
+        final boolean wasStrong = strongMode();
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        final int wasSpeed = strongSpeed();
+        final Switch strong = new Switch(this);
+        strong.setText("강해지는 모드 (무적 · 피해 50배)");
+        strong.setChecked(wasStrong);
+        box.addView(strong);
+        TextView speedLabel = new TextView(this);
+        speedLabel.setText("게임 속도");
+        speedLabel.setPadding(0, pad / 2, 0, 0);
+        box.addView(speedLabel);
+        final RadioGroup speeds = new RadioGroup(this);
+        speeds.setOrientation(RadioGroup.HORIZONTAL);
+        for (int speed : SPEEDS) {
+            RadioButton r = new RadioButton(this);
+            r.setText(speed + "배");
+            r.setId(speed);
+            speeds.addView(r);
+        }
+        speeds.check(wasSpeed);
+        box.addView(speeds);
+        TextView strongNote = new TextView(this);
+        strongNote.setText("게임에 들어 있는 테스트 기능을 켭니다. 빨리 진행하며 오프라인용 파일을 모을 때 쓰세요."
+                + " 빠를수록 그림이 늦게 뜰 수 있지만 파일은 그대로 저장됩니다."
+                + " 리더보드는 이 앱에서 꺼져 있습니다.");
+        strongNote.setTextSize(12);
+        strongNote.setPadding(0, 0, 0, pad);
+        box.addView(strongNote);
+
+        final TextView report = new TextView(this);
+        report.setTypeface(Typeface.MONOSPACE);
+        report.setText("오프라인 준비도 계산 중…");
+        box.addView(report);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(box);
+        AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("앱 설정")
+                .setView(scroll)
+                .setPositiveButton("닫기", null)
+                .create();
+        dialog.setOnDismissListener(d -> {
+            int speed = speeds.getCheckedRadioButtonId();
+            boolean on = strong.isChecked();
+            if (on == wasStrong && (!on || speed == wasSpeed)) return;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(PREF_STRONG, on).putInt(PREF_SPEED, speed > 0 ? speed : 4).apply();
+            Toast.makeText(this, on ? "강해지는 모드: 켬, 속도 " + speed + "배" : "강해지는 모드를 껐습니다",
+                    Toast.LENGTH_SHORT).show();
+            web.loadUrl(startUrl());
+        });
+        dialog.show();
+        hideSystemBars();
+
+        new Thread(() -> {
+            String text = new Readiness(gameFilesDir).report();
+            long[] stats = gameFiles.stats();
+            String all = String.format(Locale.ROOT, "오프라인 준비도 (저장 %d개, %.0f MB)\n\n", stats[0],
+                    stats[1] / 1048576.0)
+                    + (text != null ? text + "\n막: 몬스터 그림 · 지형 · 음악 기준. 보스는 만나야 저장됩니다."
+                    : "아직 정보가 없습니다. 온라인에서 HOSTED FILES로 한 번 플레이하세요.");
+            runOnUiThread(() -> report.setText(all));
+        }, "d2s-readiness").start();
     }
 
     private boolean startServer() {
@@ -156,7 +317,8 @@ public class MainActivity extends Activity {
                 Updater updater = new Updater(new File(getFilesDir(), "site"));
                 updater.applyPending();
                 LocalServer.Files files = siteFiles(updater.current());
-                final GameFileCache gameFiles = new GameFileCache(new File(getFilesDir(), "d2"));
+                gameFilesDir = new File(getFilesDir(), "d2");
+                gameFiles = new GameFileCache(gameFilesDir);
                 server = new LocalServer(files, gameFiles, PORT);
                 server.start();
                 reportKeptFiles(gameFiles);
@@ -318,13 +480,23 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (web != null) web.onPause();
+        if (web != null) {
+            // In the background the game goes quiet and still: WebView's own pause leaves
+            // its sound and timers running.
+            web.evaluateJavascript("window.__d2sAudio&&__d2sAudio(false)", null);
+            web.onPause();
+            web.pauseTimers();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (web != null) web.onResume();
+        if (web != null) {
+            web.resumeTimers();
+            web.onResume();
+            web.evaluateJavascript("window.__d2sAudio&&__d2sAudio(true)", null);
+        }
     }
 
     @Override
