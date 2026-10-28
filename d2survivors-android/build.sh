@@ -5,19 +5,19 @@
 #   ./build.sh --no-fetch reuse build/www from an earlier run
 #
 # Needs: JDK 17+, python3 (with Pillow for the launcher icons), and an Android
-# SDK with platforms;android-34 and build-tools;35.0.0 at $ANDROID_HOME.
+# SDK with platforms;android-35 and build-tools;35.0.0 at $ANDROID_HOME.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SDK="${ANDROID_HOME:-/opt/android-sdk}"
 BT="$SDK/build-tools/35.0.0"
-JAR="$SDK/platforms/android-34/android.jar"
+JAR="$SDK/platforms/android-35/android.jar"
 OUT="$HERE/build"
 WWW="$OUT/www"
 APK="$HERE/D2Survivors-offline.apk"
 
 for f in "$BT/aapt2" "$BT/d8" "$BT/zipalign" "$BT/apksigner" "$JAR"; do
-  [ -e "$f" ] || { echo "missing $f (install platforms;android-34 and build-tools;35.0.0)" >&2; exit 1; }
+  [ -e "$f" ] || { echo "missing $f (install platforms;android-35 and build-tools;35.0.0)" >&2; exit 1; }
 done
 
 if [ "${1:-}" != "--no-fetch" ]; then
@@ -46,7 +46,7 @@ PY
 "$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/compiled/res.zip"
 "$BT/aapt2" link -o "$OUT/unsigned.apk" -I "$JAR" \
   --manifest "$HERE/AndroidManifest.xml" -A "$OUT/assets" \
-  --java "$OUT/gen" --min-sdk-version 24 --target-sdk-version 34 \
+  --java "$OUT/gen" --min-sdk-version 24 --target-sdk-version 35 \
   "$OUT/compiled/res.zip"
 
 javac -source 8 -target 8 -Xlint:-options -encoding UTF-8 -bootclasspath "$JAR" -classpath "$JAR:$BT/core-lambda-stubs.jar" \

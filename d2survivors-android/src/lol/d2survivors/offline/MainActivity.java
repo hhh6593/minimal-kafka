@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -22,8 +23,12 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private static final String TAG = "D2SOffline";
@@ -37,6 +42,7 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private ValueCallback<Uri[]> pendingChooser;
+    private long lastBack;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,9 +55,19 @@ public class MainActivity extends Activity {
         }
 
         if (!startServer()) return;
+        // Lets chrome://inspect attach to the page when something misbehaves on a phone.
+        WebView.setWebContentsDebuggingEnabled(true);
 
         web = new WebView(this);
         web.setBackgroundColor(Color.BLACK);
+        // A game, not a document: no text-selection popups, haptic buzz or
+        // overscroll glow when a finger holds or drags on the screen.
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setLongClickable(false);
+        web.setOnLongClickListener(v -> true);
+        web.setHapticFeedbackEnabled(false);
+        web.setVerticalScrollBarEnabled(false);
+        web.setHorizontalScrollBarEnabled(false);
         setContentView(web);
         hideSystemBars();
 
@@ -99,7 +115,7 @@ public class MainActivity extends Activity {
                 try {
                     startActivityForResult(pick, PICK_FILES);
                     Toast.makeText(MainActivity.this,
-                            "Diablo II 폴더의 .mpq 파일을 모두 선택하세요 (d2data, d2char, d2sfx, d2exp, d2music...)",
+                            "Diablo II 폴더의 .mpq 파일을 모두 길게 눌러 한꺼번에 선택하세요 (d2data, d2char, d2sfx, d2exp, patch_d2, d2music...)",
                             Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     pendingChooser = null;
@@ -119,19 +135,14 @@ public class MainActivity extends Activity {
     private boolean startServer() {
         try {
             if (server == null) {
-                final AssetManager assets = getAssets();
-                server = new LocalServer(new LocalServer.Files() {
-                    @Override
-                    public InputStream open(String path) throws IOException {
-                        return assets.open(path);
-                    }
-
-                    @Override
-                    public String[] list(String path) throws IOException {
-                        return assets.list(path);
-                    }
-                }, PORT);
+                Updater updater = new Updater(new File(getFilesDir(), "site"));
+                updater.applyPending();
+                LocalServer.Files files = siteFiles(updater.current());
+                server = new LocalServer(files, PORT);
                 server.start();
+                updater.checkAsync(installedBuild(files), build -> runOnUiThread(() ->
+                        Toast.makeText(this, "게임 새 버전(" + build + ")을 받았습니다. 앱을 다시 시작하면 적용됩니다.",
+                                Toast.LENGTH_LONG).show()));
             }
             return true;
         } catch (IOException e) {
@@ -141,6 +152,46 @@ public class MainActivity extends Activity {
                     Toast.LENGTH_LONG).show();
             finish();
             return false;
+        }
+    }
+
+    /** The site as updated in the app's storage, else the copy built into the APK. */
+    private LocalServer.Files siteFiles(final File updated) {
+        if (new File(updated, "play/index.html").isFile()) {
+            return new LocalServer.Files() {
+                @Override
+                public InputStream open(String path) throws IOException {
+                    File f = new File(updated, path.substring(path.indexOf('/') + 1));
+                    if (!f.isFile()) throw new FileNotFoundException(path);
+                    return new FileInputStream(f);
+                }
+
+                @Override
+                public String[] list(String path) {
+                    String[] names = new File(updated, path.substring(path.indexOf('/') + 1)).list();
+                    return names != null ? names : new String[0];
+                }
+            };
+        }
+        final AssetManager assets = getAssets();
+        return new LocalServer.Files() {
+            @Override
+            public InputStream open(String path) throws IOException {
+                return assets.open(path);
+            }
+
+            @Override
+            public String[] list(String path) throws IOException {
+                return assets.list(path);
+            }
+        };
+    }
+
+    private static String installedBuild(LocalServer.Files files) {
+        try (InputStream in = files.open("www/build.json")) {
+            return new String(Updater.readAll(in), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
         }
     }
 
@@ -208,11 +259,27 @@ public class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) {
+        if (web == null) {
+            super.onBackPressed();
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (now - lastBack < 1500) {
+            super.onBackPressed();
+            return;
+        }
+        lastBack = now;
+        String path = Uri.parse(String.valueOf(web.getUrl())).getPath();
+        if ("/play/".equals(path)) {
+            // In the game, Back works like Esc: it opens or closes the game's own menu.
+            web.evaluateJavascript("(()=>{for(const t of['keydown','keyup'])"
+                    + "dispatchEvent(new KeyboardEvent(t,{key:'Escape',code:'Escape',bubbles:true}))})()", null);
+        } else if (web.canGoBack()) {
             web.goBack();
         } else {
-            super.onBackPressed();
+            web.loadUrl(START_URL);
         }
+        Toast.makeText(this, "한 번 더 누르면 종료합니다", Toast.LENGTH_SHORT).show();
     }
 
     @Override

@@ -1,4 +1,4 @@
-import re, sys, os, urllib.request, urllib.parse, concurrent.futures as cf
+import re, sys, os, urllib.request, urllib.error, urllib.parse, concurrent.futures as cf
 BASE = "https://d2survivors.lol/"
 OUT = sys.argv[1]
 SKIP = ("/d2/", "/download/", "/api/", "/next/", "/cdn-cgi/")
@@ -11,11 +11,16 @@ def local(u):
     if p.endswith("/"): p += "index.html"
     return os.path.join(OUT, p.lstrip("/"))
 def get(u):
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=60)
-        return u, r.read(), r.headers.get("content-type", ""), None
-    except Exception as e:
-        return u, None, "", str(e)
+    err = None
+    for attempt in range(3):
+        try:
+            r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=60)
+            return u, r.read(), r.headers.get("content-type", ""), None
+        except urllib.error.HTTPError as e:
+            return u, None, "", str(e)  # a guessed path that isn't there
+        except Exception as e:
+            err = str(e)  # dropped connection: try again
+    return u, None, "", err
 seen, missing, ok = set(), [], []
 frontier = [BASE + s for s in seeds]
 with cf.ThreadPoolExecutor(32) as ex:
@@ -45,4 +50,7 @@ print("fetched", len(ok))
 for m in missing:
     if "404" not in m[1]: print("ERR", m)
 print("404s:", sum("404" in m[1] for m in missing))
+failed = [m for m in missing if "HTTP Error" not in m[1] and "control characters" not in m[1]]
+if failed:
+    sys.exit(f"{len(failed)} files failed to download; run again")
 open(os.path.join(os.path.dirname(OUT), "mirror-404s.txt"), "w").write("\n".join(m[0] for m in missing))

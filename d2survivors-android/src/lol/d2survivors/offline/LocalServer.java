@@ -65,6 +65,36 @@ final class LocalServer {
         String[] list(String path) throws IOException;
     }
 
+    /** Served at APP_CSS and linked into every page: fits the site to a phone held sideways. */
+    private static final String APP_CSS_PATH = "/__app/mobile.css";
+    private static final byte[] APP_CSS = (""
+            // Taps should feel like a game's buttons, not a web page's links.
+            + "*{-webkit-tap-highlight-color:transparent}"
+            + "button,a,[role=button]{-webkit-user-select:none;user-select:none;touch-action:manipulation}"
+            // Offline the leaderboards, Discord and Ko-fi cannot load: keep them out of reach.
+            + ".site-boards,.site-discord,.site-kofi,.site-footer a[href^=http],.site-footer a[href*=leaderboards]"
+            + "{display:none!important}"
+            // A phone held sideways: the setup's big icon and title pushed its buttons off the screen.
+            + "@media (orientation:landscape) and (max-height:540px){"
+            + ".site-bar-in{min-height:0!important;padding-top:4px!important;padding-bottom:4px!important}"
+            + ".site-mark{width:28px!important;height:28px!important}"
+            // The bar above already names the game.
+            + ".stage main>header{display:none!important}"
+            + ".page p{margin-top:.3em!important;margin-bottom:.3em!important}"
+            + ".stage main{padding-top:8px!important;margin-top:0!important}"
+            + ".stage{min-height:0!important;padding-top:0!important}"
+            + "#heading{margin-top:4px!important}"
+            // Whatever the setup says above them, its buttons stay on screen.
+            + "#actions{position:sticky;bottom:0;z-index:5;padding:8px 0 10px!important;margin-bottom:0!important;"
+            + "background:linear-gradient(transparent,rgba(12,8,5,.92) 30%)}"
+            + "}"
+            + "@media (orientation:landscape) and (max-height:400px){"
+            + "#lines{font-size:.9em!important}"
+            + "#heading{font-size:1.4em!important}"
+            + "}").getBytes(StandardCharsets.UTF_8);
+    private static final byte[] APP_CSS_LINK =
+            ("<link rel=\"stylesheet\" href=\"" + APP_CSS_PATH + "\">").getBytes(StandardCharsets.UTF_8);
+
     private final Files assets;
     private final int port;
     private final ExecutorService pool = Executors.newCachedThreadPool();
@@ -150,6 +180,10 @@ final class LocalServer {
             redirect(out, "/play/");
             return;
         }
+        if (path.equals(APP_CSS_PATH)) {
+            send(out, 200, "OK", "text/css; charset=utf-8", APP_CSS, head);
+            return;
+        }
         String rel = path.substring(1);
         if (rel.endsWith("/")) rel += "index.html";
         byte[] body = read(rel);
@@ -162,7 +196,21 @@ final class LocalServer {
                     "Not available offline".getBytes(StandardCharsets.UTF_8), head);
             return;
         }
+        if (rel.endsWith(".html")) body = withAppCss(body);
         send(out, 200, "OK", typeOf(rel), body, head);
+    }
+
+    private static byte[] withAppCss(byte[] html) {
+        String text = new String(html, StandardCharsets.UTF_8);
+        int at = text.indexOf("</head>");
+        if (at < 0) return html;
+        byte[] before = text.substring(0, at).getBytes(StandardCharsets.UTF_8);
+        byte[] after = text.substring(at).getBytes(StandardCharsets.UTF_8);
+        byte[] out = new byte[before.length + APP_CSS_LINK.length + after.length];
+        System.arraycopy(before, 0, out, 0, before.length);
+        System.arraycopy(APP_CSS_LINK, 0, out, before.length, APP_CSS_LINK.length);
+        System.arraycopy(after, 0, out, before.length + APP_CSS_LINK.length, after.length);
+        return out;
     }
 
     private byte[] read(String rel) {
