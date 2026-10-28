@@ -5,6 +5,8 @@ import android.util.Log;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,13 +97,18 @@ final class LocalServer {
     private static final byte[] APP_CSS_LINK =
             ("<link rel=\"stylesheet\" href=\"" + APP_CSS_PATH + "\">").getBytes(StandardCharsets.UTF_8);
 
+    // The site's own switch: the game streams its files from the server (here, GameFileCache).
+    private static final byte[] SITE_JSON = "{ \"hostedFiles\": true }\n".getBytes(StandardCharsets.UTF_8);
+
     private final Files assets;
+    private final GameFileCache gameFiles;
     private final int port;
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private ServerSocket server;
 
-    LocalServer(Files assets, int port) {
+    LocalServer(Files assets, GameFileCache gameFiles, int port) {
         this.assets = assets;
+        this.gameFiles = gameFiles;
         this.port = port;
     }
 
@@ -166,10 +173,14 @@ final class LocalServer {
 
     private void serve(OutputStream out, String target, boolean head) throws IOException {
         String path = target;
-        int q = path.indexOf('?');
-        if (q >= 0) path = path.substring(0, q);
         int h = path.indexOf('#');
         if (h >= 0) path = path.substring(0, h);
+        String query = null;
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            query = path.substring(q + 1);
+            path = path.substring(0, q);
+        }
         path = URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
         if (!path.startsWith("/") || path.contains("..")) {
             send(out, 400, "Bad Request", "text/plain", null, head);
@@ -182,6 +193,20 @@ final class LocalServer {
         }
         if (path.equals(APP_CSS_PATH)) {
             send(out, 200, "OK", "text/css; charset=utf-8", APP_CSS, head);
+            return;
+        }
+        if (path.equals("/site.json")) {
+            send(out, 200, "OK", "application/json; charset=utf-8", SITE_JSON, head);
+            return;
+        }
+        if (path.startsWith("/d2/")) {
+            File f = gameFiles.get(path, query);
+            if (f == null) {
+                send(out, 404, "Not Found", "text/plain; charset=utf-8",
+                        "Not played online yet".getBytes(StandardCharsets.UTF_8), head);
+            } else {
+                sendFile(out, typeOf(path), f, head);
+            }
             return;
         }
         String rel = path.substring(1);
@@ -260,6 +285,21 @@ final class LocalServer {
                 + "Connection: close\r\n\r\n";
         out.write(headers.getBytes(StandardCharsets.ISO_8859_1));
         if (!head && body != null) out.write(body);
+    }
+
+    private static void sendFile(OutputStream out, String type, File f, boolean head) throws IOException {
+        try (InputStream in = new FileInputStream(f)) {
+            String headers = "HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: " + type + "\r\n"
+                    + "Content-Length: " + f.length() + "\r\n"
+                    + "Cache-Control: no-cache\r\n"
+                    + "Connection: close\r\n\r\n";
+            out.write(headers.getBytes(StandardCharsets.ISO_8859_1));
+            if (head) return;
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        }
     }
 
     private static String readLine(InputStream in) throws IOException {

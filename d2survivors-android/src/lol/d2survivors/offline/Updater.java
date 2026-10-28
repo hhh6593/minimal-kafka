@@ -138,6 +138,11 @@ final class Updater {
         for (String r : REQUIRED) {
             if (!new File(work, r).isFile()) throw new IOException("mirror lacks " + r);
         }
+        if (!playsHostedFiles(new File(work, "assets"))) {
+            // The site has announced that hosted files go away; a build without them could
+            // not play the files GameFileCache kept, so the app stays on the build it has.
+            throw new IOException("the new build no longer plays hosted files");
+        }
         patch(work);
         File next = new File(siteDir, "next");
         delete(next);
@@ -201,6 +206,18 @@ final class Updater {
         }
     }
 
+    private static boolean playsHostedFiles(File assets) throws IOException {
+        File[] files = assets.listFiles();
+        if (files == null) return false;
+        for (File f : files) {
+            if (f.getName().endsWith(".js")
+                    && new String(readFile(f), StandardCharsets.UTF_8).contains("hostedFiles")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void patch(File root) throws IOException {
         for (Patch p : PATCHES) {
             boolean hit = false;
@@ -222,7 +239,6 @@ final class Updater {
             }
             if (!hit) throw new IOException("the new build no longer matches patch " + p.find.pattern());
         }
-        writeFile(new File(root, "site.json"), "{ \"hostedFiles\": false }\n");
         new File(root, "robots.txt").delete();
         stripBeacons(root);
     }

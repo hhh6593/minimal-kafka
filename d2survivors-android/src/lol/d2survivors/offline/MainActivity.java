@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
                 Updater updater = new Updater(new File(getFilesDir(), "site"));
                 updater.applyPending();
                 LocalServer.Files files = siteFiles(updater.current());
-                server = new LocalServer(files, PORT);
+                server = new LocalServer(files, new GameFileCache(new File(getFilesDir(), "d2")), PORT);
                 server.start();
                 updater.checkAsync(installedBuild(files), build -> runOnUiThread(() ->
                         Toast.makeText(this, "게임 새 버전(" + build + ")을 받았습니다. 앱을 다시 시작하면 적용됩니다.",

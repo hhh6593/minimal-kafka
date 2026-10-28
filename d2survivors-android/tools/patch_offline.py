@@ -1,11 +1,12 @@
 """Adapt a mirror of d2survivors.lol for the offline Android wrapper.
 
 The site streams the game's Diablo II files from its own server ("hosted
-files") and offers phones nothing else. Offline there is no server, so the
-wrapper switches the site to its other mode, the player's own files, which
-the setup page extracts into the origin's private storage once. The game
-gates that mode off on touch-only devices because a phone browser cannot
-pick a folder; the wrapper supplies a file picker, so the gate is lifted.
+files"); the wrapper's LocalServer keeps the ones the player loads online
+(GameFileCache) so they play offline later. The site's other mode, the
+player's own files, extracts a Diablo II install into the origin's private
+storage. The game gates that mode off on touch-only devices because a phone
+browser cannot pick a folder; the wrapper supplies a folder picker, so the
+gate is lifted.
 
 The same patches are applied on the device by Updater.java when the app
 refreshes its copy of the site; keep the two in step.
@@ -35,31 +36,27 @@ def patch(pattern, regex, repl, done):
         sys.exit(f"pattern not found in {pattern}: {regex}")
 
 
-# 1. No server files: the game uses the player's own Diablo II files.
-with open(os.path.join(root, "site.json"), "w") as f:
-    f.write('{ "hostedFiles": false }\n')
-
-# 2. Touch-only devices may use their own files too (the app has a file picker).
+# 1. Touch-only devices may use their own files too (the app has a file picker).
 patch("assets/game-*.js",
       r"function ([\w$]+)\(\)\{return matchMedia\(`\(pointer: coarse\)`\)\.matches&&!matchMedia\(`\(pointer: fine\)`\)\.matches\}",
       r"function \1(){return!1}",
       r"function [\w$]+\(\)\{return!1\}async function")
 
-# 3. Android WebView exposes showDirectoryPicker but rejects every call, which
+# 2. Android WebView exposes showDirectoryPicker but rejects every call, which
 #    the setup page reads as the player cancelling: use the file input instead.
 patch("assets/setup-*.js",
       r"var ([\w$]+)=\(\)=>window\.showDirectoryPicker;",
       r"var \1=()=>void 0;",
       r"var [\w$]+=\(\)=>void 0;function")
 
-# 4. Android WebView cannot pick a folder: ask for the .mpq files themselves.
+# 3. Android WebView cannot pick a folder: ask for the .mpq files themselves.
 #    The setup code already accepts bare file names (no relative paths).
 patch("assets/setup-*.js",
       r"([\w$]+)\.webkitdirectory=!0",
       r"\1.webkitdirectory=!1",
       r"\.webkitdirectory=!1")
 
-# 5. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
+# 4. Drop the Cloudflare analytics beacon; it cannot load offline anyway.
 for path in glob.glob(os.path.join(root, "**", "*.html"), recursive=True):
     with open(path, encoding="utf-8") as f:
         text = f.read()
