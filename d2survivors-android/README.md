@@ -36,7 +36,7 @@
 2. 휴대폰에 Diablo II(클래식, 1.14 패치) 파일을 복사해 둡니다. 필수: `d2data.mpq`,
    `d2char.mpq`, `d2sfx.mpq`, `d2exp.mpq`, `patch_d2.mpq`. 선택: `d2music.mpq`,
    `d2xmusic.mpq`, `d2speech.mpq`, `d2xtalk.mpq`.
-3. 앱 → **USE MY OWN FILES…** → 위 파일을 **모두 한꺼번에** 선택하면 추출이 시작됩니다.
+3. 앱 → **USE MY OWN FILES…** → `.mpq` 파일이 든 폴더(예: `Download/diablo2`)를 열고 **이 폴더 사용**을 누르면, 앱이 하위 폴더까지 `.mpq`를 찾아 추출을 시작합니다.
 4. 추출이 끝나면 비행기 모드에서도 플레이할 수 있습니다.
 
 D2R(CASC 폴더)은 폴더 단위로 선택해야 해서 이 앱에서는 지원하지 않습니다.

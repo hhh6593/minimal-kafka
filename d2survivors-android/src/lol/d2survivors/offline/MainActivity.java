@@ -1,14 +1,16 @@
 package lol.d2survivors.offline;
 
 import android.app.Activity;
-import android.content.ClipData;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.provider.DocumentsContract;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -29,6 +31,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class MainActivity extends Activity {
     private static final String TAG = "D2SOffline";
@@ -36,7 +43,9 @@ public class MainActivity extends Activity {
     private static final int PORT = 47811;
     private static final String HOST = "127.0.0.1:" + PORT;
     private static final String START_URL = "http://" + HOST + "/play/";
-    private static final int PICK_FILES = 1;
+    private static final int PICK_FOLDER = 1;
+    // How deep under the picked folder to look for the .mpq files, as the setup page does.
+    private static final int SEARCH_DEPTH = 3;
 
     private static LocalServer server;
 
@@ -106,16 +115,14 @@ public class MainActivity extends Activity {
                                              FileChooserParams params) {
                 if (pendingChooser != null) pendingChooser.onReceiveValue(null);
                 pendingChooser = callback;
-                // Android has no folder picker for the web, so the player picks the
-                // Diablo II .mpq files themselves (d2data.mpq, d2exp.mpq, ...).
-                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                pick.addCategory(Intent.CATEGORY_OPENABLE);
-                pick.setType("*/*");
-                pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                // The setup asks for the Diablo II folder. WebView cannot pick one, so
+                // the app opens Android's folder picker and hands the page the .mpq
+                // files it finds there.
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
                 try {
-                    startActivityForResult(pick, PICK_FILES);
+                    startActivityForResult(pick, PICK_FOLDER);
                     Toast.makeText(MainActivity.this,
-                            "Diablo II 폴더의 .mpq 파일을 모두 길게 눌러 한꺼번에 선택하세요 (d2data, d2char, d2sfx, d2exp, patch_d2, d2music...)",
+                            ".mpq 파일이 들어 있는 Diablo II 폴더(예: Download/diablo2)를 열고 하단의 '이 폴더 사용'을 누르세요",
                             Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     pendingChooser = null;
@@ -198,19 +205,58 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != PICK_FILES || pendingChooser == null) return;
-        Uri[] result = null;
-        if (resultCode == RESULT_OK && data != null) {
-            ClipData clip = data.getClipData();
-            if (clip != null) {
-                result = new Uri[clip.getItemCount()];
-                for (int i = 0; i < result.length; i++) result[i] = clip.getItemAt(i).getUri();
-            } else if (data.getData() != null) {
-                result = new Uri[]{data.getData()};
-            }
-        }
-        pendingChooser.onReceiveValue(result);
+        if (requestCode != PICK_FOLDER || pendingChooser == null) return;
+        final ValueCallback<Uri[]> callback = pendingChooser;
         pendingChooser = null;
+        final Uri tree = resultCode == RESULT_OK && data != null ? data.getData() : null;
+        if (tree == null) {
+            callback.onReceiveValue(null);
+            return;
+        }
+        // Listing a folder through the document provider can be slow: keep it off the UI thread.
+        new Thread(() -> {
+            List<String> names = new ArrayList<>();
+            Uri[] files = findMpqs(tree, names);
+            runOnUiThread(() -> {
+                Toast.makeText(this, files.length == 0
+                                ? "이 폴더와 하위 폴더에서 .mpq 파일을 찾지 못했습니다"
+                                : ".mpq " + files.length + "개 찾음: " + TextUtils.join(", ", names),
+                        Toast.LENGTH_LONG).show();
+                callback.onReceiveValue(files);
+            });
+        }, "d2s-find-mpq").start();
+    }
+
+    /** The .mpq files in the picked folder and its subfolders, nearest first, one per name. */
+    private Uri[] findMpqs(Uri tree, List<String> names) {
+        List<Uri> found = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        List<String> level = new ArrayList<>();
+        level.add(DocumentsContract.getTreeDocumentId(tree));
+        String[] columns = {DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE};
+        for (int depth = 0; depth <= SEARCH_DEPTH && !level.isEmpty(); depth++) {
+            List<String> next = new ArrayList<>();
+            for (String dir : level) {
+                Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, dir);
+                try (Cursor c = getContentResolver().query(children, columns, null, null, null)) {
+                    while (c != null && c.moveToNext()) {
+                        String id = c.getString(0), name = c.getString(1), mime = c.getString(2);
+                        if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                            next.add(id);
+                        } else if (name != null && name.toLowerCase(Locale.ROOT).endsWith(".mpq")
+                                && seen.add(name.toLowerCase(Locale.ROOT))) {
+                            found.add(DocumentsContract.buildDocumentUriUsingTree(tree, id));
+                            names.add(name);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "cannot list " + dir, e);
+                }
+            }
+            level = next;
+        }
+        return found.toArray(new Uri[0]);
     }
 
     @SuppressWarnings("deprecation")
