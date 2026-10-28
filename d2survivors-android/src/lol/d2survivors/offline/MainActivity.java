@@ -119,10 +119,17 @@ public class MainActivity extends Activity {
                 // the app opens Android's folder picker and hands the page the .mpq
                 // files it finds there.
                 Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    // Start in internal storage's Download/diablo2: folders reached through the
+                    // picker's "Downloads" shortcut can never be picked, the same folder here can.
+                    pick.putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri(
+                            "com.android.externalstorage.documents", "primary:Download/diablo2"));
+                }
                 try {
                     startActivityForResult(pick, PICK_FOLDER);
                     Toast.makeText(MainActivity.this,
-                            ".mpq 파일이 들어 있는 Diablo II 폴더(예: Download/diablo2)를 열고 하단의 '이 폴더 사용'을 누르세요",
+                            "내장 저장공간 > Download > diablo2 폴더에서 하단의 '이 폴더 사용'을 누르세요"
+                                    + " (왼쪽 메뉴의 '다운로드' 바로가기로 들어가면 선택이 막힙니다)",
                             Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     pendingChooser = null;
