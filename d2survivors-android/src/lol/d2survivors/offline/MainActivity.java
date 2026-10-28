@@ -11,9 +11,9 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -242,35 +242,33 @@ public class MainActivity extends Activity {
     }
 
     private void showSettings() {
-        final boolean wasStrong = strongMode();
+        final int was = strongMode() ? strongSpeed() : 0;
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(pad, pad / 2, pad, 0);
 
-        final int wasSpeed = strongSpeed();
-        final Switch strong = new Switch(this);
-        strong.setText("강해지는 모드 (무적 · 피해 50배)");
-        strong.setChecked(wasStrong);
-        box.addView(strong);
-        TextView speedLabel = new TextView(this);
-        speedLabel.setText("게임 속도");
-        speedLabel.setPadding(0, pad / 2, 0, 0);
-        box.addView(speedLabel);
-        final RadioGroup speeds = new RadioGroup(this);
-        speeds.setOrientation(RadioGroup.HORIZONTAL);
-        for (int speed : SPEEDS) {
+        // One row of choices: off, or on at a speed. A separate on/off switch went unseen in
+        // this theme and the speed was dropped while it was off.
+        TextView strongLabel = new TextView(this);
+        strongLabel.setText("강해지는 모드 (무적 · 피해 50배) · 게임 속도");
+        box.addView(strongLabel);
+        final RadioGroup choices = new RadioGroup(this);
+        choices.setOrientation(RadioGroup.HORIZONTAL);
+        int[] values = new int[SPEEDS.length + 1];
+        System.arraycopy(SPEEDS, 0, values, 1, SPEEDS.length);
+        for (int i = 0; i < values.length; i++) {
             RadioButton r = new RadioButton(this);
-            r.setText(speed + "배");
-            r.setId(speed);
-            speeds.addView(r);
+            r.setText(values[i] == 0 ? "끔" : values[i] + "배");
+            r.setId(i + 1);
+            choices.addView(r);
+            if (values[i] == was) choices.check(i + 1);
         }
-        speeds.check(wasSpeed);
-        box.addView(speeds);
+        box.addView(choices);
         TextView strongNote = new TextView(this);
-        strongNote.setText("게임에 들어 있는 테스트 기능을 켭니다. 빨리 진행하며 오프라인용 파일을 모을 때 쓰세요."
-                + " 빠를수록 그림이 늦게 뜰 수 있지만 파일은 그대로 저장됩니다."
-                + " 리더보드는 이 앱에서 꺼져 있습니다.");
+        strongNote.setText("고르면 바로 적용되고 게임이 처음 화면부터 다시 열립니다."
+                + " 게임에 들어 있는 테스트 기능으로, 빨리 진행하며 오프라인용 파일을 모을 때 쓰세요."
+                + " 빠를수록 그림이 늦게 뜰 수 있지만 파일은 그대로 저장됩니다. 리더보드는 이 앱에서 꺼져 있습니다.");
         strongNote.setTextSize(12);
         strongNote.setPadding(0, 0, 0, pad);
         box.addView(strongNote);
@@ -282,19 +280,21 @@ public class MainActivity extends Activity {
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(box);
-        AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+        final AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
                 .setTitle("앱 설정")
                 .setView(scroll)
                 .setPositiveButton("닫기", null)
                 .create();
-        dialog.setOnDismissListener(d -> {
-            int speed = speeds.getCheckedRadioButtonId();
-            boolean on = strong.isChecked();
-            if (on == wasStrong && (!on || speed == wasSpeed)) return;
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putBoolean(PREF_STRONG, on).putInt(PREF_SPEED, speed > 0 ? speed : 4).apply();
-            Toast.makeText(this, on ? "강해지는 모드: 켬, 속도 " + speed + "배" : "강해지는 모드를 껐습니다",
+        choices.setOnCheckedChangeListener((group, id) -> {
+            int speed = values[id - 1];
+            if (speed == was) return;
+            SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(PREF_STRONG, speed > 0);
+            if (speed > 0) e.putInt(PREF_SPEED, speed);
+            e.apply();
+            Toast.makeText(this, speed > 0 ? "강해지는 모드: 켬 · 속도 " + speed + "배" : "강해지는 모드: 끔",
                     Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
             web.loadUrl(startUrl());
         });
         dialog.show();
