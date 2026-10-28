@@ -248,6 +248,7 @@ final class LocalServer {
         }
         if (path.startsWith("/d2/")) {
             File f = gameFiles.get(path, query);
+            if (f == null) f = gameFiles.standIn(path);
             if (f == null) {
                 send(out, 404, "Not Found", "text/plain; charset=utf-8",
                         "Not played online yet".getBytes(StandardCharsets.UTF_8), head);

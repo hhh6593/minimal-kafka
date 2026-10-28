@@ -12,7 +12,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Keeps the game files (/d2/...) the site sends while the player plays
@@ -94,6 +97,34 @@ final class GameFileCache {
         } finally {
             c.disconnect();
         }
+    }
+
+    // A gear sheet: sprites/gear/<hero>/<part>-<look>-<animation>-<weapon class>.bin
+    private static final Pattern GEAR = Pattern.compile("sprites/gear/([a-z]+)/([A-Z0-9]+)-([A-Z0-9]+)-([A-Z0-9]+)-([A-Z0-9]+)\\.bin");
+
+    /**
+     * For a gear sheet that is not kept (a look first worn offline), a kept look of the same part,
+     * animation and weapon class, the plain LIT look first. The game draws nothing for a part whose
+     * sheet is missing, so a hero would lose a head or an arm; the stand-in keeps it whole. Looks of
+     * one part share their frame layout, which is why only the look may differ. Null when there is none.
+     */
+    File standIn(String path) {
+        Matcher m = GEAR.matcher(path.substring("/d2/".length()));
+        if (!m.matches()) return null;
+        File heroDir = new File(dir, "sprites/gear/" + m.group(1));
+        String part = m.group(2), rest = "-" + m.group(4) + "-" + m.group(5) + ".bin";
+        File plain = new File(heroDir, part + "-LIT" + rest);
+        if (plain.isFile()) return plain;
+        String[] names = heroDir.list();
+        if (names == null) return null;
+        Arrays.sort(names);
+        for (String name : names) {
+            if (name.startsWith(part + "-") && name.endsWith(rest)
+                    && name.length() - part.length() - rest.length() > 1) {
+                return new File(heroDir, name);
+            }
+        }
+        return null;
     }
 
     /** How many game files are kept, and their total size in bytes. */
