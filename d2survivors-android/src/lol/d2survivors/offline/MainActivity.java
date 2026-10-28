@@ -7,6 +7,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.os.Message;
 import android.webkit.JavascriptInterface;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -33,6 +34,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
+import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
@@ -55,14 +57,14 @@ public class MainActivity extends Activity {
     private static final int PORT = 47811;
     private static final String HOST = "127.0.0.1:" + PORT;
     private static final String START_URL = "http://" + HOST + "/play/";
-    // The game's own test switches (see tn in the site's code): no damage taken, fifty times the
-    // damage dealt, and the game clock sped up so the acts go by fast while their files load.
-    // The game never ranks a run played with them.
-    private static final String STRONG_QUERY = "?god&power=50&speed=";
+    // The game's own test switches (see tn in the site's code): no damage taken, the game clock
+    // sped up so the acts go by fast while their files load, and optionally fifty times the
+    // damage dealt. The game never ranks a run played with them.
     private static final int[] SPEEDS = {2, 4, 8, 16};
     private static final String PREFS = "app";
     private static final String PREF_STRONG = "strongMode";
     private static final String PREF_SPEED = "strongSpeed";
+    private static final String PREF_HARD_HITS = "strongHardHits";
     private static final int PICK_FOLDER = 1;
     // How deep under the picked folder to look for the .mpq files, as the setup page does.
     private static final int SEARCH_DEPTH = 3;
@@ -197,7 +199,16 @@ public class MainActivity extends Activity {
     }
 
     private String startUrl() {
-        return strongMode() ? START_URL + STRONG_QUERY + strongSpeed() : START_URL;
+        if (!strongMode()) return START_URL;
+        return START_URL + "?god&speed=" + strongSpeed() + (hardHits() ? "&power=50" : "");
+    }
+
+    /**
+     * Fifty times the damage clears acts fastest, but monsters die before they attack, so their
+     * attack animations are never loaded and kept; at normal damage they are.
+     */
+    private boolean hardHits() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_HARD_HITS, false);
     }
 
     private int strongSpeed() {
@@ -251,7 +262,7 @@ public class MainActivity extends Activity {
         // One row of choices: off, or on at a speed. A separate on/off switch went unseen in
         // this theme and the speed was dropped while it was off.
         TextView strongLabel = new TextView(this);
-        strongLabel.setText("강해지는 모드 (무적 · 피해 50배) · 게임 속도");
+        strongLabel.setText("강해지는 모드 (무적) · 게임 속도");
         box.addView(strongLabel);
         final RadioGroup choices = new RadioGroup(this);
         choices.setOrientation(RadioGroup.HORIZONTAL);
@@ -265,9 +276,27 @@ public class MainActivity extends Activity {
             if (values[i] == was) choices.check(i + 1);
         }
         box.addView(choices);
+        TextView hitLabel = new TextView(this);
+        hitLabel.setText("공격력");
+        hitLabel.setPadding(0, pad / 2, 0, 0);
+        box.addView(hitLabel);
+        final RadioGroup hits = new RadioGroup(this);
+        hits.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton normal = new RadioButton(this);
+        normal.setText("보통 (몬스터 공격 그림도 저장)");
+        normal.setId(1);
+        RadioButton hard = new RadioButton(this);
+        hard.setText("50배 (빠름)");
+        hard.setId(2);
+        hits.addView(normal);
+        hits.addView(hard);
+        final boolean wasHard = hardHits();
+        hits.check(wasHard ? 2 : 1);
+        box.addView(hits);
         TextView strongNote = new TextView(this);
         strongNote.setText("고르면 바로 적용되고 게임이 처음 화면부터 다시 열립니다."
                 + " 게임에 들어 있는 테스트 기능으로, 빨리 진행하며 오프라인용 파일을 모을 때 쓰세요."
+                + " 50배면 몬스터가 공격하기 전에 쓰러져 공격 그림이 저장되지 않습니다."
                 + " 빠를수록 그림이 늦게 뜰 수 있지만 파일은 그대로 저장됩니다. 리더보드는 이 앱에서 꺼져 있습니다.");
         strongNote.setTextSize(12);
         strongNote.setPadding(0, 0, 0, pad);
@@ -278,6 +307,16 @@ public class MainActivity extends Activity {
         report.setText("오프라인 준비도 계산 중…");
         box.addView(report);
 
+        Button reset = new Button(this);
+        reset.setText("진행 초기화 (게임 파일은 유지)");
+        box.addView(reset);
+        TextView resetNote = new TextView(this);
+        resetNote.setText("캐릭터, 세이브, 게임 설정을 지우고 처음부터 시작합니다. 오프라인용으로 저장한"
+                + " 그래픽·소리는 그대로 둡니다. 강해지는 모드도 꺼집니다.");
+        resetNote.setTextSize(12);
+        resetNote.setPadding(0, 0, 0, pad);
+        box.addView(resetNote);
+
         ScrollView scroll = new ScrollView(this);
         scroll.addView(box);
         final AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
@@ -285,6 +324,16 @@ public class MainActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton("닫기", null)
                 .create();
+        hits.setOnCheckedChangeListener((group, id) -> {
+            boolean on = id == 2;
+            if (on == wasHard) return;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_HARD_HITS, on).apply();
+            if (!strongMode()) return;
+            Toast.makeText(this, on ? "공격력 50배" : "공격력 보통", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+            web.loadUrl(startUrl());
+        });
+        reset.setOnClickListener(v -> confirmReset(dialog));
         choices.setOnCheckedChangeListener((group, id) -> {
             int speed = values[id - 1];
             if (speed == was) return;
@@ -309,6 +358,33 @@ public class MainActivity extends Activity {
                     : "아직 정보가 없습니다. 온라인에서 HOSTED FILES로 한 번 플레이하세요.");
             runOnUiThread(() -> report.setText(all));
         }, "d2s-readiness").start();
+    }
+
+    /** Wipes the game's progress, never the game files the app keeps for offline play. */
+    private void confirmReset(final AlertDialog settings) {
+        new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("진행을 초기화할까요?")
+                .setMessage("모든 캐릭터와 세이브, 게임 설정이 지워지고 되돌릴 수 없습니다."
+                        + " 남기고 싶은 캐릭터가 있으면 먼저 게임의 SAVES에서 내보내세요.\n\n"
+                        + "오프라인용으로 저장한 그래픽·소리는 지워지지 않습니다."
+                        + " 내 D2 파일로 추출해 둔 파일은 지워지니 다시 추출해야 합니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("초기화", (d, w) -> {
+                    settings.dismiss();
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_STRONG, false).apply();
+                    // The page's own storage only (local storage, IndexedDB, its service worker and
+                    // private files); GameFileCache lives in the app's files, out of the page's reach.
+                    web.loadUrl("about:blank");
+                    web.clearCache(true);
+                    WebStorage.getInstance().deleteAllData();
+                    web.postDelayed(() -> {
+                        web.clearHistory();
+                        web.loadUrl(START_URL);
+                        Toast.makeText(this, "진행을 초기화했습니다", Toast.LENGTH_SHORT).show();
+                    }, 500);
+                })
+                .show();
+        hideSystemBars();
     }
 
     private boolean startServer() {

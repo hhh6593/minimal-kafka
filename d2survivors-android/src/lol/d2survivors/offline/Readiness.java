@@ -9,6 +9,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -17,9 +19,11 @@ import java.util.Set;
 /**
  * How much of each act and hero the kept game files cover, read from the
  * game's own manifests: an act needs its monsters' sprites, its areas'
- * floor tiles and its music; a hero needs its sprite sheets.
+ * floor tiles and its music; for a hero it counts the gear sheets kept.
  */
 final class Readiness {
+    // The animations the game loads for monsters (df in the site's code); it never fetches the rest.
+    private static final Set<String> MONSTER_MODES = new HashSet<>(Arrays.asList("NU", "WL", "A1", "S1", "DT"));
     static final String[] CLASSES = {"amazon", "assassin", "barbarian", "druid", "necromancer", "paladin", "sorceress"};
     private static final String[] CLASS_NAMES = {"아마존", "어쌔신", "바바리안", "드루이드", "네크로맨서", "팔라딘", "소서리스"};
 
@@ -35,7 +39,6 @@ final class Readiness {
             JSONObject catalog = json("monster-catalog.json");
             JSONObject tiles = json("tiles.json");
             JSONObject audio = json("audio.json");
-            JSONObject classes = json("classes.json");
             JSONObject sizes = json("monsters.json");
             if (catalog == null) return null;
             StringBuilder out = new StringBuilder();
@@ -50,15 +53,14 @@ final class Readiness {
                 out.append(String.format(Locale.ROOT, "%d막  %s\n", n, bar(have)));
             }
             out.append('\n');
-            if (classes == null) {
-                out.append("직업: 아직 정보 없음 (온라인에서 한 번 플레이하면 표시)\n");
-            } else {
-                for (int i = 0; i < CLASSES.length; i++) {
-                    int[] have = new int[2];
-                    JSONObject sheets = classes.optJSONObject(CLASSES[i]);
-                    if (sheets != null) files(sheets, have);
-                    out.append(String.format(Locale.ROOT, "%s  %s\n", CLASS_NAMES[i], bar(have)));
-                }
+            // A hero is drawn from gear sheets, one per part, look, animation and weapon class:
+            // over a thousand a hero, most never worn, so a count says more than a share.
+            out.append("직업별 저장된 외형 조각\n");
+            for (int i = 0; i < CLASSES.length; i++) {
+                String[] kept = new File(dir, "sprites/gear/" + CLASSES[i]).list();
+                int n = 0;
+                if (kept != null) for (String k : kept) if (k.endsWith(".bin")) n++;
+                out.append(String.format(Locale.ROOT, "%s  %d개\n", CLASS_NAMES[i], n));
             }
             return out.toString();
         } catch (IOException | JSONException e) {
@@ -104,29 +106,25 @@ final class Readiness {
     }
 
     /**
-     * One count per page of the sprite's sheets. A sprite never shown has no sheet list yet;
-     * it counts as one missing page per animation the game lists for it in monsters.json.
+     * One count per page of the sprite's sheets, for the animations the game loads. A sprite never
+     * shown has no sheet list yet; it counts as one missing page per such animation in monsters.json.
      */
     private void monster(String sprite, JSONObject sizes, int[] have) throws IOException, JSONException {
         JSONObject sheets = json("sprites/monsters/" + sprite + ".json");
         if (sheets == null) {
             JSONObject modes = sizes == null ? null : sizes.optJSONObject(sprite);
-            have[1] += modes != null && modes.length() > 0 ? modes.length() : 1;
+            int n = 0;
+            if (modes != null) for (Iterator<String> it = modes.keys(); it.hasNext(); ) if (MONSTER_MODES.contains(it.next())) n++;
+            have[1] += Math.max(1, n);
             return;
         }
-        files(sheets, have);
-    }
-
-    /** Counts the image files a sheet manifest names ("file", "shadow" or "pages"). */
-    private void files(JSONObject sheets, int[] have) {
         Iterator<String> modes = sheets.keys();
         while (modes.hasNext()) {
-            JSONObject sheet = sheets.optJSONObject(modes.next());
-            if (sheet == null) continue;
-            JSONArray pages = sheet.optJSONArray("pages");
+            String mode = modes.next();
+            if (!MONSTER_MODES.contains(mode)) continue;
+            JSONObject sheet = sheets.optJSONObject(mode);
+            JSONArray pages = sheet == null ? null : sheet.optJSONArray("pages");
             if (pages != null) for (int i = 0; i < pages.length(); i++) count(pages.optString(i), have);
-            if (sheet.has("file")) count(sheet.optString("file"), have);
-            if (sheet.has("shadow")) count(sheet.optString("shadow"), have);
         }
     }
 
