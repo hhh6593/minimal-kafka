@@ -152,8 +152,10 @@ public class MainActivity extends Activity {
                 Updater updater = new Updater(new File(getFilesDir(), "site"));
                 updater.applyPending();
                 LocalServer.Files files = siteFiles(updater.current());
-                server = new LocalServer(files, new GameFileCache(new File(getFilesDir(), "d2")), PORT);
+                final GameFileCache gameFiles = new GameFileCache(new File(getFilesDir(), "d2"));
+                server = new LocalServer(files, gameFiles, PORT);
                 server.start();
+                reportKeptFiles(gameFiles);
                 updater.checkAsync(installedBuild(files), build -> runOnUiThread(() ->
                         Toast.makeText(this, "게임 새 버전(" + build + ")을 받았습니다. 앱을 다시 시작하면 적용됩니다.",
                                 Toast.LENGTH_LONG).show()));
@@ -167,6 +169,18 @@ public class MainActivity extends Activity {
             finish();
             return false;
         }
+    }
+
+    /** Says how much of the game the app keeps for offline play: it lives in app-private storage. */
+    private void reportKeptFiles(final GameFileCache gameFiles) {
+        new Thread(() -> {
+            long[] stats = gameFiles.stats();
+            String text = stats[0] == 0
+                    ? "아직 오프라인용 게임 파일이 없습니다. 온라인에서 HOSTED FILES로 플레이하면 저장됩니다."
+                    : String.format(Locale.ROOT, "오프라인용 게임 파일 %d개 (%.1f MB) 저장됨",
+                    stats[0], stats[1] / 1048576.0);
+            runOnUiThread(() -> Toast.makeText(this, text, Toast.LENGTH_LONG).show());
+        }, "d2s-count").start();
     }
 
     /** The site as updated in the app's storage, else the copy built into the APK. */

@@ -96,6 +96,26 @@ final class GameFileCache {
         }
     }
 
+    /** How many game files are kept, and their total size in bytes. */
+    long[] stats() {
+        long[] total = new long[2];
+        count(dir, total);
+        return total;
+    }
+
+    private static void count(File d, long[] total) {
+        File[] kids = d.listFiles();
+        if (kids == null) return;
+        for (File k : kids) {
+            if (k.isDirectory()) {
+                count(k, total);
+            } else if (!k.getName().endsWith(VERSION_SUFFIX) && !k.getName().endsWith(".part")) {
+                total[0]++;
+                total[1] += k.length();
+            }
+        }
+    }
+
     private static String readVersion(File version) {
         if (!version.isFile()) return null;
         try (InputStream in = new FileInputStream(version)) {
