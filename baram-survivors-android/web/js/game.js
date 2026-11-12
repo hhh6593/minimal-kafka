@@ -254,7 +254,17 @@ function resize() {
   const k = Math.max(0.7, Math.min(1.25, innerHeight / 640));
   document.documentElement.style.setProperty('--side', Math.round(272 * k) + 'px');
   const panel = document.getElementById('panel');
-  if (panel) panel.style.transform = `translateY(${Math.min(0, innerHeight - 640 * k)}px) scale(${k})`;
+  if (panel) {
+    panel.style.transform = `translateY(${Math.min(0, innerHeight - 640 * k)}px) scale(${k})`;
+    // What goes past the top: the parchment's top edge moves down by as much, so its frame stays
+    // whole, and the name rows that no longer fit are left out rather than cut in half.
+    const cut = Math.max(0, (640 * k - innerHeight) / k);
+    panel.style.setProperty('--cut', cut + 'px');
+    for (const el of panel.querySelectorAll('.lbl, .fld')) {
+      const top = parseFloat(el.style.top);
+      if (top < 160) el.style.visibility = top < cut + 22 ? 'hidden' : '';
+    }
+  }
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
@@ -743,7 +753,16 @@ function stepHero(dx, dy, dt) {
   const nx = p.tx + dx, ny = p.ty + dy, there = occ.get(key(nx, ny));
   if (there && there.hp > 0) {
     p.pushT = (p.pushT || 0) + dt;
-    if (p.pushT < 0.5) return;
+    if (p.pushT < 0.5 || there.moving || there.kind === 'boss') return;
+    // Pushed long enough, the hero and the monster trade places: never two on one tile.
+    occ.delete(key(nx, ny));
+    place(there, p.tx, p.ty);
+    // It slides across as the hero does, rather than jumping.
+    there.fx = nx;
+    there.fy = ny;
+    there.mt = 0;
+    there.dur = TILE / heroSpeed();
+    there.moving = true;
   }
   p.pushT = 0;
   p.sfx = p.tx;
@@ -896,8 +915,16 @@ function spawn(dt) {
       G.enemies.splice(G.enemies.indexOf(e), 1);
       occ.delete(key(e.tx, e.ty));
     }
-    // Near a wall the ring can be full of rock: try again next frame rather than lose the boss.
-    if (!addEnemy(G.boss.m, 'boss', G.boss)) return;
+    // Near a wall the ring can be full of rock: try again next frame rather than lose the boss,
+    // but not for ever: after half a minute the ground is simply conquered.
+    if (!addEnemy(G.boss.m, 'boss', G.boss)) {
+      if (t > BOSS_AT + 30) {
+        G.bossDue = false;
+        G.bossT = t;
+        clearStage();
+      }
+      return;
+    }
     G.bossDue = false;
     G.bossT = t;
     audio.play('boss');
@@ -910,6 +937,17 @@ function spawn(dt) {
     // After 1:30 the boss loses life on its own, and from 2:50 takes twice the damage every
     // 10 seconds: no build gets stuck on it.
     const since = t - G.bossT, b = G.enemies.find(e => e.kind === 'boss');
+    // A boss gone without falling (it should not happen): the ground counts as conquered.
+    if (!b && !G.cleared) {
+      clearStage();
+      return;
+    }
+    // Never a ground without end: five minutes after it came, the boss falls.
+    if (b && (since > 300 || !(b.hp > -Infinity))) {
+      b.hp = 0;
+      killEnemy(b);
+      return;
+    }
     if (b && since > 90) {
       b.hp -= b.maxHp * 0.004 * dt * 60 / 60;
       b.weak = since > 170 ? Math.pow(2, (since - 170) / 10) : 1;
@@ -978,9 +1016,10 @@ function moveEnemies(dt) {
     e.stun = Math.max(0, e.stun - dt);
     e.curse = Math.max(0, e.curse - dt);
     if (e.moving || e.stun > 0) continue;
-    if (!e.kind && (Math.abs(e.tx - p.tx) > v.w + 4 || Math.abs(e.ty - p.ty) > v.h + 4)) {
-      // Left far behind: come back from the edge of the screen.
-      const at = ringTile();
+    if (Math.abs(e.tx - p.tx) > v.w + 4 || Math.abs(e.ty - p.ty) > v.h + 4) {
+      // Left far behind: come back from the edge of the screen. Champions, leaders and the
+      // boss too: they hunt the hero rather than wait somewhere off the map.
+      const at = ringTile(e.kind === 'boss' || e.kind === 'mini');
       if (at) {
         occ.delete(key(e.tx, e.ty));
         place(e, at[0], at[1]);
@@ -1048,6 +1087,7 @@ function hurtEnemy(e, dmg, push = null) {
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1);
+  if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   e.hp -= dmg;
   e.flash = 0.12;
   e.shown = G.t;
@@ -1789,8 +1829,9 @@ function updateParty(dt) {
     // Party members grow with the hero, as D2 Survivors' mercenaries share its level.
     m.lv = Math.min(6, 1 + Math.floor(p.lvl / 6));
     // Keep a place around the hero: behind it, spread to the sides.
-    const ang = [Math.PI * 0.75, Math.PI * 0.25, Math.PI * 1.5][m.slot] ?? 0;
-    const tx = p.x + Math.cos(ang) * 38, ty = p.y + Math.sin(ang) * 30 + 10;
+    // A tile of its own beside the hero, left, right or behind: never on top of it.
+    const [ox, oy] = [[-1, 0], [1, 0], [0, 1]][m.slot] || [0, 1];
+    const tx = (p.tx + ox) * TILE + TILE / 2, ty = (p.ty + oy) * TILE + TILE - 6;
     let dx = tx - m.x, dy = ty - m.y;
     const d = Math.hypot(dx, dy);
     m.moving = d > 6;

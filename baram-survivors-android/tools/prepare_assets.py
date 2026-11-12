@@ -82,6 +82,27 @@ def unwhite(frames):
     return [im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS) for im in out]
 
 
+def unframe(frames):
+    """Some of the site's GIFs were saved with a 1-pixel black box around the picture (투명, 저주,
+    지진, ...): drawn in the game it showed as a square. Clear any ring that is all opaque black."""
+    out = []
+    for f in frames:
+        f = f.copy()
+        px = f.load()
+        w, h = f.size
+        for r in range(3):
+            if w - 2 * r < 4 or h - 2 * r < 4:
+                break
+            ring = [(x, r) for x in range(r, w - r)] + [(x, h - 1 - r) for x in range(r, w - r)] \
+                + [(r, y) for y in range(r, h - r)] + [(w - 1 - r, y) for y in range(r, h - r)]
+            if not all(px[q][3] > 200 and sum(px[q][:3]) < 60 for q in ring):
+                break
+            for q in ring:
+                px[q] = (0, 0, 0, 0)
+        out.append(f)
+    return out
+
+
 def is_additive(frames):
     """True when the effect sits on an opaque, mostly black background."""
     px = black = 0
@@ -226,6 +247,8 @@ def main():
             continue
         frames, durs = frames_of(fx_files[fid])
         add = is_additive(frames)
+        if not add:
+            frames = unframe(frames)
         strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
         icon(frames, add).save(os.path.join(out, "icon", fid + ".png"))
         manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),

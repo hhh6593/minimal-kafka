@@ -123,7 +123,13 @@
   #town-gold { color: #ffe070; }
   #town-back { position: absolute; left: max(8px, env(safe-area-inset-left)); bottom: 8px; min-width: 0; }
   .town-tip { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); white-space: nowrap;
-      font: 10px G9, monospace; color: #f6e6c0; text-shadow: 1px 1px 0 #000; }
+      font: 10px G9, monospace; color: #f6e6c0; text-shadow: 1px 1px 0 #000;
+      /* A notice line, as the client's system messages: it says its piece and goes, so it never
+         sits on top of the people at the bottom of the map. */
+      padding: 3px 10px; background: rgba(20, 10, 4, .75); border: 1px solid #6a3a18;
+      animation: tip-out 9s forwards; pointer-events: none; }
+  @keyframes tip-out { 0%, 80% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+  #town:not([hidden]) .town-tip { animation-name: tip-out; }
   #talk { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: 40px; min-width: 0; padding: 10px 16px; }
   #trade { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
@@ -223,7 +229,7 @@
   #panel { position: absolute; left: 0; top: 0; width: 272px; height: 640px; transform-origin: 0 0; color: #2a1606;
       font: 12px/15px G11, monospace;
       background: repeating-linear-gradient(45deg, #5a3216 0 3px, #4e2a12 3px 6px); }
-  #panel .scroll { position: absolute; left: 10px; top: 16px; width: 252px; height: 376px; border-radius: 26px / 30px;
+  #panel .scroll { position: absolute; left: 10px; top: calc(16px + var(--cut, 0px)); width: 252px; height: calc(376px - var(--cut, 0px)); border-radius: 26px / 30px;
       background: radial-gradient(ellipse at 50% 45%, #d4a868, #c08a4c 70%, #a8723a);
       box-shadow: inset 0 0 0 2px #e6c48a, inset 0 0 0 4px #8a5424, 0 0 0 2px #2a1206; }
   #panel .lbl { position: absolute; left: 18px; font: 700 14px/18px G11, monospace; color: #f6e6c0;
