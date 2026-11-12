@@ -333,6 +333,7 @@ function buildStages() {
   for (const b of document.querySelectorAll('#map-tabs button')) b.classList.toggle('on', b.dataset.map === mapTab);
   const map = $('#map');
   map.innerHTML = `<img src="assets/ui/${mapTab}.webp" alt="">`;
+  map.classList.toggle('gungnae', mapTab === 'gungnae');
   STAGES.forEach((s, i) => {
     if (s.map !== mapTab) return;
     const b = document.createElement('button');

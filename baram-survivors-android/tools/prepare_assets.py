@@ -342,6 +342,12 @@ def main():
                 im.save(os.path.join(out, "ui", key + ".png"), optimize=True)
                 manifest["ui"][key] = {"w": im.width, "h": im.height}
 
+    # 국내성 seen whole (TOWN_DIR/gungnae.png, a labelled overview): the hunting-ground picker's
+    # first map, its caves where the city has them.
+    if town_src and os.path.isfile(os.path.join(town_src, "gungnae.png")):
+        im = Image.open(os.path.join(town_src, "gungnae.png")).convert("RGB")
+        im.save(os.path.join(out, "ui", "gungnae.webp"), quality=90)
+
     # The world maps, for the hunting-ground picker.
     for name in ("world_1", "world_4"):
         p = os.path.join(src, "maps", "world", name + ".bmp")

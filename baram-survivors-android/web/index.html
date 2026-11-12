@@ -81,6 +81,10 @@
   .pin.locked i { border-top-color: #6a5a42; }
   .pin.on span { color: #000; background: var(--gold); border-color: #fff4c0; }
   .pin.on i { border-top-color: #fff4c0; }
+  /* On the 국내성 map the caves carry their own painted labels: a marker only, named when picked. */
+  #map.gungnae .pin span { display: none; }
+  #map.gungnae .pin.on span { display: inline; }
+  #map.gungnae .pin i { border-width: 6px; border-top-width: 9px; filter: drop-shadow(0 0 1px #000); }
   .info-col { display: flex; flex-direction: column; gap: 6px; width: min(300px, 42%); justify-content: center; }
   #stage-info { padding: 0 10px 8px; }
   #stage-info h3 { margin: 0; font-size: 16px; color: #7a1800; }
@@ -329,7 +333,7 @@
 <div id="stages" class="screen" hidden>
   <div class="stage-wrap">
     <div class="map-col">
-      <div id="map-tabs"><button data-map="world_1">대륙</button><button data-map="world_4">환상의 섬</button></div>
+      <div id="map-tabs"><button data-map="gungnae">국내성</button><button data-map="world_1">대륙</button><button data-map="world_4">환상의 섬</button></div>
       <div id="map"></div>
     </div>
     <div class="info-col">
