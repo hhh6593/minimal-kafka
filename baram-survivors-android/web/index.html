@@ -82,6 +82,14 @@
   .pin.on span { color: #000; background: var(--gold); border-color: #fff4c0; }
   .pin.on i { border-top-color: #fff4c0; }
   /* On the 국내성 map the caves carry their own painted labels: a marker only, named when picked. */
+  /* The boss's bar under the map's name: dark wood, a red fill, the numbers on it. */
+  #bossbar { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: min(40%, 300px); z-index: 3;
+      padding: 2px 6px 4px; background: #2a1408; border: 2px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
+      box-shadow: 0 0 0 1px #000; pointer-events: none; text-align: center; }
+  #bossbar b { display: block; font: 700 10px/12px G11, monospace; color: #ff9a6a; text-shadow: 1px 1px 0 #000; }
+  #bossbar i { position: relative; display: block; height: 6px; background: #3a0a06; border: 1px solid #000; }
+  #bossbar s { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#e8402a, #a01808); }
+  #bossbar span { display: block; margin-top: 1px; font: 8px G9, monospace; color: #f0d8b0; }
   /* The raid list: one carved plate per raid, its boss standing on it. */
   #map.raids { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: #2a1a0c; width: min(56vw, 420px); }
   .raid { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; padding: 4px 8px; text-align: left;
@@ -308,7 +316,7 @@
   #mini { position: absolute; left: 50%; top: 36px; transform: translateX(-50%); display: flex; gap: 6px;
       font: 10px G9, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
   #mini b { font-weight: normal; }
-  #banner { position: fixed; top: 22%; left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
+  #banner { position: fixed; top: max(22%, 86px); left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
       font-weight: 700; color: #ffe070; background: rgba(30, 16, 8, .9); border: 1px solid var(--frame-hi);
       pointer-events: none; white-space: nowrap; z-index: 4; }
   @media (max-height: 420px) {
@@ -405,6 +413,7 @@
   <div id="keys"><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
+  <div id="bossbar" hidden><b id="bb-name"></b><i><s id="bb-fill"></s></i><span id="bb-num"></span></div>
 </div>
 <div id="side" hidden><div id="panel">
   <div class="scroll"></div>
