@@ -432,8 +432,8 @@ function startRun(cls, stage) {
   audio.bgm('battle');
   $('#chat').innerHTML = '';
   $('#vert').innerHTML = '';
-  say(`${stage.name}에 들어왔습니다.`, '', 'sys');
-  say(stage.intro, '#c8e0ff');
+  say(`${stage.name}에 들어왔습니다.`, 'sys');
+  say(stage.intro);
 }
 
 function xpFor(lvl) {
@@ -564,7 +564,7 @@ function spawn(dt) {
   if (G.minis.length && t >= G.minis[0]) {
     G.minis.shift();
     addEnemy(G.mini.m, 'mini', G.mini);
-    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, '', 'warn');
+    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
     banner(`${G.mini.name} 등장`);
   }
   if (G.bossDue && t >= BOSS_AT) {
@@ -573,7 +573,7 @@ function spawn(dt) {
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
-    say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, '', 'warn');
+    say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, 'warn');
     banner(`보스 ${G.boss.name} 등장!`);
   }
 }
@@ -716,7 +716,7 @@ function killEnemy(e) {
   const roll = Math.random();
   if (e.kind) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
-    say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`, '#ffe08a');
+    say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
     if (e.kind === 'boss') clearStage();
     else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm('battle');
   } else if (roll < 0.006) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
@@ -732,8 +732,8 @@ function clearStage() {
   saveJson('bs_progress', progress);
   record();
   const next = STAGES[STAGES.indexOf(G.stage) + 1];
-  say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, '', 'sys');
-  if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`, '#c8e0ff');
+  say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, 'sys');
+  if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`);
   banner(`${G.stage.name} 정복!`);
 }
 
@@ -950,7 +950,7 @@ function castUlt() {
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   G.bubble = { text: `${def.name}!`, t: G.t };
-  say(`${def.name}!`, '#ffe08a');
+  say(`${def.name}!`);
   audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
   const lvl = p.lvl, pw = 1 + 0.1 * G.passives.power;
@@ -1087,7 +1087,7 @@ function gainXp(v) {
     p.lvl++;
     p.next = xpFor(p.lvl);
     G.pendingLevels++;
-    say(`레벨이 올랐습니다. (Lv ${p.lvl})`, '', 'sys');
+    say(`레벨이 올랐습니다. (Lv ${p.lvl})`, 'sys');
   }
   if (G.pendingLevels && !G.choosing) nextChoice();
 }
@@ -1162,7 +1162,7 @@ function choose(o) {
   if (!G.choosing) return; // a second tap on the same card
   if (o.type === 'skill') {
     addSkill(o.id);
-    say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`, '#c8e0ff');
+    say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`);
   } else if (o.type === 'passive') {
     G.passives[o.id]++;
     if (o.id === 'life') {
@@ -1205,7 +1205,7 @@ function die() {
     p.hp = p.maxHp * 0.5;
     G.buffs.guard = G.t + 3;
     G.bubble = { text: '부활!', t: G.t };
-    say('부활 마법으로 다시 일어났습니다.', '#ffe08a');
+    say('부활 마법으로 다시 일어났습니다.');
     addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
     audio.play('heal');
     return;
@@ -1214,7 +1214,7 @@ function die() {
   p.hp = 0;
   audio.play('lose');
   audio.stopBgm();
-  say('유령이 되었습니다…', '', 'warn');
+  say('유령이 되었습니다…', 'warn');
   record();
   setTimeout(() => {
     if (!G) return;
@@ -1261,13 +1261,13 @@ function note(text) {
 }
 
 /** A line in the chat window. kind 'sys' is the blue system line, 'warn' red. */
-function say(text, color, kind = '') {
+function say(text, kind = '') {
   const chat = $('#chat');
   const p = document.createElement('p');
   p.textContent = text;
   if (kind) p.className = kind;
   chat.append(p);
-  while (chat.children.length > 3) chat.firstChild.remove();
+  while (chat.children.length > 4) chat.firstChild.remove();
 }
 
 /** The right particle after a Korean word: josa('서생원', '이', '가') -> '서생원이'. */
@@ -1645,30 +1645,6 @@ function bar(x, y, w, h, k, color, back = 'rgba(0,0,0,0.65)') {
   ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, k))), h);
 }
 
-/** A gauge of separate blocks, filled from the left. */
-function blocks(x, y, n, h, k, on, off) {
-  const lit = Math.round(Math.max(0, Math.min(1, k)) * n);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(x - 1, y - 1, n * 6 + 1, h + 2);
-  for (let i = 0; i < n; i++) {
-    ctx.fillStyle = i < lit ? on : off;
-    ctx.fillRect(x + i * 6, y, 5, h);
-  }
-}
-
-/** A bevelled wooden panel: light edges top-left, dark bottom-right. */
-function panel(x, y, w, h, sunken = false) {
-  const hi = '#a07a46', lo = '#0d0703';
-  ctx.fillStyle = sunken ? 'rgba(20,12,6,0.85)' : 'rgba(43,29,18,0.92)';
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = sunken ? lo : hi;
-  ctx.fillRect(x, y, w, 1);
-  ctx.fillRect(x, y, 1, h);
-  ctx.fillStyle = sunken ? '#5c4228' : lo;
-  ctx.fillRect(x, y + h - 1, w, 1);
-  ctx.fillRect(x + w - 1, y, 1, h);
-}
-
 /** Text with a one-pixel dark edge, crisp at any whole scale. */
 function outline(text, x, y, color = '#efe3c2') {
   x = Math.round(x);
@@ -1722,7 +1698,6 @@ function drawMenuBackdrop(now) {
 // ---------------------------------------------------------------- menus
 
 const ultBtn = $('#ult');
-const STEPS = 14;
 
 const shown = {};
 

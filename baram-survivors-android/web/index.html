@@ -23,16 +23,20 @@
   img { image-rendering: pixelated; }
   [hidden] { display: none !important; }
 
-  .bevel, .btn, .card, .choice, #stage-info, #map, #pause-box, #lv-box, #over-box {
-    background: var(--panel); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi);
-    box-shadow: inset 1px 1px 0 var(--mid), inset -1px -1px 0 #1a1008; border-radius: 0;
-  }
-  .btn { padding: 6px 16px; font-weight: 700; font-size: 12px; background: var(--panel2); min-width: 112px; }
-  .btn:active, .card:active, .choice:active, #pause-btn:active {
-    border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px 0 #1a1008; }
-  .btn:disabled { color: #6e5e44; }
-  .caption { margin: -2px -2px 8px; padding: 2px 8px; font-weight: 700; color: var(--gold);
-      background: linear-gradient(#5a3a1c, #3a2410); border-bottom: 1px solid var(--lo); }
+  /* Windows share the side panel's materials: a carved wooden frame around parchment, dark ink,
+     raised tan keys. Text that sits straight on the game view stays light with a dark edge. */
+  #pause-box, #lv-box, #over-box, #sounds-box, #stage-info {
+    color: #2a1606; background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
+    box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; border-radius: 0; }
+  .card, .choice {
+    color: #2a1606; background: #e0c088; border: 2px solid; border-color: #f4dca8 #7a4a1e #7a4a1e #f4dca8; border-radius: 0; }
+  #map { border: 3px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a; box-shadow: 0 0 0 1px #000; }
+  .btn { padding: 5px 14px; min-width: 104px; font: 700 12px/16px G11, monospace; color: #2a1606; background: #c89858;
+      border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
+  .btn:active, .card:active, .choice:active { border-color: #5a3212 #e8c48c #e8c48c #5a3212; }
+  .btn:disabled { color: #8a6a44; background: #b08a58; }
+  .caption { margin: -2px -2px 6px; padding: 2px 8px; font-weight: 700; color: #f6e6c0; background: #6a3a18;
+      border-bottom: 2px solid #2a1004; text-shadow: 1px 1px 0 #2a1004; }
 
   .screen, #levelup, #pause, #loading { position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 8px; padding: max(8px, env(safe-area-inset-top))
@@ -51,20 +55,20 @@
   #classes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: min(100%, 820px); }
   .card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; text-align: center; }
   .card .slot { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 78px;
-      background: #140c06; border: 1px solid; border-color: var(--lo) var(--mid) var(--mid) var(--lo); }
+      background: url(assets/ui/wback.png) center 70% / cover; border: 1px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
   .card .hero { height: 70px; }
-  .card b { font-size: 14px; color: var(--gold); }
-  .card span { font: 10px/1.4 G9, monospace; color: var(--text); min-height: 4.2em; }
-  .card em { font-style: normal; font-size: 10px; font-family: G9; color: var(--sky); }
-  .card small { font: 10px G9, monospace; color: var(--dim); }
+  .card b { font-size: 14px; color: #7a1800; }
+  .card span { font: 10px/1.4 G9, monospace; min-height: 4.2em; }
+  .card em { font-style: normal; font-size: 10px; font-family: G9; color: #1a4aa0; }
+  .card small { font: 10px G9, monospace; color: #6a4a2a; }
   h2 { margin: 0; font-size: 14px; color: var(--gold); text-shadow: 1px 1px 0 #000; }
 
   .stage-wrap { display: flex; gap: 10px; align-items: stretch; justify-content: center; width: 100%; height: 100%; }
   .map-col { display: flex; flex-direction: column; gap: 4px; flex: none; }
   #map-tabs { display: flex; gap: 2px; }
-  #map-tabs button { padding: 2px 10px; font-weight: 700; background: var(--panel); border: 1px solid var(--mid);
-      color: var(--dim); }
-  #map-tabs button.on { color: var(--gold); background: var(--panel2); border-color: var(--hi); }
+  #map-tabs button { padding: 2px 10px; font-weight: 700; color: #6a4a2a; background: #b08a58;
+      border: 2px solid; border-color: #d8b47c #5a3212 #5a3212 #d8b47c; }
+  #map-tabs button.on { color: #2a1606; background: #d8b070; border-color: #f0d49c #5a3212 #5a3212 #f0d49c; }
   #map { position: relative; padding: 0; overflow: hidden; }
   #map img { display: block; height: calc(100vh - 52px); max-width: 56vw; object-fit: contain; }
   .pin { position: absolute; transform: translate(-50%, -100%); padding: 0; background: none; border: 0;
@@ -79,39 +83,41 @@
   .pin.on i { border-top-color: #fff4c0; }
   .info-col { display: flex; flex-direction: column; gap: 6px; width: min(300px, 42%); justify-content: center; }
   #stage-info { padding: 0 10px 8px; }
-  #stage-info h3 { margin: 0; font-size: 16px; color: var(--gold); }
-  #stage-info .lv { font: 10px G9, monospace; color: var(--red); }
+  #stage-info h3 { margin: 0; font-size: 16px; color: #7a1800; }
+  #stage-info .lv { font: 10px G9, monospace; color: #8a3a10; }
   #stage-info p { margin: 4px 0; font: 10px/1.5 G9, monospace; }
   #stage-info .mons { display: flex; gap: 8px; align-items: flex-end; height: 58px; padding: 2px 6px;
-      background: #140c06; border: 1px solid; border-color: var(--lo) var(--mid) var(--mid) var(--lo); }
+      background: #c49a62; border: 1px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
   #stage-info .mons img { max-height: 54px; }
   #stage-info .boss { margin-top: 4px; }
-  #stage-info .boss b { color: var(--red); }
-  #stage-info .state { font: 10px G9, monospace; color: var(--dim); }
-  #stage-info .state.done { color: #b8f0a0; }
+  #stage-info .boss b { color: #a01800; }
+  #stage-info .state { font: 10px G9, monospace; color: #6a4a2a; }
+  #stage-info .state.done { color: #1a6a10; }
 
-  #levelup, #pause { background: rgba(0, 0, 0, .5); }
+  #levelup, #pause { background: rgba(0, 0, 0, .5); z-index: 10; }
+  /* In a hunt, windows open over the play view, not over the side panel. */
+  body.hunting #levelup, body.hunting #pause { right: var(--side); }
   #lv-box, #pause-box, #over-box { padding: 0 8px 8px; width: min(100%, 480px); }
   #choices { display: flex; flex-direction: column; gap: 4px; }
-  .choice { display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; background: var(--panel2); }
+  .choice { display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; }
   .choice canvas, .choice .item { position: static; width: 40px; height: 40px; flex: none; object-fit: none;
-      background: #140c06; border: 1px solid; border-color: var(--lo) var(--mid) var(--mid) var(--lo); }
-  .choice b { font-size: 13px; color: var(--gold); }
-  .choice i { font: normal 10px G9, monospace; color: var(--red); }
+      background: #3a2010; border: 1px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
+  .choice b { font-size: 13px; color: #7a1800; }
+  .choice i { font: normal 10px G9, monospace; color: #1a4aa0; }
   .choice span { display: block; font: 10px/1.4 G9, monospace; }
   #pause-box .row { margin-top: 6px; }
   #sounds { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
-  #sounds-box { width: min(96vw, 560px); max-height: 94vh; display: flex; flex-direction: column; padding: 0 8px 8px;
-      background: var(--panel); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); }
-  #sounds-box .caption small { font: 10px G9, monospace; color: var(--dim); margin-left: 6px; }
+  #sounds-box { width: min(96vw, 560px); max-height: 94vh; display: flex; flex-direction: column; padding: 0 8px 8px; }
+  #sounds-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
   #sound-rows { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px;
       margin-bottom: 6px; touch-action: pan-y; }
-  #sound-rows h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; color: var(--gold); }
+  #sound-rows h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; color: #7a1800; }
   #sound-rows span { align-self: center; }
   #sound-rows .pick { display: flex; gap: 2px; align-items: center; }
-  #sound-rows .pick b { min-width: 54px; text-align: center; font: 12px G11, monospace; color: var(--gold); }
-  #sound-rows .pick button { width: 30px; height: 26px; padding: 0; background: var(--panel2); border: 1px solid var(--hi); }
+  #sound-rows .pick b { min-width: 54px; text-align: center; font: 12px G11, monospace; color: #7a1800; }
+  #sound-rows .pick button { width: 30px; height: 26px; padding: 0; color: #2a1606; background: #c89858;
+      border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
   #over-stats { margin: 6px 0; text-align: center; line-height: 1.7; }
 
   /* ---- The old client's screen: a framed play area, a carved side panel, a parchment chat. ---- */
@@ -126,8 +132,9 @@
       text-align: center; font-weight: 700; color: #f4e6c4; background: #1e1008; border: 1px solid var(--frame-hi);
       border-top: 0; }
   #map-tab small { display: block; font: 10px G9, monospace; color: #ffb08a; }
-  #chat { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 2px 6px; font: 10px/13px G9, monospace;
-      color: var(--ink); background: #f0d9a8; border-top: 2px solid var(--frame-lo); max-height: 47px; overflow: hidden; }
+  #chat { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 2px 6px 0; font: 10px/13px G9, monospace;
+      color: var(--ink); background: #f0d9a8; border-top: 2px solid var(--frame-lo); overflow: hidden; }
+  #chat::after { content: ''; display: block; height: 11px; margin: 1px -6px 0; background: #000; }
   #chat p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #chat p.sys { color: #fff; background: #3e5cc0; margin: 0 -6px; padding: 0 6px; }
   #chat p.warn { color: #a01800; }

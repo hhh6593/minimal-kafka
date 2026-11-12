@@ -225,6 +225,11 @@ def main():
             im.save(os.path.join(out, "item", iid + ".png"))
             manifest["items"][role] = {"id": iid, "w": im.width, "h": im.height}
 
+    # The wardrobe's backdrop (the island seen from the sea), behind the class figures.
+    p = os.path.join(src, "wardrobeB", "wback3.png")
+    if os.path.isfile(p):
+        Image.open(p).convert("RGB").save(os.path.join(out, "ui", "wback.png"), optimize=True)
+
     # The world maps, for the hunting-ground picker.
     for name in ("world_1", "world_4"):
         p = os.path.join(src, "maps", "world", name + ".bmp")
