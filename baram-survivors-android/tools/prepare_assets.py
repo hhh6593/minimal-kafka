@@ -150,7 +150,7 @@ def render_midi(audio_src, out, manifest):
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-af",
                         "areverse,silenceremove=start_periods=1:start_threshold=-60dB,areverse",
-                        "-c:a", "libvorbis", "-q:a", "2", ogg], check=True)
+                        "-ac", "1", "-ar", "22050", "-c:a", "libvorbis", "-q:a", "1", ogg], check=True)
         os.remove(wav)
         manifest["audio"]["bgm"].append({"key": "mid" + key, "file": "audio/bgm/mid" + key + ".ogg"})
 
@@ -245,6 +245,10 @@ def main():
         print("avatar", avatar_assets.build(avatar_src, out, manifest))
 
     if audio_src and os.path.isdir(audio_src):
+        # Names of the numbered sounds, when the sound files come with a list of them.
+        names = os.path.join(audio_src, "names.json")
+        if os.path.isfile(names):
+            manifest["audio"]["names"] = json.load(open(names, encoding="utf-8"))
         render_midi(audio_src, out, manifest)
         for kind in ("bgm", "sfx"):
             d = os.path.join(audio_src, kind)
@@ -254,8 +258,16 @@ def main():
             for name in sorted(os.listdir(d)):
                 if not name.lower().endswith(AUDIO_EXT):
                     continue
-                shutil.copyfile(os.path.join(d, name), os.path.join(out, "audio", kind, name))
                 key = os.path.splitext(name)[0]
+                src_file = os.path.join(d, name)
+                if name.lower().endswith(".wav") and shutil.which("ffmpeg"):
+                    # WAV is big in an APK: OGG at the sounds' own 11 kHz mono is a tenth the size.
+                    name = key + ".ogg"
+                    import subprocess
+                    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src_file, "-c:a", "libvorbis",
+                                    "-q:a", "3", os.path.join(out, "audio", kind, name)], check=True)
+                else:
+                    shutil.copyfile(src_file, os.path.join(out, "audio", kind, name))
                 if kind == "bgm":
                     manifest["audio"]["bgm"].append({"key": key, "file": "audio/bgm/" + name})
                 else:

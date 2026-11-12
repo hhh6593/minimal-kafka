@@ -1278,7 +1278,7 @@ function die() {
     G.bubble = { text: '부활!', t: G.t };
     say('부활 마법으로 다시 일어났습니다.');
     addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
-    audio.play('heal');
+    audio.play('revive');
     return;
   }
   G.dead = true;
@@ -1952,7 +1952,7 @@ document.addEventListener('pointerdown', () => audio && audio.unlock(), { captur
 // picks. Choices are saved with the other settings.
 
 const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
-  ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨']];
+  ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활']];
 const MUSIC = [['title', '처음 화면'], ['battle', '사냥'], ['boss', '보스']];
 
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
@@ -1972,18 +1972,36 @@ const KIND_USES = {
   monster: ['kill', 'hurt', 'boss'],
   ui: ['levelup', 'chest', 'pickup', 'win', 'lose'],
 };
-// What the player has said so far: 003 to 010 are the eight 기원 heals, in order.
-const KNOWN_KINDS = { '003': 'heal', '004': 'heal', '005': 'heal', '006': 'heal', '007': 'heal', '008': 'heal',
-  '009': 'heal', '010': 'heal' };
-
 function soundKinds() {
-  return Object.assign({}, KNOWN_KINDS, settings.kinds || {});
+  return Object.assign({}, settings.kinds || {});
 }
 
-/** Fills each game sound from the sorted sounds: one per use in order, 기원 by level. */
+// The game's own sound for each spell and event, by its number (from the community list of
+// spell sound numbers that came with the files; RTK-Server's use for the rest). A list is one
+// sound per level of the spell, following its names (화염주 → 화영열주 → … use the 화염주 set
+// 040-044). Numbers missing from the build fall back to the sorting below.
+const GAME_SOUNDS = {
+  skill_c_heal: ['003', '005', '010', '010', '034', '034', '066', '076'], // 누리·대지·바다·…·천공·구름·태양의 기원
+  skill_w_slash: ['331', '004', '007', '009', '007', '013', '013', '017'], // 타격음, 이중·후면·삼중·측면·사중·오중공격
+  skill_w_tiger: '087', skill_w_roar: '018', skill_w_ult: '014', // 백호참, 동귀어진, 건곤대나이
+  skill_w_buff: ['012', '012', '012', '012', '089', '089', '089', '089'], // 백호령, 진백호령
+  skill_r_blink: '030', skill_r_stealth: '028', skill_r_drain: '038', skill_r_clone: '039', skill_r_ult: '035',
+  skill_r_bolt: ['055', '055', '056', '056', '057', '057', '058', '059'], // 뢰진주 계열
+  skill_m_fire: ['040', '040', '041', '041', '042', '042', '043', '044'], // 화염주 계열
+  skill_m_fire4: ['040', '040', '041', '041', '042', '042', '043', '044'],
+  skill_m_ice: ['050', '050', '051', '051', '052', '052', '053', '054'], // 백열주 계열
+  skill_m_para: '070', skill_m_curse: '069', skill_m_ult: '073', // 마비, 저주, 헬파이어
+  skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
+  skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084', skill_p_ult: '095',
+  hit: '331', kill: '353', hurt: '116', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
+  win: '401', lose: '402', revive: '112',
+};
+
+/** Each game sound: the game's own where known, else one from the player's sorting. */
 function soundDefaults() {
   const kinds = soundKinds();
   const d = {};
+  const bank = new Set(audio.bank());
   for (const [kind, uses] of Object.entries(KIND_USES)) {
     const list = audio.bank().filter(n => kinds[n] === kind);
     if (!list.length) continue;
@@ -1991,16 +2009,27 @@ function soundDefaults() {
       d[use] = use === 'skill_c_heal' ? list.slice(0, 8) : list[i % list.length];
     });
   }
+  for (const [use, n] of Object.entries(GAME_SOUNDS)) {
+    if ((Array.isArray(n) ? n : [n]).every(x => bank.has(x))) d[use] = n;
+  }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
-    d.bgm_title = mids[0];
-    d.bgm_battle = mids[1] || mids[0];
-    d.bgm_boss = mids[2] || d.bgm_battle;
+    const has = k => mids.includes(k);
+    d.bgm_title = has('mid12') ? 'mid12' : mids[0];
+    d.bgm_battle = has('mid02') ? 'mid02' : mids[1] || mids[0];
+    d.bgm_boss = has('mid04') ? 'mid04' : mids[2] || d.bgm_battle;
   }
   return d;
 }
 
 function applySounds() {
+  // Picks made before the sounds had names were guesses: start again from the game's own.
+  if (settings.soundsVer !== 2) {
+    delete settings.sounds;
+    delete settings.kinds;
+    settings.soundsVer = 2;
+    saveJson('bs_settings', settings);
+  }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
 }
 
@@ -2067,6 +2096,9 @@ function buildSounds() {
     const show = () => {
       const v = audio.map[key];
       val.textContent = Array.isArray(v) ? `${v[0]}~${v[v.length - 1]}` : v || '-';
+      const nm = !Array.isArray(v) && (M.audio.names || {})[v];
+      val.title = nm || '';
+      name.textContent = nm ? `${label} · ${nm}` : label;
     };
     const move = d => {
       const cur = audio.map[key];

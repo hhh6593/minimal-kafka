@@ -53,11 +53,12 @@ ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더]
 
 ## 효과음·배경음 넣기
 
-원작 소리 파일(번호가 붙은 `001.wav`… 와 MIDI 음악 `1.mid`…)은 그대로 넣으면 됩니다.
-`audio/sfx/`에 wav를, `audio/bgm/`에 mid를 넣고 빌드하면 MIDI는 fluidsynth와 GM 사운드폰트
-(`apt-get install fluidsynth fluid-soundfont-gm`)로 OGG로 바꿔 넣습니다. 어떤 번호가 어떤 소리인지
-목록이 없으므로, 마법은 이펙트 그림과 같은 번호(화염주는 그림 92번이라 `092.wav`)로 먼저 연결하고,
-게임 안 **메뉴 → 소리 맞추기**에서 고칩니다(바로 저장됨).
+원작 소리 파일은 번호가 붙은 wav(`001.wav`…)와 MIDI 음악입니다. `audio/sfx/`에 wav를, `audio/bgm/`에
+mid를 넣고, 번호별 이름 목록이 있으면 `audio/names.json`(`{"014": "건곤대나이", …}`)으로 둡니다.
+빌드할 때 wav는 OGG로, MIDI는 fluidsynth와 GM 사운드폰트(`apt-get install fluidsynth fluid-soundfont-gm`)로
+OGG로 바꿉니다. 마법과 게임 소리는 `web/js/game.js`의 `GAME_SOUNDS`에 원작 번호로 연결되어 있습니다
+(커뮤니티 정리 "마법소리번호"와 영문판 커뮤니티 서버 RTK-Server의 사용처 기준. 예: 건곤대나이 014,
+화염주 계열 040~044를 단계별로, 레벨업 123). 게임 안 **메뉴 → 소리 맞추기**에서 바꿀 수 있습니다.
 
 - **빠르게 나누기**: 아직 나누지 않은 소리를 하나씩 들려주고, 종류 버튼(회복, 불, 얼음·물, 번개,
   베기·타격, 폭발·큰 마법, 빛·신비, 몬스터, 알림, 모름·안 씀)을 한 번 누르면 다음 소리로 넘어갑니다.

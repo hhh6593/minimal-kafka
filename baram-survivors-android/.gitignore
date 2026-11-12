@@ -6,3 +6,6 @@ keystore/
 audio/bgm/*
 audio/sfx/*
 !audio/*/.gitkeep
+
+# The sound names list comes with the sound files.
+audio/names.json
