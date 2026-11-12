@@ -687,7 +687,7 @@ function hurtPlayer(dmg) {
   p.hp -= taken;
   p.inv = 0.25;
   audio.play('hurt');
-  floatText(p.x, p.y - 60, '-' + Math.round(taken), '#ff6060');
+  floatText(p.x, p.y - 64, '-' + Math.round(taken), '#ff6060');
   if (p.hp <= 0) die();
 }
 
@@ -819,7 +819,7 @@ function cast(skill, st) {
       const [bx, by] = Math.abs(e.tx - p.tx) >= Math.abs(e.ty - p.ty) ? [e.tx + dx, e.ty] : [e.tx, e.ty + dy];
       // Not into the middle of a pack: 비영승보 is for getting behind one, not into many.
       if (!occ.has(key(bx, by)) && around(bx, by, 1).length < 3) {
-        addFx(def.fx, p.x, p.y - 30, { scale: 0.7 });
+        addFx(def.fx, p.x, p.y - 26, { scale: 0.7 });
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
         heroTile();
@@ -889,7 +889,7 @@ function cast(skill, st) {
     }
     case 'nova': {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-      addFx(def.fx, 0, -30, { follow: true });
+      addFx(def.fx, 0, -26, { follow: true });
       later(0.1, () => {
         for (const e of around(p.tx, p.ty, st.radius)) {
           if (def.stun) e.stun = def.stun;
@@ -934,7 +934,7 @@ function cast(skill, st) {
       G.buffs[def.buff] = G.t + st.duration;
       if (def.buff === 'power') G.buffs.powerK = def.power;
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
-      addFx(def.fx, 0, -40, { follow: true });
+      addFx(def.fx, 0, -26, { follow: true });
       break;
     }
   }
@@ -961,7 +961,7 @@ function castUlt() {
       // 건곤대나이: "spends health to strike the enemies in front" — four tiles ahead, three wide,
       // with strength from the warrior's health.
       const fdx = p.fdx || p.face, fdy = p.fdx ? 0 : p.fdy;
-      addFx(def.fx, fdx * TILE * 2, fdy * TILE * 2 - 30, { follow: true, scale: 1.3 });
+      addFx(def.fx, fdx * TILE * 2, fdy * TILE * 2 - 26, { follow: true, scale: 1.3 });
       later(0.15, () => G.enemies.slice().forEach(e => {
         const ahead = (e.tx - p.tx) * fdx + (e.ty - p.ty) * fdy;
         const side = Math.abs((e.tx - p.tx) * fdy - (e.ty - p.ty) * fdx);
@@ -985,13 +985,13 @@ function castUlt() {
       list.slice(0, 12).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.05 }));
       later(0.5, () => list.forEach(e => hurtEnemy(e, (70 + lvl * 14) * pw)));
       G.buffs.shield = G.t + def.shield;
-      addFx(FX.shield, 0, -30, { follow: true, scale: 0.6 });
+      addFx(FX.shield, 0, -26, { follow: true, scale: 0.6 });
       break;
     }
     case 'p_ult': {
       heal(p.maxHp, true);
       G.buffs.guard = G.t + def.guard;
-      addFx(def.fx, 0, -30, { follow: true, scale: 1.3 });
+      addFx(def.fx, 0, -26, { follow: true, scale: 1.3 });
       break;
     }
   }
@@ -1073,8 +1073,8 @@ function heal(n, sound, quiet = false) {
   n = Math.min(n, p.maxHp - p.hp);
   if (n <= 0) return;
   p.hp += n;
-  floatText(p.x, p.y - 70, '+' + Math.round(n), '#7dff8a');
-  if (!quiet) addFx(FX.heal, 0, -40, { follow: true });
+  floatText(p.x, p.y - 64, '+' + Math.round(n), '#7dff8a');
+  if (!quiet) addFx(FX.heal, 0, -26, { follow: true });
   if (sound) audio.play('heal');
 }
 
@@ -1117,7 +1117,7 @@ function nextChoice() {
   if (!picks.length) picks.push({ type: 'heal' }, { type: 'gold' });
   G.choosing = true;
   audio.play('levelup');
-  addFx(FX.levelup, 0, -40, { follow: true });
+  addFx(FX.levelup, 0, -26, { follow: true });
   $('#lv-title').textContent = `레벨 ${G.player.lvl}`;
   const box = $('#choices');
   box.innerHTML = '';
@@ -1206,7 +1206,7 @@ function die() {
     G.buffs.guard = G.t + 3;
     G.bubble = { text: '부활!', t: G.t };
     say('부활 마법으로 다시 일어났습니다.', '#ffe08a');
-    addFx(FX.levelup, 0, -40, { follow: true, scale: 1.4 });
+    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
     audio.play('heal');
     return;
   }

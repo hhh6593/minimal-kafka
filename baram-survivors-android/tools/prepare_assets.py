@@ -35,6 +35,7 @@ ITEMS = {
     "p_life": "1304", "p_area": "1141", "chest": "16",
 }
 HEROES = ["1001", "1002", "1003", "1004"]
+HERO_HEIGHT = 56
 AUDIO_EXT = (".ogg", ".mp3", ".m4a", ".wav")
 
 
@@ -183,6 +184,12 @@ def main():
     for fid in HEROES:
         im = Image.open(os.path.join(src, "magics", fid + ".gif"))
         im = dehalo(im) if fid == "1001" else trim(im.convert("RGBA"))
+        # These portraits are drawn larger than characters stand in the game: in captures of
+        # the old client a character is about an eighth of the view's height (56 of ~470
+        # pixels here). Shrink smoothly, then make the edge hard again so it stays pixel art.
+        k = HERO_HEIGHT / im.height
+        im = im.resize((round(im.width * k), HERO_HEIGHT), Image.LANCZOS)
+        im.putalpha(im.getchannel("A").point(lambda v: 255 if v > 110 else 0))
         im.save(os.path.join(out, "hero", fid + ".png"))
         manifest["heroes"].append({"id": fid, "w": im.width, "h": im.height})
 
