@@ -1,5 +1,6 @@
 import {
-  CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_SKILL_LEVEL, STAGE_SECONDS, BOSS_AT, MINI_AT, FX,
+  CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
+  CHAMPIONS_AT, FX,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -439,19 +440,24 @@ function startRun(cls, stage) {
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0 },
     enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [],
-    bubble: null, spawnT: 0, waveT: 50, minis: MINI_AT.slice(), bossDue: true, pendingLevels: 0, shake: 0,
+    bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true,
+    pendingLevels: 0, shake: 0, plainDropAt: 0,
+    rerolls: 2, skips: 2, banishes: 2, banished: new Set(), banishing: false,
   };
   G.player.x = TILE / 2;
   G.player.y = TILE - 6;
   heroTile();
   applyGear();
-  addSkill(cls.start);
+  // A run starts with the weapon's plain attack only; the first card comes at once.
+  G.pendingLevels = 1;
+  G.firstCard = true;
   showScreen(null);
   audio.bgm(huntMusic());
   $('#chat').innerHTML = '';
   $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
+  nextChoice();
 }
 
 // ---------------------------------------------------------------- gear
@@ -475,25 +481,84 @@ function applyGear() {
   p.gearPower = 1 + 0.12 * g.weapon;
 }
 
-/** The next piece of gear from a chest, if any is left; true when one was given. */
-function nextGear() {
-  const p = G.player, g = p.gear, line = GEAR[G.cls.id];
-  // The piece furthest behind along its line comes first, so all three move up together.
-  const order = ['weapon', 'armor', 'shield'].sort((a, b) => (g[a] + 1) / line[a].length - (g[b] + 1) / line[b].length);
-  for (const kind of order) {
-    if (g[kind] + 1 >= line[kind].length) continue;
-    g[kind]++;
-    progress.gear[G.cls.id] = { ...g };
-    saveJson('bs_progress', progress);
-    if (hasAvatars()) p.av = dress(G.cls.id, g);
-    applyGear();
-    const name = gearName(G.cls.id, kind, g[kind]);
-    say(`${josa(name, '을', '를')} 얻었습니다!`, 'sys');
-    note(`${name} 착용`);
-    return true;
-  }
-  return false;
+// The bag: every piece found is kept for the class (as in D2 Survivors, gear stays even after
+// death), and the player chooses what to wear from the menu's 장비 window.
+
+function bag(cls) {
+  progress.inv = progress.inv || {};
+  const b = progress.inv[cls.id] = progress.inv[cls.id] || ['armor:0', 'weapon:0'];
+  return b;
 }
+
+function gearImage(g) {
+  const path = hasAvatars() && gearIcon(G.cls.id, g.kind, g.tier);
+  return path ? images[path.slice('assets/'.length)] : images[`item/${M.items.chest.id}.png`];
+}
+
+function pickGear(g) {
+  const b = bag(G.cls), id = `${g.kind}:${g.tier}`;
+  const name = gearName(G.cls.id, g.kind, g.tier) || '장비';
+  audio.play('pickup');
+  if (b.includes(id)) {
+    G.gold += 50 * (g.tier + 1);
+    note(`${name}: 이미 가진 장비라 팔았습니다.`);
+    return;
+  }
+  b.push(id);
+  saveJson('bs_progress', progress);
+  say(`${josa(name, '을', '를')} 주웠습니다. (메뉴 → 장비)`, 'sys');
+  note(`${name} 획득`);
+}
+
+/** Puts on a piece from the bag (or takes off a shield with tier -1). */
+function wear(kind, tier) {
+  const cls = G ? G.cls : chosenClass;
+  progress.gear = progress.gear || {};
+  const g = Object.assign(savedGear(cls), { [kind]: tier });
+  progress.gear[cls.id] = g;
+  saveJson('bs_progress', progress);
+  if (G) {
+    G.player.gear = { ...g };
+    if (hasAvatars()) G.player.av = dress(cls.id, g);
+    applyGear();
+  }
+}
+
+function buildEquip() {
+  const cls = G ? G.cls : chosenClass, g = savedGear(cls), b = bag(cls);
+  const box = $('#equip-rows');
+  box.innerHTML = '';
+  for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패']]) {
+    const h = document.createElement('h4');
+    h.textContent = label;
+    box.append(h);
+    const row = document.createElement('div');
+    row.className = 'equip-row';
+    const tiers = b.filter(x => x.startsWith(kind + ':')).map(x => +x.split(':')[1]).sort((x, y) => x - y);
+    if (kind === 'shield') tiers.unshift(-1);
+    for (const t of tiers) {
+      const btn = document.createElement('button');
+      btn.className = 'equip' + (g[kind] === t ? ' on' : '');
+      const icon = t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : gearName(cls.id, kind, t)}</span>`;
+      btn.onclick = () => {
+        wear(kind, t);
+        buildEquip();
+      };
+      row.append(btn);
+    }
+    box.append(row);
+  }
+  const p = G && G.player;
+  $('#equip-stats').textContent = `공격력 +${Math.round(12 * g.weapon)}% · 체력 +${g.armor * 20} · 방어 +${Math.max(0, g.shield + 1)}`
+    + (p ? '' : '');
+}
+
+$('#open-equip').onclick = () => {
+  buildEquip();
+  $('#equip').hidden = false;
+};
+$('#close-equip').onclick = () => { $('#equip').hidden = true; };
 
 /** A class's figure in the gear it has found, for the menus. */
 function heroPicture(cls) {
@@ -520,8 +585,10 @@ function huntMusic() {
   return 'stage_' + G.stage.id;
 }
 
+/** Experience to the next level, on D2 Survivors' curve: 5 at level 1, 83 at 10, 297 at 25. */
 function xpFor(lvl) {
-  return Math.floor(3 + lvl * 2.5 + Math.pow(lvl, 1.55));
+  const l = lvl - 1;
+  return Math.floor(5 + 6 * l + 0.25 * l * l + (lvl > 25 ? 0.05 * Math.pow(lvl - 25, 3) : 0));
 }
 
 function addSkill(id) {
@@ -591,6 +658,7 @@ function update(dt) {
         cast(s, st);
       }
     }
+    plainAttack(dt);
   }
   runTimers();
   updateAllies(dt);
@@ -632,30 +700,58 @@ function ringTile() {
   return null;
 }
 
+// Monster numbers follow D2 Survivors' acts: a floor that rises from the act's opening count
+// to its 5:00 count, about one more each second from 1:00 and two from 3:00, a pack of
+// champions every 90 seconds and a named leader with followers twice a ground. At 6:00 the
+// boss comes and the field calms to 25; the boss weakens after 1:30 and is surely down by
+// 2:50. The grounds map onto the five acts in order.
+const FLOOR_OPEN = [8, 45, 60, 70, 80], FLOOR_FIVE = [80, 90, 110, 115, 125];
+const FIELD_MAX = 220;
+
+function floorCount(t) {
+  const a = Math.min(4, Math.round((G.level / (STAGES.length - 1)) * 4));
+  return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 300));
+}
+
 function spawn(dt) {
-  const t = G.t;
-  const want = Math.min(130, 5 + t * 0.13 + (t > 300 ? 15 : 0) + (G.cleared ? 30 : 0));
-  G.spawnT -= dt;
-  if (G.spawnT <= 0 && G.enemies.length < want) {
-    G.spawnT = Math.max(0.15, 1.1 - t / 400);
-    const n = 1 + Math.floor(t / 150);
-    for (let i = 0; i < n && G.enemies.length < want; i++) addEnemy(pickMonster());
-  }
-  G.waveT -= dt;
-  if (G.waveT <= 0) {
-    // A pack of one kind from one side.
-    G.waveT = 60;
-    const m = pickMonster();
-    for (let i = 0; i < 6 + Math.floor(t / 60); i++) addEnemy(m);
-  }
-  if (G.minis.length && t >= G.minis[0]) {
-    G.minis.shift();
-    addEnemy(G.mini.m, 'mini', G.mini);
-    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
-    banner(`${G.mini.name} 등장`);
+  const t = G.t, boss = G.bossT !== undefined;
+  const floor = boss ? 25 : floorCount(t);
+  // Up to the floor at once, a few a frame.
+  for (let i = 0; i < 4 && G.enemies.length < floor; i++) addEnemy(pickMonster());
+  if (!boss) {
+    // And on top of the floor, one a second from 1:00, two from 3:00.
+    G.spawnT -= dt;
+    if (G.spawnT <= 0) {
+      G.spawnT = 1;
+      const extra = t >= 180 ? 2 : t >= 60 ? 1 : 0;
+      // Never far past the floor: a field that is not being thinned does not keep swelling.
+      const cap = Math.min(FIELD_MAX, floor + 70);
+      for (let i = 0; i < extra && G.enemies.length < cap; i++) addEnemy(pickMonster());
+    }
+    if (G.champs.length && t >= G.champs[0]) {
+      G.champs.shift();
+      const m = pickMonster(true), pack = ++G.packs;
+      for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+      say(`챔피언 무리가 나타났습니다!`, 'warn');
+    }
+    if (G.minis.length && t >= G.minis[0]) {
+      G.minis.shift();
+      addEnemy(G.mini.m, 'mini', G.mini);
+      for (let i = 0; i < 3; i++) addEnemy(pickMonster(), 'minion');
+      say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
+      banner(`${G.mini.name} 등장`);
+    }
   }
   if (G.bossDue && t >= BOSS_AT) {
     G.bossDue = false;
+    G.bossT = t;
+    // The field calms for the boss.
+    while (G.enemies.length > 25) {
+      const e = G.enemies.find(x => !x.kind);
+      if (!e) break;
+      G.enemies.splice(G.enemies.indexOf(e), 1);
+      occ.delete(key(e.tx, e.ty));
+    }
     addEnemy(G.boss.m, 'boss', G.boss);
     audio.play('boss');
     audio.bgm('boss');
@@ -663,29 +759,46 @@ function spawn(dt) {
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, 'warn');
     banner(`보스 ${G.boss.name} 등장!`);
   }
+  if (boss) {
+    // After 1:30 the boss loses life on its own, and from 2:50 takes twice the damage every
+    // 10 seconds: no build gets stuck on it.
+    const since = t - G.bossT, b = G.enemies.find(e => e.kind === 'boss');
+    if (b && since > 90) {
+      b.hp -= b.maxHp * 0.004 * dt * 60 / 60;
+      b.weak = since > 170 ? Math.pow(2, (since - 170) / 10) : 1;
+      if (b.hp <= 0) killEnemy(b);
+    }
+  }
 }
 
-function pickMonster() {
-  const c = Math.min(1, G.t / (STAGE_SECONDS * 0.8));
+function pickMonster(strong = false) {
+  if (strong) return G.pool[Math.max(0, G.pool.length - 1 - Math.floor(Math.random() * 3))];
+  const c = Math.min(1, G.t / (BOSS_AT * 0.9));
   const r = Math.min(1, Math.max(0, c + (Math.random() - 0.7) * 0.5));
   return G.pool[Math.round(r * (G.pool.length - 1))];
 }
 
-function addEnemy(m, kind = null, named = null) {
+function addEnemy(m, kind = null, named = null, pack = 0) {
   const at = ringTile();
   if (!at) return;
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
   let hp = (6 + m.area / 70) * tough;
-  if (kind === 'mini') hp = (70 + m.area / 10) * tough * 2;
+  // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
+  // ×12, ×1.25, ×5; followers ×2 life.
+  const base = hp;
+  if (kind === 'champ') hp = base * 8;
+  if (kind === 'minion') hp = base * 2;
+  if (kind === 'mini') hp = Math.max(base * 12, (70 + m.area / 10) * tough * 2);
   if (kind === 'boss') hp = (180 + m.area / 5) * tough * 4;
   const e = {
-    m, hp, maxHp: hp, kind, name: named && named.name, scale: named ? named.scale : 1,
+    m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1,
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
-    dmg: (kind === 'boss' ? 13 : kind === 'mini' ? 8 : 2 + rank * 3.5) + t / 180 + G.level * 0.5,
-    xp: kind === 'boss' ? 60 : kind === 'mini' ? 20 : 1 + Math.floor(rank * 4 + t / 300),
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 2 + rank * 3.5) + t / 180 + G.level * 0.5)
+      * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1),
+    xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 300)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
     face: 1, phase: Math.random() * 6, flash: 0, slow: 0, stun: 0, curse: 0, cd: Math.random() * 0.5, atk: 0.6,
     lunge: 0, hits: new Map(),
   };
@@ -780,11 +893,11 @@ function hurtPlayer(dmg) {
 
 function hurtEnemy(e, dmg) {
   if (e.hp <= 0) return 0;
-  dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1);
+  dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1);
   e.hp -= dmg;
   e.flash = 0.12;
   e.shown = G.t;
-  if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale - 8, Math.round(dmg), '#ffffff', true);
+  if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale - 8, Math.round(dmg), '#ffffff');
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
@@ -801,13 +914,46 @@ function killEnemy(e) {
   // Experience comes at the kill, as in the game: nothing to pick up.
   gainXp(e.xp);
   const roll = Math.random();
-  if (e.kind) {
+  // Gear drops as in D2 Survivors: a plain monster at most one piece every three minutes,
+  // a champion one time in three, a named leader one in two, a boss two.
+  if (e.kind === 'champ') {
+    if (!G.enemies.some(o => o.pack === e.pack)) {
+      G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
+      say('챔피언 무리를 물리쳤습니다!');
+    }
+    if (Math.random() < 0.33) dropGear(e);
+  } else if (e.kind === 'mini') {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
     say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
-    if (e.kind === 'boss') clearStage();
-    else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm(huntMusic());
-  } else if (roll < 0.006) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
-  else if (roll < 0.04) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
+    if (Math.random() < 0.5) dropGear(e);
+  } else if (e.kind === 'boss') {
+    G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
+    dropGear(e, -12);
+    dropGear(e, 12);
+    say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
+    fieldFalls();
+    clearStage();
+  } else if (G.t >= G.plainDropAt && roll < 0.02) {
+    G.plainDropAt = G.t + 180;
+    dropGear(e);
+  } else if (roll < 0.026) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
+  else if (roll < 0.06) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
+}
+
+/** With the boss, the whole field falls (over two seconds), giving its experience. */
+function fieldFalls() {
+  const rest = G.enemies.slice();
+  rest.forEach((o, i) => later(0.02 * i % 2, () => { if (o.hp > 0) killEnemy(o); }));
+}
+
+/** A piece of the class's gear on the ground, about as good as the ground is deep. */
+function dropGear(e, dx = 0) {
+  const line = GEAR[G.cls.id], kinds = ['weapon', 'armor', 'shield'];
+  const kind = kinds[Math.floor(Math.random() * 3)];
+  const top = line[kind].length - 1;
+  const tier = Math.max(0, Math.min(top, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0)
+    + (e.kind === 'boss' ? 1 : 0)));
+  G.drops.push({ x: e.x + dx, y: e.y, kind: 'gear', gear: { kind, tier } });
 }
 
 function clearStage() {
@@ -822,6 +968,9 @@ function clearStage() {
   say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, 'sys');
   if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`);
   banner(`${G.stage.name} 정복!`);
+  // A moment to pick up what the boss left, then the results.
+  const run = G;
+  setTimeout(() => { if (G === run && !G.dead) showResults(`${G.stage.name} 정복!`); }, 6000);
 }
 
 // ---------------------------------------------------------------- skills
@@ -1027,11 +1176,36 @@ function cast(skill, st) {
     }
   }
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
+  if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
     audio.play('skill_' + skill.id, def.kind, skill.lv);
     const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior');
     strikePose(melee ? 'attack' : 'magic');
   }
+}
+
+/**
+ * The weapon's plain attack: a swing at a monster on a tile beside the hero, only while no
+ * damaging spell has gone off for 1.5 seconds (as in D2 Survivors). Weak; the weapon worn
+ * makes it stronger.
+ */
+function plainAttack(dt) {
+  const p = G.player;
+  p.atkT = (p.atkT || 0) - dt;
+  if (p.atkT > 0 || G.t - (G.lastHit || -9) < 1.5) return;
+  const t = [[p.tx, p.ty], ...DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy])]
+    .map(([x, y]) => occ.get(key(x, y))).find(b => b && b.m && !b.ally && b.hp > 0);
+  if (!t) return;
+  p.atkT = 0.75;
+  const dx = t.tx - p.tx, dy = t.ty - p.ty;
+  if (dx || dy) {
+    p.fdx = Math.sign(dx);
+    p.fdy = dx ? 0 : Math.sign(dy);
+    if (p.fdx) p.face = p.fdx;
+  }
+  hurtEnemy(t, 7 * (1 + 0.1 * G.passives.power));
+  audio.play('hit');
+  strikePose('attack');
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
@@ -1148,7 +1322,6 @@ const PARTY = {
   warrior: { names: ['철우', '백호', '무쇠'], role: '가까이 온 적을 베어 막는다' },
   rogue: { names: ['그림자', '바람', '야월'], role: '적 뒤로 파고들어 벤다' },
 };
-const PARTY_MAX = 3;
 
 function joinParty(cls) {
   const p = G.player;
@@ -1178,6 +1351,8 @@ function partySay(m, spell) {
 function updateParty(dt) {
   const p = G.player;
   for (const m of G.party) {
+    // Party members grow with the hero, as D2 Survivors' mercenaries share its level.
+    m.lv = Math.min(6, 1 + Math.floor(p.lvl / 6));
     // Keep a place around the hero: behind it, spread to the sides.
     const ang = [Math.PI * 0.75, Math.PI * 0.25, Math.PI * 1.5][m.slot] ?? 0;
     const tx = p.x + Math.cos(ang) * 38, ty = p.y + Math.sin(ang) * 30 + 10;
@@ -1327,7 +1502,8 @@ function updatePickups(dt) {
   for (const d of G.drops) {
     if (Math.hypot(d.x - p.x, d.y - p.y) < reach) {
       d.taken = true;
-      if (d.kind === 'heal') heal(30, true);
+      if (d.kind === 'gear') pickGear(d.gear);
+      else if (d.kind === 'heal') heal(30, true);
       else if (d.kind === 'coin') {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         G.gold += n;
@@ -1338,9 +1514,11 @@ function updatePickups(dt) {
         heal(p.maxHp * 0.3, false);
         audio.play('chest');
         note('보물 상자를 열었습니다.');
-        nextGear();
-        G.pendingLevels++;
-        nextChoice();
+        // A spell ready to evolve does so, and the chest holds only gold; else a level-up.
+        if (!evolve()) {
+          G.pendingLevels++;
+          nextChoice();
+        }
       }
     }
   }
@@ -1367,38 +1545,90 @@ function gainXp(v) {
     p.next = xpFor(p.lvl);
     G.pendingLevels++;
     say(`레벨이 올랐습니다. (Lv ${p.lvl})`, 'sys');
+    // Party members join at levels 3, 9 and 15, as D2 Survivors' mercenaries do.
+    const joinAt = [3, 9, 15].indexOf(p.lvl);
+    if (joinAt >= 0) {
+      const order = ['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id);
+      const c = CLASSES.find(x => x.id === order[joinAt]);
+      if (c && !G.party.some(m => m.cls.id === c.id)) joinParty(c);
+    }
   }
   if (G.pendingLevels && !G.choosing) nextChoice();
+}
+
+/** The highest level a spell may have now: never past (character level − its req + 1). */
+function levelCap(id) {
+  return Math.min(MAX_SKILL_LEVEL, G.player.lvl - (SKILLS[id].req || 1) + 1);
+}
+
+/** Evolves the first spell that is ready: level 8, its catalyst passive, its form's level. */
+function evolve() {
+  for (const s of G.skills) {
+    const d = SKILLS[s.id];
+    if (!d.evo || s.lv < MAX_SKILL_LEVEL || !G.passives[d.evo.with]) continue;
+    const into = SKILLS[d.evo.into];
+    if (G.player.lvl < into.req) continue;
+    const from = d.names ? d.names[7] : d.name;
+    s.from = s.id;
+    s.id = d.evo.into;
+    s.lv = 1;
+    s.timer = 0.2;
+    G.shake = 0.4;
+    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
+    audio.play('levelup');
+    shout(into.name);
+    say(`${josa(from, '이', '가')} ${josa(into.name, '으로', '로')} 거듭났습니다!`, 'sys');
+    banner(`${into.name} 각성!`);
+    return true;
+  }
+  return false;
+}
+
+/** Three cards, as D2 Survivors deals them. */
+function drawCards() {
+  const lvl = G.player.lvl, mine = id => SKILLS[id].cls === G.cls.id || SKILLS[id].cls === 'all';
+  const have = id => G.skills.some(x => x.id === id || x.from === id);
+  const banned = o => G.banished.has(o.type + ':' + o.id);
+  if (G.firstCard) {
+    // The first card: the class's first-tier spells, and the 기원.
+    G.firstCard = false;
+    return Object.entries(SKILLS).filter(([id, d]) => mine(id) && d.req === 1 && !d.evolved && d.kind !== 'ult')
+      .map(([id]) => ({ type: 'skill', id, lv: 1 })).slice(0, 3);
+  }
+  const opts = [];
+  // Spells and passives that lead to an evolution the hero is working toward weigh more.
+  const wanted = new Set(G.skills.map(x => SKILLS[x.id].evo).filter(Boolean).map(e => e.with));
+  for (const s of G.skills) {
+    if (SKILLS[s.id].evolved || s.lv >= levelCap(s.id)) continue;
+    opts.push({ type: 'skill', id: s.id, lv: s.lv + 1, w: SKILLS[s.id].evo && G.passives[SKILLS[s.id].evo.with] ? 4 : 3 });
+  }
+  if (G.skills.length < MAX_SKILLS) {
+    for (const [id, d] of Object.entries(SKILLS)) {
+      if (!mine(id) || d.evolved || d.kind === 'ult' || (d.req || 1) > lvl || have(id)) continue;
+      opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
+    }
+  }
+  const owned = Object.values(G.passives).filter(v => v > 0).length;
+  for (const [id] of Object.entries(PASSIVES)) {
+    const lv = G.passives[id];
+    if (lv >= MAX_PASSIVE_LEVEL || (!lv && owned >= MAX_PASSIVES)) continue;
+    opts.push({ type: 'passive', id, lv: lv + 1, w: wanted.has(id) ? 3 : 1.3 });
+  }
+  const pool = opts.filter(o => !banned(o));
+  const picks = [];
+  while (picks.length < 3 && pool.length) {
+    const total = pool.reduce((a, o) => a + o.w, 0);
+    let r = Math.random() * total;
+    const i = pool.findIndex(o => (r -= o.w) <= 0);
+    picks.push(pool.splice(i < 0 ? 0 : i, 1)[0]);
+  }
+  return picks;
 }
 
 function nextChoice() {
   if (!G.pendingLevels || G.over || G.dead) return;
   G.pendingLevels--;
-  const opts = [];
-  for (const s of G.skills) if (s.lv < MAX_SKILL_LEVEL) opts.push({ type: 'skill', id: s.id, lv: s.lv + 1, w: 3 });
-  if (G.skills.length < MAX_SKILLS) {
-    for (const [id, s] of Object.entries(SKILLS)) {
-      if ((s.cls === G.cls.id || s.cls === 'all') && s.kind !== 'ult' && !G.skills.some(x => x.id === id)) {
-        opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
-      }
-    }
-  }
-  for (const [id, ps] of Object.entries(PASSIVES)) {
-    if (G.passives[id] < ps.max) opts.push({ type: 'passive', id, lv: G.passives[id] + 1, w: 1.3 });
-  }
-  for (const c of CLASSES) {
-    if (c.id === G.cls.id) continue;
-    const m = G.party.find(x => x.cls.id === c.id);
-    if (!m && G.party.length < PARTY_MAX) opts.push({ type: 'party', cls: c, w: G.party.length ? 1.6 : 3 });
-    else if (m && m.lv < 5) opts.push({ type: 'party', cls: c, m, w: 1.2 });
-  }
-  const picks = [];
-  while (picks.length < 3 && opts.length) {
-    const total = opts.reduce((a, o) => a + o.w, 0);
-    let r = Math.random() * total;
-    const i = opts.findIndex(o => (r -= o.w) <= 0);
-    picks.push(opts.splice(i < 0 ? 0 : i, 1)[0]);
-  }
+  const picks = drawCards();
   if (!picks.length) picks.push({ type: 'heal' }, { type: 'gold' });
   G.choosing = true;
   audio.play('levelup');
@@ -1422,13 +1652,6 @@ function nextChoice() {
       name = ps.name;
       text = ps.desc;
       tag = `Lv ${o.lv}`;
-    } else if (o.type === 'party') {
-      icon = document.createElement('img');
-      icon.src = heroPicture(o.cls);
-      icon.className = 'item';
-      name = o.m ? `${o.m.name} (${o.cls.name})` : `${o.cls.name} 동료`;
-      text = o.m ? '파티원이 강해진다' : `파티에 들어온다. ${PARTY[o.cls.id].role}`;
-      tag = o.m ? `Lv ${o.m.lv + 1}` : '파티';
     } else if (o.type === 'heal') {
       icon = itemIcon('heal');
       name = '회복';
@@ -1447,11 +1670,49 @@ function nextChoice() {
     b.onclick = () => choose(o);
     box.append(b);
   }
+  $('#lv-reroll').textContent = `다시 뽑기 ${G.rerolls}`;
+  $('#lv-skip').textContent = `넘기기 ${G.skips}`;
+  $('#lv-banish').textContent = G.banishing ? '뺄 카드를 고르세요' : `빼기 ${G.banishes}`;
+  $('#lv-reroll').disabled = !G.rerolls;
+  $('#lv-skip').disabled = !G.skips;
+  $('#lv-banish').disabled = !G.banishes;
   $('#levelup').hidden = false;
 }
 
+// Two of each per run, as in D2 Survivors: deal again, pass, or strike a card out for the run.
+$('#lv-reroll').onclick = () => {
+  if (!G || !G.choosing || !G.rerolls) return;
+  G.rerolls--;
+  G.pendingLevels++;
+  G.choosing = false;
+  nextChoice();
+};
+$('#lv-skip').onclick = () => {
+  if (!G || !G.choosing || !G.skips) return;
+  G.skips--;
+  $('#levelup').hidden = true;
+  G.choosing = false;
+  if (G.pendingLevels) nextChoice();
+};
+$('#lv-banish').onclick = () => {
+  if (!G || !G.choosing || !G.banishes) return;
+  G.banishing = !G.banishing;
+  $('#lv-banish').textContent = G.banishing ? '뺄 카드를 고르세요' : `빼기 ${G.banishes}`;
+};
+
 function choose(o) {
   if (!G.choosing) return; // a second tap on the same card
+  if (G.banishing && (o.type === 'skill' || o.type === 'passive')) {
+    G.banishing = false;
+    G.banishes--;
+    G.banished.add(o.type + ':' + o.id);
+    const n = o.type === 'skill' ? SKILLS[o.id].name : PASSIVES[o.id].name;
+    say(`${josa(n, '은', '는')} 이번 사냥에서 나오지 않습니다.`);
+    G.pendingLevels++;
+    G.choosing = false;
+    nextChoice();
+    return;
+  }
   if (o.type === 'skill') {
     addSkill(o.id);
     say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`);
@@ -1461,11 +1722,6 @@ function choose(o) {
       G.player.maxHp += 20;
       G.player.hp += 20;
     }
-  } else if (o.type === 'party') {
-    if (o.m) {
-      o.m.lv++;
-      say(`${o.m.name}의 레벨이 올랐습니다.`, 'party');
-    } else joinParty(o.cls);
   } else if (o.type === 'heal') heal(50, true);
   else G.gold += 100;
   $('#levelup').hidden = true;
@@ -1513,15 +1769,17 @@ function die() {
   audio.stopBgm();
   say('유령이 되었습니다…', 'warn');
   record();
-  setTimeout(() => {
-    if (!G) return;
-    G.over = true;
-    $('#over-title').textContent = G.cleared ? `${G.stage.name} 정복!` : '유령이 되었습니다';
-    $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}<br>`
-      + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
-      + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ');
-    showScreen('over');
-  }, 1800);
+  setTimeout(() => showResults('유령이 되었습니다'), 1800);
+}
+
+function showResults(title) {
+  if (!G || G.over) return;
+  G.over = true;
+  $('#over-title').textContent = title;
+  $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}<br>`
+    + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
+    + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ');
+  showScreen('over');
 }
 
 function leaveHunt() {
@@ -1776,7 +2034,8 @@ function render(now) {
 
   // On the ground: experience, money, boxes.
   for (const d of G.drops) {
-    const im = images[`item/${M.items[d.kind].id}.png`];
+    const im = d.kind === 'gear' ? gearImage(d.gear) : images[`item/${M.items[d.kind].id}.png`];
+    if (!im) continue;
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
@@ -2280,7 +2539,16 @@ function soundDefaults() {
   return d;
 }
 
+function migrateSettings() {
+  if (settings.numbersVer !== 1) {
+    settings.numbers = false;
+    settings.numbersVer = 1;
+    saveJson('bs_settings', settings);
+  }
+}
+
 function applySounds() {
+  migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
   if (settings.soundsVer !== 2) {
     delete settings.sounds;
