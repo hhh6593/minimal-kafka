@@ -120,43 +120,77 @@
   #chat p.sys { color: #fff; background: #3e5cc0; margin: 0 -6px; padding: 0 6px; }
   #chat p.warn { color: #a01800; }
 
+  /* The side panel, laid out like the old client's: a parchment scroll (CLAN / C.T. / TITLE,
+     class, the figure with its gear slots, a lettered list), a sheet of vertical writing,
+     then the status block with the two round emblems. It folds away to give the view room. */
   #side { position: fixed; top: 0; right: 0; bottom: 0; width: var(--side); z-index: 3; display: flex; flex-direction: column;
-      gap: 4px; padding: max(4px, env(safe-area-inset-top)) max(5px, env(safe-area-inset-right)) 5px 5px; color: var(--ink);
-      background: var(--wood); border-left: 3px solid; border-color: var(--wood-hi);
-      box-shadow: inset 2px 0 0 var(--wood-lo); }
-  #side .field { padding: 0 5px; background: var(--field); border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
-  #side .head { display: flex; justify-content: space-between; font-weight: 700; }
-  #side .doll { display: flex; align-items: center; gap: 4px; }
-  #side .doll .me { flex: none; display: flex; align-items: flex-end; justify-content: center; width: 54px; height: 64px;
-      background: #3a200c; border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
-  #side .doll .me img { max-width: 50px; max-height: 62px; }
-  #side .slots { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; }
-  #side .slots i { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; position: relative;
-      background: #3a200c; border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
-  #side .slots i img { max-width: 20px; max-height: 20px; }
-  #side .slots i b { position: absolute; right: 0; bottom: -2px; font: 8px G7, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
-  #magic { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; align-content: start;
-      column-gap: 6px; font: 10px/13px G9, monospace; }
-  #magic span { white-space: nowrap; overflow: hidden; }
-  #magic span b { font-weight: normal; color: #7a2a00; }
-  #magic span.buff { grid-column: 1 / -1; color: #1a4aa0; }
-  #stat { display: grid; grid-template-columns: auto 1fr auto; gap: 1px 4px; align-items: center; font: 10px/12px G9, monospace;
-      padding: 3px 5px; color: #f4e6c4; background: #3a200c;
-      border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
-  #stat .g { height: 7px; background: #120a04; border: 1px solid #000; display: flex; gap: 1px; padding: 1px; }
-  #stat .g i { flex: 1; }
-  #stat .num { text-align: right; min-width: 52px; }
-  #stat .hp i { background: #4a1208; } #stat .hp i.on { background: #e03a22; }
-  #stat .mp i { background: #0e1a44; } #stat .mp i.on { background: #3a72e8; }
-  #stat .ex i { background: #2a2008; } #stat .ex i.on { background: #d8b030; }
-  #stat .k { color: #e6c992; }
-  #side .keys { display: flex; gap: 4px; }
-  #side .keys button { flex: 1; padding: 3px 0; font-weight: 700; color: var(--ink); background: var(--field);
-      border: 2px solid; border-color: var(--wood-hi) var(--wood-lo) var(--wood-lo) var(--wood-hi); }
-  #side .keys button:active { border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+      gap: 3px; padding: max(3px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) 4px 4px; color: var(--ink);
+      background: #6a3a18; border-left: 3px solid; border-color: #a0602a; box-shadow: inset 2px 0 0 #2a1004;
+      font: 10px/12px G9, monospace; }
+  body.panel-off { --side: 0px; }
+  body.panel-off #side { display: none; }
+  .scroll { position: relative; padding: 7px 7px 6px; background: #c49a62; border-radius: 10px / 6px;
+      box-shadow: inset 0 3px 0 #e0bf88, inset 0 -3px 0 #8a5a2a, inset 3px 0 0 #a8763e, inset -3px 0 0 #a8763e; }
+  .scroll .row { display: flex; align-items: center; gap: 3px; margin-bottom: 2px; }
+  .scroll .row em { width: 34px; font: 700 10px G11, monospace; font-style: normal; color: #f4e2b8;
+      text-shadow: -1px -1px 0 #7a4a1e; letter-spacing: 1px; }
+  .fld { flex: 1; min-width: 0; height: 13px; padding: 0 3px; overflow: hidden; white-space: nowrap; color: var(--ink);
+      background: #d6b27a; border: 1px solid; border-color: #8a5a2a #ecd09c #ecd09c #8a5a2a; }
+  .fld.r { text-align: right; }
+  .doll { position: relative; height: 96px; margin: 3px 0; }
+  .doll .me { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); width: 40px; height: 66px;
+      display: flex; align-items: flex-end; justify-content: center; }
+  .doll .me img { max-width: 40px; max-height: 64px; }
+  .doll i { position: absolute; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+      background: #a8763e; border: 1px solid; border-color: #6a3e16 #e0bf88 #e0bf88 #6a3e16; }
+  .doll i img { max-width: 18px; max-height: 18px; }
+  .doll i b { position: absolute; right: 0; bottom: -2px; font: 8px G7, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
+  .list { height: 52px; overflow: hidden; padding: 1px 3px; background: #d6b27a;
+      border: 1px solid; border-color: #8a5a2a #ecd09c #ecd09c #8a5a2a; display: grid; grid-template-columns: 1fr 1fr;
+      column-gap: 4px; align-content: start; }
+  .list span { white-space: nowrap; overflow: hidden; }
+  .list span u { text-decoration: none; color: #6a3e16; }
+  .list span b { font-weight: normal; color: #8a1a00; }
+  .fold { position: absolute; right: 6px; bottom: 2px; padding: 0 3px; font: 10px G9, monospace; color: #6a3e16;
+      background: none; border: 0; }
+  /* The second parchment is the system message window: effects received, items picked up. */
+  .vert { flex: 1; min-height: 0; overflow: hidden; padding: 2px 4px; display: flex; flex-direction: column;
+      justify-content: flex-end; font: 10px/12px G9, monospace; color: #3a2010; background: #d8c09a;
+      border: 2px solid #7a2a10; box-shadow: inset 0 0 0 1px #f0dcb8; }
+  .vert p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #stat { display: grid; grid-template-columns: 40px 1fr; gap: 0 4px; padding: 3px; color: #f4e6c4; background: #3a1e0a;
+      border: 1px solid; border-color: #1a0802 #8a5a2a #8a5a2a #1a0802; }
+  .emblems { grid-row: 1 / 8; display: flex; flex-direction: column; justify-content: space-around; align-items: center; }
+  .emblems i { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font: 700 9px G9, monospace; color: #f4e6c4; text-shadow: 1px 1px 0 #000;
+      background: radial-gradient(circle at 40% 35%, #8aa0b8, #2a3a50 60%, #101820); border: 2px solid #8a6a3a;
+      box-shadow: 0 0 0 1px #000; }
+  .emblems i.land { background: radial-gradient(circle at 40% 35%, #e0b070, #8a3a1a 60%, #2a1008); }
+  #stat .line { display: flex; align-items: center; justify-content: space-between; gap: 3px; height: 12px; white-space: nowrap; }
+  #stat .line.name { color: #fff; }
+  #stat .line .n { color: #b8d8a0; }
+  /* Health and mana as in the client: a filled bar with the number inside, at its right. */
+  #stat .g { position: relative; flex: 1; height: 11px; background: #000; border: 1px solid #000; }
+  #stat .g i { position: absolute; left: 0; top: 0; bottom: 0; }
+  #stat .hp i { background: linear-gradient(#f08040, #c03010 60%, #801808); }
+  #stat .mp i { background: linear-gradient(#a0c0ff, #3a6ae0 60%, #1a3080); }
+  #stat .g span { position: absolute; right: 2px; top: -1px; font: 10px/12px G9, monospace; color: #fff;
+      text-shadow: 1px 1px 0 #000; }
+  #stat .k { width: 18px; color: #e6c992; }
+  #side .keys { display: flex; gap: 3px; }
+  #side .keys button { flex: 1; padding: 2px 0; font: 700 11px G11, monospace; color: var(--ink); background: #c49a62;
+      border: 2px solid; border-color: #e0bf88 #5a3212 #5a3212 #e0bf88; }
+  #side .keys button:active { border-color: #5a3212 #e0bf88 #e0bf88 #5a3212; }
   #ult { flex: 2 !important; }
   #ult.ready { color: #7a1800 !important; background: #ffe9a0 !important; }
   #ult small { display: block; font: 8px G7, monospace; font-weight: normal; }
+  /* Folded away: a tab on the frame brings it back; health and mana stay in sight under the map tab. */
+  #unfold { position: absolute; right: 0; top: 50%; transform: translateY(-50%); pointer-events: auto; padding: 8px 2px;
+      writing-mode: vertical-rl; font: 700 10px G9, monospace; color: #f4e6c4; background: #6a3a18;
+      border: 2px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a; border-right: 0; }
+  #mini { position: absolute; left: 50%; top: 36px; transform: translateX(-50%); display: flex; gap: 6px;
+      font: 10px G9, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
+  #mini b { font-weight: normal; }
   #banner { position: fixed; top: 22%; left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
       font-weight: 700; color: #ffe070; background: rgba(30, 16, 8, .9); border: 1px solid var(--frame-hi);
       pointer-events: none; white-space: nowrap; z-index: 4; }
@@ -230,17 +264,30 @@
 
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
+  <div id="mini" hidden></div>
+  <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
 </div>
 <div id="side" hidden>
-  <div class="head field"><span id="side-class"></span><span id="side-lv"></span></div>
-  <div class="doll"><div class="me"><img id="side-hero" alt=""></div><div class="slots" id="side-slots"></div></div>
-  <div id="magic" class="field"></div>
+  <div class="scroll">
+    <div class="row"><em>CLAN</em><span class="fld" id="sd-clan"></span></div>
+    <div class="row"><em>C. T.</em><span class="fld" id="sd-ct"></span></div>
+    <div class="row"><em>TITLE</em><span class="fld" id="sd-title"></span></div>
+    <div class="row"><span class="fld" id="sd-class"></span><span class="fld r" id="sd-lv"></span></div>
+    <div class="doll"><div class="me"><img id="side-hero" alt=""></div><div id="side-slots"></div></div>
+    <div class="list" id="magic"></div>
+    <button class="fold" id="fold" aria-label="상태창 접기">접기</button>
+  </div>
+  <div class="vert" id="vert"></div>
   <div id="stat">
-    <span class="k">체력</span><div class="g hp"></div><span class="num" id="st-hp"></span>
-    <span class="k">마력</span><div class="g mp"></div><span class="num" id="st-mp"></span>
-    <span class="k">경험</span><div class="g ex"></div><span class="num" id="st-ex"></span>
-    <span class="k">시간</span><span id="st-time"></span><span class="num" id="st-gold"></span>
+    <div class="emblems"><i>용</i><i class="land" id="sd-land"></i></div>
+    <div class="line name"><span id="sd-name"></span><span id="sd-lv2"></span></div>
+    <div class="line"><span>힘 <b class="n" id="sd-str"></b></span><span>지 <b class="n" id="sd-int"></b></span><span>민 <b class="n" id="sd-dex"></b></span></div>
+    <div class="line"><span class="k">체</span><div class="g hp"></div></div>
+    <div class="line"><span class="k">마</span><div class="g mp"></div></div>
+    <div class="line"><span class="k">경</span><span class="n" id="sd-exp"></span></div>
+    <div class="line"><span class="k">전</span><span class="n" id="sd-gold"></span></div>
+    <div class="line"><span class="k">위치</span><span class="n" id="sd-pos"></span></div>
   </div>
   <div class="keys"><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
 </div>

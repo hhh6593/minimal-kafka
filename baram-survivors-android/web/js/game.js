@@ -246,6 +246,8 @@ function showScreen(name) {
   const hunting = name === null;
   document.body.classList.toggle('hunting', hunting);
   $('#side').hidden = $('#play-frame').hidden = !hunting;
+  document.body.classList.toggle('panel-off', hunting && settings.panel === false);
+  $('#unfold').hidden = $('#mini').hidden = !(hunting && settings.panel === false);
   resize();
   if (name === 'title') audio.bgm('title');
   if (name === 'select') buildSelect();
@@ -423,6 +425,7 @@ function startRun(cls, stage) {
   showScreen(null);
   audio.bgm('battle');
   $('#chat').innerHTML = '';
+  $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, '', 'sys');
   say(stage.intro, '#c8e0ff');
 }
@@ -506,10 +509,10 @@ function update(dt) {
   G.dying = G.dying.filter(d => d.t < 1.2);
   for (const t of G.texts) {
     t.t += dt;
-    t.y -= 18 * dt;
+    if (t.t < 0.15) t.y -= 40 * dt;
   }
-  G.texts = G.texts.filter(t => t.t < 0.6);
-  if (G.bubble && G.t - G.bubble.t > 1.8) G.bubble = null;
+  G.texts = G.texts.filter(t => t.t < 1.1);
+  if (G.bubble && G.t - G.bubble.t > 1.3) G.bubble = null;
 }
 
 // ---------------------------------------------------------------- monsters
@@ -687,7 +690,8 @@ function hurtEnemy(e, dmg) {
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1);
   e.hp -= dmg;
   e.flash = 0.12;
-  if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale, Math.round(dmg), '#fff');
+  e.shown = G.t;
+  if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale - 8, Math.round(dmg), '#ffffff', true);
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
@@ -916,15 +920,14 @@ function cast(skill, st) {
     case 'heal': {
       if (p.hp >= p.maxHp) return retry(1);
       heal(st.heal, true);
-      say(`${skillName(skill.id, skill.lv)}!`, '#9fffa8');
+      note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
       break;
     }
     case 'buff': {
       G.buffs[def.buff] = G.t + st.duration;
       if (def.buff === 'power') G.buffs.powerK = def.power;
-      if (def.buff === 'stealth') say('모습을 감췄습니다.', '#c8c8ff');
-      if (def.buff === 'guard') say('금강불체!', '#ffe08a');
+      note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       addFx(def.fx, 0, -40, { follow: true });
       break;
     }
@@ -940,7 +943,7 @@ function castUlt() {
   const def = SKILLS[G.cls.ult];
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-  G.bubble = { text: `${G.cls.name}: ${def.name}!`, t: G.t };
+  G.bubble = { text: `${def.name}!`, t: G.t };
   say(`${def.name}!`, '#ffe08a');
   audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
@@ -1042,13 +1045,15 @@ function updatePickups(dt) {
       d.taken = true;
       if (d.kind === 'heal') heal(30, true);
       else if (d.kind === 'coin') {
-        G.gold += 5 + Math.floor(Math.random() * 10 * (1 + G.level));
+        const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
+        G.gold += n;
+        note(`${n}전을 주웠습니다.`);
         audio.play('pickup');
       } else if (d.kind === 'chest') {
         G.gold += 100 * (1 + G.level);
         heal(p.maxHp * 0.3, false);
         audio.play('chest');
-        say('보물 상자를 열었습니다.', '#ffe08a');
+        note('보물 상자를 열었습니다.');
         G.pendingLevels++;
         nextChoice();
       }
@@ -1070,6 +1075,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   p.xp += v;
+  p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
     p.xp -= p.next;
     p.lvl++;
@@ -1239,6 +1245,15 @@ function banner(text) {
 }
 
 /** A line in the message window, like the game's system messages. */
+/** A line in the side panel's message window: effects received, things picked up. */
+function note(text) {
+  const box = $('#vert');
+  const p = document.createElement('p');
+  p.textContent = text;
+  box.append(p);
+  while (box.children.length > 8) box.firstChild.remove();
+}
+
 /** A line in the chat window. kind 'sys' is the blue system line, 'warn' red. */
 function say(text, color, kind = '') {
   const chat = $('#chat');
@@ -1256,9 +1271,19 @@ function josa(word, withFinal, without) {
   return word + (has ? withFinal : without);
 }
 
-function floatText(x, y, text, color) {
-  if (G.texts.length > 70) G.texts.shift();
-  G.texts.push({ x: x + rand(-4, 4), y, text: String(text), color, t: 0 });
+/** Big numbers with a heavy dark edge, as the game shows damage and healing. */
+function thick(text, x, y, color) {
+  x = Math.round(x);
+  y = Math.round(y);
+  ctx.fillStyle = '#1a1a1a';
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) ctx.fillText(text, x + dx, y + dy);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+function floatText(x, y, text, color, box = false) {
+  if (G.texts.length > 50) G.texts.shift();
+  G.texts.push({ x: x + rand(-4, 4), y, text: String(text), color, t: 0, box });
 }
 
 function rand(a, b) {
@@ -1470,6 +1495,14 @@ function render(now) {
     // A monster leans in as it strikes.
     const lx = b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0, ly = b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0;
     drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
+    if (!b.kind && b.shown && G.t - b.shown < 3) {
+      // A struck monster shows its health over its head for a while.
+      const bx = Math.round(b.x - 12), by = Math.round(b.y - b.m.h * s - 5);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(bx - 1, by - 1, 26, 4);
+      ctx.fillStyle = '#4ad82a';
+      ctx.fillRect(bx, by, Math.round(24 * Math.max(0, b.hp / b.maxHp)), 2);
+    }
     if (b.kind) {
       bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
       ctx.font = '10px G9';
@@ -1500,9 +1533,21 @@ function render(now) {
   }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
+  ctx.font = '10px G9';
   for (const t of G.texts) {
-    ctx.globalAlpha = 1 - t.t / 0.6;
-    outline(t.text, t.x, t.y, t.color);
+    ctx.globalAlpha = t.t < 0.7 ? 1 : 1 - (t.t - 0.7) / 0.4;
+    if (t.box) {
+      const w = Math.ceil(ctx.measureText(t.text).width) + 6, x = Math.round(t.x - w / 2), y = Math.round(t.y - 10);
+      ctx.fillStyle = 'rgba(34,30,92,0.9)';
+      ctx.fillRect(x, y, w, 12);
+      ctx.fillStyle = '#a8a0f0';
+      ctx.fillRect(x, y, w, 1);
+      ctx.fillRect(x, y + 11, w, 1);
+      ctx.fillRect(x, y, 1, 12);
+      ctx.fillRect(x + w - 1, y, 1, 12);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(t.text, Math.round(t.x), y + 9);
+    } else thick(t.text, t.x, t.y, t.color);
   }
   ctx.globalAlpha = 1;
   if (!G.dead) {
@@ -1516,7 +1561,7 @@ function render(now) {
     ctx.fillStyle = '#2a9a14';
     ctx.fillRect(bx, by + 2, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 1);
   }
-  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 12);
+  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 12, G.t - G.bubble.t);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const dark = DARK[G.stage.terrain];
@@ -1545,27 +1590,39 @@ function drawHero(now, hidden) {
   if (!blink) drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
 }
 
-function drawBubble(text, x, y) {
-  // What a character says, in the game's style: a dark box with a white rim, white letters.
-  ctx.font = '10px G9';
+// The colour a class shouts its spells in.
+// Kept for reference: the newer game colours shouts by class; the old client does not.
+
+function drawBubble(text, x, y, age = 0) {
+  // A spell shouted aloud: the name in the class's colour in a grey box with a rim of the
+  // same colour, fading away after a second, as in the game's spell clips.
+  ctx.save();
+  ctx.globalAlpha = age < 0.9 ? 1 : Math.max(0, 1 - (age - 0.9) / 0.4);
+  ctx.font = 'bold 12px G11';
   ctx.textAlign = 'center';
-  const w = Math.ceil(ctx.measureText(text).width) + 12;
+  const c = '#a8a0f0';
+  const w = Math.ceil(ctx.measureText(text).width) + 24;
   x = Math.round(x);
   y = Math.round(y);
-  const l = x - Math.round(w / 2), t = y - 16;
-  ctx.fillStyle = 'rgba(58,32,20,0.85)';
-  ctx.fillRect(l + 1, t + 1, w - 2, 14);
-  ctx.fillStyle = '#f4f0e8';
+  const l = x - Math.round(w / 2), t = y - 20;
+  ctx.fillStyle = 'rgba(34,30,92,0.9)';
+  ctx.fillRect(l + 1, t + 1, w - 2, 16);
+  ctx.fillStyle = c;
   ctx.fillRect(l + 2, t, w - 4, 1);
-  ctx.fillRect(l + 2, t + 15, w - 4, 1);
-  ctx.fillRect(l, t + 2, 1, 12);
-  ctx.fillRect(l + w - 1, t + 2, 1, 12);
+  ctx.fillRect(l + 2, t + 17, w - 4, 1);
+  ctx.fillRect(l, t + 2, 1, 14);
+  ctx.fillRect(l + w - 1, t + 2, 1, 14);
   ctx.fillRect(l + 1, t + 1, 1, 1);
   ctx.fillRect(l + w - 2, t + 1, 1, 1);
-  ctx.fillRect(l + 1, t + 14, 1, 1);
-  ctx.fillRect(l + w - 2, t + 14, 1, 1);
+  ctx.fillRect(l + 1, t + 16, 1, 1);
+  ctx.fillRect(l + w - 2, t + 16, 1, 1);
+  ctx.fillStyle = 'rgba(34,30,92,0.9)';
+  ctx.fillRect(x - 2, t + 18, 5, 1);
+  ctx.fillRect(x - 1, t + 19, 3, 1);
+  ctx.fillRect(x, t + 20, 1, 1);
   ctx.fillStyle = '#fff';
-  ctx.fillText(text, x, t + 11);
+  ctx.fillText(text, x, t + 13);
+  ctx.restore();
 }
 
 /** A gauge in steps, as the old client drew them. */
@@ -1659,7 +1716,7 @@ function drawMenuBackdrop(now) {
 
 const ultBtn = $('#ult');
 const STEPS = 14;
-for (const g of document.querySelectorAll('#stat .g')) g.innerHTML = '<i></i>'.repeat(STEPS);
+for (const g of document.querySelectorAll('#stat .g')) g.innerHTML = '<i></i><span></span>';
 const shown = {};
 
 /** Sets an element's text only when it changed (the panel is refreshed every frame). */
@@ -1669,45 +1726,69 @@ function put(id, text) {
   $(id).textContent = text;
 }
 
-function gauge(sel, k) {
-  const on = Math.round(Math.max(0, Math.min(1, k)) * STEPS);
-  if (shown[sel] === on) return;
-  shown[sel] = on;
-  document.querySelectorAll(sel + ' i').forEach((el, i) => el.classList.toggle('on', i < on));
+function gauge(sel, k, text) {
+  const w = (Math.max(0, Math.min(1, k)) * 100).toFixed(1) + '%';
+  if (shown[sel] !== w) {
+    shown[sel] = w;
+    $(sel + ' i').style.width = w;
+  }
+  put(sel + ' span', text);
 }
 
-/** The carved side panel and the map tab, as the old client showed them. */
+// Gear slots around the figure, as on the old panel: two on each side, one above, two below.
+const SLOT_AT = [['50%', '0', true], ['2px', '16px'], ['2px', '42px'], ['right', '16px'], ['right', '42px'],
+  ['30%', '74px', true], ['70%', '74px', true], ['2px', '74px']];
+const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12] };
+const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
+
+/** The side panel and the map tab, kept in step with the hunt. */
 function syncUlt() {
-  if (!G || $('#side').hidden) return;
+  if (!G) return;
   const p = G.player;
-  put('#side-class', G.cls.name);
-  put('#side-lv', `Lv ${p.lvl}`);
+  put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
+  put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock(BOSS_AT - G.t)}` : '');
+  if (document.body.classList.contains('panel-off')) {
+    put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
+    return;
+  }
+  const cleared = Object.keys(progress.cleared).length;
+  put('#sd-clan', G.stage.map === 'world_4' ? '환상의 섬' : '고구려');
+  put('#sd-ct', G.stage.name);
+  put('#sd-title', TITLES[Math.min(TITLES.length - 1, Math.floor(cleared / 3))]);
+  put('#sd-class', G.cls.name);
+  put('#sd-lv', String(p.lvl));
+  put('#sd-land', G.stage.map === 'world_4' ? '환상' : '고구려');
+  put('#sd-name', '나');
+  put('#sd-lv2', `Lv ${p.lvl}`);
+  const [bs, bi, bd] = BASE_STATS[G.cls.id];
+  put('#sd-str', String(bs + p.lvl + G.passives.power * 3));
+  put('#sd-int', String(bi + p.lvl + G.passives.haste * 3));
+  put('#sd-dex', String(bd + p.lvl + G.passives.speed * 3));
+  gauge('#stat .hp', p.hp / p.maxHp, String(Math.ceil(Math.max(0, p.hp))));
+  gauge('#stat .mp', p.mp / p.maxMp, String(Math.floor(p.mp)));
+  put('#sd-exp', String(p.total || 0));
+  put('#sd-gold', String(G.gold));
+  put('#sd-pos', `${String(p.tx + 500).padStart(4, '0')} ${String(p.ty + 500).padStart(4, '0')}`);
   const hero = `assets/hero/${G.cls.hero}.png`;
   if (shown.hero !== hero) {
     shown.hero = hero;
     $('#side-hero').src = hero;
   }
-  put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
-  put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock(BOSS_AT - G.t)}` : '');
-  gauge('#stat .hp', p.hp / p.maxHp);
-  gauge('#stat .mp', p.mp / p.maxMp);
-  gauge('#stat .ex', p.xp / p.next);
-  put('#st-hp', `${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}`);
-  put('#st-mp', `${Math.floor(p.mp)}/${p.maxMp}`);
-  put('#st-ex', `${Math.floor((100 * p.xp) / p.next)}%`);
-  put('#st-time', `${clock(G.t)}  ${G.kills}마리`);
-  put('#st-gold', `${G.gold}전`);
-  // Spells, then whatever is on the hero right now, as the old status line listed them.
-  const on = [['power', '공격력 증가'], ['stealth', '투명'], ['guard', '금강불체'], ['shield', '보호막']]
-    .filter(([k]) => G.buffs[k] > G.t).map(([k, n]) => `<span class="buff">${n} ${Math.ceil(G.buffs[k] - G.t)}초</span>`);
-  const magic = G.skills.map(s => `<span>${skillName(s.id, s.lv)} <b>${s.lv}</b></span>`).join('') + on.join('');
+  // The lettered list holds the learned spells, as the magic window lettered them.
+  // The scroll's list: effects on the hero with the seconds left, as the client listed them,
+  // then the spells learned.
+  const effects = [['power', '공격력증가'], ['stealth', '투명'], ['guard', '금강불체'], ['shield', '보호막']]
+    .filter(([k]) => G.buffs[k] > G.t).map(([k, n]) => `<span>${n} <b>${Math.ceil(G.buffs[k] - G.t)}초</b></span>`);
+  const magic = effects.join('') + G.skills.map((s, i) => `<span><u>${'abcdefgh'[i]}:</u>${skillName(s.id, s.lv)} <b>${s.lv}</b></span>`).join('');
   if (shown.magic !== magic) {
     shown.magic = magic;
     $('#magic').innerHTML = magic;
   }
-  // The equipment slots hold the trained stats, each shown by its item.
-  const slots = Object.entries(G.passives).map(([id, lv]) => lv
-    ? `<i><img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b></i>` : '<i></i>').join('');
+  const slots = Object.entries(G.passives).map(([id, lv], i) => {
+    const [x, y, mid] = SLOT_AT[i];
+    const pos = x === 'right' ? `right:2px;top:${y}` : `left:${x};top:${y};${mid ? 'transform:translateX(-50%)' : ''}`;
+    return `<i style="${pos}">${lv ? `<img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b>` : ''}</i>`;
+  }).join('');
   if (shown.slots !== slots) {
     shown.slots = slots;
     $('#side-slots').innerHTML = slots;
@@ -1717,6 +1798,20 @@ function syncUlt() {
   put('#ult small', ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
   ultBtn.classList.toggle('ready', ready);
 }
+
+/** Folds the side panel away for a wider view, or brings it back; remembered between runs. */
+function setPanel(on) {
+  settings.panel = on;
+  saveJson('bs_settings', settings);
+  document.body.classList.toggle('panel-off', !on);
+  $('#unfold').hidden = on;
+  $('#mini').hidden = on;
+  for (const k of Object.keys(shown)) delete shown[k];
+  resize();
+}
+$('#fold').onclick = () => setPanel(false);
+$('#unfold').onclick = () => setPanel(true);
+
 ultBtn.addEventListener('pointerdown', e => {
   e.preventDefault();
   e.stopPropagation();
