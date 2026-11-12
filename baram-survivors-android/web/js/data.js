@@ -38,7 +38,7 @@ const tier = base => ['', '', ' 2차', ' 2차', ' 3차', ' 3차', ' 4차', ' 5�
 // on cards. dmg is per hit at level 1; evolved forms count as level 8.
 export const SKILLS = {
   // 공통
-  c_heal: { cls: 'all', req: 1, name: '누리의 기원', kind: 'heal', fx: '150', heal: 10, cd: 11,
+  c_heal: { cls: 'all', req: 1, name: '누리의 기원', kind: 'heal', fx: '136', heal: 10, cd: 11,
     names: ['누리의 기원', '대지의 기원', '바다의 기원', '동해의 기원', '하늘의 기원', '천공의 기원', '구름의 기원', '태양의 기원'],
     desc: '이따금 체력을 회복한다' },
 
@@ -46,14 +46,14 @@ export const SKILLS = {
   w_slash: { cls: 'warrior', req: 1, name: '이중공격', kind: 'slash', fx: null, dmg: 12, cd: 0.8,
     names: ['이중공격', '이중공격', '후면 공격', '삼중공격', '측면 공격', '사중공격', '신검합일', '오중공격'],
     evo: { with: 'power', into: 'w_sword' }, desc: '바로 옆 칸의 몬스터를 연달아 벤다' },
-  w_tiger: { cls: 'warrior', req: 1, name: '백호참', kind: 'spell', fx: '20', dmg: 18, cd: 3, range: 2, count: 1,
+  w_tiger: { cls: 'warrior', req: 1, name: '백호참', kind: 'spell', fx: '140', dmg: 18, cd: 3, range: 2, count: 1,
     scaleHp: 0.06, evo: { with: 'life', into: 'w_roar2' }, desc: '두 칸 안의 몬스터 하나를 크게 벤다. 체력이 높을수록 강하다' },
   w_buff: { cls: 'warrior', req: 6, name: '백호령', kind: 'buff', buff: 'power', fx: '138', cd: 14, duration: 4, power: 0.4,
     names: ['백호령', '백호령', '검신검귀', '검신검귀', '대력검신', '대력검신', '대력검신', '대력검신'],
     desc: '잠시 공격력이 크게 오른다' },
   w_roar: { cls: 'warrior', req: 12, name: '동귀어진', kind: 'nova', fx: '141', dmg: 26, cd: 7, radius: 1, stun: 1,
     hpCost: 0.05, desc: '체력을 조금 깎아 내며, 둘러싼 여덟 칸에 큰 피해를 주고 잠시 멈추게 한다' },
-  w_sword: { cls: 'warrior', req: 12, evolved: true, name: '어검술', kind: 'nova', fx: '137', dmg: 9, cd: 1, radius: 1,
+  w_sword: { cls: 'warrior', req: 12, evolved: true, name: '어검술', kind: 'nova', fx: '20', dmg: 9, cd: 1, radius: 1,
     desc: '이중공격 8단 + 힘. 검기가 둘러싼 여덟 칸을 쉼 없이 벤다' },
   w_roar2: { cls: 'warrior', req: 18, evolved: true, name: '포효검황', kind: 'nova', fx: '24', dmg: 22, cd: 3.5, radius: 2,
     scaleHp: 0.1, desc: '백호참 8단 + 체력 단련. 포효와 함께 두 칸 안을 모두 벤다' },
@@ -65,32 +65,32 @@ export const SKILLS = {
     evo: { with: 'speed', into: 'r_dance' }, desc: '네 칸 안의 몬스터 뒤로 순식간에 옮겨 가며 벤다' },
   r_bolt: { cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '48', dmg: 12, cd: 1.8, range: 6, count: 1,
     names: tier('뇌진주'), evo: { with: 'haste', into: 'r_storm' }, desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
-  r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '57', cd: 12, duration: 2.5,
+  r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '33', cd: 12, duration: 2.5,
     desc: '잠시 모습을 감춘다. 몬스터가 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
-  r_drain: { cls: 'rogue', req: 6, name: '흡성대법', kind: 'spell', fx: '9', dmg: 16, cd: 2.8, range: 5, count: 1,
+  r_drain: { cls: 'rogue', req: 6, name: '흡성대법', kind: 'spell', fx: '55', dmg: 16, cd: 2.8, range: 5, count: 1,
     drain: 0.3, weakest: true, desc: '체력이 낮은 몬스터의 기운을 빨아들여 체력을 회복한다' },
   r_clone: { cls: 'rogue', req: 12, name: '분신', kind: 'buff', buff: 'power', fx: '56', cd: 14, duration: 4, power: 1,
     desc: '분신을 만들어 잠시 공격력이 두 배가 된다' },
   r_dance: { cls: 'rogue', req: 12, evolved: true, name: '백호검무', kind: 'blink', fx: '142', dmg: 7, cd: 0.9, range: 5,
     count: 4, desc: '비영승보 8단 + 민첩. 네 몬스터 사이를 오가며 벤다' },
-  r_storm: { cls: 'rogue', req: 18, evolved: true, name: '쇄혼비무', kind: 'strike', fx: '46', dmg: 10, cd: 2, range: 6,
+  r_storm: { cls: 'rogue', req: 18, evolved: true, name: '쇄혼비무', kind: 'strike', fx: '143', dmg: 10, cd: 2, range: 6,
     radius: 1, count: 3, hitAt: 0.3, desc: '뇌진주 8단 + 지력. 번개 세 줄기가 몬스터와 그 주위를 친다' },
-  r_ult: { cls: 'rogue', name: '필살검무', kind: 'ult', fx: '52', hpCost: 0.2,
+  r_ult: { cls: 'rogue', name: '필살검무', kind: 'ult', fx: '145', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 네 칸 안의 모든 몬스터를 순식간에 베어 낸다' },
 
   // 주술사: 신수마법과 상태이상
-  m_fire: { cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '92', dmg: 10, cd: 1.1, range: 7, count: 1,
+  m_fire: { cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '54', dmg: 10, cd: 1.1, range: 7, count: 1,
     names: FIRE, evo: { with: 'haste', into: 'm_fire3' }, desc: '신수마법. 가까운 몬스터를 불태운다' },
-  m_ice: { cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '146', dmg: 14, cd: 2.4, range: 7, radius: 0, count: 1,
+  m_ice: { cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '3', dmg: 14, cd: 2.4, range: 7, radius: 0, count: 1,
     hitAt: 0.5, slow: 2, names: tier('백열주'), evo: { with: 'area', into: 'm_quake' },
-    desc: '신수마법. 얼음 기둥이 솟아 몬스터를 느리게 한다' },
-  m_curse: { cls: 'mage', req: 6, name: '저주', kind: 'strike', fx: '61', dmg: 3, cd: 5, range: 7, radius: 1, count: 1,
+    desc: '신수마법. 백호의 땅 기운으로 몬스터를 치고 느리게 한다' },
+  m_curse: { cls: 'mage', req: 6, name: '저주', kind: 'strike', fx: '83', dmg: 3, cd: 5, range: 7, radius: 1, count: 1,
     hitAt: 0.3, curse: 4, desc: '몬스터와 그 주위의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
   m_fire4: { cls: 'mage', req: 12, name: '화염주첨', kind: 'spell4', fx: '95', dmg: 10, cd: 2.2, range: 7,
     names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '72', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
-  m_fire3: { cls: 'mage', req: 12, evolved: true, name: '삼매진화', kind: 'spell', fx: '139', dmg: 6, cd: 0.8, range: 8,
+  m_fire3: { cls: 'mage', req: 12, evolved: true, name: '삼매진화', kind: 'spell', fx: '96', dmg: 6, cd: 0.8, range: 8,
     count: 4, desc: '화염주 8단 + 지력. 진짜 불이 몬스터 넷을 한꺼번에 태운다' },
   m_quake: { cls: 'mage', req: 18, evolved: true, name: '지폭지술', kind: 'strike', fx: '147', dmg: 14, cd: 3, range: 7,
     radius: 2, count: 2, hitAt: 0.4, desc: '백열주 8단 + 공력. 땅이 터지며 두 칸 안을 휩쓴다' },
@@ -98,21 +98,21 @@ export const SKILLS = {
     desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
 
   // 도사: 회복, 결계, 소환
-  p_orb: { cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '133', dmg: 9, cd: 1.2, range: 7, count: 1,
-    names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 기운의 구슬로 몬스터를 친다' },
+  p_orb: { cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '29', dmg: 9, cd: 1.2, range: 7, count: 1,
+    names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
   p_barrier: { cls: 'poet', req: 6, name: '차폐', kind: 'aura', fx: '134', dmg: 3, cd: 0.8,
     desc: '결계를 둘러, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
   p_quake: { cls: 'poet', req: 12, name: '지진', kind: 'strike', fx: '121', dmg: 14, cd: 3.6, range: 6, radius: 1, count: 1,
     hitAt: 0.3, evo: { with: 'life', into: 'p_break' }, desc: '몬스터와 그 주위 여덟 칸을 흔든다' },
-  p_summon: { cls: 'poet', req: 1, name: '소혼강신', kind: 'summon', fx: '125', dmg: 7, cd: 9, count: 1, duration: 7,
+  p_summon: { cls: 'poet', req: 1, name: '소혼강신', kind: 'summon', fx: '120', dmg: 7, cd: 9, count: 1, duration: 7,
     allies: ['3013', '3012', '1022', '1023'], desc: '불여우와 맹수를 불러 함께 싸우게 한다' },
   p_guard: { cls: 'poet', req: 18, name: '금강불체', kind: 'buff', buff: 'guard', fx: '135', cd: 16, duration: 2,
     desc: '잠시 어떤 공격도 받지 않는 몸이 된다' },
-  p_wave: { cls: 'poet', req: 12, evolved: true, name: '노도성황', kind: 'spell', fx: '117', dmg: 7, cd: 0.9, range: 8,
-    count: 3, desc: '자무주 8단 + 공력. 기운이 성난 물결처럼 몬스터 셋을 친다' },
-  p_break: { cls: 'poet', req: 18, evolved: true, name: '파력무참', kind: 'strike', fx: '144', dmg: 16, cd: 3, range: 6,
+  p_wave: { cls: 'poet', req: 12, evolved: true, name: '노도성황', kind: 'spell', fx: '131', dmg: 7, cd: 0.9, range: 8,
+    count: 3, desc: '자무주 8단 + 공력. 현무의 물 기운이 성난 물결처럼 몬스터 셋을 친다' },
+  p_break: { cls: 'poet', req: 18, evolved: true, name: '파력무참', kind: 'strike', fx: '132', dmg: 16, cd: 3, range: 6,
     radius: 2, count: 1, hitAt: 0.3, desc: '지진 8단 + 체력 단련. 땅을 부수어 두 칸 안을 친다' },
-  p_ult: { cls: 'poet', name: '백호의희원', kind: 'ult', fx: '130', guard: 3,
+  p_ult: { cls: 'poet', name: '백호의희원', kind: 'ult', fx: '146', guard: 3,
     desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 금강불체 상태가 된다' },
 };
 
@@ -184,7 +184,7 @@ export const MINI_AT = [135, 285];
 export const CHAMPIONS_AT = [90, 180, 270];
 
 // Shared effects: hit spark, death puff, level-up, heal, shield and the ghost a dead hero becomes.
-export const FX = { hit: '29', death: '29', levelup: '131', heal: '150', ghost: '151', shield: '132', summon: '125' };
+export const FX = { hit: '21', death: '21', levelup: '150', heal: '117', ghost: '151', shield: '57', summon: '125' };
 
 /** A skill's name at a level. */
 export function skillName(id, level) {
