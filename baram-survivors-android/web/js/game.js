@@ -226,9 +226,9 @@ const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35 };
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(innerWidth * dpr);
-  canvas.height = Math.round(innerHeight * dpr);
-  Z = Math.max(1, Math.round(canvas.height / 500));
+  canvas.width = Math.round(canvas.clientWidth * dpr);
+  canvas.height = Math.round(canvas.clientHeight * dpr);
+  Z = Math.max(1, Math.round(canvas.height / 470));
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -242,8 +242,11 @@ addEventListener('resize', () => {
 
 function showScreen(name) {
   for (const el of document.querySelectorAll('.screen')) el.hidden = el.id !== name;
-  $('#pause-btn').hidden = name !== null;
-  $('#ult').hidden = name !== null;
+  // In a hunt: the old client's screen, a framed view with the carved panel at its side.
+  const hunting = name === null;
+  document.body.classList.toggle('hunting', hunting);
+  $('#side').hidden = $('#play-frame').hidden = !hunting;
+  resize();
   if (name === 'title') audio.bgm('title');
   if (name === 'select') buildSelect();
   if (name === 'stages') buildStages();
@@ -382,7 +385,7 @@ function step(b, dx, dy, dur) {
 function advance(b, dt) {
   if (b.moving) {
     b.mt += dt;
-    b.phase += dt * 10;
+    b.phase += (dt / b.dur) * 2 * Math.PI;
     if (b.mt >= b.dur) {
       b.moving = false;
       b.fx = b.tx;
@@ -419,7 +422,8 @@ function startRun(cls, stage) {
   addSkill(cls.start);
   showScreen(null);
   audio.bgm('battle');
-  say(`${stage.name}에 들어왔습니다.`, '#fff4d6');
+  $('#chat').innerHTML = '';
+  say(`${stage.name}에 들어왔습니다.`, '', 'sys');
   say(stage.intro, '#c8e0ff');
 }
 
@@ -472,7 +476,7 @@ function update(dt) {
       if (dx) p.face = dx;
       p.x += dx * heroSpeed() * dt;
       p.y += dy * heroSpeed() * dt;
-      p.phase += dt * 10;
+      p.phase += (heroSpeed() * dt / (TILE / 2)) * Math.PI;
       heroTile();
     }
     p.inv = Math.max(0, p.inv - dt);
@@ -499,7 +503,7 @@ function update(dt) {
   for (const f of G.fxs) f.t += dt;
   G.fxs = G.fxs.filter(f => f.t < f.life);
   for (const d of G.dying) d.t += dt;
-  G.dying = G.dying.filter(d => d.t < 0.4);
+  G.dying = G.dying.filter(d => d.t < 1.2);
   for (const t of G.texts) {
     t.t += dt;
     t.y -= 18 * dt;
@@ -551,7 +555,7 @@ function spawn(dt) {
   if (G.minis.length && t >= G.minis[0]) {
     G.minis.shift();
     addEnemy(G.mini.m, 'mini', G.mini);
-    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, '#ffb060');
+    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, '', 'warn');
     banner(`${G.mini.name} 등장`);
   }
   if (G.bossDue && t >= BOSS_AT) {
@@ -560,7 +564,7 @@ function spawn(dt) {
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
-    say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, '#ff7070');
+    say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, '', 'warn');
     banner(`보스 ${G.boss.name} 등장!`);
   }
 }
@@ -718,7 +722,7 @@ function clearStage() {
   saveJson('bs_progress', progress);
   record();
   const next = STAGES[STAGES.indexOf(G.stage) + 1];
-  say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, '#ffe08a');
+  say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, '', 'sys');
   if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`, '#c8e0ff');
   banner(`${G.stage.name} 정복!`);
 }
@@ -936,7 +940,7 @@ function castUlt() {
   const def = SKILLS[G.cls.ult];
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-  G.bubble = { text: def.name + '!', t: G.t };
+  G.bubble = { text: `${G.cls.name}: ${def.name}!`, t: G.t };
   say(`${def.name}!`, '#ffe08a');
   audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
@@ -945,9 +949,15 @@ function castUlt() {
   const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
   switch (G.cls.ult) {
     case 'w_ult': {
-      // 건곤대나이: strength from the warrior's health, on everything within three tiles.
-      addFx(def.fx, 0, -30, { follow: true, scale: 1.5 });
-      later(0.15, () => around(p.tx, p.ty, 3).forEach(e => hurtEnemy(e, p.maxHp * 2.2 * pw)));
+      // 건곤대나이: "spends health to strike the enemies in front" — four tiles ahead, three wide,
+      // with strength from the warrior's health.
+      const fdx = p.fdx || p.face, fdy = p.fdx ? 0 : p.fdy;
+      addFx(def.fx, fdx * TILE * 2, fdy * TILE * 2 - 30, { follow: true, scale: 1.3 });
+      later(0.15, () => G.enemies.slice().forEach(e => {
+        const ahead = (e.tx - p.tx) * fdx + (e.ty - p.ty) * fdy;
+        const side = Math.abs((e.tx - p.tx) * fdy - (e.ty - p.ty) * fdx);
+        if (ahead >= 0 && ahead <= 4 && side <= 1) hurtEnemy(e, p.maxHp * 2.6 * pw);
+      }));
       break;
     }
     case 'r_ult': {
@@ -1065,7 +1075,7 @@ function gainXp(v) {
     p.lvl++;
     p.next = xpFor(p.lvl);
     G.pendingLevels++;
-    say(`레벨이 올랐습니다. (Lv ${p.lvl})`, '#9fd0ff');
+    say(`레벨이 올랐습니다. (Lv ${p.lvl})`, '', 'sys');
   }
   if (G.pendingLevels && !G.choosing) nextChoice();
 }
@@ -1192,7 +1202,7 @@ function die() {
   p.hp = 0;
   audio.play('lose');
   audio.stopBgm();
-  say('유령이 되었습니다…', '#b0b0ff');
+  say('유령이 되었습니다…', '', 'warn');
   record();
   setTimeout(() => {
     if (!G) return;
@@ -1229,9 +1239,14 @@ function banner(text) {
 }
 
 /** A line in the message window, like the game's system messages. */
-function say(text, color = '#fff') {
-  G.log.push({ text, color, t: G.t });
-  if (G.log.length > 5) G.log.shift();
+/** A line in the chat window. kind 'sys' is the blue system line, 'warn' red. */
+function say(text, color, kind = '') {
+  const chat = $('#chat');
+  const p = document.createElement('p');
+  p.textContent = text;
+  if (kind) p.className = kind;
+  chat.append(p);
+  while (chat.children.length > 3) chat.firstChild.remove();
 }
 
 /** The right particle after a Korean word: josa('서생원', '이', '가') -> '서생원이'. */
@@ -1365,30 +1380,51 @@ function white(img) {
   return c;
 }
 
-/** A still sprite made to walk: it bobs and leans as it goes, faces where it heads. */
+function silhouette(img) {
+  let c = shadowCache.get(img);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, c.width, c.height);
+    shadowCache.set(img, c);
+  }
+  return c;
+}
+const shadowCache = new Map();
+
+/**
+ * A still sprite on the move. The old game's characters do not sway or tilt as they walk:
+ * the body stays upright and only the steps show. With one picture per body, a step is a
+ * one-pixel rise on alternate footfalls; the shadow, cast up and to the right as in the
+ * game, carries the sense of weight.
+ */
 function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1) {
-  const w = img.width * scale, h = img.height * scale;
-  const bob = moving ? Math.abs(Math.sin(phase)) : 0;
-  const breathe = Math.sin(phase * 0.5) * 0.015;
-  const sy = 1 + breathe - bob * 0.04, sx = 1 - breathe + bob * 0.03;
+  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+  const lift = moving && Math.floor(phase / Math.PI) % 2 === 0 ? 1 : 0;
+  x = Math.round(x);
+  y = Math.round(y);
+  // Shadow: the silhouette laid on the floor, sheared to the upper right.
+  ctx.save();
+  ctx.globalAlpha = 0.32 * alpha;
+  ctx.transform(1, 0, -0.75, 0.42, x, y);
+  ctx.scale(face, 1);
+  ctx.drawImage(silhouette(img), -w / 2, -h, w, h);
+  ctx.restore();
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(Math.round(x), Math.round(y - bob * 2));
-  ctx.rotate(moving ? Math.sin(phase) * 0.05 * face : 0);
-  ctx.scale(face * sx, sy);
+  ctx.translate(x, y - lift);
+  ctx.scale(face, 1);
   ctx.drawImage(img, -w / 2, -h, w, h);
   if (flash > 0) {
     ctx.globalAlpha = alpha * Math.min(1, flash * 8) * 0.8;
     ctx.drawImage(white(img), -w / 2, -h, w, h);
   }
   ctx.restore();
-}
-
-function shadow(x, y, r) {
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
-  ctx.beginPath();
-  ctx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function render(now) {
@@ -1427,14 +1463,12 @@ function render(now) {
       continue;
     }
     if (b.ally) {
-      shadow(b.x, b.y, 10);
       drawWalker(b.m.img, b.x, b.y, b.face, b.phase, b.moving, 0, 1, Math.min(1, (b.life - b.t) * 2) * 0.85);
       continue;
     }
     const s = b.scale;
     // A monster leans in as it strikes.
     const lx = b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0, ly = b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0;
-    shadow(b.x, b.y, Math.min(22, b.m.w * s * 0.4));
     drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
     if (b.kind) {
       bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
@@ -1444,8 +1478,16 @@ function render(now) {
     }
   }
   for (const d of G.dying) {
-    const k = d.t / 0.4;
-    drawWalker(d.e.m.img, d.e.x, d.e.y, d.e.face, 0, false, 0.12, d.e.scale, 1 - k);
+    // The body falls on its side, darkens and fades, as slain monsters did.
+    const e = d.e, im = e.m.img, k = Math.min(1, d.t / 0.15);
+    const w = im.width * e.scale, h = im.height * e.scale;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - Math.max(0, d.t - 0.6) / 0.6);
+    ctx.translate(Math.round(e.x), Math.round(e.y));
+    ctx.rotate((Math.PI / 2) * k * e.face);
+    ctx.filter = 'brightness(0.7)';
+    ctx.drawImage(im, -w / 2, -h, w, h);
+    ctx.restore();
   }
 
   // Spell effects over everything, at their own size.
@@ -1463,7 +1505,18 @@ function render(now) {
     outline(t.text, t.x, t.y, t.color);
   }
   ctx.globalAlpha = 1;
-  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 6);
+  if (!G.dead) {
+    const bx = Math.round(p.x - 14), by = Math.round(p.y - p.img.height - 6);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(bx - 1, by - 1, 30, 5);
+    ctx.fillStyle = '#1e4a10';
+    ctx.fillRect(bx, by, 28, 3);
+    ctx.fillStyle = '#4ad82a';
+    ctx.fillRect(bx, by, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 2);
+    ctx.fillStyle = '#2a9a14';
+    ctx.fillRect(bx, by + 2, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 1);
+  }
+  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 12);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const dark = DARK[G.stage.terrain];
@@ -1476,7 +1529,6 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  drawHud();
   drawJoystick();
 }
 
@@ -1489,39 +1541,31 @@ function drawHero(now, hidden) {
     ctx.globalAlpha = 1;
     return;
   }
-  shadow(p.x, p.y, 12);
-  if (G.buffs.guard > G.t) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(255,220,120,0.16)';
-    ctx.fillRect(Math.round(p.x - p.img.width / 2 - 2), Math.round(p.y - p.img.height - 2), p.img.width + 4, p.img.height + 4);
-    ctx.restore();
-  }
-  if (G.buffs.shield > G.t) {
-    ctx.strokeStyle = 'rgba(140,200,255,0.7)';
-    ctx.strokeRect(Math.round(p.x - p.img.width / 2 - 3) + 0.5, Math.round(p.y - p.img.height - 3) + 0.5, p.img.width + 6, p.img.height + 6);
-  }
   const blink = p.inv > 0 && Math.floor(p.inv * 30) % 2 === 0;
   if (!blink) drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
 }
 
 function drawBubble(text, x, y) {
-  // A speech balloon, as players shout their spells.
-  ctx.font = '8px G7';
+  // What a character says, in the game's style: a dark box with a white rim, white letters.
+  ctx.font = '10px G9';
   ctx.textAlign = 'center';
-  const w = Math.ceil(ctx.measureText(text).width) + 8;
+  const w = Math.ceil(ctx.measureText(text).width) + 12;
   x = Math.round(x);
   y = Math.round(y);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(x - w / 2 - 1, y - 12, w + 2, 12);
-  ctx.fillStyle = '#fbf8ec';
-  ctx.fillRect(x - w / 2, y - 11, w, 10);
-  ctx.fillRect(x - 1, y - 1, 3, 2);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(x - 2, y - 1, 1, 2);
-  ctx.fillRect(x + 2, y - 1, 1, 2);
-  ctx.fillRect(x - 1, y + 1, 3, 1);
-  ctx.fillText(text, x, y - 3);
+  const l = x - Math.round(w / 2), t = y - 16;
+  ctx.fillStyle = 'rgba(58,32,20,0.85)';
+  ctx.fillRect(l + 1, t + 1, w - 2, 14);
+  ctx.fillStyle = '#f4f0e8';
+  ctx.fillRect(l + 2, t, w - 4, 1);
+  ctx.fillRect(l + 2, t + 15, w - 4, 1);
+  ctx.fillRect(l, t + 2, 1, 12);
+  ctx.fillRect(l + w - 1, t + 2, 1, 12);
+  ctx.fillRect(l + 1, t + 1, 1, 1);
+  ctx.fillRect(l + w - 2, t + 1, 1, 1);
+  ctx.fillRect(l + 1, t + 14, 1, 1);
+  ctx.fillRect(l + w - 2, t + 14, 1, 1);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, x, t + 11);
 }
 
 /** A gauge in steps, as the old client drew them. */
@@ -1559,99 +1603,6 @@ function panel(x, y, w, h, sunken = false) {
   ctx.fillStyle = sunken ? '#5c4228' : lo;
   ctx.fillRect(x, y + h - 1, w, 1);
   ctx.fillRect(x + w - 1, y, 1, h);
-}
-
-function drawHud() {
-  const p = G.player;
-  // The HUD has its own pixel scale, a little finer than the world's.
-  const H = Math.max(1, Math.round(canvas.height / 340));
-  const HW = Math.floor(canvas.width / H), HH = Math.floor(canvas.height / H);
-  const right = HW - Math.ceil((64 * (window.devicePixelRatio || 1)) / H);
-  ctx.setTransform(H, 0, 0, H, 0, 0);
-
-  // Top: the ground, the clock, the tally.
-  ctx.font = 'bold 12px G11';
-  ctx.textAlign = 'left';
-  outline(`${G.stage.name}${G.cleared ? ' [정복]' : ''}`, 6, 15, G.cleared ? '#b8f0a0' : '#ffe070');
-  ctx.textAlign = 'center';
-  outline(clock(G.t), Math.round(HW / 2), 15);
-  ctx.font = '10px G9';
-  if (G.bossDue) outline(`보스 ${G.boss.name}까지 ${clock(BOSS_AT - G.t)}`, Math.round(HW / 2), 27, '#ff8a6a');
-  ctx.textAlign = 'right';
-  outline(`처치 ${G.kills}`, right, 14);
-  outline(`${G.gold}전`, right, 26, '#ffe070');
-
-  // Learned spells in sunken slots, then the trained stats.
-  let x = 6;
-  const y = 21;
-  ctx.font = '8px G7';
-  for (const s of G.skills) {
-    const def = SKILLS[s.id];
-    panel(x, y, 18, 18, true);
-    if (def.fx === 'hero') {
-      const im = p.img, sc = Math.min(16 / im.width, 16 / im.height);
-      ctx.drawImage(im, x + 9 - (im.width * sc) / 2, y + 9 - (im.height * sc) / 2, im.width * sc, im.height * sc);
-    } else {
-      const im = images[`icon/${def.fx}.png`], sc = Math.min(16 / im.width, 16 / im.height);
-      ctx.drawImage(im, x + 9 - (im.width * sc) / 2, y + 9 - (im.height * sc) / 2, im.width * sc, im.height * sc);
-    }
-    ctx.textAlign = 'right';
-    outline(String(s.lv), x + 18, y + 18);
-    x += 20;
-  }
-  x += 4;
-  for (const [id, lv] of Object.entries(G.passives)) {
-    if (!lv) continue;
-    const im = images[`item/${M.items[PASSIVES[id].item].id}.png`];
-    const sc = Math.min(1, 14 / im.width, 14 / im.height);
-    ctx.drawImage(im, Math.round(x), y + 2, Math.round(im.width * sc), Math.round(im.height * sc));
-    ctx.textAlign = 'right';
-    outline(String(lv), x + 16, y + 18);
-    x += 17;
-  }
-
-  // Bottom: the status window of the old client — numbers first, in sunken fields, with
-  // block gauges beside them rather than smooth bars.
-  const pw = 236, ph = 44, px = Math.round((HW - pw) / 2), py = HH - ph - 3;
-  panel(px, py, pw, ph);
-  const row = (label, color, y, cur, max, on, off) => {
-    ctx.font = '10px G9';
-    ctx.textAlign = 'left';
-    outline(label, px + 6, y + 9, color);
-    panel(px + 32, y, 58, 12, true);
-    ctx.font = '10px G9';
-    ctx.textAlign = 'right';
-    outline(`${cur}/${max}`, px + 87, y + 9);
-    blocks(px + 96, y + 2, 20, 8, cur / max, on, off);
-  };
-  row('체력', '#ff8a6a', py + 4, Math.ceil(Math.max(0, p.hp)), p.maxHp, '#d0382c', '#3a120c');
-  row('마력', '#a8d0ff', py + 17, Math.floor(p.mp), p.maxMp, '#3a68d8', '#101a40');
-  ctx.font = '10px G9';
-  ctx.textAlign = 'left';
-  outline('레벨', px + 6, py + 39, '#ffe070');
-  outline(String(p.lvl), px + 32, py + 39);
-  outline('경험치', px + 56, py + 39, '#ffe070');
-  blocks(px + 96, py + 32, 20, 6, p.xp / p.next, '#d8b030', '#2a2208');
-
-  // The message window.
-  ctx.font = '10px G9';
-  ctx.textAlign = 'left';
-  const lines = G.log.filter(l => G.t - l.t < 10);
-  if (lines.length) {
-    const lw = Math.min(px - 10, 200);
-    let ly = HH - 6 - lines.length * 12;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(4, ly, lw, lines.length * 12 + 3);
-    for (const l of lines) {
-      ctx.globalAlpha = Math.min(1, (10 - (G.t - l.t)) / 2);
-      ly += 12;
-      ctx.fillStyle = '#000';
-      ctx.fillText(l.text, 8, ly);
-      ctx.fillStyle = l.color;
-      ctx.fillText(l.text, 7, ly - 1);
-    }
-    ctx.globalAlpha = 1;
-  }
 }
 
 /** Text with a one-pixel dark edge, crisp at any whole scale. */
@@ -1697,7 +1648,6 @@ function drawMenuBackdrop(now) {
     if (!m) return;
     const x = ((i * 70 + now * 14) % (VW + 80)) - 40;
     const y = VH * 0.86 + (i % 3) * 8;
-    shadow(x, y, 6);
     drawWalker(m.img, x, y, 1, now * 6 + i, true, 0);
   });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1708,19 +1658,63 @@ function drawMenuBackdrop(now) {
 // ---------------------------------------------------------------- menus
 
 const ultBtn = $('#ult');
-const ULT_STEPS = 10;
-ultBtn.querySelector('.gauge').innerHTML = '<i></i>'.repeat(ULT_STEPS);
+const STEPS = 14;
+for (const g of document.querySelectorAll('#stat .g')) g.innerHTML = '<i></i>'.repeat(STEPS);
+const shown = {};
+
+/** Sets an element's text only when it changed (the panel is refreshed every frame). */
+function put(id, text) {
+  if (shown[id] === text) return;
+  shown[id] = text;
+  $(id).textContent = text;
+}
+
+function gauge(sel, k) {
+  const on = Math.round(Math.max(0, Math.min(1, k)) * STEPS);
+  if (shown[sel] === on) return;
+  shown[sel] = on;
+  document.querySelectorAll(sel + ' i').forEach((el, i) => el.classList.toggle('on', i < on));
+}
+
+/** The carved side panel and the map tab, as the old client showed them. */
 function syncUlt() {
-  if (!G || ultBtn.hidden) return;
+  if (!G || $('#side').hidden) return;
   const p = G.player;
-  const k = Math.max(0, Math.min(1, p.mp / p.maxMp));
-  const on = Math.floor(k * ULT_STEPS + 1e-6), ready = k >= 1 && !G.dead;
-  const key = `${G.cls.ult}|${on}|${ready}|${Math.floor(p.mp)}`;
-  if (ultBtn.dataset.key === key) return;
-  ultBtn.dataset.key = key;
-  ultBtn.querySelector('b').textContent = SKILLS[G.cls.ult].name;
-  ultBtn.querySelectorAll('.gauge i').forEach((el, i) => el.classList.toggle('on', i < on));
-  ultBtn.querySelector('small').textContent = ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`;
+  put('#side-class', G.cls.name);
+  put('#side-lv', `Lv ${p.lvl}`);
+  const hero = `assets/hero/${G.cls.hero}.png`;
+  if (shown.hero !== hero) {
+    shown.hero = hero;
+    $('#side-hero').src = hero;
+  }
+  put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
+  put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock(BOSS_AT - G.t)}` : '');
+  gauge('#stat .hp', p.hp / p.maxHp);
+  gauge('#stat .mp', p.mp / p.maxMp);
+  gauge('#stat .ex', p.xp / p.next);
+  put('#st-hp', `${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}`);
+  put('#st-mp', `${Math.floor(p.mp)}/${p.maxMp}`);
+  put('#st-ex', `${Math.floor((100 * p.xp) / p.next)}%`);
+  put('#st-time', `${clock(G.t)}  ${G.kills}마리`);
+  put('#st-gold', `${G.gold}전`);
+  // Spells, then whatever is on the hero right now, as the old status line listed them.
+  const on = [['power', '공격력 증가'], ['stealth', '투명'], ['guard', '금강불체'], ['shield', '보호막']]
+    .filter(([k]) => G.buffs[k] > G.t).map(([k, n]) => `<span class="buff">${n} ${Math.ceil(G.buffs[k] - G.t)}초</span>`);
+  const magic = G.skills.map(s => `<span>${skillName(s.id, s.lv)} <b>${s.lv}</b></span>`).join('') + on.join('');
+  if (shown.magic !== magic) {
+    shown.magic = magic;
+    $('#magic').innerHTML = magic;
+  }
+  // The equipment slots hold the trained stats, each shown by its item.
+  const slots = Object.entries(G.passives).map(([id, lv]) => lv
+    ? `<i><img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b></i>` : '<i></i>').join('');
+  if (shown.slots !== slots) {
+    shown.slots = slots;
+    $('#side-slots').innerHTML = slots;
+  }
+  const ready = p.mp >= p.maxMp && !G.dead;
+  put('#ult span', SKILLS[G.cls.ult].name);
+  put('#ult small', ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
   ultBtn.classList.toggle('ready', ready);
 }
 ultBtn.addEventListener('pointerdown', e => {

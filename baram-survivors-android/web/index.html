@@ -23,7 +23,7 @@
   img { image-rendering: pixelated; }
   [hidden] { display: none !important; }
 
-  .bevel, .btn, .card, .choice, #stage-info, #map, #pause-box, #lv-box, #over-box, #banner, #ult, #pause-btn {
+  .bevel, .btn, .card, .choice, #stage-info, #map, #pause-box, #lv-box, #over-box {
     background: var(--panel); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi);
     box-shadow: inset 1px 1px 0 var(--mid), inset -1px -1px 0 #1a1008; border-radius: 0;
   }
@@ -102,24 +102,64 @@
   #pause-box .row { margin-top: 6px; }
   #over-stats { margin: 6px 0; text-align: center; line-height: 1.7; }
 
-  #pause-btn { position: fixed; top: max(6px, env(safe-area-inset-top)); right: max(6px, env(safe-area-inset-right));
-      padding: 2px 8px; font-weight: 700; z-index: 5; }
-  #banner { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); padding: 3px 14px; font-weight: 700;
-      color: var(--gold); pointer-events: none; text-align: center; white-space: nowrap; }
+  /* ---- The old client's screen: a framed play area, a carved side panel, a parchment chat. ---- */
+  :root { --side: clamp(176px, 27vw, 250px); --wood: #c18a4e; --wood-hi: #e2b679; --wood-lo: #5a3212;
+    --field: #e6c992; --ink: #2a1606; --frame: #8a2c10; --frame-hi: #d8743a; --frame-lo: #2a0802; }
+  /* A canvas keeps its drawing size unless told its box size outright. */
+  body.hunting canvas#game { width: calc(100% - var(--side)); }
+  #play-frame { position: fixed; top: 0; left: 0; bottom: 0; right: var(--side); pointer-events: none; z-index: 2;
+      border: 5px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi);
+      box-shadow: inset 0 0 0 2px var(--frame), inset 0 0 0 3px #000; }
+  #map-tab { position: absolute; top: 0; left: 50%; transform: translateX(-50%); min-width: 120px; padding: 1px 14px 2px;
+      text-align: center; font-weight: 700; color: #f4e6c4; background: #1e1008; border: 1px solid var(--frame-hi);
+      border-top: 0; }
+  #map-tab small { display: block; font: 10px G9, monospace; color: #ffb08a; }
+  #chat { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 2px 6px; font: 10px/13px G9, monospace;
+      color: var(--ink); background: #f0d9a8; border-top: 2px solid var(--frame-lo); max-height: 47px; overflow: hidden; }
+  #chat p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chat p.sys { color: #fff; background: #3e5cc0; margin: 0 -6px; padding: 0 6px; }
+  #chat p.warn { color: #a01800; }
 
-  /* The finishing spell: a plain bevelled key with the spell's name over a stepped mana gauge. */
-  #ult { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
-      width: 104px; padding: 4px 6px 5px; z-index: 4; text-align: center; touch-action: none; }
-  #ult b { display: block; font-size: 12px; color: var(--dim); }
-  #ult .gauge { display: flex; gap: 1px; height: 6px; margin-top: 3px; padding: 1px; background: var(--lo); }
-  #ult .gauge i { flex: 1; background: #22305a; }
-  #ult .gauge i.on { background: #4a7ae0; }
-  #ult small { display: block; margin-top: 2px; font: 10px G9, monospace; color: var(--dim); }
-  #ult.ready { border-color: #ffe9a0 var(--lo) var(--lo) #ffe9a0; }
-  #ult.ready b { color: var(--gold); }
-  #ult.ready .gauge i { background: #8ab0ff; }
-  #ult.ready small { color: var(--text); }
-
+  #side { position: fixed; top: 0; right: 0; bottom: 0; width: var(--side); z-index: 3; display: flex; flex-direction: column;
+      gap: 4px; padding: max(4px, env(safe-area-inset-top)) max(5px, env(safe-area-inset-right)) 5px 5px; color: var(--ink);
+      background: var(--wood); border-left: 3px solid; border-color: var(--wood-hi);
+      box-shadow: inset 2px 0 0 var(--wood-lo); }
+  #side .field { padding: 0 5px; background: var(--field); border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+  #side .head { display: flex; justify-content: space-between; font-weight: 700; }
+  #side .doll { display: flex; align-items: center; gap: 4px; }
+  #side .doll .me { flex: none; display: flex; align-items: flex-end; justify-content: center; width: 54px; height: 64px;
+      background: #3a200c; border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+  #side .doll .me img { max-width: 50px; max-height: 62px; }
+  #side .slots { display: grid; grid-template-columns: repeat(4, 22px); gap: 2px; }
+  #side .slots i { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; position: relative;
+      background: #3a200c; border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+  #side .slots i img { max-width: 20px; max-height: 20px; }
+  #side .slots i b { position: absolute; right: 0; bottom: -2px; font: 8px G7, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
+  #magic { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; align-content: start;
+      column-gap: 6px; font: 10px/13px G9, monospace; }
+  #magic span { white-space: nowrap; overflow: hidden; }
+  #magic span b { font-weight: normal; color: #7a2a00; }
+  #magic span.buff { grid-column: 1 / -1; color: #1a4aa0; }
+  #stat { display: grid; grid-template-columns: auto 1fr auto; gap: 1px 4px; align-items: center; font: 10px/12px G9, monospace;
+      padding: 3px 5px; color: #f4e6c4; background: #3a200c;
+      border: 1px solid; border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+  #stat .g { height: 7px; background: #120a04; border: 1px solid #000; display: flex; gap: 1px; padding: 1px; }
+  #stat .g i { flex: 1; }
+  #stat .num { text-align: right; min-width: 52px; }
+  #stat .hp i { background: #4a1208; } #stat .hp i.on { background: #e03a22; }
+  #stat .mp i { background: #0e1a44; } #stat .mp i.on { background: #3a72e8; }
+  #stat .ex i { background: #2a2008; } #stat .ex i.on { background: #d8b030; }
+  #stat .k { color: #e6c992; }
+  #side .keys { display: flex; gap: 4px; }
+  #side .keys button { flex: 1; padding: 3px 0; font-weight: 700; color: var(--ink); background: var(--field);
+      border: 2px solid; border-color: var(--wood-hi) var(--wood-lo) var(--wood-lo) var(--wood-hi); }
+  #side .keys button:active { border-color: var(--wood-lo) var(--wood-hi) var(--wood-hi) var(--wood-lo); }
+  #ult { flex: 2 !important; }
+  #ult.ready { color: #7a1800 !important; background: #ffe9a0 !important; }
+  #ult small { display: block; font: 8px G7, monospace; font-weight: normal; }
+  #banner { position: fixed; top: 22%; left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
+      font-weight: 700; color: #ffe070; background: rgba(30, 16, 8, .9); border: 1px solid var(--frame-hi);
+      pointer-events: none; white-space: nowrap; z-index: 4; }
   @media (max-height: 420px) {
     .card .slot { height: 58px; }
     .card .hero { height: 52px; }
@@ -188,8 +228,22 @@
   </div>
 </div>
 
-<button id="pause-btn" hidden>메뉴</button>
-<button id="ult" hidden><b></b><div class="gauge"></div><small></small></button>
+<div id="play-frame" hidden>
+  <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
+  <div id="chat"></div>
+</div>
+<div id="side" hidden>
+  <div class="head field"><span id="side-class"></span><span id="side-lv"></span></div>
+  <div class="doll"><div class="me"><img id="side-hero" alt=""></div><div class="slots" id="side-slots"></div></div>
+  <div id="magic" class="field"></div>
+  <div id="stat">
+    <span class="k">체력</span><div class="g hp"></div><span class="num" id="st-hp"></span>
+    <span class="k">마력</span><div class="g mp"></div><span class="num" id="st-mp"></span>
+    <span class="k">경험</span><div class="g ex"></div><span class="num" id="st-ex"></span>
+    <span class="k">시간</span><span id="st-time"></span><span class="num" id="st-gold"></span>
+  </div>
+  <div class="keys"><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
+</div>
 <div id="banner" hidden></div>
 
 <script type="module" src="js/game.js"></script>
