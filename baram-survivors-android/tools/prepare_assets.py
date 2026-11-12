@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turns the downloaded old-Baram images (and optional sound files) into the game's assets.
 
-    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR]
+    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR]
 
 IMAGES_DIR is the unpacked old_images zip (the folder holding image/, magics/,
 itemImage/, _pages.json, ...). OUT_DIR becomes www/assets in the APK.
@@ -159,6 +159,7 @@ def main():
     src, out = sys.argv[1], sys.argv[2]
     audio_src = sys.argv[3] if len(sys.argv) > 3 else None
     avatar_src = sys.argv[4] if len(sys.argv) > 4 else None
+    town_src = sys.argv[5] if len(sys.argv) > 5 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
     for d in ("fx", "icon", "mon", "item", "hero", "ui"):
@@ -230,6 +231,33 @@ def main():
     p = os.path.join(src, "wardrobeB", "wback3.png")
     if os.path.isfile(p):
         Image.open(p).convert("RGB").save(os.path.join(out, "ui", "wback.png"), optimize=True)
+
+    # Townsfolk, shrunk like the wardrobe figures to the monsters' scale (see avatar_assets).
+    npc_dir = os.path.join(src, "npc")
+    if os.path.isdir(npc_dir):
+        os.makedirs(os.path.join(out, "npc"), exist_ok=True)
+        manifest["npc"] = []
+        for name in sorted(os.listdir(npc_dir)):
+            if not name.endswith(".png"):
+                continue
+            im = Image.open(os.path.join(npc_dir, name)).convert("RGBA")
+            im = im.crop(im.getbbox())
+            w, h = round(im.width * 0.64), round(im.height * 0.64)
+            im = im.resize((w, h), Image.LANCZOS)
+            im.putalpha(im.getchannel("A").point(lambda v: 255 if v > 110 else 0))
+            key = os.path.splitext(name)[0]
+            im.save(os.path.join(out, "npc", key + ".png"))
+            manifest["npc"].append(key)
+
+    # The town: a map from the 1996 client (TOWN_DIR/town.png, 48-pixel tiles) and the smithy's
+    # inside for its window.
+    if town_src and os.path.isdir(town_src):
+        for key in ("town", "smithy"):
+            p = os.path.join(town_src, key + ".png")
+            if os.path.isfile(p):
+                im = Image.open(p).convert("RGB")
+                im.save(os.path.join(out, "ui", key + ".png"), optimize=True)
+                manifest["ui"][key] = {"w": im.width, "h": im.height}
 
     # The world maps, for the hunting-ground picker.
     for name in ("world_1", "world_4"):

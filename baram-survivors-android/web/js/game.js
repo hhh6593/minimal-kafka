@@ -70,6 +70,8 @@ async function boot() {
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
     ...avatarPaths(M),
+    ...(M.npc || []).map(n => `npc/${n}.png`),
+    ...(M.ui.town ? ['ui/town.png'] : []),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -243,10 +245,13 @@ const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35 };
 
 function resize() {
   // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
-  const k = innerHeight / 640;
+  // On a short phone screen the whole panel would shrink past reading: keep it at 0.7 or more
+  // and let its top (the CLAN / C.T. / TITLE fields) go past the screen's top edge instead,
+  // so the figure, the spells and the status block stay in sight.
+  const k = Math.max(0.7, Math.min(1.25, innerHeight / 640));
   document.documentElement.style.setProperty('--side', Math.round(272 * k) + 'px');
   const panel = document.getElementById('panel');
-  if (panel) panel.style.transform = `scale(${k})`;
+  if (panel) panel.style.transform = `translateY(${Math.min(0, innerHeight - 640 * k)}px) scale(${k})`;
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
@@ -272,6 +277,7 @@ function showScreen(name) {
   $('#unfold').hidden = $('#mini').hidden = !(hunting && settings.panel === false);
   resize();
   if (name === 'title') audio.bgm('title');
+  if (name !== 'town' && name !== null && !['equip', 'trade'].includes(name)) $('#talk').hidden = true;
   if (name === 'select') buildSelect();
   if (name === 'stages') buildStages();
 }
@@ -285,11 +291,11 @@ function buildSelect() {
     const rec = best[c.id];
     b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
-      <em>${SKILLS[c.start].name} · 필살기 ${SKILLS[c.ult].name}</em>
+      <em>필살기 ${SKILLS[c.ult].name}</em>
       <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}</small>`;
     b.onclick = () => {
       chosenClass = c;
-      showScreen('stages');
+      enterTown(c);
     };
     box.append(b);
   }
@@ -432,7 +438,7 @@ function startRun(cls, stage) {
     cls, stage, ...mons, level: STAGES.indexOf(stage), ground: makeGround(stage.terrain),
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
     player: {
-      hp: cls.hp, maxHp: cls.hp, mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
+      hp: Math.round(cls.hp * (1 + 0.1 * up('life'))), maxHp: Math.round(cls.hp * (1 + 0.1 * up('life'))), mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
       face: 1, fdx: 0, fdy: 1, phase: 0, lvl: 1, xp: 0, next: xpFor(1), inv: 0,
       img: images[`hero/${hero.id}.png`], hero: true, gear, av: hasAvatars() ? dress(cls.id, gear) : null,
       pose: null, poseT: 0, walkT: 0,
@@ -442,7 +448,8 @@ function startRun(cls, stage) {
     enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [],
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true,
     pendingLevels: 0, shake: 0, plainDropAt: 0,
-    rerolls: 2, skips: 2, banishes: 2, banished: new Set(), banishing: false,
+    rerolls: 2 + up('reroll'), skips: 2 + up('skip'), banishes: 2 + up('banish'), banished: new Set(),
+    banishing: false, extraLives: up('revive'),
   };
   G.player.x = TILE / 2;
   G.player.y = TILE - 6;
@@ -613,6 +620,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - (frame.last || now)) / 1000);
   frame.last = now;
   for (let i = 0; i < TEST_SPEED; i++) if (G && !G.paused && !G.choosing && !G.over) update(dt);
+  if (T && !G && !$('#town').hidden) updateTown(dt);
   render(now / 1000);
   syncUlt();
   requestAnimationFrame(frame);
@@ -1308,6 +1316,178 @@ function updateAllies(dt) {
   G.allies = G.allies.filter(a => a.t < a.life);
 }
 
+// ---------------------------------------------------------------- town
+//
+// Between hunts the hero stands in 국내성, as D2 Survivors' heroes return to camp: a village map
+// from the 1996 client, walked in four directions. Its people: the smith (the bag and what to
+// wear), the merchant (gear for gold), the innkeeper (lasting training for gold) and the guide,
+// who sends the hero to a hunting ground.
+
+let T = null;
+const TOWN_TILE = 48;
+// Tiles of the village map that cannot be walked: the three houses, the fences, the tables.
+const TOWN_WALLS = new Set();
+for (let x = 0; x < 16; x++) {
+  TOWN_WALLS.add(`${x},0`);
+  if (x !== 8 && x !== 2) TOWN_WALLS.add(`${x},9`);
+}
+for (const [x0, y0, x1, y1] of [[1, 1, 5, 3], [9, 1, 13, 3], [1, 5, 5, 7], [11, 5, 14, 5], [9, 7, 10, 7], [11, 7, 14, 7],
+  [14, 1, 15, 2]]) {
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) TOWN_WALLS.add(`${x},${y}`);
+}
+const TOWNSFOLK = [
+  { id: 'smith', name: '대장장이', img: '3', tx: 3, ty: 4, line: '쓸 만한 걸 주워 왔나? 골라 입게.' },
+  { id: 'merchant', name: '상인', img: '5', tx: 11, ty: 4, line: '좋은 물건 있소. 전만 있으면 되오.' },
+  { id: 'inn', name: '주모', img: 'hwahwa', tx: 4, ty: 8, line: '몸을 단련하고 가시구려.' },
+  { id: 'guide', name: '길잡이', img: '도우미', tx: 8, ty: 8, line: '어느 사냥터로 모실까요?' },
+];
+
+function enterTown(cls) {
+  chosenClass = cls;
+  if (!M.ui.town) {
+    showScreen('stages');
+    return;
+  }
+  const gear = savedGear(cls);
+  T = { cls, av: hasAvatars() ? dress(cls.id, gear) : null, x: 7.5 * TOWN_TILE, y: 5 * TOWN_TILE - 6,
+    fdx: 0, fdy: 1, moving: false, walkT: 0, near: null };
+  showScreen('town');
+  audio.bgm('town');
+  $('#town-gold').textContent = `${progress.gold || 0}전`;
+  $('#town-name').textContent = `국내성 · ${cls.name}`;
+}
+
+function townBlocked(x, y) {
+  const tx = Math.floor(x / TOWN_TILE), ty = Math.floor((y - 4) / TOWN_TILE);
+  if (tx < 0 || ty < 0 || tx > 15 || ty > 9) return true;
+  return TOWN_WALLS.has(`${tx},${ty}`) || TOWNSFOLK.some(n => n.tx === tx && n.ty === ty);
+}
+
+function updateTown(dt) {
+  const [dx, dy] = input();
+  T.moving = !!(dx || dy);
+  if (T.moving) {
+    T.fdx = dx;
+    T.fdy = dy;
+    const sp = (TILE / 0.24) * (T.cls.speed / 70) * dt;
+    const nx = T.x + dx * sp, ny = T.y + dy * sp;
+    // Test a little ahead of the feet, so the hero does not clip into walls.
+    if (!townBlocked(nx + dx * 10, ny + dy * 4)) {
+      T.x = nx;
+      T.y = ny;
+    }
+    T.walkT += dt * 1000;
+  }
+  const tx = Math.floor(T.x / TOWN_TILE), ty = Math.floor((T.y - 4) / TOWN_TILE);
+  const near = TOWNSFOLK.find(n => Math.abs(n.tx - tx) + Math.abs(n.ty - ty) <= 1) || null;
+  if (near !== T.near) {
+    T.near = near;
+    $('#talk').hidden = !near;
+    if (near) $('#talk').textContent = `${near.name}에게 말 걸기`;
+  }
+}
+
+function drawTown(now) {
+  const map = images['ui/town.png'];
+  const mw = M.ui.town.w, mh = M.ui.town.h;
+  let camX = Math.round(T.x - VW / 2), camY = Math.round(T.y - 30 - VH / 2);
+  camX = VW >= mw ? Math.round((mw - VW) / 2) : Math.max(0, Math.min(mw - VW, camX));
+  camY = VH >= mh ? Math.round((mh - VH) / 2) : Math.max(0, Math.min(mh - VH, camY));
+  ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
+  ctx.fillStyle = '#2a1a0e';
+  ctx.fillRect(camX, camY, VW, VH);
+  if (map && map.width) ctx.drawImage(map, 0, 0);
+  const bodies = TOWNSFOLK.map(n => ({ n, y: n.ty * TOWN_TILE + TOWN_TILE - 6 })).concat([{ hero: true, y: T.y }]);
+  bodies.sort((a, b) => a.y - b.y);
+  for (const b of bodies) {
+    if (b.hero) {
+      if (T.av) drawAvatar(ctx, T.av, T.x, T.y, facing(T.fdx, T.fdy), T.moving ? 'walk' : 'idle', Math.floor(T.walkT / WALK_MS));
+      continue;
+    }
+    const im = images[`npc/${b.n.img}.png`], x = b.n.tx * TOWN_TILE + TOWN_TILE / 2;
+    if (im && im.width) drawWalker(im, x, b.y, 1, now * 2, false, 0);
+    ctx.font = '8px G7';
+    ctx.textAlign = 'center';
+    outline(b.n.name, x, b.y + 10, b.n === T.near ? '#ffe070' : '#efe3c2');
+  }
+  if (T.near) drawBubble(T.near.line, T.near.tx * TOWN_TILE + TOWN_TILE / 2, T.near.ty * TOWN_TILE - 22, 0);
+}
+
+function talk() {
+  const n = T && T.near;
+  if (!n) return;
+  if (n.id === 'guide') showScreen('stages');
+  else if (n.id === 'smith') {
+    buildEquip();
+    $('#equip').hidden = false;
+  } else openTrade(n.id);
+}
+
+// Lasting training sold by the innkeeper, as Charsi's ranks in D2 Survivors.
+const TRAINING = [
+  { id: 'reroll', name: '다시 뽑기 +1', max: 3, cost: l => 200 * (l + 1), desc: '사냥마다 다시 뽑기를 한 번 더' },
+  { id: 'skip', name: '넘기기 +1', max: 3, cost: l => 150 * (l + 1), desc: '사냥마다 넘기기를 한 번 더' },
+  { id: 'banish', name: '빼기 +1', max: 3, cost: l => 200 * (l + 1), desc: '사냥마다 빼기를 한 번 더' },
+  { id: 'life', name: '체력 단련', max: 5, cost: l => 150 * (l + 1), desc: '최대 체력 +10%' },
+  { id: 'revive', name: '성황령', max: 1, cost: () => 1200, desc: '사냥마다 한 번, 쓰러져도 체력 절반으로 일어난다' },
+];
+
+function up(id) {
+  return ((progress.up || {})[id]) || 0;
+}
+
+function openTrade(who) {
+  const cls = chosenClass, box = $('#trade-rows');
+  box.innerHTML = '';
+  $('#trade-title').textContent = who === 'inn' ? '주모 · 단련' : '상인 · 장비';
+  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전`;
+  const row = (name, desc, cost, done, buy) => {
+    const r = document.createElement('div');
+    r.className = 'trade-row';
+    r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = done ? '다 배움' : `${cost}전`;
+    b.disabled = done || (progress.gold || 0) < cost;
+    b.onclick = () => {
+      progress.gold -= cost;
+      buy();
+      saveJson('bs_progress', progress);
+      $('#town-gold').textContent = `${progress.gold}전`;
+      openTrade(who);
+    };
+    r.append(b);
+    box.append(r);
+  };
+  if (who === 'inn') {
+    for (const t of TRAINING) {
+      const l = up(t.id);
+      row(`${t.name}${t.max > 1 ? ` (${l}/${t.max})` : ''}`, t.desc, t.cost(l), l >= t.max, () => {
+        progress.up = progress.up || {};
+        progress.up[t.id] = l + 1;
+      });
+    }
+  } else {
+    // The first piece of each kind the bag lacks, priced by its tier.
+    const b = bag(cls);
+    for (const kind of ['weapon', 'armor', 'shield']) {
+      const tier = GEAR[cls.id][kind].findIndex((_, i) => !b.includes(`${kind}:${i}`));
+      if (tier < 0) continue;
+      row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[kind]} · ${tier + 1}단계`,
+        250 * (tier + 1) * (tier + 1), false, () => b.push(`${kind}:${tier}`));
+    }
+    if (!box.children.length) box.textContent = '더 팔 물건이 없소.';
+  }
+  $('#trade').hidden = false;
+}
+
+$('#talk').onclick = talk;
+$('#close-trade').onclick = () => { $('#trade').hidden = true; };
+$('#town-back').onclick = () => showScreen('select');
+addEventListener('keydown', e => {
+  if ((e.code === 'Enter' || e.code === 'Space') && T && !G && !$('#town').hidden) talk();
+});
+
 // ---------------------------------------------------------------- party
 //
 // Hunting in a party, as players did: other classes join from the level-up choices and keep
@@ -1753,6 +1933,16 @@ function itemIcon(role) {
 /** Death: a 도사 rises once; anyone else becomes a ghost, as in the game. */
 function die() {
   const p = G.player;
+  if (G.extraLives > 0) {
+    // 성황령, bought in town: back on one's feet at half health.
+    G.extraLives--;
+    p.hp = p.maxHp * 0.5;
+    G.buffs.guard = G.t + 3;
+    say('성황령의 힘으로 다시 일어났습니다.', 'sys');
+    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
+    audio.play('revive');
+    return;
+  }
   if (G.cls.revive && !G.revived) {
     G.revived = true;
     p.hp = p.maxHp * 0.5;
@@ -1775,6 +1965,7 @@ function die() {
 function showResults(title) {
   if (!G || G.over) return;
   G.over = true;
+  bankGold();
   $('#over-title').textContent = title;
   $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}<br>`
     + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
@@ -1783,10 +1974,21 @@ function showResults(title) {
 }
 
 function leaveHunt() {
-  if (G) record();
+  if (G) {
+    record();
+    bankGold();
+  }
+  const cls = G ? G.cls : chosenClass;
   G = null;
-  audio.bgm('title');
-  showScreen('stages');
+  enterTown(cls);
+}
+
+/** The gold of a hunt goes to the purse once, whether it ends in death, victory or leaving. */
+function bankGold() {
+  if (!G || G.banked) return;
+  G.banked = true;
+  progress.gold = (progress.gold || 0) + G.gold;
+  saveJson('bs_progress', progress);
 }
 
 function record() {
@@ -2019,7 +2221,8 @@ function render(now) {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!G) {
-    drawMenuBackdrop(now);
+    if (T && !$('#town').hidden) drawTown(now);
+    else drawMenuBackdrop(now);
     return;
   }
   const p = G.player;
@@ -2418,7 +2621,7 @@ $('#start-btn').onclick = () => {
   showScreen('select');
 };
 $('#back-title').onclick = () => showScreen('title');
-$('#back-select').onclick = () => showScreen('select');
+$('#back-select').onclick = () => enterTown(chosenClass);
 $('#go').onclick = () => startRun(chosenClass, pickedStage);
 $('#pause-btn').onclick = () => togglePause();
 $('#resume').onclick = () => togglePause(false);
@@ -2465,7 +2668,7 @@ document.addEventListener('click', e => {
 
 const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
   ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활'], ['click', '버튼 누름']];
-const MUSIC = [['title', '처음 화면'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
+const MUSIC = [['title', '처음 화면'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
 
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
 const SOUND_KINDS = [
@@ -2530,6 +2733,7 @@ function soundDefaults() {
     // 08 is the one tune scored for Korean instruments (가야금, 거문고, 대금, 아쟁, 꽹과리): the
     // game's own theme. 04 is the fastest, with drums: for bosses.
     d.bgm_title = has('mid08') ? 'mid08' : mids[0];
+    d.bgm_town = d.bgm_title;
     d.bgm_boss = has('mid04') ? 'mid04' : mids[mids.length - 1];
     for (const st of STAGES) {
       const k = 'mid' + st.bgm;
