@@ -438,7 +438,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0 },
-    enemies: [], dying: [], allies: [], fxs: [], drops: [], texts: [], log: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [],
     bubble: null, spawnT: 0, waveT: 50, minis: MINI_AT.slice(), bossDue: true, pendingLevels: 0, shake: 0,
   };
   G.player.x = TILE / 2;
@@ -587,6 +587,7 @@ function update(dt) {
   }
   runTimers();
   updateAllies(dt);
+  updateParty(dt);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
   G.fxs = G.fxs.filter(f => f.t < f.life);
@@ -1125,6 +1126,190 @@ function updateAllies(dt) {
   G.allies = G.allies.filter(a => a.t < a.life);
 }
 
+// ---------------------------------------------------------------- party
+//
+// Hunting in a party, as players did: other classes join from the level-up choices and keep
+// with the hero. Each does its class's work and shouts its spells, which show in the chat as
+// party talk: the 도사 heals with the 기원, guards with 보호 and curses the crowd; the 주술사
+// burns with 화염주 and freezes with 마비; the 전사 cuts down what comes close; the 도적 slips
+// in with 비영승보. Party members cannot be hurt.
+
+const PARTY = {
+  poet: { names: ['소소', '달빛', '청운'], role: '회복 · 보호 · 저주로 돕는다' },
+  mage: { names: ['홍염', '백야', '흑풍'], role: '화염주와 마비로 무리를 친다' },
+  warrior: { names: ['철우', '백호', '무쇠'], role: '가까이 온 적을 베어 막는다' },
+  rogue: { names: ['그림자', '바람', '야월'], role: '적 뒤로 파고들어 벤다' },
+};
+const PARTY_MAX = 3;
+
+function joinParty(cls) {
+  const p = G.player;
+  const def = PARTY[cls.id];
+  const name = def.names[Math.floor(Math.random() * def.names.length)];
+  const gear = savedGear(cls);
+  const slot = G.party.length;
+  const m = {
+    cls, name, lv: 1, gear, av: hasAvatars() ? dress(cls.id, gear) : null, img: images[`hero/${cls.hero}.png`],
+    x: p.x - 30 + slot * 30, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
+    cd: { a: 1, b: 3, c: 6 }, bubble: null, slot,
+  };
+  G.party.push(m);
+  addFx(FX.summon, m.x, m.y - 26, { scale: 0.8 });
+  say(`${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
+}
+
+function partySay(m, spell) {
+  m.bubble = { text: `${spell}!`, t: G.t };
+  // In the chat at most once every few seconds per member, so the party does not drown it.
+  if (G.t - (m.said || -9) > 4) {
+    m.said = G.t;
+    say(`${m.name}: ${spell}!`, 'party');
+  }
+}
+
+function updateParty(dt) {
+  const p = G.player;
+  for (const m of G.party) {
+    // Keep a place around the hero: behind it, spread to the sides.
+    const ang = [Math.PI * 0.75, Math.PI * 0.25, Math.PI * 1.5][m.slot] ?? 0;
+    const tx = p.x + Math.cos(ang) * 38, ty = p.y + Math.sin(ang) * 30 + 10;
+    let dx = tx - m.x, dy = ty - m.y;
+    const d = Math.hypot(dx, dy);
+    m.moving = d > 6;
+    if (d > 260) {
+      m.x = tx;
+      m.y = ty;
+    } else if (m.moving) {
+      // Four directions, like everyone else: the longer way first.
+      const sp = heroSpeed() * (d > 80 ? 1.3 : 0.95) * dt;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        m.x += Math.sign(dx) * Math.min(sp, Math.abs(dx));
+        m.fdx = Math.sign(dx);
+        m.fdy = 0;
+      } else {
+        m.y += Math.sign(dy) * Math.min(sp, Math.abs(dy));
+        m.fdx = 0;
+        m.fdy = Math.sign(dy);
+      }
+      m.walkT += dt * 1000;
+    }
+    m.poseT = Math.max(0, m.poseT - dt);
+    if (m.bubble && G.t - m.bubble.t > 1.3) m.bubble = null;
+    if (G.dead) continue;
+    for (const k of Object.keys(m.cd)) m.cd[k] -= dt;
+    partyAct(m);
+  }
+}
+
+function partyAct(m) {
+  const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + p.lvl * 0.04);
+  const pose = kind => { m.pose = kind; m.poseT = 0.3; };
+  const near = n => {
+    const fx = Math.floor(m.x / TILE), fy = Math.floor((m.y - TILE / 2 + 6) / TILE);
+    return nearestEnemies(n, 7, { tx: fx, ty: fy });
+  };
+  switch (m.cls.id) {
+    case 'poet': {
+      if (m.cd.a <= 0 && p.hp < p.maxHp * 0.8) {
+        m.cd.a = 5;
+        const tier = Math.min(7, m.lv + 1);
+        const names = ['누리의기원', '대지의기원', '바다의기원', '동해의기원', '하늘의기원', '천공의기원', '구름의기원', '태양의기원'];
+        heal(p.maxHp * (0.12 + 0.04 * m.lv), false);
+        audio.play('skill_c_heal', 'heal', tier + 1);
+        partySay(m, names[tier]);
+        pose('magic');
+      } else if (m.cd.b <= 0) {
+        m.cd.b = 14;
+        G.buffs.shield = Math.max(G.buffs.shield, G.t + 4 + m.lv);
+        addFx(FX.shield, 0, -26, { follow: true, scale: 0.6 });
+        audio.play('party_guard');
+        partySay(m, '보호');
+        note('보호의 효과를 받습니다.');
+        pose('magic');
+      } else if (m.cd.c <= 0) {
+        const t = near(1)[0];
+        if (!t) break;
+        m.cd.c = 7;
+        for (const e of around(t.tx, t.ty, 1 + (m.lv >= 3))) e.curse = 4;
+        fxOn(SKILLS.m_curse.fx, t);
+        audio.play('skill_m_curse', 'strike');
+        partySay(m, '저주');
+        pose('magic');
+      }
+      break;
+    }
+    case 'mage': {
+      if (m.cd.a <= 0) {
+        const t = near(1)[0];
+        if (!t) break;
+        m.cd.a = 1.3;
+        fxOn(SKILLS.m_fire.fx, t);
+        later(0.15, () => hurtEnemy(t, 14 * pw));
+        audio.play('skill_m_fire', 'spell', Math.min(8, m.lv * 2));
+        if (Math.random() < 0.2) partySay(m, ['화염주', '화영열주', '화열참주'][Math.min(2, m.lv - 1)]);
+        pose('magic');
+      } else if (m.cd.b <= 0) {
+        const t = near(1)[0];
+        if (!t) break;
+        m.cd.b = 8;
+        for (const e of around(t.tx, t.ty, 1)) e.stun = 2;
+        fxOn(SKILLS.m_para.fx, t);
+        audio.play('skill_m_para', 'strike');
+        partySay(m, '마비');
+        pose('magic');
+      }
+      break;
+    }
+    case 'warrior': {
+      if (m.cd.a <= 0) {
+        const t = near(1)[0];
+        if (!t || Math.hypot(t.x - m.x, t.y - m.y) > TILE * 1.6) break;
+        m.cd.a = 0.8;
+        m.fdx = Math.abs(t.x - m.x) > Math.abs(t.y - m.y) ? Math.sign(t.x - m.x) : 0;
+        m.fdy = m.fdx ? 0 : Math.sign(t.y - m.y);
+        hurtEnemy(t, 20 * pw);
+        audio.play('hit');
+        pose('attack');
+        if (m.cd.b <= 0) {
+          m.cd.b = 10;
+          for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 30 * pw);
+          fxOn(SKILLS.w_tiger.fx, t);
+          audio.play('skill_w_tiger', 'spell');
+          partySay(m, '백호참');
+        }
+      }
+      break;
+    }
+    case 'rogue': {
+      if (m.cd.a <= 0) {
+        const t = near(1)[0];
+        if (!t) break;
+        m.cd.a = 1.6;
+        m.x = t.x + (t.x > p.x ? 18 : -18);
+        m.y = t.y;
+        fxOn(SKILLS.r_blink.fx, t);
+        hurtEnemy(t, 22 * pw);
+        audio.play('skill_r_blink', 'blink');
+        if (Math.random() < 0.25) partySay(m, '비영승보');
+        pose('attack');
+      }
+      break;
+    }
+  }
+}
+
+function drawParty(m) {
+  const dir = facing(m.fdx, m.fdy);
+  if (m.av) {
+    const pose = m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
+    drawAvatar(ctx, m.av, m.x, m.y, dir, pose, Math.floor(m.walkT / WALK_MS));
+  } else drawWalker(m.img, m.x, m.y, m.fdx < 0 ? -1 : 1, m.walkT / 100, m.moving, 0);
+  // Name under the feet, in the party's green, as the client named players.
+  ctx.font = '8px G7';
+  ctx.textAlign = 'center';
+  outline(m.name, m.x, m.y + 9, '#9ff08a');
+}
+
 // ---------------------------------------------------------------- pickups and levels
 
 function updatePickups(dt) {
@@ -1193,6 +1378,12 @@ function nextChoice() {
   for (const [id, ps] of Object.entries(PASSIVES)) {
     if (G.passives[id] < ps.max) opts.push({ type: 'passive', id, lv: G.passives[id] + 1, w: 1.3 });
   }
+  for (const c of CLASSES) {
+    if (c.id === G.cls.id) continue;
+    const m = G.party.find(x => x.cls.id === c.id);
+    if (!m && G.party.length < PARTY_MAX) opts.push({ type: 'party', cls: c, w: G.party.length ? 1.6 : 3 });
+    else if (m && m.lv < 5) opts.push({ type: 'party', cls: c, m, w: 1.2 });
+  }
   const picks = [];
   while (picks.length < 3 && opts.length) {
     const total = opts.reduce((a, o) => a + o.w, 0);
@@ -1223,6 +1414,13 @@ function nextChoice() {
       name = ps.name;
       text = ps.desc;
       tag = `Lv ${o.lv}`;
+    } else if (o.type === 'party') {
+      icon = document.createElement('img');
+      icon.src = heroPicture(o.cls);
+      icon.className = 'item';
+      name = o.m ? `${o.m.name} (${o.cls.name})` : `${o.cls.name} 동료`;
+      text = o.m ? '파티원이 강해진다' : `파티에 들어온다. ${PARTY[o.cls.id].role}`;
+      tag = o.m ? `Lv ${o.m.lv + 1}` : '파티';
     } else if (o.type === 'heal') {
       icon = itemIcon('heal');
       name = '회복';
@@ -1255,6 +1453,11 @@ function choose(o) {
       G.player.maxHp += 20;
       G.player.hp += 20;
     }
+  } else if (o.type === 'party') {
+    if (o.m) {
+      o.m.lv++;
+      say(`${o.m.name}의 레벨이 올랐습니다.`, 'party');
+    } else joinParty(o.cls);
   } else if (o.type === 'heal') heal(50, true);
   else G.gold += 100;
   $('#levelup').hidden = true;
@@ -1570,13 +1773,17 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies);
+  const bodies = G.enemies.concat(G.allies, G.party);
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
   for (const b of bodies) {
     if (b === p) {
       drawHero(now, hidden);
+      continue;
+    }
+    if (b.cls) {
+      drawParty(b);
       continue;
     }
     if (b.ally) {
@@ -1655,6 +1862,9 @@ function render(now) {
     ctx.fillRect(bx, by + 2, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 1);
   }
   if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - heroHeight() - 12, G.t - G.bubble.t);
+  for (const m of G.party) {
+    if (m.bubble) drawBubble(m.bubble.text, m.x, m.y - (m.av ? m.av.top : 50) - 12, G.t - m.bubble.t);
+  }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const dark = DARK[G.stage.terrain];
@@ -2014,7 +2224,7 @@ const GAME_SOUNDS = {
   skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
   skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084', skill_p_ult: '095',
   hit: '331', kill: '353', hurt: '116', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
-  win: '401', lose: '402', revive: '112', click: '408',
+  win: '401', lose: '402', revive: '112', click: '408', party_guard: '008',
 };
 
 /** Each game sound: the game's own where known, else one from the player's sorting. */
