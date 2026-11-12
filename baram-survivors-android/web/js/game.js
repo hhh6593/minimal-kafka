@@ -1010,6 +1010,7 @@ function around(tx, ty, r) {
 /** Where an effect sits on a body: tall pillars stand on its feet, the rest on its middle. */
 function fxOn(id, b, o = {}) {
   const f = M.fx[id];
+  if (!f) return 0.3;
   const tall = f.h > f.w * 1.4;
   const h = b.m ? b.m.h * b.scale : b.img.height;
   return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...o });
@@ -1017,6 +1018,8 @@ function fxOn(id, b, o = {}) {
 
 function cast(skill, st) {
   const def = SKILLS[skill.id];
+  // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
+  const fxid = def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
   const p = G.player;
   let used = true;
   const retry = t => {
@@ -1030,7 +1033,7 @@ function cast(skill, st) {
       const hits = 1 + (lv >= 2) + (lv >= 4) + (lv >= 6) + (lv >= 8);
       const under = occ.get(key(p.tx, p.ty));
       if (under && under.m && !under.ally) {
-        if (def.fx) fxOn(def.fx, under);
+        if (fxid) fxOn(fxid, under);
         hurtEnemy(under, st.dmg);
       }
       const near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
@@ -1049,7 +1052,7 @@ function cast(skill, st) {
           for (const [dx, dy] of dirs) {
             const b = occ.get(key(p.tx + dx, p.ty + dy));
             if (!b || !b.m || b.ally) continue;
-            if (def.fx) fxOn(def.fx, b, { rot: (h % 2) * 0.6 });
+            if (fxid) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
             hurtEnemy(b, dmg);
           }
         });
@@ -1064,7 +1067,7 @@ function cast(skill, st) {
       const [bx, by] = Math.abs(e.tx - p.tx) >= Math.abs(e.ty - p.ty) ? [e.tx + dx, e.ty] : [e.tx, e.ty + dy];
       // Not into the middle of a pack: 비영승보 is for getting behind one, not into many.
       if (!occ.has(key(bx, by)) && around(bx, by, 1).length < 3) {
-        addFx(def.fx, p.x, p.y - 26, { scale: 0.7 });
+        addFx(fxid, p.x, p.y - 26, { scale: 0.7 });
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
         heroTile();
@@ -1075,7 +1078,7 @@ function cast(skill, st) {
       for (let i = 0; i < st.count; i++) {
         later(i * 0.12, () => {
           if (e.hp <= 0) return;
-          fxOn(def.fx, e);
+          fxOn(fxid, e);
           hurtEnemy(e, st.dmg);
         });
       }
@@ -1088,7 +1091,7 @@ function cast(skill, st) {
       if (!targets.length) return retry(0.25);
       targets.forEach((e, i) => later(i * 0.1, () => {
         if (e.hp <= 0) return;
-        const life = fxOn(def.fx, e);
+        const life = fxOn(fxid, e);
         later(life * 0.3, () => {
           const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
           if (def.drain && dealt) heal(dealt * def.drain, false, true);
@@ -1104,7 +1107,7 @@ function cast(skill, st) {
           const b = occ.get(key(p.tx + dx * k, p.ty + dy * k));
           if (b && b.m && !b.ally) {
             any = true;
-            fxOn(def.fx, b);
+            fxOn(fxid, b);
             hurtEnemy(b, st.dmg);
             break;
           }
@@ -1119,7 +1122,7 @@ function cast(skill, st) {
       if (!targets.length) return retry(0.3);
       targets.forEach((e, i) => {
         const tx = e.tx, ty = e.ty;
-        const life = fxOn(def.fx, e, { delay: i * 0.12 });
+        const life = fxOn(fxid, e, { delay: i * 0.12 });
         later(i * 0.12 + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
           for (const o of around(tx, ty, st.radius)) {
@@ -1134,7 +1137,7 @@ function cast(skill, st) {
     }
     case 'nova': {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-      addFx(def.fx, 0, -26, { follow: true });
+      addFx(fxid, 0, -26, { follow: true });
       later(0.1, () => {
         for (const e of around(p.tx, p.ty, st.radius)) {
           if (def.stun) e.stun = def.stun;
@@ -1147,7 +1150,7 @@ function cast(skill, st) {
       // 차폐: the monsters beside the hero cannot strike, and are worn down.
       let h = G.fxs.find(f => f.aura === skill);
       if (!h) {
-        h = { id: def.fx, x: 0, y: -30, t: 0, life: Infinity, scale: 1, rot: 0, follow: true, anchor: 'center',
+        h = { id: fxid, x: 0, y: -30, t: 0, life: Infinity, scale: 1, rot: 0, follow: true, anchor: 'center',
           aura: skill, loop: true, alpha: 0.7 };
         G.fxs.push(h);
       }
@@ -1163,7 +1166,7 @@ function cast(skill, st) {
         const a = { m, ally: true, scale: 1, t: 0, life: st.duration, dmg: st.dmg, face: 1, phase: 0, cd: 0, atk: 0,
           hp: 1, flash: 0 };
         place(a, spot[0], spot[1]);
-        addFx(def.fx, a.x, a.y - 20, { scale: 0.8 });
+        addFx(fxid, a.x, a.y - 20, { scale: 0.8 });
         G.allies.push(a);
       }
       break;
@@ -1180,7 +1183,7 @@ function cast(skill, st) {
       G.buffs[def.buff] = G.t + st.duration;
       if (def.buff === 'power') G.buffs.powerK = def.power;
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
-      addFx(def.fx, 0, -26, { follow: true });
+      addFx(fxid, 0, -26, { follow: true });
       break;
     }
   }
@@ -1823,7 +1826,8 @@ function nextChoice() {
     let icon, name, text, tag;
     if (o.type === 'skill') {
       const def = SKILLS[o.id];
-      icon = !def.fx ? itemIcon('p_power') : def.fx === 'hero' ? heroIcon() : fxIcon(def.fx);
+      const lvFx = def.fxs ? def.fxs[Math.min(o.lv, def.fxs.length) - 1] : def.fx;
+      icon = !lvFx ? itemIcon('p_power') : fxIcon(lvFx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
       tag = o.lv === 1 ? '새 마법' : `Lv ${o.lv}`;

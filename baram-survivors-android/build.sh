@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Builds the Baram Survivors APK, for playing alone on your own phone.
 #
-#   ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR]
+#   ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR]
 #
 # IMAGES_DIR is the unpacked image download (the folder holding image/, magics/, itemImage/,
 # maps/ and _pages.json). AUDIO_DIR holds bgm/ and sfx/ sound files (default: ./audio); see README.
 # AVATAR_DIR is the unpacked wardrobe download (oldbaram_avatar_sprites): the hero is dressed
 # from it, with walking and casting frames. Without it the class pictures stand in.
+# SKILL_FX_DIR: the skill-icon download's numbered effect GIFs (사이트번호별/).
 # TOWN_DIR holds town.png (a village map from the 1996 client, 48-pixel tiles) and smithy.png.
 # The art and sound go into the APK only, never into the repository.
 #
@@ -15,10 +16,11 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR]}"
+IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR]}"
 AUDIO="${2:-$HERE/audio}"
 AVATAR="${3:-}"
 TOWN="${4:-}"
+SKILLFX="${5:-}"
 SDK="${ANDROID_HOME:-/opt/android-sdk}"
 BT="$SDK/build-tools/35.0.0"
 JAR="$SDK/platforms/android-35/android.jar"
@@ -33,7 +35,7 @@ done
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
 cp -r "$HERE/web" "$OUT/assets/www"
-python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN
+python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN $SKILLFX
 cp -r "$HERE/res" "$OUT/res"
 
 # Each build gets a higher version code (minutes since 2026-01-01) so Android installs it as an

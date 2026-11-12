@@ -160,6 +160,7 @@ def main():
     audio_src = sys.argv[3] if len(sys.argv) > 3 else None
     avatar_src = sys.argv[4] if len(sys.argv) > 4 else None
     town_src = sys.argv[5] if len(sys.argv) > 5 else None
+    skill_fx = sys.argv[6] if len(sys.argv) > 6 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
     for d in ("fx", "icon", "mon", "item", "hero", "ui"):
@@ -172,11 +173,18 @@ def main():
         for f in pages.get(page, []):
             if f.startswith("magics/"):
                 owner.setdefault(f, page.rsplit("/", 1)[-1])
-    for name in sorted(os.listdir(os.path.join(src, "magics"))):
-        fid = os.path.splitext(name)[0]
+    # Effects: the image download's magics/, and the skill-icon download's numbered files
+    # (SKILL_FX_DIR: the site's own effect numbers, matched to skill names in its list).
+    fx_files = {os.path.splitext(n)[0]: os.path.join(src, "magics", n) for n in os.listdir(os.path.join(src, "magics"))}
+    if skill_fx and os.path.isdir(skill_fx):
+        for n in os.listdir(skill_fx):
+            if n.endswith(".gif") and n != "default.gif":
+                fx_files[os.path.splitext(n)[0]] = os.path.join(skill_fx, n)
+    for fid in sorted(fx_files, key=lambda k: (len(k), k)):
+        name = fid + ".gif"
         if fid in HEROES:
             continue
-        frames, durs = frames_of(os.path.join(src, "magics", name))
+        frames, durs = frames_of(fx_files[fid])
         add = is_additive(frames)
         strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
         icon(frames, add).save(os.path.join(out, "icon", fid + ".png"))
