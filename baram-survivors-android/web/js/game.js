@@ -19,7 +19,7 @@ let Z = 3; // screen pixels per game pixel
 let VW = 320, VH = 180; // view size in game pixels
 let G = null; // the hunt being played
 let chosenClass = null;
-let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true });
+let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true, bubbles: true });
 let best = loadJson('bs_best', {});
 let progress = loadJson('bs_progress', { cleared: {} });
 // ?speed=N runs the game N times as fast, ?all opens every hunting ground (for trying things out).
@@ -499,6 +499,13 @@ function nextGear() {
 function heroPicture(cls) {
   if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
   return portrait(dress(cls.id, savedGear(cls)));
+}
+
+/** The hero calls out a spell, as players typed it: a bubble over the head. */
+function shout(name, plain = false) {
+  if (plain) return;
+  if (G.bubble && G.t - G.bubble.t < 0.8) return; // one at a time, so they can be read
+  G.bubble = { text: `${name}!`, t: G.t };
 }
 
 /** Shows an attack or casting pose for a moment. */
@@ -1019,6 +1026,7 @@ function cast(skill, st) {
       break;
     }
   }
+  if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) {
     audio.play('skill_' + skill.id, def.kind, skill.lv);
     const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior');
@@ -1910,34 +1918,43 @@ function drawHero(now, hidden) {
 // Kept for reference: the newer game colours shouts by class; the old client does not.
 
 function drawBubble(text, x, y, age = 0) {
-  // A spell shouted aloud: the name in the class's colour in a grey box with a rim of the
-  // same colour, fading away after a second, as in the game's spell clips.
+  // A shout over a character's head, drawn as the old client drew them (see the 노획 capture):
+  // a pill of near-black maroon with a violet rim and violet letters, a small tail below.
+  if (!settings.bubbles) return;
+  const RIM = '#5c58d7', EDGE = '#1c0d3a', FILL = '#251117';
   ctx.save();
-  ctx.globalAlpha = age < 0.9 ? 1 : Math.max(0, 1 - (age - 0.9) / 0.4);
+  ctx.globalAlpha = age < 1 ? 1 : Math.max(0, 1 - (age - 1) / 0.3);
   ctx.font = 'bold 12px G11';
   ctx.textAlign = 'center';
-  const c = '#a8a0f0';
-  const w = Math.ceil(ctx.measureText(text).width) + 24;
+  const h = 20, r = h / 2;
+  const w = Math.max(h + 8, Math.ceil(ctx.measureText(text).width) + 18);
   x = Math.round(x);
-  y = Math.round(y);
-  const l = x - Math.round(w / 2), t = y - 20;
-  ctx.fillStyle = 'rgba(34,30,92,0.9)';
-  ctx.fillRect(l + 1, t + 1, w - 2, 16);
-  ctx.fillStyle = c;
-  ctx.fillRect(l + 2, t, w - 4, 1);
-  ctx.fillRect(l + 2, t + 17, w - 4, 1);
-  ctx.fillRect(l, t + 2, 1, 14);
-  ctx.fillRect(l + w - 1, t + 2, 1, 14);
-  ctx.fillRect(l + 1, t + 1, 1, 1);
-  ctx.fillRect(l + w - 2, t + 1, 1, 1);
-  ctx.fillRect(l + 1, t + 16, 1, 1);
-  ctx.fillRect(l + w - 2, t + 16, 1, 1);
-  ctx.fillStyle = 'rgba(34,30,92,0.9)';
-  ctx.fillRect(x - 2, t + 18, 5, 1);
-  ctx.fillRect(x - 1, t + 19, 3, 1);
-  ctx.fillRect(x, t + 20, 1, 1);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(text, x, t + 13);
+  const l = x - Math.round(w / 2), t = Math.round(y) - h - 4;
+  // Row by row, so the rounded ends stay pixel-sharp.
+  for (let row = 0; row < h; row++) {
+    const dy = row + 0.5 - r;
+    const inset = Math.round(r - Math.sqrt(Math.max(0, r * r - dy * dy)));
+    const yy = t + row;
+    ctx.fillStyle = EDGE;
+    ctx.fillRect(l + inset, yy, w - inset * 2, 1);
+    if (row === 0 || row === h - 1) continue;
+    const dy2 = row + 0.5 - r, r2 = r - 1;
+    const in2 = Math.round(r - Math.sqrt(Math.max(0, r2 * r2 - dy2 * dy2)));
+    ctx.fillStyle = RIM;
+    ctx.fillRect(l + in2, yy, w - in2 * 2, 1);
+    if (row === 1 || row === h - 2) continue;
+    const r3 = r - 2.5, in3 = Math.round(r - Math.sqrt(Math.max(0, r3 * r3 - dy2 * dy2)));
+    ctx.fillStyle = FILL;
+    ctx.fillRect(l + in3, yy, w - in3 * 2, 1);
+  }
+  // The tail.
+  ctx.fillStyle = RIM;
+  ctx.fillRect(x - 2, t + h - 1, 5, 1);
+  ctx.fillRect(x - 1, t + h, 3, 1);
+  ctx.fillStyle = EDGE;
+  ctx.fillRect(x, t + h + 1, 1, 1);
+  ctx.fillStyle = RIM;
+  ctx.fillText(text, x, t + 14);
   ctx.restore();
 }
 
@@ -2134,6 +2151,7 @@ function syncSettings() {
   $('#opt-bgm').textContent = '배경음: ' + (settings.bgm ? '켬' : '끔');
   $('#opt-sfx').textContent = '효과음: ' + (settings.sfx ? '켬' : '끔');
   $('#opt-num').textContent = '피해 숫자: ' + (settings.numbers ? '켬' : '끔');
+  $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
 }
 
 $('#start-btn').onclick = () => {
@@ -2160,6 +2178,11 @@ $('#opt-bgm').onclick = () => {
 $('#opt-sfx').onclick = () => {
   settings.sfx = !settings.sfx;
   audio.setSfx(settings.sfx);
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+$('#opt-bubble').onclick = () => {
+  settings.bubbles = !settings.bubbles;
   saveJson('bs_settings', settings);
   syncSettings();
 };
