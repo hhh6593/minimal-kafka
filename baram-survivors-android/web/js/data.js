@@ -37,7 +37,7 @@ export const SKILLS = {
     desc: '이따금 체력을 회복한다' },
 
   // 전사: 붙어 싸우는 연속 공격과 체력 비례 필살기
-  w_slash: { cls: 'warrior', name: '기본 공격', kind: 'slash', fx: '22', dmg: 22, cd: 0.6,
+  w_slash: { cls: 'warrior', name: '기본 공격', kind: 'slash', fx: null, dmg: 22, cd: 0.6,
     names: ['기본 공격', '이중공격', '후면 공격', '삼중공격', '측면 공격', '사중공격', '신검합일', '오중공격'],
     desc: '바로 옆 칸의 몬스터를 벤다' },
   w_tiger: { cls: 'warrior', name: '백호참', kind: 'spell', fx: '20', dmg: 44, cd: 2.4, range: 3, count: 1,

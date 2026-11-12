@@ -149,20 +149,29 @@ function makeGround(kind) {
     case 'field':
     case 'field2': {
       const [base, a, b] = kind === 'field' ? ['#5d7a3a', '#557236', '#668443'] : ['#7f8a4c', '#747f44', '#8a9656'];
+      // Grass as the old maps drew it: an even ground with small tufts, not big soft patches.
       g.fillStyle = base;
       g.fillRect(0, 0, 256, 256);
-      blot(a, 35, 6, 22);
-      blot(b, 35, 6, 18);
-      specks(['#7a9a4c', '#4b6630', '#86a85a'], 280);
-      specks(['#e8d36a', '#f2f2f2', '#d9604a'], 18, 1, 1);
-      stones('#8b8a74', '#6b6a58', 8);
+      blot(a, 60, 2, 5, 0.7);
+      blot(b, 40, 2, 4, 0.7);
+      for (let i = 0; i < 140; i++) {
+        const x = Math.floor(rnd() * 254), y = Math.floor(rnd() * 254);
+        g.fillStyle = i % 2 ? '#4b6630' : '#3f5a28';
+        g.fillRect(x, y + 1, 1, 2);
+        g.fillRect(x + 2, y + 1, 1, 2);
+        g.fillStyle = '#86a85a';
+        g.fillRect(x + 1, y, 1, 3);
+      }
+      specks(['#7a9a4c', '#4b6630'], 200, 1, 1);
+      specks(['#e8d36a', '#f2f2f2', '#d9604a'], 10, 1, 1);
+      stones('#8b8a74', '#6b6a58', 5);
       break;
     }
     case 'cave':
       g.fillStyle = '#5a4632';
       g.fillRect(0, 0, 256, 256);
-      blot('#4e3c2a', 40, 6, 24);
-      blot('#685140', 30, 4, 14);
+      blot('#4e3c2a', 70, 2, 6, 0.7);
+      blot('#685140', 50, 2, 4, 0.7);
       specks(['#3e2f20', '#7a6148'], 260);
       stones('#8d7b66', '#3a2c1e', 22);
       g.strokeStyle = 'rgba(40,28,18,0.7)';
@@ -855,7 +864,7 @@ function cast(skill, st) {
       const hits = 1 + (lv >= 2) + (lv >= 4) + (lv >= 6) + (lv >= 8);
       const under = occ.get(key(p.tx, p.ty));
       if (under && under.m && !under.ally) {
-        fxOn(def.fx, under);
+        if (def.fx) fxOn(def.fx, under);
         hurtEnemy(under, st.dmg);
       }
       const near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
@@ -874,7 +883,7 @@ function cast(skill, st) {
           for (const [dx, dy] of dirs) {
             const b = occ.get(key(p.tx + dx, p.ty + dy));
             if (!b || !b.m || b.ally) continue;
-            fxOn(def.fx, b, { rot: (h % 2) * 0.6 });
+            if (def.fx) fxOn(def.fx, b, { rot: (h % 2) * 0.6 });
             hurtEnemy(b, dmg);
           }
         });
@@ -1204,7 +1213,7 @@ function nextChoice() {
     let icon, name, text, tag;
     if (o.type === 'skill') {
       const def = SKILLS[o.id];
-      icon = def.fx === 'hero' ? heroIcon() : fxIcon(def.fx);
+      icon = !def.fx ? itemIcon('p_power') : def.fx === 'hero' ? heroIcon() : fxIcon(def.fx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
       tag = o.lv === 1 ? '새 마법' : `Lv ${o.lv}`;
@@ -1846,7 +1855,7 @@ function syncUlt() {
   const look = JSON.stringify(p.gear);
   if (shown.hero !== look) {
     shown.hero = look;
-    $('#side-hero').src = p.av ? portrait(p.av) : `assets/hero/${G.cls.hero}.png`;
+    $('#side-hero').src = $('#sd-face').src = p.av ? portrait(p.av) : `assets/hero/${G.cls.hero}.png`;
   }
   // The lettered list holds the learned spells, as the magic window lettered them.
   // The scroll's list: effects on the hero with the seconds left, as the client listed them,
@@ -1858,10 +1867,11 @@ function syncUlt() {
     shown.magic = magic;
     $('#magic').innerHTML = magic;
   }
-  // Worn gear in the slots by the figure (armor above, weapon and shield at the left), the
+  // Worn gear in the slots by the figure (weapon and shield at the left), the
   // trained stats in the others, highest first.
   const g = p.gear || {};
-  const worn = ['armor', 'weapon', 'shield'].map(k => (p.av ? gearIcon(G.cls.id, k, g[k]) : null));
+  // The top slot is the helmet's, and no helmet is worn; the armor shows on the figure itself.
+  const worn = [null, ...['weapon', 'shield'].map(k => (p.av ? gearIcon(G.cls.id, k, g[k]) : null))];
   const trained = Object.entries(G.passives).filter(([, lv]) => lv).sort((a, b) => b[1] - a[1]);
   const slots = SLOT_AT.map(([x, y, dark], i) => {
     let inner = '';

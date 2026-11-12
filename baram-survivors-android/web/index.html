@@ -138,11 +138,11 @@
       text-align: center; font-weight: 700; color: #f4e6c4; background: #1e1008; border: 1px solid var(--frame-hi);
       border-top: 0; }
   #map-tab small { display: block; font: 10px G9, monospace; color: #ffb08a; }
-  #chat { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 2px 6px 0; font: 10px/13px G9, monospace;
+  #chat { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 70px; padding: 2px 6px 0; font: 10px/13px G9, monospace;
       color: var(--ink); background: #f0d9a8; border-top: 2px solid var(--frame-lo); overflow: hidden; }
-  #chat::after { content: ''; display: block; height: 11px; margin: 1px -6px 0; background: #000; }
+  #chat::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: #000; }
   #chat p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #chat p.sys { color: #fff; background: #3e5cc0; margin: 0 -6px; padding: 0 6px; }
+  #chat p.sys { color: #1a2a8a; }
   #chat p.warn { color: #a01800; }
 
   /* The side panel, drawn at the old client's own size (272 x 640, positions measured from a
@@ -186,9 +186,11 @@
   #panel .msg p:last-child { color: #2a2a3a; }
   #panel .em { position: absolute; left: 10px; width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center;
       justify-content: center; font: 700 12px G11, monospace; color: #f4e2c0; text-shadow: 1px 1px 0 #000;
-      background: radial-gradient(circle, #6a5040 0 52%, transparent 53%),
-                  conic-gradient(#c03020 0 25%, #2a8a4a 0 50%, #2a5ab0 0 75%, #d0a030 0);
-      box-shadow: 0 0 0 2px #1a0a04, inset 0 0 0 2px #1a0a04; }
+      overflow: hidden; background: #2a1a0e; border: 4px solid #8a6a3a;
+      box-shadow: 0 0 0 1px #1a0a04, inset 0 0 0 1px #1a0a04, inset 0 0 0 3px #4a3420; }
+  #panel .em img { max-width: 44px; max-height: 50px; margin-top: 8px; }
+  #panel .em.coin { color: #3a2408; text-shadow: none; background: #b08a4a; border-color: #7a5a2a;
+      box-shadow: 0 0 0 1px #1a0a04, inset 0 0 0 1px #e0c080, inset 0 0 0 6px #9a7438; }
   #panel .row { position: absolute; left: 80px; width: 186px; height: 20px; display: flex; align-items: center; gap: 4px;
       white-space: nowrap; color: #f0e8d8; border-bottom: 1px solid #2a1206; }
   #panel .row .k { width: 26px; flex: none; font: 10px G9, monospace; color: #d8b070; }
@@ -201,14 +203,14 @@
   #panel .row .gauge span { position: absolute; right: 3px; top: 0; line-height: 13px; color: #c8f0b8; text-shadow: 1px 1px 0 #000; }
   #panel .lvbox { padding: 0 4px; background: #000; color: #fff; }
   #panel .lv { color: #f0d890; }
-  #keys { position: absolute; right: 8px; bottom: 56px; display: flex; flex-direction: column; align-items: flex-end;
+  #keys { position: absolute; right: 8px; bottom: 84px; display: flex; flex-direction: column; align-items: flex-end;
       gap: 6px; pointer-events: auto; }
   #keys button { padding: 0; font: 700 12px/14px G11, monospace; color: #2a1606; background: #c89858;
       border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
   #keys button:active { border-color: #5a3212 #e8c48c #e8c48c #5a3212; }
   #pause-btn { width: 52px; height: 24px; }
   #ult { width: 92px; height: 40px; }
-  #ult.ready { color: #7a1800; background: #ffe9a0; }
+  #ult.ready { color: #7a1800; border-color: #fff0c0 #5a3212 #5a3212 #fff0c0; }
   #ult small { display: block; font: 8px G7, monospace; font-weight: normal; }
   /* Folded away: a tab on the frame brings it back; health and mana stay in sight under the map tab. */
   #unfold { position: absolute; right: 0; top: 30%; transform: translateY(-50%); pointer-events: auto; padding: 8px 2px;
@@ -310,8 +312,8 @@
   <div class="bar"><span>△</span><span>□</span><span>▽</span></div>
   <button class="fold" id="fold" aria-label="상태창 접기">접기</button>
   <div class="msg" id="vert"></div>
-  <i class="em" style="top:500px"></i>
-  <i class="em" style="top:566px" id="sd-land"></i>
+  <i class="em" style="top:500px"><img id="sd-face" alt=""></i>
+  <i class="em coin" style="top:566px" id="sd-land"></i>
   <div class="row" style="top:496px"><span class="v" style="text-align:left" id="sd-me"></span><span class="lvbox" id="sd-cls1"></span><span class="lv" id="sd-lv"></span></div>
   <div class="row" style="top:516px"><span class="k">힘</span><span class="v" id="sd-str"></span><span class="k">지</span><span class="v" id="sd-int"></span><span class="k">민</span><span class="v" id="sd-dex"></span></div>
   <div class="row" style="top:536px"><span class="k">체력</span><div class="gauge hp" id="g-hp"><i></i><span></span></div></div>
