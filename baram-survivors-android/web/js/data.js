@@ -48,13 +48,13 @@ export const SKILLS = {
     evo: { with: 'power', into: 'w_sword' }, desc: '바로 옆 칸의 몬스터를 연달아 벤다' },
   w_tiger: { cls: 'warrior', req: 1, name: '백호참', kind: 'spell', fx: '20', dmg: 18, cd: 3, range: 2, count: 1,
     scaleHp: 0.06, evo: { with: 'life', into: 'w_roar2' }, desc: '두 칸 안의 몬스터 하나를 크게 벤다. 체력이 높을수록 강하다' },
-  w_buff: { fxs: ['12', '12', '15', '15', '16', '16', '16', '16'], cls: 'warrior', req: 6, name: '백호령', kind: 'buff', buff: 'power', fx: '12', cd: 14, duration: 4, power: 0.4,
-    names: ['백호령', '백호령', '검신검귀', '검신검귀', '대력검신', '대력검신', '대력검신', '대력검신'],
+  w_buff: { fxs: ['12', '12', '15', '15', '21', '21', '21', '21'], cls: 'warrior', req: 6, name: '백호령', kind: 'buff', buff: 'power', fx: '12', cd: 14, duration: 4, power: 0.4,
+    names: ['백호령', '백호령', '검신검귀', '검신검귀', '진백호령', '진백호령', '진백호령', '진백호령'],
     desc: '잠시 공격력이 크게 오른다' },
   w_roar: { cls: 'warrior', req: 12, name: '동귀어진', kind: 'nova', fx: '19', dmg: 26, cd: 7, radius: 1, stun: 1,
     hpCost: 0.05, desc: '체력을 조금 깎아 내며, 둘러싼 여덟 칸에 큰 피해를 주고 잠시 멈추게 한다' },
-  w_sword: { cls: 'warrior', req: 12, evolved: true, name: '어검술', kind: 'nova', fx: '22', dmg: 9, cd: 1, radius: 1,
-    desc: '이중공격 8단 + 힘. 검기가 둘러싼 여덟 칸을 쉼 없이 벤다' },
+  w_sword: { cls: 'warrior', req: 12, evolved: true, name: '쇄혼비무', kind: 'nova', fx: '23', dmg: 9, cd: 1, radius: 1,
+    desc: '이중공격 8단 + 힘. 혼을 부수는 검무로 둘러싼 여덟 칸을 쉼 없이 벤다' },
   w_roar2: { cls: 'warrior', req: 18, evolved: true, name: '극백호참', kind: 'nova', fx: '140', dmg: 22, cd: 3.5, radius: 2,
     scaleHp: 0.1, desc: '백호참 8단 + 체력 단련. 거대한 백호의 검이 두 칸 안을 모두 벤다' },
   w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '14', hpCost: 0.3,
@@ -90,8 +90,8 @@ export const SKILLS = {
     names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '85', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
-  m_fire3: { cls: 'mage', req: 12, evolved: true, name: '삼매진화', kind: 'spell', fx: '94', dmg: 6, cd: 0.8, range: 8,
-    count: 4, desc: '화염주 8단 + 지력. 진짜 불이 몬스터 넷을 한꺼번에 태운다' },
+  m_fire3: { cls: 'mage', req: 12, evolved: true, name: '폭류유성', kind: 'spell', fx: '148', dmg: 6, cd: 0.8, range: 8,
+    count: 4, desc: '화염주 8단 + 지력. 불타는 유성이 몬스터 넷을 한꺼번에 친다' },
   m_quake: { cls: 'mage', req: 18, evolved: true, name: '지폭지술', kind: 'strike', fx: '96', dmg: 14, cd: 3, range: 7,
     radius: 2, count: 2, hitAt: 0.4, desc: '백열주 8단 + 공력. 땅이 터지며 두 칸 안을 휩쓴다' },
   m_ult: { cls: 'mage', name: '헬파이어', kind: 'ult', fx: '92', shield: 5,
@@ -100,8 +100,8 @@ export const SKILLS = {
   // 도사: 회복, 결계, 소환
   p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 9, cd: 1.2, range: 7, count: 1,
     names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
-  p_barrier: { cls: 'poet', req: 6, name: '차폐', kind: 'aura', fx: '108', dmg: 3, cd: 0.8,
-    desc: '결계를 둘러, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
+  p_barrier: { cls: 'poet', req: 6, name: '신령지익진', kind: 'aura', fx: '135', dmg: 3, cd: 0.8,
+    desc: '진을 펼쳐, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
   p_quake: { cls: 'poet', req: 12, name: '지진', kind: 'strike', fx: '123', dmg: 14, cd: 3.6, range: 6, radius: 1, count: 1,
     hitAt: 0.3, evo: { with: 'life', into: 'p_break' }, desc: '몬스터와 그 주위 여덟 칸을 흔든다' },
   p_summon: { cls: 'poet', req: 1, name: '소혼강신', kind: 'summon', fx: null, dmg: 7, cd: 9, count: 1, duration: 7,
@@ -189,7 +189,7 @@ export const CHAMPIONS_AT = [90, 180, 270];
 // Shared effects: hit spark, death puff, level-up, heal, shield and the ghost a dead hero becomes.
 // Shared effects, by the site's numbers: level-up (봉황의기원), potion heal (바다의기원), 보호, 소환, and the
 // outline figure (무영보법) for the ghost. No spark on plain hits: the client drew none.
-export const FX = { hit: null, death: null, levelup: '150', heal: '64', ghost: '33', shield: '77', summon: '44' };
+export const FX = { hit: null, death: null, levelup: '150', heal: null, ghost: '151', shield: '77', summon: '44' };
 
 /** A skill's name at a level. */
 export function skillName(id, level) {
