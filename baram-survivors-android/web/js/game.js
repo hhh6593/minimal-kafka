@@ -1452,7 +1452,7 @@ function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1)
   ctx.scale(face, 1);
   ctx.drawImage(img, -w / 2, -h, w, h);
   if (flash > 0) {
-    ctx.globalAlpha = alpha * Math.min(1, flash * 8) * 0.8;
+    ctx.globalAlpha = alpha;
     ctx.drawImage(white(img), -w / 2, -h, w, h);
   }
   ctx.restore();
@@ -1506,8 +1506,9 @@ function render(now) {
       const bx = Math.round(b.x - 12), by = Math.round(b.y - b.m.h * s - 5);
       ctx.fillStyle = '#000';
       ctx.fillRect(bx - 1, by - 1, 26, 4);
-      ctx.fillStyle = '#4ad82a';
-      ctx.fillRect(bx, by, Math.round(24 * Math.max(0, b.hp / b.maxHp)), 2);
+      const k = Math.max(0, b.hp / b.maxHp);
+      ctx.fillStyle = k > 0.5 ? '#4ad82a' : k > 0.25 ? '#e8d020' : '#e83a1a';
+      ctx.fillRect(bx, by, Math.round(24 * k), 2);
     }
     if (b.kind) {
       bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
