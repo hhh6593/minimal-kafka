@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Turns the downloaded old-Baram images (and optional sound files) into the game's assets.
+
+    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR]
+
+IMAGES_DIR is the unpacked old_images zip (the folder holding image/, magics/,
+itemImage/, _pages.json, ...). OUT_DIR becomes www/assets in the APK.
+
+What it writes:
+  fx/<id>.png      every magic effect as one horizontal strip of its frames
+  mon/<id>.png     every distinct monster image (the zip's duplicates left out)
+  item/<id>.png    the item icons the game uses
+  hero/<id>.png    the four class portraits
+  icon/<id>.png    each effect's fullest frame, cropped, for spell slots
+  ui/...           the world maps for the hunting-ground picker
+  audio/...        whatever sound files AUDIO_DIR holds (see README)
+  manifest.json    sizes, frame timings and blending of all of the above
+
+Effects drawn on a black background are marked "add": the game draws them with
+additive blending, the way the original client did, so the black disappears.
+"""
+import json
+import os
+import re
+import shutil
+import sys
+
+from PIL import Image
+
+# Item icons the game uses, by role (file names in itemImage/).
+ITEMS = {
+    "gem1": "1034", "gem2": "1036", "gem3": "1035", "gem4": "1082",
+    "coin": "1022", "heal": "11", "potion": "1125", "magnet": "1161",
+    "p_armor": "1165", "p_power": "1116", "p_haste": "1208", "p_speed": "1215",
+    "p_life": "1304", "p_area": "1141", "chest": "16",
+}
+HEROES = ["1001", "1002", "1003", "1004"]
+AUDIO_EXT = (".ogg", ".mp3", ".m4a", ".wav")
+
+
+def frames_of(path):
+    im = Image.open(path)
+    n = getattr(im, "n_frames", 1)
+    frames, durs = [], []
+    for i in range(n):
+        im.seek(i)
+        frames.append(im.convert("RGBA").copy())
+        durs.append(int(im.info.get("duration", 100) or 100))
+    return frames, durs
+
+
+def is_additive(frames):
+    """True when the effect sits on an opaque, mostly black background."""
+    px = black = 0
+    for f in frames:
+        if f.getextrema()[3][0] < 255:
+            return False  # has real transparency
+        data = f.convert("RGB").resize((16, 16)).tobytes()
+        for i in range(0, len(data), 3):
+            px += 1
+            black += data[i] + data[i + 1] + data[i + 2] < 40
+    return px > 0 and black / px > 0.4
+
+
+def icon(frames, add):
+    """The fullest frame of an effect, cropped to what is drawn, for the spell slots."""
+    def mask(f):
+        if add:
+            return f.convert("L").point(lambda v: 255 if v > 40 else 0)
+        return f.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+    best = max(frames, key=lambda f: mask(f).histogram()[255])
+    box = mask(best).getbbox() or (0, 0, best.width, best.height)
+    out = best.crop(box)
+    if add:
+        # Black stands for nothing in these: make it see-through so the slot shows behind.
+        px = out.load()
+        for y in range(out.height):
+            for x in range(out.width):
+                r, g, b, a = px[x, y]
+                m = max(r, g, b)
+                px[x, y] = (r, g, b, 0) if m < 24 else (r, g, b, min(255, m * 2))
+    return out
+
+
+def strip(frames):
+    w, h = frames[0].size
+    out = Image.new("RGBA", (w * len(frames), h))
+    for i, f in enumerate(frames):
+        out.paste(f, (i * w, 0))
+    return out
+
+
+def trim(im):
+    box = im.getbbox()
+    return im.crop(box) if box else im
+
+
+def dehalo(im):
+    """Drops the dotted yellow selection halo around a class portrait: flood the halo in from
+    the edges, then keep only the biggest connected shape (the figure)."""
+    im = im.convert('RGBA'); W, H = im.size; px = im.load()
+    def halo(c):
+        r, g, b, a = c
+        return a == 0 or (r, g, b) == (24, 24, 24) or (r >= 190 and 150 <= g <= 210 and 75 <= b <= 130 and r > b + 60)
+    seen = set(); st = [(x, y) for x in range(W) for y in (0, H - 1)] + [(x, y) for y in range(H) for x in (0, W - 1)]
+    while st:
+        x, y = st.pop()
+        if (x, y) in seen or not (0 <= x < W and 0 <= y < H) or not halo(px[x, y]): continue
+        seen.add((x, y)); px[x, y] = (0, 0, 0, 0); st += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    comp = {}; best = None
+    for sx in range(W):
+        for sy in range(H):
+            if px[sx, sy][3] == 0 or (sx, sy) in comp: continue
+            members = []; st = [(sx, sy)]; comp[(sx, sy)] = len(members)
+            while st:
+                x, y = st.pop(); members.append((x, y))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        n = (x + dx, y + dy)
+                        if 0 <= n[0] < W and 0 <= n[1] < H and n not in comp and px[n][3] > 0:
+                            comp[n] = 1; st.append(n)
+            if best is None or len(members) > len(best): best = members
+    keep = set(best or [])
+    for x in range(W):
+        for y in range(H):
+            if (x, y) not in keep: px[x, y] = (0, 0, 0, 0)
+    return im.crop(im.getbbox())
+
+
+def main():
+    src, out = sys.argv[1], sys.argv[2]
+    audio_src = sys.argv[3] if len(sys.argv) > 3 else None
+    pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
+    dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
+    for d in ("fx", "icon", "mon", "item", "hero", "ui"):
+        os.makedirs(os.path.join(out, d), exist_ok=True)
+    manifest = {"fx": {}, "monsters": [], "items": {}, "heroes": [], "ui": {}, "audio": {"bgm": [], "sfx": {}}}
+
+    # Effects, with the class page each one was listed on.
+    owner = {}
+    for page in ("/magic/warrior", "/magic/rogue", "/magic/mage", "/magic/poet", "/magic"):
+        for f in pages.get(page, []):
+            if f.startswith("magics/"):
+                owner.setdefault(f, page.rsplit("/", 1)[-1])
+    for name in sorted(os.listdir(os.path.join(src, "magics"))):
+        fid = os.path.splitext(name)[0]
+        if fid in HEROES:
+            continue
+        frames, durs = frames_of(os.path.join(src, "magics", name))
+        add = is_additive(frames)
+        strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+        icon(frames, add).save(os.path.join(out, "icon", fid + ".png"))
+        manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),
+                               "durs": durs, "add": add, "cls": owner.get("magics/" + name, "magic")}
+
+    for fid in HEROES:
+        im = Image.open(os.path.join(src, "magics", fid + ".gif"))
+        im = dehalo(im) if fid == "1001" else trim(im.convert("RGBA"))
+        im.save(os.path.join(out, "hero", fid + ".png"))
+        manifest["heroes"].append({"id": fid, "w": im.width, "h": im.height})
+
+    # Monsters: every image on a monster page. Each page is one hunting ground; the game's
+    # stages (web/js/data.js) pick their monsters by these page numbers.
+    seen = {}
+    for page, files in pages.items():
+        m = re.fullmatch(r"/monster/(\d+)", page)
+        if not m:
+            continue
+        for f in files:
+            if not f.startswith("image/"):
+                continue
+            f = dups.get(f, f)
+            seen.setdefault(f, set()).add(int(m.group(1)))
+    for f in sorted(seen):
+        p = os.path.join(src, f)
+        if not os.path.isfile(p):
+            continue
+        im = trim(Image.open(p).convert("RGBA"))
+        if im.width < 8 or im.height < 8:
+            continue
+        mid = os.path.splitext(os.path.basename(f))[0].split(".")[0]
+        if any(x["id"] == mid for x in manifest["monsters"]):
+            continue
+        im.save(os.path.join(out, "mon", mid + ".png"), optimize=True)
+        manifest["monsters"].append({"id": mid, "w": im.width, "h": im.height, "pages": sorted(seen[f])})
+
+    for role, iid in ITEMS.items():
+        p = os.path.join(src, "itemImage", iid + ".png")
+        if os.path.isfile(p):
+            im = trim(Image.open(p).convert("RGBA"))
+            im.save(os.path.join(out, "item", iid + ".png"))
+            manifest["items"][role] = {"id": iid, "w": im.width, "h": im.height}
+
+    # The world maps, for the hunting-ground picker.
+    for name in ("world_1", "world_4"):
+        p = os.path.join(src, "maps", "world", name + ".bmp")
+        if os.path.isfile(p):
+            im = Image.open(p).convert("RGB")
+            im.save(os.path.join(out, "ui", name + ".webp"), quality=82)
+            manifest["ui"][name] = {"w": im.width, "h": im.height}
+
+    if audio_src and os.path.isdir(audio_src):
+        for kind in ("bgm", "sfx"):
+            d = os.path.join(audio_src, kind)
+            if not os.path.isdir(d):
+                continue
+            os.makedirs(os.path.join(out, "audio", kind), exist_ok=True)
+            for name in sorted(os.listdir(d)):
+                if not name.lower().endswith(AUDIO_EXT):
+                    continue
+                shutil.copyfile(os.path.join(d, name), os.path.join(out, "audio", kind, name))
+                key = os.path.splitext(name)[0]
+                if kind == "bgm":
+                    manifest["audio"]["bgm"].append({"key": key, "file": "audio/bgm/" + name})
+                else:
+                    manifest["audio"]["sfx"][key] = "audio/sfx/" + name
+
+    with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, ensure_ascii=False, separators=(",", ":"))
+    a = manifest["audio"]
+    print(f"fx {len(manifest['fx'])}, monsters {len(manifest['monsters'])}, items {len(manifest['items'])}, "
+          f"bgm {len(a['bgm'])}, sfx {len(a['sfx'])}")
+
+
+if __name__ == "__main__":
+    main()
