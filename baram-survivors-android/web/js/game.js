@@ -3313,8 +3313,7 @@ function drawHero(now, hidden) {
     else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
     return;
   }
-  const blink = p.inv > 0 && Math.floor(p.inv * 30) % 2 === 0;
-  if (blink) return;
+  // Struck, the hero does not flicker: the client showed a blow only in the health bar.
   if (!p.av) {
     drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
     return;
