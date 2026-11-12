@@ -288,12 +288,13 @@ def main():
                     continue
                 key = os.path.splitext(name)[0]
                 src_file = os.path.join(d, name)
-                if name.lower().endswith(".wav") and shutil.which("ffmpeg"):
-                    # WAV is big in an APK: OGG at the sounds' own 11 kHz mono is a tenth the size.
+                if shutil.which("ffmpeg") and (name.lower().endswith(".wav") or kind == "bgm"):
+                    # Small in an APK: sounds as OGG at their own rate; music as mono 22 kHz OGG.
                     name = key + ".ogg"
                     import subprocess
-                    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src_file, "-c:a", "libvorbis",
-                                    "-q:a", "3", os.path.join(out, "audio", kind, name)], check=True)
+                    extra = ["-ac", "1", "-ar", "22050", "-q:a", "1"] if kind == "bgm" else ["-q:a", "3"]
+                    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src_file, *extra, "-c:a", "libvorbis",
+                                    os.path.join(out, "audio", kind, name)], check=True)
                 else:
                     shutil.copyfile(src_file, os.path.join(out, "audio", kind, name))
                 if kind == "bgm":

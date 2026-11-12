@@ -2730,16 +2730,17 @@ function soundDefaults() {
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
     const has = k => mids.includes(k);
-    // 08 is the one tune scored for Korean instruments (가야금, 거문고, 대금, 아쟁, 꽹과리): the
-    // game's own theme. 04 is the fastest, with drums: for bosses.
     d.bgm_title = has('mid08') ? 'mid08' : mids[0];
     d.bgm_town = d.bgm_title;
     d.bgm_boss = has('mid04') ? 'mid04' : mids[mids.length - 1];
-    for (const st of STAGES) {
-      const k = 'mid' + st.bgm;
-      d['bgm_stage_' + st.id] = has(k) ? k : mids[0];
-    }
   }
+  // The official OST, when it is in the build: the old login/title theme, 국내성 for the town,
+  // 공성전 for bosses, and each ground's own track.
+  const all = M.audio.bgm.map(b => b.key), has = k => all.includes(k);
+  if (has('nx_04_Winds_take2')) d.bgm_title = 'nx_04_Winds_take2';
+  if (has('nx_08_2_Goguryeo')) d.bgm_town = 'nx_08_2_Goguryeo';
+  if (has('nx_10_4way_battle')) d.bgm_boss = 'nx_10_4way_battle';
+  for (const st of STAGES) if (has(st.bgm)) d['bgm_stage_' + st.id] = st.bgm;
   return d;
 }
 
@@ -2754,10 +2755,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 2) {
+  if (settings.soundsVer !== 3) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 2;
+    settings.soundsVer = 3;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
