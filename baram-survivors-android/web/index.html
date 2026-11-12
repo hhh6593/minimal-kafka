@@ -112,6 +112,12 @@
   #sounds-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
   #sound-rows { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px;
       margin-bottom: 6px; touch-action: pan-y; }
+  #sort { padding: 4px 0 8px; }
+  .sort-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sort-head b { font-size: 20px; color: #7a1800; min-width: 80px; }
+  .sort-head span { flex: 1; font: 10px G9, monospace; color: #6a4a2a; }
+  #sort-kinds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 6px; }
+  #sort-kinds .btn { min-width: 0; padding: 10px 0; }
   #sound-rows h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; color: #7a1800; }
   #sound-rows span { align-self: center; }
   #sound-rows .pick { display: flex; gap: 2px; align-items: center; }
@@ -315,9 +321,14 @@
 </div></div>
 <div id="sounds" hidden>
   <div id="sounds-box">
-    <div class="caption">소리 맞추기 <small>번호를 바꾸고 ▶로 들어 보세요. 바로 저장됩니다.</small></div>
+    <div class="caption">소리 맞추기 <small>소리를 종류별로 나누면 마법마다 알맞은 종류에서 골라 씁니다.</small></div>
+    <div id="sort" hidden>
+      <div class="sort-head"><b id="sort-num"></b><span id="sort-left"></span><button id="sort-again" class="btn">다시 듣기</button></div>
+      <div id="sort-kinds"></div>
+      <div class="row"><button id="sort-done" class="btn">그만 나누기</button></div>
+    </div>
     <div id="sound-rows"></div>
-    <div class="row"><button id="close-sounds" class="btn">닫기</button></div>
+    <div class="row"><button id="start-sort" class="btn">빠르게 나누기</button><button id="close-sounds" class="btn">닫기</button></div>
   </div>
 </div>
 <div id="banner" hidden></div>

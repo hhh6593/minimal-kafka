@@ -88,14 +88,16 @@ export class Audio {
     }
   }
 
-  play(key, kind) {
+  /** kind: the skill's kind, for fallbacks; level picks among several sounds (기원 tiers). */
+  play(key, kind, level = 1) {
     if (!this.sfxOn || !this.ctx || this.halted) return;
     const now = this.ctx.currentTime;
     if (now - (this.last[key] || -1) < (MIN_GAP[key] ?? MIN_GAP[kind] ?? 0.03)) return;
     this.last[key] = now;
     const chain = key.startsWith('skill_') ? [key, 'skill_' + kind, 'skill'] : [key];
     for (const k of chain) {
-      const n = this.map[k];
+      let n = this.map[k];
+      if (Array.isArray(n)) n = n[Math.min(level, n.length) - 1];
       if (n === '-') return; // chosen: no sound
       const b = (n && this.buffers[n]) || this.buffers[k];
       if (b) {

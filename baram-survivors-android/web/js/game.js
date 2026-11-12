@@ -925,7 +925,8 @@ function cast(skill, st) {
     }
     case 'heal': {
       if (p.hp >= p.maxHp) return retry(1);
-      heal(st.heal, true);
+      heal(st.heal, false);
+      audio.play('skill_' + skill.id, def.kind, skill.lv);
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
       break;
@@ -938,7 +939,7 @@ function cast(skill, st) {
       break;
     }
   }
-  if (used) audio.play('skill_' + skill.id, def.kind);
+  if (used) audio.play('skill_' + skill.id, def.kind, skill.lv);
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
@@ -1861,12 +1862,41 @@ const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '�
   ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨']];
 const MUSIC = [['title', '처음 화면'], ['battle', '사냥'], ['boss', '보스']];
 
+// Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
+const SOUND_KINDS = [
+  ['heal', '회복'], ['fire', '불'], ['ice', '얼음·물'], ['thunder', '번개'], ['slash', '베기·타격'],
+  ['boom', '폭발·큰 마법'], ['light', '빛·신비'], ['monster', '몬스터'], ['ui', '알림'], ['none', '모름·안 씀'],
+];
+const KIND_USES = {
+  heal: ['skill_c_heal', 'heal', 'skill_p_ult'],
+  fire: ['skill_m_fire', 'skill_m_fire4'],
+  ice: ['skill_m_ice'],
+  thunder: ['skill_r_bolt'],
+  slash: ['hit', 'skill_w_slash', 'skill_r_blink', 'skill_r_drain'],
+  boom: ['skill_w_ult', 'skill_w_tiger', 'skill_w_roar', 'skill_r_ult', 'skill_m_ult', 'skill_p_quake'],
+  light: ['skill_p_orb', 'skill_p_barrier', 'skill_p_guard', 'skill_w_buff', 'skill_r_stealth', 'skill_r_clone',
+    'skill_m_para', 'skill_m_curse', 'skill_p_summon'],
+  monster: ['kill', 'hurt', 'boss'],
+  ui: ['levelup', 'chest', 'pickup', 'win', 'lose'],
+};
+// What the player has said so far: 003 to 010 are the eight 기원 heals, in order.
+const KNOWN_KINDS = { '003': 'heal', '004': 'heal', '005': 'heal', '006': 'heal', '007': 'heal', '008': 'heal',
+  '009': 'heal', '010': 'heal' };
+
+function soundKinds() {
+  return Object.assign({}, KNOWN_KINDS, settings.kinds || {});
+}
+
+/** Fills each game sound from the sorted sounds: one per use in order, 기원 by level. */
 function soundDefaults() {
-  const bank = new Set(audio.bank());
+  const kinds = soundKinds();
   const d = {};
-  for (const [id, def] of Object.entries(SKILLS)) {
-    const n = String(def.fx).padStart(3, '0');
-    if (bank.has(n)) d['skill_' + id] = n;
+  for (const [kind, uses] of Object.entries(KIND_USES)) {
+    const list = audio.bank().filter(n => kinds[n] === kind);
+    if (!list.length) continue;
+    uses.forEach((use, i) => {
+      d[use] = use === 'skill_c_heal' ? list.slice(0, 8) : list[i % list.length];
+    });
   }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
@@ -1881,6 +1911,55 @@ function applySounds() {
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
 }
 
+// ---- quick sort: play each unsorted sound once, one tap files it under a kind
+
+let sortQueue = [];
+
+function startSort() {
+  const kinds = soundKinds();
+  sortQueue = audio.bank().filter(n => !kinds[n]);
+  $('#sound-rows').hidden = true;
+  $('#start-sort').hidden = true;
+  $('#sort').hidden = false;
+  nextSort();
+}
+
+function nextSort() {
+  const left = sortQueue.length;
+  if (!left) {
+    $('#sort-num').textContent = '다 나눴습니다';
+    $('#sort-left').textContent = '';
+    return;
+  }
+  const n = sortQueue[0];
+  $('#sort-num').textContent = n + '번';
+  $('#sort-left').textContent = `남은 소리 ${left}개 · 전체 ${audio.bank().length}개`;
+  audio.preview(n);
+}
+
+function fileSort(kind) {
+  const n = sortQueue.shift();
+  if (!n) return;
+  settings.kinds = Object.assign(settings.kinds || {}, { [n]: kind });
+  // A choice by kind replaces earlier one-by-one picks for what it now feeds.
+  for (const use of KIND_USES[kind] || []) if (settings.sounds) delete settings.sounds[use];
+  saveJson('bs_settings', settings);
+  applySounds();
+  nextSort();
+}
+
+function buildSort() {
+  const box = $('#sort-kinds');
+  box.innerHTML = '';
+  for (const [kind, label] of SOUND_KINDS) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = label;
+    b.onclick = () => fileSort(kind);
+    box.append(b);
+  }
+}
+
 function buildSounds() {
   const box = $('#sound-rows');
   box.innerHTML = '';
@@ -1892,9 +1971,13 @@ function buildSounds() {
     const pick = document.createElement('div');
     pick.className = 'pick';
     const val = document.createElement('b');
-    const show = () => { val.textContent = audio.map[key] || '-'; };
+    const show = () => {
+      const v = audio.map[key];
+      val.textContent = Array.isArray(v) ? `${v[0]}~${v[v.length - 1]}` : v || '-';
+    };
     const move = d => {
-      const i = Math.max(0, options.indexOf(audio.map[key] || '-'));
+      const cur = audio.map[key];
+      const i = Math.max(0, options.indexOf(Array.isArray(cur) ? cur[0] : cur || '-'));
       const v = options[(i + d + options.length) % options.length];
       settings.sounds = Object.assign(settings.sounds || {}, { [key]: v });
       saveJson('bs_settings', settings);
@@ -1903,7 +1986,8 @@ function buildSounds() {
       play();
     };
     const play = () => {
-      const v = audio.map[key];
+      let v = audio.map[key];
+      if (Array.isArray(v)) v = v[0];
       if (!v || v === '-') return;
       if (music) {
         audio.stopBgm();
@@ -1946,7 +2030,19 @@ function buildSounds() {
 $('#open-sounds').onclick = () => {
   audio.unlock();
   buildSounds();
+  buildSort();
+  $('#sort').hidden = true;
+  $('#start-sort').hidden = false;
+  $('#sound-rows').hidden = false;
   $('#sounds').hidden = false;
+};
+$('#start-sort').onclick = startSort;
+$('#sort-again').onclick = () => audio.preview(sortQueue[0]);
+$('#sort-done').onclick = () => {
+  $('#sort').hidden = true;
+  $('#start-sort').hidden = false;
+  buildSounds();
+  $('#sound-rows').hidden = false;
 };
 $('#close-sounds').onclick = () => {
   $('#sounds').hidden = true;
