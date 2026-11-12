@@ -42,6 +42,26 @@ export class Audio {
     this.ctx = null;
     this.music = null;
     this.musicKey = null;
+    // Which numbered sound (e.g. "092" for 092.wav) plays for a game event; set by the game.
+    this.map = {};
+  }
+
+  /** The numbered sounds in the build (the game's own files are numbered), for the sound picker. */
+  bank() {
+    return Object.keys(this.files).filter(k => /^\d+$/.test(k)).sort((a, b) => a - b);
+  }
+
+  /** Plays one numbered sound now, for trying a choice out. */
+  preview(n) {
+    this.unlock();
+    if (this.buffers[n]) this.start(this.buffers[n]);
+  }
+
+  start(buffer) {
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.master);
+    src.start();
   }
 
   /** Called from the first tap: browsers only let sound start from one. */
@@ -75,11 +95,11 @@ export class Audio {
     this.last[key] = now;
     const chain = key.startsWith('skill_') ? [key, 'skill_' + kind, 'skill'] : [key];
     for (const k of chain) {
-      if (this.buffers[k]) {
-        const src = this.ctx.createBufferSource();
-        src.buffer = this.buffers[k];
-        src.connect(this.master);
-        src.start();
+      const n = this.map[k];
+      if (n === '-') return; // chosen: no sound
+      const b = (n && this.buffers[n]) || this.buffers[k];
+      if (b) {
+        this.start(b);
         return;
       }
     }
@@ -150,6 +170,10 @@ export class Audio {
   }
 
   pickBgm(key) {
+    const chosen = this.map['bgm_' + key];
+    if (chosen === '-') return null;
+    const pick = chosen && this.bgmList.find(b => b.key === chosen);
+    if (pick) return pick.file;
     const named = this.bgmList.find(b => b.key === key);
     if (named) return named.file;
     if (key === 'title') return null;

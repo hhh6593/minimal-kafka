@@ -44,6 +44,15 @@ ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더]
 
 ## 효과음·배경음 넣기
 
+원작 소리 파일(번호가 붙은 `001.wav`… 와 MIDI 음악 `1.mid`…)은 그대로 넣으면 됩니다.
+`audio/sfx/`에 wav를, `audio/bgm/`에 mid를 넣고 빌드하면 MIDI는 fluidsynth와 GM 사운드폰트
+(`apt-get install fluidsynth fluid-soundfont-gm`)로 OGG로 바꿔 넣습니다. 어떤 번호가 어떤 소리인지
+목록이 없으므로, 마법은 이펙트 그림과 같은 번호(화염주는 그림 92번이라 `092.wav`)로 먼저 연결하고,
+게임 안 **메뉴 → 소리 맞추기**에서 들어 보며 번호를 바꿀 수 있습니다(바로 저장됨).
+
+### 직접 이름 붙인 파일
+
+
 `audio/bgm/`, `audio/sfx/`에 파일(ogg, mp3, m4a, wav)을 넣고 다시 빌드합니다. 이 폴더의 파일은
 git에 올라가지 않습니다. 파일이 없는 마법은 소리를 내지 않습니다(가짜 소리로 원작 느낌을 해치지 않도록). 레벨업·피격 같은
 기본 소리만 파일이 없을 때 간단한 소리로 대신합니다.

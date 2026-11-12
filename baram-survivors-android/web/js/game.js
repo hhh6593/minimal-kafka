@@ -56,6 +56,7 @@ async function boot() {
   // The pixel fonts, before anything is written on the canvas with them.
   await Promise.all(['12px G11', 'bold 12px G11', '10px G9', '8px G7'].map(f => document.fonts.load(f).catch(() => {})));
   audio = new Audio(M.audio);
+  applySounds();
   audio.setBgm(settings.bgm);
   audio.setSfx(settings.sfx);
   const paths = [
@@ -225,6 +226,11 @@ function makeGround(kind) {
 const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35 };
 
 function resize() {
+  // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
+  const k = innerHeight / 640;
+  document.documentElement.style.setProperty('--side', Math.round(272 * k) + 'px');
+  const panel = document.getElementById('panel');
+  if (panel) panel.style.transform = `scale(${k})`;
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
@@ -1716,7 +1722,7 @@ function drawMenuBackdrop(now) {
 
 const ultBtn = $('#ult');
 const STEPS = 14;
-for (const g of document.querySelectorAll('#stat .g')) g.innerHTML = '<i></i><span></span>';
+
 const shown = {};
 
 /** Sets an element's text only when it changed (the panel is refreshed every frame). */
@@ -1736,8 +1742,9 @@ function gauge(sel, k, text) {
 }
 
 // Gear slots around the figure, as on the old panel: two on each side, one above, two below.
-const SLOT_AT = [['50%', '0', true], ['2px', '16px'], ['2px', '42px'], ['right', '16px'], ['right', '42px'],
-  ['30%', '74px', true], ['70%', '74px', true], ['2px', '74px']];
+// The gear slots as placed on the old panel: two on the left, the helmet above the figure,
+// two at its feet, three darker ones down the right.
+const SLOT_AT = [[35, 164], [35, 208], [117, 160], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
 const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12] };
 const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
 
@@ -1756,16 +1763,17 @@ function syncUlt() {
   put('#sd-ct', G.stage.name);
   put('#sd-title', TITLES[Math.min(TITLES.length - 1, Math.floor(cleared / 3))]);
   put('#sd-class', G.cls.name);
-  put('#sd-lv', String(p.lvl));
-  put('#sd-land', G.stage.map === 'world_4' ? '환상' : '고구려');
   put('#sd-name', '나');
-  put('#sd-lv2', `Lv ${p.lvl}`);
+  put('#sd-land', G.stage.map === 'world_4' ? '환상' : '고구려');
+  put('#sd-me', '나');
+  put('#sd-cls1', G.cls.name[0]);
+  put('#sd-lv', String(p.lvl));
   const [bs, bi, bd] = BASE_STATS[G.cls.id];
   put('#sd-str', String(bs + p.lvl + G.passives.power * 3));
   put('#sd-int', String(bi + p.lvl + G.passives.haste * 3));
   put('#sd-dex', String(bd + p.lvl + G.passives.speed * 3));
-  gauge('#stat .hp', p.hp / p.maxHp, String(Math.ceil(Math.max(0, p.hp))));
-  gauge('#stat .mp', p.mp / p.maxMp, String(Math.floor(p.mp)));
+  gauge('#g-hp', p.hp / p.maxHp, String(Math.ceil(Math.max(0, p.hp))));
+  gauge('#g-mp', p.mp / p.maxMp, String(Math.floor(p.mp)));
   put('#sd-exp', String(p.total || 0));
   put('#sd-gold', String(G.gold));
   put('#sd-pos', `${String(p.tx + 500).padStart(4, '0')} ${String(p.ty + 500).padStart(4, '0')}`);
@@ -1779,15 +1787,15 @@ function syncUlt() {
   // then the spells learned.
   const effects = [['power', '공격력증가'], ['stealth', '투명'], ['guard', '금강불체'], ['shield', '보호막']]
     .filter(([k]) => G.buffs[k] > G.t).map(([k, n]) => `<span>${n} <b>${Math.ceil(G.buffs[k] - G.t)}초</b></span>`);
-  const magic = effects.join('') + G.skills.map((s, i) => `<span><u>${'abcdefgh'[i]}:</u>${skillName(s.id, s.lv)} <b>${s.lv}</b></span>`).join('');
+  const magic = effects.join('') + G.skills.map(s => `<span>${skillName(s.id, s.lv)} <b>${s.lv}단</b></span>`).join('');
   if (shown.magic !== magic) {
     shown.magic = magic;
     $('#magic').innerHTML = magic;
   }
   const slots = Object.entries(G.passives).map(([id, lv], i) => {
-    const [x, y, mid] = SLOT_AT[i];
-    const pos = x === 'right' ? `right:2px;top:${y}` : `left:${x};top:${y};${mid ? 'transform:translateX(-50%)' : ''}`;
-    return `<i style="${pos}">${lv ? `<img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b>` : ''}</i>`;
+    const [x, y, dark] = SLOT_AT[i];
+    return `<i class="slot${dark ? ' dark' : ''}" style="left:${x}px;top:${y}px">${lv
+      ? `<img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b>` : ''}</i>`;
   }).join('');
   if (shown.slots !== slots) {
     shown.slots = slots;
@@ -1865,6 +1873,109 @@ $('#opt-num').onclick = () => {
   syncSettings();
 };
 document.addEventListener('pointerdown', () => audio && audio.unlock(), { capture: true });
+
+// ---------------------------------------------------------------- sound picker
+//
+// The game's sound files are numbered with no list of what each is for, so each game event
+// gets a number here: spells start on the number of their effect picture (화염주 is effect
+// 92, so 092.wav), the rest start silent or on a made-up sound, and the player listens and
+// picks. Choices are saved with the other settings.
+
+const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
+  ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨']];
+const MUSIC = [['title', '처음 화면'], ['battle', '사냥'], ['boss', '보스']];
+
+function soundDefaults() {
+  const bank = new Set(audio.bank());
+  const d = {};
+  for (const [id, def] of Object.entries(SKILLS)) {
+    const n = String(def.fx).padStart(3, '0');
+    if (bank.has(n)) d['skill_' + id] = n;
+  }
+  const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
+  if (mids.length) {
+    d.bgm_title = mids[0];
+    d.bgm_battle = mids[1] || mids[0];
+    d.bgm_boss = mids[2] || d.bgm_battle;
+  }
+  return d;
+}
+
+function applySounds() {
+  audio.map = Object.assign(soundDefaults(), settings.sounds || {});
+}
+
+function buildSounds() {
+  const box = $('#sound-rows');
+  box.innerHTML = '';
+  const bank = ['-', ...audio.bank()];
+  const music = ['-', ...M.audio.bgm.map(b => b.key)];
+  const row = (key, label, options, music) => {
+    const name = document.createElement('span');
+    name.textContent = label;
+    const pick = document.createElement('div');
+    pick.className = 'pick';
+    const val = document.createElement('b');
+    const show = () => { val.textContent = audio.map[key] || '-'; };
+    const move = d => {
+      const i = Math.max(0, options.indexOf(audio.map[key] || '-'));
+      const v = options[(i + d + options.length) % options.length];
+      settings.sounds = Object.assign(settings.sounds || {}, { [key]: v });
+      saveJson('bs_settings', settings);
+      applySounds();
+      show();
+      play();
+    };
+    const play = () => {
+      const v = audio.map[key];
+      if (!v || v === '-') return;
+      if (music) {
+        audio.stopBgm();
+        audio.bgm(key.slice(4));
+      } else audio.preview(v);
+    };
+    for (const [text, fn] of [['◀', () => move(-1)], ['▶', () => move(1)], ['♪', play]]) {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.onclick = fn;
+      if (text === '▶') pick.append(val);
+      pick.append(b);
+    }
+    show();
+    box.append(name, pick);
+  };
+  const head = text => {
+    const h = document.createElement('h4');
+    h.textContent = text;
+    box.append(h);
+  };
+  if (bank.length > 1) {
+    head('게임 소리');
+    for (const [k, label] of EVENTS) row(k, label, bank);
+    for (const c of CLASSES) {
+      head(c.name + ' 마법');
+      for (const [id, def] of Object.entries(SKILLS)) {
+        if (def.cls === c.id || (def.cls === 'all' && c.id === 'warrior')) row('skill_' + id, def.name, bank);
+      }
+    }
+  } else {
+    head('효과음 파일이 없습니다. README의 "효과음·배경음 넣기"를 보세요.');
+  }
+  if (music.length > 1) {
+    head('배경음');
+    for (const [k, label] of MUSIC) row('bgm_' + k, label, music, true);
+  }
+}
+
+$('#open-sounds').onclick = () => {
+  audio.unlock();
+  buildSounds();
+  $('#sounds').hidden = false;
+};
+$('#close-sounds').onclick = () => {
+  $('#sounds').hidden = true;
+  audio.bgm(G ? (G.enemies.some(e => e.kind === 'boss') ? 'boss' : 'battle') : 'title');
+};
 
 // Hooks for the Android app (MainActivity).
 window.__appPause = on => {

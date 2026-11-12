@@ -127,6 +127,33 @@ def dehalo(im):
     return im.crop(im.getbbox())
 
 
+def render_midi(audio_src, out, manifest):
+    """Old Baram's music is MIDI, which a WebView cannot play: render each tune to OGG with
+    fluidsynth and a General MIDI soundfont, trimming the silence at its end."""
+    import glob
+    import subprocess
+    mids = sorted(glob.glob(os.path.join(audio_src, "**", "*.mid"), recursive=True))
+    if not mids:
+        return
+    sf = next((f for f in ("/usr/share/sounds/sf2/FluidR3_GM.sf2", "/usr/share/sounds/sf2/default-GM.sf2")
+               if os.path.isfile(f)), None)
+    if not sf or not shutil.which("fluidsynth") or not shutil.which("ffmpeg"):
+        print("skipping MIDI music: needs fluidsynth, a GM soundfont and ffmpeg", file=sys.stderr)
+        return
+    os.makedirs(os.path.join(out, "audio", "bgm"), exist_ok=True)
+    for mid in mids:
+        key = os.path.splitext(os.path.basename(mid))[0]
+        wav = os.path.join(out, "audio", "bgm", key + ".wav")
+        ogg = os.path.join(out, "audio", "bgm", "mid" + key + ".ogg")
+        subprocess.run(["fluidsynth", "-ni", "-g", "0.8", "-r", "44100", "-F", wav, sf, mid],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", wav, "-af",
+                        "areverse,silenceremove=start_periods=1:start_threshold=-60dB,areverse",
+                        "-c:a", "libvorbis", "-q:a", "2", ogg], check=True)
+        os.remove(wav)
+        manifest["audio"]["bgm"].append({"key": "mid" + key, "file": "audio/bgm/mid" + key + ".ogg"})
+
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     audio_src = sys.argv[3] if len(sys.argv) > 3 else None
@@ -200,6 +227,7 @@ def main():
             manifest["ui"][name] = {"w": im.width, "h": im.height}
 
     if audio_src and os.path.isdir(audio_src):
+        render_midi(audio_src, out, manifest)
         for kind in ("bgm", "sfx"):
             d = os.path.join(audio_src, kind)
             if not os.path.isdir(d):
