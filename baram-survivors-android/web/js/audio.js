@@ -27,7 +27,7 @@ const SYNTH = {
 };
 
 // The game plays the same sound many times a second; a little gap keeps it from roaring.
-const MIN_GAP = { hit: 0.05, kill: 0.04, pickup: 0.03, skill_aura: 0.5 };
+const MIN_GAP = { hit: 0.05, kill: 0.04, pickup: 0.03, skill_aura: 0.5, click: 0 };
 
 export class Audio {
   constructor(manifest) {

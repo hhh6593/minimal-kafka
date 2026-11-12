@@ -83,6 +83,7 @@ async function boot() {
   resize();
   menuGround = makeGround('field');
   initAvatars(M, images);
+  $('#version').textContent = M.version ? `빌드 ${M.version}` : '';
   $('#heroes').innerHTML = CLASSES.map(c => `<img src="${heroPicture(c)}" alt="${c.name}">`).join('');
   showScreen('title');
   requestAnimationFrame(frame);
@@ -437,7 +438,7 @@ function startRun(cls, stage) {
   applyGear();
   addSkill(cls.start);
   showScreen(null);
-  audio.bgm('battle');
+  audio.bgm(huntMusic());
   $('#chat').innerHTML = '';
   $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, 'sys');
@@ -496,6 +497,11 @@ function strikePose(kind) {
   const p = G.player;
   p.pose = kind;
   p.poseT = kind === 'attack' ? 0.22 : 0.3;
+}
+
+/** The music key of the ground being hunted. */
+function huntMusic() {
+  return 'stage_' + G.stage.id;
 }
 
 function xpFor(lvl) {
@@ -782,13 +788,13 @@ function killEnemy(e) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
     say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
     if (e.kind === 'boss') clearStage();
-    else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm('battle');
+    else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm(huntMusic());
   } else if (roll < 0.006) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
   else if (roll < 0.04) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
 }
 
 function clearStage() {
-  audio.bgm('battle');
+  audio.bgm(huntMusic());
   if (G.cleared) return;
   G.cleared = true;
   audio.play('win');
@@ -1943,6 +1949,10 @@ $('#opt-num').onclick = () => {
   syncSettings();
 };
 document.addEventListener('pointerdown', () => audio && audio.unlock(), { capture: true });
+// Every button clicks, as the client's did (408).
+document.addEventListener('click', e => {
+  if (audio && e.target.closest('button')) audio.play('click');
+}, { capture: true });
 
 // ---------------------------------------------------------------- sound picker
 //
@@ -1952,8 +1962,8 @@ document.addEventListener('pointerdown', () => audio && audio.unlock(), { captur
 // picks. Choices are saved with the other settings.
 
 const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
-  ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활']];
-const MUSIC = [['title', '처음 화면'], ['battle', '사냥'], ['boss', '보스']];
+  ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활'], ['click', '버튼 누름']];
+const MUSIC = [['title', '처음 화면'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
 
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
 const SOUND_KINDS = [
@@ -1994,7 +2004,7 @@ const GAME_SOUNDS = {
   skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
   skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084', skill_p_ult: '095',
   hit: '331', kill: '353', hurt: '116', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
-  win: '401', lose: '402', revive: '112',
+  win: '401', lose: '402', revive: '112', click: '408',
 };
 
 /** Each game sound: the game's own where known, else one from the player's sorting. */
@@ -2015,9 +2025,14 @@ function soundDefaults() {
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
     const has = k => mids.includes(k);
-    d.bgm_title = has('mid12') ? 'mid12' : mids[0];
-    d.bgm_battle = has('mid02') ? 'mid02' : mids[1] || mids[0];
-    d.bgm_boss = has('mid04') ? 'mid04' : mids[2] || d.bgm_battle;
+    // 08 is the one tune scored for Korean instruments (가야금, 거문고, 대금, 아쟁, 꽹과리): the
+    // game's own theme. 04 is the fastest, with drums: for bosses.
+    d.bgm_title = has('mid08') ? 'mid08' : mids[0];
+    d.bgm_boss = has('mid04') ? 'mid04' : mids[mids.length - 1];
+    for (const st of STAGES) {
+      const k = 'mid' + st.bgm;
+      d['bgm_stage_' + st.id] = has(k) ? k : mids[0];
+    }
   }
   return d;
 }
@@ -2171,7 +2186,7 @@ $('#sort-done').onclick = () => {
 };
 $('#close-sounds').onclick = () => {
   $('#sounds').hidden = true;
-  audio.bgm(G ? (G.enemies.some(e => e.kind === 'boss') ? 'boss' : 'battle') : 'title');
+  audio.bgm(G ? (G.enemies.some(e => e.kind === 'boss') ? 'boss' : huntMusic()) : 'title');
 };
 
 // Hooks for the Android app (MainActivity).

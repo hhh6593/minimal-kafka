@@ -76,6 +76,8 @@ public class MainActivity extends Activity {
         // The phone's font size setting would scale the game's text and push its windows apart.
         s.setTextZoom(100);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        // The game's files come with the APK: never serve an older copy after an update.
+        s.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         web.setWebViewClient(new WebViewClient() {
             @Override

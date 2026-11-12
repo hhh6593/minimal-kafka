@@ -150,7 +150,7 @@ final class LocalServer {
         String headers = "HTTP/1.1 " + code + " " + reason + "\r\n"
                 + "Content-Type: " + type + "\r\n"
                 + "Content-Length: " + len + "\r\n"
-                + "Cache-Control: no-cache\r\n"
+                + "Cache-Control: no-store\r\n"
                 + "Connection: close\r\n\r\n";
         out.write(headers.getBytes(StandardCharsets.ISO_8859_1));
         if (!head && body != null) out.write(body);

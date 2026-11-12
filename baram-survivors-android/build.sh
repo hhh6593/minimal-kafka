@@ -34,6 +34,21 @@ cp -r "$HERE/web" "$OUT/assets/www"
 python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR
 cp -r "$HERE/res" "$OUT/res"
 
+# Each build gets a higher version code (minutes since 2026-01-01) so Android installs it as an
+# update, and the title screen shows which build is running.
+VERSION_CODE=$(( ($(date +%s) - 1767225600) / 60 ))
+VERSION_NAME="$(date +%Y.%m.%d-%H%M)"
+sed -e "s/android:versionCode=\"[0-9]*\"/android:versionCode=\"$VERSION_CODE\"/" \
+    -e "s/android:versionName=\"[^\"]*\"/android:versionName=\"$VERSION_NAME\"/" \
+    "$HERE/AndroidManifest.xml" > "$OUT/AndroidManifest.xml"
+python3 -I - "$OUT/assets/www/assets/manifest.json" "$VERSION_NAME" <<'PY'
+import json, sys
+p, v = sys.argv[1], sys.argv[2]
+m = json.load(open(p, encoding="utf-8"))
+m["version"] = v
+json.dump(m, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+PY
+
 # Launcher icon: the four classes' faces on a wooden tile.
 python3 -I - "$OUT/assets/www/assets/hero" "$OUT/res" <<'PY'
 import sys, os
@@ -53,7 +68,7 @@ PY
 
 "$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/compiled/res.zip"
 "$BT/aapt2" link -o "$OUT/unsigned.apk" -I "$JAR" \
-  --manifest "$HERE/AndroidManifest.xml" -A "$OUT/assets" \
+  --manifest "$OUT/AndroidManifest.xml" -A "$OUT/assets" \
   --java "$OUT/gen" --min-sdk-version 24 --target-sdk-version 35 \
   "$OUT/compiled/res.zip"
 
