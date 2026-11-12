@@ -693,9 +693,9 @@ function viewTiles() {
 }
 
 /** A free tile just outside the screen. */
-function ringTile() {
+function ringTile(must = false) {
   const p = G.player, v = viewTiles();
-  for (let tries = 0; tries < 40; tries++) {
+  for (let tries = 0; tries < (must ? 200 : 40); tries++) {
     let tx, ty;
     if (Math.random() < 0.5) {
       tx = p.tx + Math.floor(rand(-v.w, v.w + 1));
@@ -705,6 +705,13 @@ function ringTile() {
       ty = p.ty + Math.floor(rand(-v.h, v.h + 1));
     }
     if (free(tx, ty)) return [tx, ty];
+  }
+  if (must) {
+    // A boss comes even when the edge of the view is all rock: the nearest open tile 4 away.
+    for (let r = 4; r < 20; r++)
+      for (let i = -r; i <= r; i++)
+        for (const [tx, ty] of [[p.tx + i, p.ty - r], [p.tx + i, p.ty + r], [p.tx - r, p.ty + i], [p.tx + r, p.ty + i]])
+          if (free(tx, ty)) return [tx, ty];
   }
   return null;
 }
@@ -743,17 +750,14 @@ function spawn(dt) {
       for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
       say(`챔피언 무리가 나타났습니다!`, 'warn');
     }
-    if (G.minis.length && t >= G.minis[0]) {
+    if (G.minis.length && t >= G.minis[0] && addEnemy(G.mini.m, 'mini', G.mini)) {
       G.minis.shift();
-      addEnemy(G.mini.m, 'mini', G.mini);
       for (let i = 0; i < 3; i++) addEnemy(pickMonster(), 'minion');
       say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
       banner(`${G.mini.name} 등장`);
     }
   }
   if (G.bossDue && t >= BOSS_AT) {
-    G.bossDue = false;
-    G.bossT = t;
     // The field calms for the boss.
     while (G.enemies.length > 25) {
       const e = G.enemies.find(x => !x.kind);
@@ -761,7 +765,10 @@ function spawn(dt) {
       G.enemies.splice(G.enemies.indexOf(e), 1);
       occ.delete(key(e.tx, e.ty));
     }
-    addEnemy(G.boss.m, 'boss', G.boss);
+    // Near a wall the ring can be full of rock: try again next frame rather than lose the boss.
+    if (!addEnemy(G.boss.m, 'boss', G.boss)) return;
+    G.bossDue = false;
+    G.bossT = t;
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
@@ -788,8 +795,8 @@ function pickMonster(strong = false) {
 }
 
 function addEnemy(m, kind = null, named = null, pack = 0) {
-  const at = ringTile();
-  if (!at) return;
+  const at = ringTile(kind === 'boss' || kind === 'mini');
+  if (!at) return null;
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
@@ -813,6 +820,7 @@ function addEnemy(m, kind = null, named = null, pack = 0) {
   };
   place(e, at[0], at[1]);
   G.enemies.push(e);
+  return e;
 }
 
 /** Directions toward a tile, best first: the longer way, then the shorter, then around. */
@@ -1569,6 +1577,7 @@ function updateParty(dt) {
 }
 
 function partyAct(m) {
+  // Companions help; the hero carries the hunt, so each hits about as hard as a starting spell.
   const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + p.lvl * 0.04);
   const pose = kind => { m.pose = kind; m.poseT = 0.3; };
   const near = n => {
@@ -1611,7 +1620,7 @@ function partyAct(m) {
         if (!t) break;
         m.cd.a = 1.3;
         fxOn(SKILLS.m_fire.fx, t);
-        later(0.15, () => hurtEnemy(t, 14 * pw));
+        later(0.15, () => hurtEnemy(t, 8 * pw));
         audio.play('skill_m_fire', 'spell', Math.min(8, m.lv * 2));
         if (Math.random() < 0.2) partySay(m, ['화염주', '화영열주', '화열참주'][Math.min(2, m.lv - 1)]);
         pose('magic');
@@ -1634,12 +1643,12 @@ function partyAct(m) {
         m.cd.a = 0.8;
         m.fdx = Math.abs(t.x - m.x) > Math.abs(t.y - m.y) ? Math.sign(t.x - m.x) : 0;
         m.fdy = m.fdx ? 0 : Math.sign(t.y - m.y);
-        hurtEnemy(t, 20 * pw);
+        hurtEnemy(t, 9 * pw);
         audio.play('hit');
         pose('attack');
         if (m.cd.b <= 0) {
           m.cd.b = 10;
-          for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 30 * pw);
+          for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 15 * pw);
           fxOn(SKILLS.w_tiger.fx, t);
           audio.play('skill_w_tiger', 'spell');
           partySay(m, '백호참');
@@ -1655,7 +1664,7 @@ function partyAct(m) {
         m.x = t.x + (t.x > p.x ? 18 : -18);
         m.y = t.y;
         fxOn(SKILLS.r_blink.fx, t);
-        hurtEnemy(t, 22 * pw);
+        hurtEnemy(t, 12 * pw);
         audio.play('skill_r_blink', 'blink');
         if (Math.random() < 0.25) partySay(m, '비영승보');
         pose('attack');
@@ -1774,9 +1783,9 @@ function drawCards() {
   const have = id => G.skills.some(x => x.id === id || x.from === id);
   const banned = o => G.banished.has(o.type + ':' + o.id);
   if (G.firstCard) {
-    // The first card: the class's first-tier spells, and the 기원.
+    // The first card: the class's first-tier attacks; the 기원 comes with the next.
     G.firstCard = false;
-    return Object.entries(SKILLS).filter(([id, d]) => mine(id) && d.req === 1 && !d.evolved && d.kind !== 'ult')
+    return Object.entries(SKILLS).filter(([id, d]) => mine(id) && d.req === 1 && !d.evolved && d.kind !== 'ult' && d.kind !== 'heal')
       .map(([id]) => ({ type: 'skill', id, lv: 1 })).slice(0, 3);
   }
   const opts = [];
@@ -2017,10 +2026,13 @@ function banner(text) {
 /** A line in the side panel's message window: effects received, things picked up. */
 function note(text) {
   const box = $('#vert');
+  // The client wrote a repeated message once.
+  if (box.lastChild && box.lastChild.dataset.t === text) return;
   const p = document.createElement('p');
   p.textContent = text;
+  p.dataset.t = text;
   box.append(p);
-  while (box.children.length > 8) box.firstChild.remove();
+  while (box.children.length > 6) box.firstChild.remove();
 }
 
 /** A line in the chat window. kind 'sys' is the blue system line, 'warn' red. */
@@ -2138,7 +2150,7 @@ addEventListener('contextmenu', e => e.preventDefault());
 /** One of the four directions, or none: the grid has no diagonals. */
 function input() {
   let x = 0, y = 0;
-  if (window.__botInput) [x, y] = window.__botInput(G);
+  if (window.__botInput && G) [x, y] = window.__botInput(G);
   else if (joy.id !== null) {
     x = joy.x - joy.ox;
     y = joy.y - joy.oy;
@@ -2279,11 +2291,11 @@ function render(now) {
       ctx.fillStyle = k > 0.5 ? '#4ad82a' : k > 0.25 ? '#e8d020' : '#e83a1a';
       ctx.fillRect(bx, by, Math.round(24 * k), 2);
     }
-    if (b.kind) {
+    if (b.kind && b.kind !== 'minion') {
       bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
       ctx.font = '10px G9';
       ctx.textAlign = 'center';
-      outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
+      if (b.name) outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
     }
   }
   for (const d of G.dying) {
