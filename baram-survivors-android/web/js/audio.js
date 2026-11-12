@@ -83,13 +83,9 @@ export class Audio {
         return;
       }
     }
-    // A file named only "skill" stands for every skill; otherwise make one up.
-    for (const k of chain) {
-      if (SYNTH[k]) {
-        this.synth(SYNTH[k]);
-        return;
-      }
-    }
+    // Spells stay silent without their own files: a made-up sound misrepresents them.
+    if (key.startsWith('skill_')) return;
+    if (SYNTH[key]) this.synth(SYNTH[key]);
   }
 
   synth(s) {

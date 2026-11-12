@@ -228,7 +228,7 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(innerWidth * dpr);
   canvas.height = Math.round(innerHeight * dpr);
-  Z = Math.max(1, Math.round(canvas.height / 300));
+  Z = Math.max(1, Math.round(canvas.height / 500));
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -323,23 +323,99 @@ for (const b of document.querySelectorAll('#map-tabs button')) {
 }
 
 // ---------------------------------------------------------------- the hunt
+//
+// As in the old game, monsters stand on a grid of 48-pixel tiles and move one tile at a time,
+// up, down, left or right; a tile holds one monster, and they strike from the four tiles next
+// to the hero. The hero also moves only up, down, left or right, but freely, without stopping
+// on tiles, and is never blocked: being walled in by monsters was too harsh for this genre.
+
+const TILE = 48;
+const occ = new Map(); // "tx,ty" -> the body on that tile
+const key = (x, y) => x + ',' + y;
+const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+
+function place(b, tx, ty) {
+  b.tx = b.fx = tx;
+  b.ty = b.fy = ty;
+  b.mt = 0;
+  b.moving = false;
+  occ.set(key(tx, ty), b);
+  locate(b);
+}
+
+/** Pixel position of a body's feet, between its last tile and the next while it steps. */
+function locate(b) {
+  const k = b.moving ? Math.min(1, b.mt / b.dur) : 1;
+  b.x = (b.fx + (b.tx - b.fx) * k) * TILE + TILE / 2;
+  b.y = (b.fy + (b.ty - b.fy) * k) * TILE + TILE - 6;
+}
+
+function free(tx, ty) {
+  const p = G.player;
+  return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty);
+}
+
+/** The tile under the hero's feet. */
+function heroTile() {
+  const p = G.player;
+  p.tx = Math.floor(p.x / TILE);
+  p.ty = Math.floor((p.y - TILE / 2 + 6) / TILE);
+}
+
+/** Starts a one-tile step; false when the tile is taken. */
+function step(b, dx, dy, dur) {
+  const nx = b.tx + dx, ny = b.ty + dy;
+  if (!free(nx, ny)) return false;
+  occ.delete(key(b.tx, b.ty));
+  occ.set(key(nx, ny), b);
+  b.fx = b.tx;
+  b.fy = b.ty;
+  b.tx = nx;
+  b.ty = ny;
+  b.mt = 0;
+  b.dur = dur;
+  b.moving = true;
+  if (dx) b.face = dx > 0 ? 1 : -1;
+  return true;
+}
+
+function advance(b, dt) {
+  if (b.moving) {
+    b.mt += dt;
+    b.phase += dt * 10;
+    if (b.mt >= b.dur) {
+      b.moving = false;
+      b.fx = b.tx;
+      b.fy = b.ty;
+    }
+  }
+  locate(b);
+}
+
+function tdist(a, b) {
+  return Math.hypot(a.tx - b.tx, a.ty - b.ty);
+}
 
 function startRun(cls, stage) {
   const hero = M.heroes.find(h => h.id === cls.hero);
   const mons = stageMonsters(stage);
+  occ.clear();
   G = {
     cls, stage, ...mons, level: STAGES.indexOf(stage), ground: makeGround(stage.terrain),
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
     player: {
-      x: 0, y: 0, hp: cls.hp, maxHp: cls.hp, mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
-      face: 1, mx: 1, my: 0, moving: false, inv: 0, lvl: 1, xp: 0, next: xpFor(1), walk: 0,
-      img: images[`hero/${hero.id}.png`], r: 7,
+      hp: cls.hp, maxHp: cls.hp, mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
+      face: 1, fdx: 0, fdy: 1, phase: 0, lvl: 1, xp: 0, next: xpFor(1), inv: 0,
+      img: images[`hero/${hero.id}.png`], hero: true,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0 },
-    enemies: [], dying: [], projs: [], hazards: [], allies: [], fxs: [], gems: [], drops: [], texts: [], log: [],
+    enemies: [], dying: [], allies: [], fxs: [], drops: [], texts: [], log: [],
     bubble: null, spawnT: 0, waveT: 50, minis: MINI_AT.slice(), bossDue: true, pendingLevels: 0, shake: 0,
   };
+  G.player.x = TILE / 2;
+  G.player.y = TILE - 6;
+  heroTile();
   addSkill(cls.start);
   showScreen(null);
   audio.bgm('battle');
@@ -378,22 +454,26 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+/** Pixels a second the hero walks. */
+function heroSpeed() {
+  return (TILE / 0.24) * (G.player.speed / 70) * (1 + 0.08 * G.passives.speed);
+}
+
 function update(dt) {
   G.t += dt;
   const p = G.player;
 
   if (!G.dead) {
-    const [ix, iy] = input();
-    p.moving = ix !== 0 || iy !== 0;
-    const spd = p.speed * (1 + 0.08 * G.passives.speed);
-    p.x += ix * spd * dt;
-    p.y += iy * spd * dt;
-    if (ix) p.face = ix > 0 ? 1 : -1;
+    const [dx, dy] = input();
+    p.moving = !!(dx || dy);
     if (p.moving) {
-      const l = Math.hypot(ix, iy);
-      p.mx = ix / l;
-      p.my = iy / l;
-      p.walk += dt * 9;
+      p.fdx = dx;
+      p.fdy = dy;
+      if (dx) p.face = dx;
+      p.x += dx * heroSpeed() * dt;
+      p.y += dy * heroSpeed() * dt;
+      p.phase += dt * 10;
+      heroTile();
     }
     p.inv = Math.max(0, p.inv - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * dt);
@@ -401,7 +481,6 @@ function update(dt) {
   G.shake = Math.max(0, G.shake - dt);
 
   spawn(dt);
-  buildGrid();
   moveEnemies(dt);
   if (!G.dead) {
     for (const s of G.skills) {
@@ -415,8 +494,6 @@ function update(dt) {
     }
   }
   runTimers();
-  updateProjectiles(dt);
-  updateHazards(dt);
   updateAllies(dt);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
@@ -433,36 +510,53 @@ function update(dt) {
 
 // ---------------------------------------------------------------- monsters
 
+/** Tiles from the hero to the edge of the screen, and a little beyond. */
+function viewTiles() {
+  return { w: Math.ceil(VW / TILE / 2) + 1, h: Math.ceil(VH / TILE / 2) + 1 };
+}
+
+/** A free tile just outside the screen. */
+function ringTile() {
+  const p = G.player, v = viewTiles();
+  for (let tries = 0; tries < 40; tries++) {
+    let tx, ty;
+    if (Math.random() < 0.5) {
+      tx = p.tx + Math.floor(rand(-v.w, v.w + 1));
+      ty = p.ty + (Math.random() < 0.5 ? -v.h : v.h);
+    } else {
+      tx = p.tx + (Math.random() < 0.5 ? -v.w : v.w);
+      ty = p.ty + Math.floor(rand(-v.h, v.h + 1));
+    }
+    if (free(tx, ty)) return [tx, ty];
+  }
+  return null;
+}
+
 function spawn(dt) {
   const t = G.t;
-  const want = Math.min(230, 8 + t * 0.26 + (t > 300 ? 30 : 0) + (G.cleared ? 40 : 0));
+  const want = Math.min(130, 5 + t * 0.13 + (t > 300 ? 15 : 0) + (G.cleared ? 30 : 0));
   G.spawnT -= dt;
   if (G.spawnT <= 0 && G.enemies.length < want) {
-    G.spawnT = Math.max(0.08, 0.9 - t / 400);
-    const n = 1 + Math.floor(t / 120);
-    for (let i = 0; i < n && G.enemies.length < want; i++) addEnemy(pickMonster(), ringPoint());
+    G.spawnT = Math.max(0.15, 1.1 - t / 400);
+    const n = 1 + Math.floor(t / 150);
+    for (let i = 0; i < n && G.enemies.length < want; i++) addEnemy(pickMonster());
   }
   G.waveT -= dt;
   if (G.waveT <= 0) {
-    // A pack of one kind closing in from all sides.
+    // A pack of one kind from one side.
     G.waveT = 60;
     const m = pickMonster();
-    const k = 14 + Math.floor(t / 40);
-    for (let i = 0; i < k; i++) {
-      const a = (i / k) * Math.PI * 2;
-      const r = Math.hypot(VW, VH) / 2 + 20;
-      addEnemy(m, { x: G.player.x + Math.cos(a) * r, y: G.player.y + Math.sin(a) * r });
-    }
+    for (let i = 0; i < 6 + Math.floor(t / 60); i++) addEnemy(m);
   }
   if (G.minis.length && t >= G.minis[0]) {
     G.minis.shift();
-    addEnemy(G.mini.m, ringPoint(), 'mini', G.mini);
+    addEnemy(G.mini.m, 'mini', G.mini);
     say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, '#ffb060');
     banner(`${G.mini.name} 등장`);
   }
   if (G.bossDue && t >= BOSS_AT) {
     G.bossDue = false;
-    addEnemy(G.boss.m, ringPoint(), 'boss', G.boss);
+    addEnemy(G.boss.m, 'boss', G.boss);
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
@@ -477,120 +571,118 @@ function pickMonster() {
   return G.pool[Math.round(r * (G.pool.length - 1))];
 }
 
-function ringPoint() {
-  const a = Math.random() * Math.PI * 2;
-  const r = Math.hypot(VW, VH) / 2 + 16 + Math.random() * 40;
-  return { x: G.player.x + Math.cos(a) * r, y: G.player.y + Math.sin(a) * r };
-}
-
-function addEnemy(m, at, kind = null, named = null) {
+function addEnemy(m, kind = null, named = null) {
+  const at = ringTile();
+  if (!at) return;
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
-  const scale = named ? named.scale : 1;
-  let hp = (6 + m.area / 45) * tough;
-  if (kind === 'mini') hp = (60 + m.area / 12) * tough * 2;
-  if (kind === 'boss') hp = (150 + m.area / 6) * tough * 4;
-  G.enemies.push({
-    m, x: at.x, y: at.y, hp, maxHp: hp, kind, name: named && named.name, scale,
-    spd: kind ? 30 : 24 + 30 * (1 - rank) + t / 60,
-    dmg: (kind === 'boss' ? 14 : kind === 'mini' ? 10 : 3 + rank * 6) + t / 120 + G.level * 0.8,
-    r: Math.max(5, Math.min(m.w, m.h) * scale * 0.32),
+  let hp = (6 + m.area / 70) * tough;
+  if (kind === 'mini') hp = (70 + m.area / 10) * tough * 2;
+  if (kind === 'boss') hp = (180 + m.area / 5) * tough * 4;
+  const e = {
+    m, hp, maxHp: hp, kind, name: named && named.name, scale: named ? named.scale : 1,
+    // Seconds per tile: small monsters scurry, big ones lumber.
+    stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
+    dmg: (kind === 'boss' ? 13 : kind === 'mini' ? 8 : 2 + rank * 3.5) + t / 180 + G.level * 0.5,
     xp: kind === 'boss' ? 60 : kind === 'mini' ? 20 : 1 + Math.floor(rank * 4 + t / 300),
-    face: 1, flash: 0, slow: 0, stun: 0, curse: 0, kx: 0, ky: 0, phase: Math.random() * 6, hits: new Map(),
-  });
+    face: 1, phase: Math.random() * 6, flash: 0, slow: 0, stun: 0, curse: 0, cd: Math.random() * 0.5, atk: 0.6,
+    lunge: 0, hits: new Map(),
+  };
+  place(e, at[0], at[1]);
+  G.enemies.push(e);
 }
 
-let grid = new Map();
-const CELL = 32;
-function buildGrid() {
-  grid = new Map();
-  for (const e of G.enemies) {
-    const k = ((e.x / CELL) | 0) * 73856093 ^ ((e.y / CELL) | 0) * 19349663;
-    let a = grid.get(k);
-    if (!a) grid.set(k, a = []);
-    a.push(e);
-  }
-}
-
-function near(x, y, r, fn) {
-  const x0 = Math.floor((x - r) / CELL), x1 = Math.floor((x + r) / CELL);
-  const y0 = Math.floor((y - r) / CELL), y1 = Math.floor((y + r) / CELL);
-  for (let cx = x0; cx <= x1; cx++) {
-    for (let cy = y0; cy <= y1; cy++) {
-      const a = grid.get((cx * 73856093) ^ (cy * 19349663));
-      if (a) for (const e of a) if (e.hp > 0) fn(e);
-    }
-  }
+/** Directions toward a tile, best first: the longer way, then the shorter, then around. */
+function towards(b, tx, ty) {
+  const dx = Math.sign(tx - b.tx), dy = Math.sign(ty - b.ty);
+  const horiz = Math.abs(tx - b.tx) >= Math.abs(ty - b.ty);
+  const first = horiz ? [dx, 0] : [0, dy], second = horiz ? [0, dy] : [dx, 0];
+  const out = [];
+  if (first[0] || first[1]) out.push(first);
+  if (second[0] || second[1]) out.push(second);
+  return out;
 }
 
 function moveEnemies(dt) {
   const p = G.player;
-  const far = Math.hypot(VW, VH) * 0.9;
+  const v = viewTiles();
   const hidden = G.buffs.stealth > G.t || G.dead;
   for (const e of G.enemies) {
-    let dx = p.x - e.x, dy = p.y - e.y;
-    const d = Math.hypot(dx, dy) || 1;
-    if (d > far && !e.kind) {
-      // Left far behind: come back from ahead of the hero.
-      const at = ringPoint();
-      e.x = at.x;
-      e.y = at.y;
-      continue;
-    }
-    dx /= d;
-    dy /= d;
-    if (hidden) {
-      // The hero cannot be seen: wander.
-      dx = Math.cos(e.phase * 0.3);
-      dy = Math.sin(e.phase * 0.23);
-    }
-    let sx = 0, sy = 0;
-    near(e.x, e.y, e.r * 2, o => {
-      if (o === e) return;
-      const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy);
-      const min = e.r + o.r;
-      if (od > 0 && od < min) {
-        sx += (ox / od) * (min - od);
-        sy += (oy / od) * (min - od);
-      }
-    });
+    advance(e, dt);
+    e.flash = Math.max(0, e.flash - dt);
+    e.lunge = Math.max(0, e.lunge - dt);
     e.slow = Math.max(0, e.slow - dt);
     e.stun = Math.max(0, e.stun - dt);
     e.curse = Math.max(0, e.curse - dt);
-    const spd = e.stun > 0 ? 0 : e.spd * (e.slow > 0 ? 0.5 : 1) * (hidden ? 0.4 : 1);
-    e.x += (dx * spd + e.kx) * dt + sx * 0.3;
-    e.y += (dy * spd + e.ky) * dt + sy * 0.3;
-    e.kx *= 0.85;
-    e.ky *= 0.85;
-    if (spd) e.face = dx >= 0 ? 1 : -1;
-    if (spd) e.phase += dt * (4 + spd / 12);
-    e.flash = Math.max(0, e.flash - dt);
-    if (!hidden && d < e.r + p.r && p.inv <= 0 && e.stun <= 0) hurtPlayer(e.dmg);
+    if (e.moving || e.stun > 0) continue;
+    if (!e.kind && (Math.abs(e.tx - p.tx) > v.w + 4 || Math.abs(e.ty - p.ty) > v.h + 4)) {
+      // Left far behind: come back from the edge of the screen.
+      const at = ringTile();
+      if (at) {
+        occ.delete(key(e.tx, e.ty));
+        place(e, at[0], at[1]);
+      }
+      continue;
+    }
+    e.cd -= dt;
+    e.atk -= dt;
+    const next = Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1; // beside, or under the hero
+    if (next && !hidden) {
+      // Beside the hero: strike, as monsters do, from the next tile.
+      e.face = p.tx >= e.tx ? 1 : -1;
+      if (e.atk <= 0 && !barred(e)) {
+        e.atk = 1.6;
+        e.lunge = 0.15;
+        hurtPlayer(e.dmg);
+      }
+      continue;
+    }
+    if (e.cd > 0) continue;
+    const st = e.stepTime * (e.slow > 0 ? 2 : 1);
+    e.cd = st;
+    if (hidden) {
+      const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
+      step(e, dx, dy, st);
+      continue;
+    }
+    let moved = false;
+    for (const [dx, dy] of towards(e, p.tx, p.ty)) {
+      if (step(e, dx, dy, st)) {
+        moved = true;
+        break;
+      }
+    }
+    if (!moved && Math.random() < 0.3) {
+      // Blocked: sidestep, so a crowd flows around instead of jamming.
+      const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
+      step(e, dx, dy, st);
+    }
   }
+}
+
+/** 차폐: monsters next to the hero cannot touch them while it holds. */
+function barred(e) {
+  return G.skills.some(s => SKILLS[s.id].kind === 'aura');
 }
 
 function hurtPlayer(dmg) {
   const p = G.player;
-  if (G.buffs.guard > G.t) return;
+  if (G.buffs.guard > G.t || p.inv > 0) return;
   let taken = Math.max(1, dmg - p.armor - G.passives.armor);
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
   p.hp -= taken;
-  p.inv = 0.5;
+  p.inv = 0.25;
   audio.play('hurt');
-  floatText(p.x, p.y - 30, '-' + Math.round(taken), '#ff6060');
+  floatText(p.x, p.y - 60, '-' + Math.round(taken), '#ff6060');
   if (p.hp <= 0) die();
 }
 
-function hurtEnemy(e, dmg, kx = 0, ky = 0) {
+function hurtEnemy(e, dmg) {
   if (e.hp <= 0) return 0;
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1);
   e.hp -= dmg;
   e.flash = 0.12;
-  if (!e.kind) {
-    e.kx += kx;
-    e.ky += ky;
-  }
   if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale, Math.round(dmg), '#fff');
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
@@ -600,12 +692,13 @@ function hurtEnemy(e, dmg, kx = 0, ky = 0) {
 function killEnemy(e) {
   G.kills++;
   G.enemies.splice(G.enemies.indexOf(e), 1);
+  occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
-  addFx(FX.death, e.x, e.y - (e.m.h * e.scale) / 2, { scale: Math.min(1, e.m.w / 50) + 0.3 });
   audio.play('kill');
   const p = G.player;
   p.mp = Math.min(p.maxMp, p.mp + 0.6);
-  G.gems.push({ x: e.x, y: e.y - 3, v: e.xp, fly: false });
+  // Experience comes at the kill, as in the game: nothing to pick up.
+  gainXp(e.xp);
   const roll = Math.random();
   if (e.kind) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
@@ -613,13 +706,7 @@ function killEnemy(e) {
     if (e.kind === 'boss') clearStage();
     else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm('battle');
   } else if (roll < 0.006) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
-  else if (roll < 0.009) G.drops.push({ x: e.x, y: e.y, kind: 'magnet' });
   else if (roll < 0.04) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
-  if (G.gems.length > 400) {
-    // Too many on the ground: fold the oldest into the newest.
-    const old = G.gems.shift();
-    G.gems[G.gems.length - 1].v += old.v;
-  }
 }
 
 function clearStage() {
@@ -637,189 +724,208 @@ function clearStage() {
 }
 
 // ---------------------------------------------------------------- skills
+//
+// Spells land on their target at once, as in the game: no flying bolts. Sizes are in tiles.
 
-function nearestEnemies(n, range = 260, from = G.player) {
+function nearestEnemies(n, range, from = G.player) {
   return G.enemies
-    .map(e => [e, Math.hypot(e.x - from.x, e.y - from.y)])
-    .filter(([, d]) => d < range)
+    .map(e => [e, tdist(e, from)])
+    .filter(([, d]) => d <= range)
     .sort((a, b) => a[1] - b[1])
     .slice(0, n)
     .map(([e]) => e);
 }
 
+/** Monsters within a square of tiles around a tile (radius 1 = the eight around it). */
+function around(tx, ty, r) {
+  const out = [];
+  for (let x = tx - r; x <= tx + r; x++) {
+    for (let y = ty - r; y <= ty + r; y++) {
+      const b = occ.get(key(x, y));
+      if (b && b.m && b.hp > 0 && !b.ally) out.push(b);
+    }
+  }
+  return out;
+}
+
+/** Where an effect sits on a body: tall pillars stand on its feet, the rest on its middle. */
+function fxOn(id, b, o = {}) {
+  const f = M.fx[id];
+  const tall = f.h > f.w * 1.4;
+  const h = b.m ? b.m.h * b.scale : b.img.height;
+  return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...o });
+}
+
 function cast(skill, st) {
   const def = SKILLS[skill.id];
   const p = G.player;
-  const fx = M.fx[def.fx];
   let used = true;
+  const retry = t => {
+    used = false;
+    skill.timer = t;
+  };
   switch (def.kind) {
     case 'slash': {
-      // 기본 공격: n중공격 = hits, 후면/측면 공격 = more directions.
+      // 기본 공격: the tile ahead; 후면/측면 공격 add the tiles behind and beside; n중공격 hits again.
       const lv = skill.lv;
       const hits = 1 + (lv >= 2) + (lv >= 4) + (lv >= 6) + (lv >= 8);
-      const dirs = [0];
-      if (lv >= 3) dirs.push(Math.PI);
-      if (lv >= 5) dirs.push(Math.PI / 2, -Math.PI / 2);
+      const under = occ.get(key(p.tx, p.ty));
+      if (under && under.m && !under.ally) {
+        fxOn(def.fx, under);
+        hurtEnemy(under, st.dmg);
+      }
+      const near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
+      if (!near.length) return under ? undefined : retry(0.12);
+      // Turn to face a monster beside the hero, as a player would before swinging.
+      if (!near.some(([dx, dy]) => dx === p.fdx && dy === p.fdy)) {
+        [p.fdx, p.fdy] = near[0];
+        if (p.fdx) p.face = p.fdx;
+      }
+      const dirs = [[p.fdx, p.fdy]];
+      if (lv >= 3) dirs.push([-p.fdx, -p.fdy]);
+      if (lv >= 5) dirs.push([p.fdy, p.fdx], [-p.fdy, -p.fdx]);
       const dmg = st.dmg * (lv >= 7 ? 1.3 : 1) / Math.sqrt(hits);
-      const tgt = nearestEnemies(1, st.area * 2.5)[0];
-      const base = tgt ? Math.atan2(tgt.y - p.y, tgt.x - p.x) : Math.atan2(p.my, p.mx);
       for (let h = 0; h < hits; h++) {
-        for (const off of dirs) {
-          const a = base + off;
-          later(h * 0.12, () => {
-            const cx = p.x + Math.cos(a) * st.area * 0.8, cy = p.y - 10 + Math.sin(a) * st.area * 0.8;
-            addFx(def.fx, cx, cy, { scale: (st.area * 2) / fx.w, rot: a + (h % 2) * 0.6 });
-            near(cx, cy + 10, st.area + 20, e => {
-              if (Math.hypot(e.x - cx, e.y - cy - 10) < st.area * 0.9 + e.r) hurtEnemy(e, dmg, Math.cos(a) * 50, Math.sin(a) * 50);
-            });
-          });
-        }
-      }
-      break;
-    }
-    case 'blink': {
-      const targets = nearestEnemies(st.count, st.area);
-      if (!targets.length) {
-        used = false;
-        skill.timer = 0.2;
-        break;
-      }
-      targets.forEach((e, i) => later(i * 0.1, () => {
-        if (e.hp <= 0) return;
-        const a = Math.atan2(e.y - p.y, e.x - p.x);
-        addFx(def.fx, e.x + Math.cos(a) * 6, e.y - (e.m.h * e.scale) / 2, { scale: 0.9, rot: a });
-        hurtEnemy(e, st.dmg, Math.cos(a) * 40, Math.sin(a) * 40);
-      }));
-      break;
-    }
-    case 'bolt': {
-      const targets = nearestEnemies(st.count);
-      if (!targets.length) {
-        used = false;
-        skill.timer = 0.2;
-        break;
-      }
-      for (let i = 0; i < st.count; i++) {
-        const tgt = targets[i % targets.length];
-        later(i * 0.09, () => {
-          const a = Math.atan2(tgt.y - (tgt.m.h * tgt.scale) / 2 - (p.y - 12), tgt.x - p.x);
-          shoot(def, st, a);
+        later(h * 0.14, () => {
+          for (const [dx, dy] of dirs) {
+            const b = occ.get(key(p.tx + dx, p.ty + dy));
+            if (!b || !b.m || b.ally) continue;
+            fxOn(def.fx, b, { rot: (h % 2) * 0.6 });
+            hurtEnemy(b, dmg);
+          }
         });
       }
       break;
     }
-    case 'bolt4': {
-      if (def.castFx) addFx(def.castFx, 0, -12, { follow: true, scale: 0.8 });
-      const n = st.count >= 3 ? 8 : 4;
-      for (let i = 0; i < n; i++) shoot(def, st, (i / n) * Math.PI * 2);
+    case 'blink': {
+      // 비영승보: to the tile behind the nearest monster, striking it.
+      const e = nearestEnemies(1, st.range)[0];
+      if (!e) return retry(0.25);
+      const dx = Math.sign(e.tx - p.tx), dy = Math.sign(e.ty - p.ty);
+      const [bx, by] = Math.abs(e.tx - p.tx) >= Math.abs(e.ty - p.ty) ? [e.tx + dx, e.ty] : [e.tx, e.ty + dy];
+      // Not into the middle of a pack: 비영승보 is for getting behind one, not into many.
+      if (!occ.has(key(bx, by)) && around(bx, by, 1).length < 3) {
+        addFx(def.fx, p.x, p.y - 30, { scale: 0.7 });
+        p.x = bx * TILE + TILE / 2;
+        p.y = by * TILE + TILE - 6;
+        heroTile();
+        p.fdx = -Math.sign(bx - e.tx);
+        p.fdy = -Math.sign(by - e.ty);
+        if (p.fdx) p.face = p.fdx;
+      }
+      for (let i = 0; i < st.count; i++) {
+        later(i * 0.12, () => {
+          if (e.hp <= 0) return;
+          fxOn(def.fx, e);
+          hurtEnemy(e, st.dmg);
+        });
+      }
+      break;
+    }
+    case 'spell': {
+      let targets = nearestEnemies(st.count * 3, st.range);
+      if (def.weakest) targets.sort((a, b) => a.hp - b.hp);
+      targets = targets.slice(0, st.count);
+      if (!targets.length) return retry(0.25);
+      targets.forEach((e, i) => later(i * 0.1, () => {
+        if (e.hp <= 0) return;
+        const life = fxOn(def.fx, e);
+        later(life * 0.3, () => {
+          const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
+          if (def.drain && dealt) heal(dealt * def.drain, false, true);
+        });
+      }));
+      break;
+    }
+    case 'spell4': {
+      // The 첨 spells: the first monster up, down, left and right of the hero.
+      let any = false;
+      for (const [dx, dy] of DIRS) {
+        for (let k = 1; k <= st.range; k++) {
+          const b = occ.get(key(p.tx + dx * k, p.ty + dy * k));
+          if (b && b.m && !b.ally) {
+            any = true;
+            fxOn(def.fx, b);
+            hurtEnemy(b, st.dmg);
+            break;
+          }
+        }
+      }
+      if (!any) return retry(0.3);
       break;
     }
     case 'strike': {
-      let targets = nearestEnemies(st.count * 3, 220);
-      if (def.weakest) targets.sort((a, b) => a.hp - b.hp);
-      else targets.sort(() => Math.random() - 0.5);
-      targets = targets.slice(0, st.count);
-      if (!targets.length) {
-        used = false;
-        skill.timer = 0.3;
-        break;
-      }
-      const dmg = st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0);
+      // On a monster near the hero, and the tiles around it as the spell grows.
+      const targets = nearestEnemies(st.count * 3, st.range).sort(() => Math.random() - 0.5).slice(0, st.count);
+      if (!targets.length) return retry(0.3);
       targets.forEach((e, i) => {
-        const x = e.x, y = e.y;
-        const tall = fx.h > fx.w * 1.4;
-        const scale = Math.max(0.7, Math.min(2.4, (st.area * 2.6) / fx.w));
-        const life = addFx(def.fx, x, tall ? y + 4 : y - 8, { scale, anchor: tall ? 'bottom' : 'center', delay: i * 0.12 });
+        const tx = e.tx, ty = e.ty;
+        const life = fxOn(def.fx, e, { delay: i * 0.12 });
         later(i * 0.12 + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
-          let dealt = 0;
-          near(x, y, st.area + 30, o => {
-            if (Math.hypot(o.x - x, o.y - y) < st.area + o.r) {
-              if (def.slow) o.slow = def.slow;
-              if (def.stun) o.stun = def.stun;
-              if (def.curse) o.curse = def.curse;
-              dealt += hurtEnemy(o, dmg);
-            }
-          });
-          if (def.drain && dealt) heal(dealt * def.drain, false, true);
+          for (const o of around(tx, ty, st.radius)) {
+            if (def.slow) o.slow = def.slow;
+            if (def.stun) o.stun = def.stun;
+            if (def.curse) o.curse = def.curse;
+            hurtEnemy(o, st.dmg);
+          }
         });
       });
       break;
     }
     case 'nova': {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-      addFx(def.fx, 0, -10, { scale: (st.area * 2.2) / fx.w, follow: true });
-      later(0.1, () => near(p.x, p.y, st.area + 20, e => {
-        const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
-        if (d < st.area + e.r) {
+      addFx(def.fx, 0, -30, { follow: true });
+      later(0.1, () => {
+        for (const e of around(p.tx, p.ty, st.radius)) {
           if (def.stun) e.stun = def.stun;
-          hurtEnemy(e, st.dmg, (dx / d) * 160, (dy / d) * 160);
+          hurtEnemy(e, st.dmg);
         }
-      }));
-      break;
-    }
-    case 'orbit': {
-      G.hazards = G.hazards.filter(h => h.skill !== skill);
-      for (let i = 0; i < st.count; i++) {
-        G.hazards.push({ kind: 'orbit', skill, def, st, t: 0, life: st.duration, a: (i / st.count) * Math.PI * 2 });
-      }
+      });
       break;
     }
     case 'aura': {
-      let h = G.hazards.find(x => x.skill === skill);
-      if (!h) G.hazards.push(h = { kind: 'aura', skill, def, st, t: 0, life: Infinity });
-      h.st = st;
-      near(p.x, p.y, st.area + 20, e => {
-        const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
-        if (d < st.area + e.r) hurtEnemy(e, st.dmg, (dx / d) * 120, (dy / d) * 120);
-      });
-      used = false; // quiet: it ticks all the time
+      // 차폐: the monsters beside the hero cannot strike, and are worn down.
+      let h = G.fxs.find(f => f.aura === skill);
+      if (!h) {
+        h = { id: def.fx, x: 0, y: -30, t: 0, life: Infinity, scale: 1, rot: 0, follow: true, anchor: 'center',
+          aura: skill, loop: true, alpha: 0.7 };
+        G.fxs.push(h);
+      }
+      for (const e of around(p.tx, p.ty, 1)) hurtEnemy(e, st.dmg);
+      used = false;
       break;
     }
     case 'summon': {
       for (let i = 0; i < st.count; i++) {
-        const id = def.allies[(skill.lv + i) % def.allies.length];
-        const m = monsterById[id];
-        if (!m) continue;
-        const a = Math.random() * Math.PI * 2;
-        const x = p.x + Math.cos(a) * 20, y = p.y + Math.sin(a) * 14;
-        addFx(def.fx, x, y - 10, { scale: 0.7 });
-        G.allies.push({ m, x, y, t: 0, life: st.duration, dmg: st.dmg, face: 1, phase: 0, hits: new Map() });
+        const m = monsterById[def.allies[(skill.lv + i) % def.allies.length]];
+        const spot = DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy]).find(([x, y]) => free(x, y));
+        if (!m || !spot) continue;
+        const a = { m, ally: true, scale: 1, t: 0, life: st.duration, dmg: st.dmg, face: 1, phase: 0, cd: 0, atk: 0,
+          hp: 1, flash: 0 };
+        place(a, spot[0], spot[1]);
+        addFx(def.fx, a.x, a.y - 20, { scale: 0.8 });
+        G.allies.push(a);
       }
       break;
     }
     case 'heal': {
-      if (p.hp >= p.maxHp) {
-        skill.timer = 1;
-        used = false;
-        break;
-      }
+      if (p.hp >= p.maxHp) return retry(1);
       heal(st.heal, true);
       say(`${skillName(skill.id, skill.lv)}!`, '#9fffa8');
       used = false;
       break;
     }
     case 'buff': {
-      const until = G.t + st.duration;
-      G.buffs[def.buff] = until;
+      G.buffs[def.buff] = G.t + st.duration;
       if (def.buff === 'power') G.buffs.powerK = def.power;
       if (def.buff === 'stealth') say('모습을 감췄습니다.', '#c8c8ff');
       if (def.buff === 'guard') say('금강불체!', '#ffe08a');
-      addFx(def.fx, 0, -14, { follow: true });
+      addFx(def.fx, 0, -40, { follow: true });
       break;
     }
   }
   if (used) audio.play('skill_' + skill.id, def.kind);
-}
-
-function shoot(def, st, a) {
-  const p = G.player;
-  const fx = M.fx[def.fx];
-  G.projs.push({
-    def, x: p.x, y: p.y - 12, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
-    dmg: st.dmg, pierce: st.pierce, life: 1.6, t: 0, scale: def.area, hit: new Set(),
-    r: 4 + fx.w * def.area * 0.2,
-  });
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
@@ -832,27 +938,24 @@ function castUlt() {
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   G.bubble = { text: def.name + '!', t: G.t };
   say(`${def.name}!`, '#ffe08a');
-  audio.play('skill_' + G.cls.ult, 'nova');
+  audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
   const lvl = p.lvl, pw = 1 + 0.1 * G.passives.power;
-  const onScreen = () => G.enemies.filter(e => Math.abs(e.x - p.x) < VW / 2 + 20 && Math.abs(e.y - p.y) < VH / 2 + 30);
+  const v = viewTiles();
+  const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
   switch (G.cls.ult) {
     case 'w_ult': {
-      // 건곤대나이: strength from the warrior's health.
-      addFx(def.fx, 0, -10, { follow: true, scale: 300 / M.fx[def.fx].w });
-      addFx('24', 0, -10, { follow: true, scale: 200 / M.fx['24'].w });
-      later(0.15, () => near(p.x, p.y, 160, e => {
-        const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
-        if (d < 150 + e.r) hurtEnemy(e, p.maxHp * 2.2 * pw, (dx / d) * 220, (dy / d) * 220);
-      }));
+      // 건곤대나이: strength from the warrior's health, on everything within three tiles.
+      addFx(def.fx, 0, -30, { follow: true, scale: 1.5 });
+      later(0.15, () => around(p.tx, p.ty, 3).forEach(e => hurtEnemy(e, p.maxHp * 2.2 * pw)));
       break;
     }
     case 'r_ult': {
-      const list = onScreen().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+      const list = around(p.tx, p.ty, 4);
       for (let k = 0; k < 3; k++) {
         later(k * 0.2, () => list.forEach((e, i) => {
           if (e.hp <= 0) return;
-          if (i < 30) addFx(def.fx, e.x, e.y - (e.m.h * e.scale) / 2, { scale: 0.7, rot: k });
+          if (i < 30) fxOn(def.fx, e, { rot: k });
           hurtEnemy(e, (40 + lvl * 9) * pw);
         }));
       }
@@ -860,20 +963,16 @@ function castUlt() {
     }
     case 'm_ult': {
       const list = onScreen();
-      for (let i = 0; i < 7; i++) {
-        const e = list[Math.floor(Math.random() * list.length)];
-        const x = e ? e.x : p.x + rand(-120, 120), y = e ? e.y : p.y + rand(-80, 80);
-        addFx(def.fx, x, y - 20, { scale: 1.6, delay: i * 0.08 });
-      }
+      list.slice(0, 12).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.05 }));
       later(0.5, () => list.forEach(e => hurtEnemy(e, (70 + lvl * 14) * pw)));
       G.buffs.shield = G.t + def.shield;
-      addFx(FX.shield, 0, -10, { follow: true, scale: 0.6 });
+      addFx(FX.shield, 0, -30, { follow: true, scale: 0.6 });
       break;
     }
     case 'p_ult': {
       heal(p.maxHp, true);
       G.buffs.guard = G.t + def.guard;
-      addFx(def.fx, 0, -12, { follow: true, scale: 1.6 });
+      addFx(def.fx, 0, -30, { follow: true, scale: 1.3 });
       break;
     }
   }
@@ -896,98 +995,44 @@ function runTimers() {
   }
 }
 
-function updateProjectiles(dt) {
-  for (const b of G.projs) {
-    b.t += dt;
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
-    near(b.x, b.y + 8, b.r + 30, e => {
-      if (b.pierce < 0 || b.hit.has(e)) return;
-      if (Math.hypot(e.x - b.x, e.y - (e.m.h * e.scale) / 2 - b.y) < b.r + e.r) {
-        b.hit.add(e);
-        hurtEnemy(e, b.dmg, b.vx * 0.3, b.vy * 0.3);
-        if (Math.random() < 0.5) addFx(FX.hit, e.x, e.y - (e.m.h * e.scale) / 2, { scale: 0.6 });
-        b.pierce--;
-      }
-    });
-  }
-  G.projs = G.projs.filter(b => b.t < b.life && b.pierce >= 0);
-}
-
-function updateHazards(dt) {
-  const p = G.player;
-  for (const h of G.hazards) {
-    h.t += dt;
-    if (h.kind === 'orbit') {
-      h.a += dt * 3.2;
-      h.x = p.x + Math.cos(h.a) * h.st.area;
-      h.y = p.y - 10 + Math.sin(h.a) * h.st.area * 0.8;
-      contact(h, h.x, h.y + 10, 12, 0.45, h.st.dmg);
-    }
-  }
-  G.hazards = G.hazards.filter(h => h.t < h.life);
-}
-
+/** Summoned helpers walk the grid like monsters and bite what stands beside them. */
 function updateAllies(dt) {
   for (const a of G.allies) {
     a.t += dt;
-    const tgt = nearestEnemies(1, 200, a)[0];
-    let tx = G.player.x + 20, ty = G.player.y;
-    if (tgt) {
-      tx = tgt.x;
-      ty = tgt.y;
+    advance(a, dt);
+    if (a.moving) continue;
+    a.cd -= dt;
+    a.atk -= dt;
+    const beside = DIRS.map(([dx, dy]) => occ.get(key(a.tx + dx, a.ty + dy))).find(b => b && b.m && !b.ally && b.hp > 0);
+    if (beside) {
+      a.face = beside.tx >= a.tx ? 1 : -1;
+      if (a.atk <= 0) {
+        a.atk = 0.6;
+        hurtEnemy(beside, a.dmg);
+      }
+      continue;
     }
-    const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy) || 1;
-    if (d > 6) {
-      a.x += (dx / d) * 110 * dt;
-      a.y += (dy / d) * 110 * dt;
-      a.face = dx >= 0 ? 1 : -1;
-      a.phase += dt * 12;
-    }
-    contact(a, a.x, a.y, 10, 0.5, a.dmg);
+    if (a.cd > 0) continue;
+    a.cd = 0.3;
+    const tgt = nearestEnemies(1, 8, a)[0] || G.player;
+    for (const [dx, dy] of towards(a, tgt.tx, tgt.ty)) if (step(a, dx, dy, 0.28)) break;
   }
+  for (const a of G.allies) if (a.t >= a.life) occ.delete(key(a.tx, a.ty));
   G.allies = G.allies.filter(a => a.t < a.life);
-}
-
-function contact(h, x, y, r, every, dmg) {
-  near(x, y, r + 20, e => {
-    if (Math.hypot(e.x - x, e.y - y) > r + e.r) return;
-    const last = e.hits.get(h) || -9;
-    if (G.t - last < every) return;
-    e.hits.set(h, G.t);
-    hurtEnemy(e, dmg);
-  });
 }
 
 // ---------------------------------------------------------------- pickups and levels
 
 function updatePickups(dt) {
   const p = G.player;
-  const reach = 46 * (1 + 0.3 * G.passives.magnet);
-  for (const g of G.gems) {
-    const d = Math.hypot(g.x - p.x, g.y - (p.y - 6));
-    if (d < reach) g.fly = true;
-    if (g.fly) {
-      const s = Math.max(120, 260 - d) * dt;
-      g.x += ((p.x - g.x) / d) * s;
-      g.y += ((p.y - 6 - g.y) / d) * s;
-      if (d < 8) {
-        g.taken = true;
-        gainXp(g.v);
-      }
-    }
-  }
-  G.gems = G.gems.filter(g => !g.taken);
+  // 노획 reaches for dropped things from further away.
+  const reach = TILE * (0.7 + 0.5 * G.passives.magnet);
   for (const d of G.drops) {
-    if (Math.hypot(d.x - p.x, d.y - p.y) < 16) {
+    if (Math.hypot(d.x - p.x, d.y - p.y) < reach) {
       d.taken = true;
       if (d.kind === 'heal') heal(30, true);
       else if (d.kind === 'coin') {
-        const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
-        G.gold += n;
-        audio.play('pickup');
-      } else if (d.kind === 'magnet') {
-        for (const g of G.gems) g.fly = true;
+        G.gold += 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         audio.play('pickup');
       } else if (d.kind === 'chest') {
         G.gold += 100 * (1 + G.level);
@@ -1007,15 +1052,14 @@ function heal(n, sound, quiet = false) {
   n = Math.min(n, p.maxHp - p.hp);
   if (n <= 0) return;
   p.hp += n;
-  floatText(p.x, p.y - 34, '+' + Math.round(n), '#7dff8a');
-  if (!quiet) addFx(FX.heal, 0, -14, { scale: 0.8, follow: true });
+  floatText(p.x, p.y - 70, '+' + Math.round(n), '#7dff8a');
+  if (!quiet) addFx(FX.heal, 0, -40, { follow: true });
   if (sound) audio.play('heal');
 }
 
 function gainXp(v) {
   const p = G.player;
   p.xp += v;
-  audio.play('pickup');
   while (p.xp >= p.next) {
     p.xp -= p.next;
     p.lvl++;
@@ -1051,7 +1095,7 @@ function nextChoice() {
   if (!picks.length) picks.push({ type: 'heal' }, { type: 'gold' });
   G.choosing = true;
   audio.play('levelup');
-  addFx(FX.levelup, 0, -14, { follow: true });
+  addFx(FX.levelup, 0, -40, { follow: true });
   $('#lv-title').textContent = `레벨 ${G.player.lvl}`;
   const box = $('#choices');
   box.innerHTML = '';
@@ -1093,6 +1137,7 @@ function nextChoice() {
 }
 
 function choose(o) {
+  if (!G.choosing) return; // a second tap on the same card
   if (o.type === 'skill') {
     addSkill(o.id);
     say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`, '#c8e0ff');
@@ -1139,7 +1184,7 @@ function die() {
     G.buffs.guard = G.t + 3;
     G.bubble = { text: '부활!', t: G.t };
     say('부활 마법으로 다시 일어났습니다.', '#ffe08a');
-    addFx(FX.levelup, 0, -14, { follow: true, scale: 1.4 });
+    addFx(FX.levelup, 0, -40, { follow: true, scale: 1.4 });
     audio.play('heal');
     return;
   }
@@ -1281,22 +1326,25 @@ for (const t of ['pointerup', 'pointercancel']) {
 }
 addEventListener('contextmenu', e => e.preventDefault());
 
+/** One of the four directions, or none: the grid has no diagonals. */
 function input() {
-  if (window.__botInput) return window.__botInput(G);
   let x = 0, y = 0;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) x--;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) x++;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) y--;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) y++;
-  if (joy.id !== null) {
-    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy);
-    if (d > 6) {
-      const m = Math.min(1, d / JOY_R);
-      return [(dx / d) * m, (dy / d) * m];
+  if (window.__botInput) [x, y] = window.__botInput(G);
+  else if (joy.id !== null) {
+    x = joy.x - joy.ox;
+    y = joy.y - joy.oy;
+    if (Math.hypot(x, y) < 10) x = y = 0;
+  } else {
+    // The key held down last wins, so turning a corner feels right.
+    for (const k of keys) {
+      if (k === 'KeyA' || k === 'ArrowLeft') [x, y] = [-1, 0];
+      if (k === 'KeyD' || k === 'ArrowRight') [x, y] = [1, 0];
+      if (k === 'KeyW' || k === 'ArrowUp') [x, y] = [0, -1];
+      if (k === 'KeyS' || k === 'ArrowDown') [x, y] = [0, 1];
     }
   }
-  const l = Math.hypot(x, y);
-  return l ? [x / l, y / l] : [0, 0];
+  if (!x && !y) return [0, 0];
+  return Math.abs(x) >= Math.abs(y) ? [Math.sign(x), 0] : [0, Math.sign(y)];
 }
 
 // ---------------------------------------------------------------- drawing
@@ -1353,34 +1401,19 @@ function render(now) {
     return;
   }
   const p = G.player;
-  let camX = p.x - VW / 2, camY = p.y - VH / 2;
+  let camX = Math.round(p.x - VW / 2), camY = Math.round(p.y - 30 - VH / 2);
   if (G.shake > 0) {
-    camX += rand(-2, 2);
-    camY += rand(-2, 2);
+    camX += Math.round(rand(-2, 2));
+    camY += Math.round(rand(-2, 2));
   }
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
   ctx.fillStyle = G.ground;
   ctx.fillRect(camX, camY, VW, VH);
 
-  // Ground-level things first.
-  for (const h of G.hazards) {
-    if (h.kind === 'aura') {
-      const f = M.fx[h.def.fx];
-      ctx.globalAlpha = 0.85;
-      drawFx(h.def.fx, p.x, p.y - 8, now, (h.st.area * 2.1) / f.w, 0, 'center', true);
-      ctx.globalAlpha = 1;
-    }
-  }
-  for (const g of G.gems) {
-    const role = g.v >= 10 ? 'gem4' : g.v >= 4 ? 'gem3' : g.v >= 2 ? 'gem2' : 'gem1';
-    const im = images[`item/${M.items[role].id}.png`];
-    ctx.drawImage(im, Math.round(g.x - im.width / 4), Math.round(g.y - im.height / 4), im.width / 2, im.height / 2);
-  }
+  // On the ground: experience, money, boxes.
   for (const d of G.drops) {
     const im = images[`item/${M.items[d.kind].id}.png`];
-    const bob = Math.sin(now * 4) * 1.5;
-    shadow(d.x, d.y, 6);
-    ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + bob));
+    ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
   // Bodies, back to front.
@@ -1393,46 +1426,35 @@ function render(now) {
       drawHero(now, hidden);
       continue;
     }
-    if (b.life) {
-      // A summoned helper: tinted, fading as its time runs out.
-      shadow(b.x, b.y, 6);
-      drawWalker(b.m.img, b.x, b.y, b.face, b.phase, true, 0, 1, Math.min(1, (b.life - b.t) * 2) * 0.9);
+    if (b.ally) {
+      shadow(b.x, b.y, 10);
+      drawWalker(b.m.img, b.x, b.y, b.face, b.phase, b.moving, 0, 1, Math.min(1, (b.life - b.t) * 2) * 0.85);
       continue;
     }
     const s = b.scale;
-    shadow(b.x, b.y, b.r * 1.2);
-    drawWalker(b.m.img, b.x, b.y, b.face, b.phase, b.stun <= 0, b.flash, s);
-    if (b.slow > 0 || b.stun > 0) {
-      ctx.fillStyle = b.stun > 0 ? 'rgba(255,240,120,0.3)' : 'rgba(120,180,255,0.35)';
-      ctx.fillRect(b.x - (b.m.w * s) / 2, b.y - b.m.h * s, b.m.w * s, b.m.h * s);
-    }
-    if (b.curse > 0) {
-      ctx.fillStyle = 'rgba(160,60,200,0.25)';
-      ctx.fillRect(b.x - (b.m.w * s) / 2, b.y - b.m.h * s, b.m.w * s, b.m.h * s);
-    }
+    // A monster leans in as it strikes.
+    const lx = b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0, ly = b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0;
+    shadow(b.x, b.y, Math.min(22, b.m.w * s * 0.4));
+    drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
     if (b.kind) {
-      bar(b.x - 22, b.y + 4, 44, 3, b.hp / b.maxHp, '#d33');
-      ctx.font = '8px G7';
+      bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
+      ctx.font = '10px G9';
       ctx.textAlign = 'center';
-      outline(b.name, b.x, b.y - b.m.h * s - 3, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
+      outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
     }
   }
   for (const d of G.dying) {
     const k = d.t / 0.4;
-    drawWalker(d.e.m.img, d.e.x, d.e.y, d.e.face, 0, false, 0.12, d.e.scale * (1 - k * 0.3), 1 - k);
+    drawWalker(d.e.m.img, d.e.x, d.e.y, d.e.face, 0, false, 0.12, d.e.scale, 1 - k);
   }
 
-  // Flying and sky-level things.
-  for (const b of G.projs) drawFx(b.def.fx, b.x, b.y, b.t, b.scale, 0, 'center', true);
-  for (const h of G.hazards) {
-    if (h.kind !== 'orbit') continue;
-    if (h.def.fx === 'hero') drawWalker(p.img, h.x, h.y + 12, p.face, now * 8, true, 0, 0.8, 0.55);
-    else drawFx(h.def.fx, h.x, h.y, h.t, Math.min(1.2, 26 / M.fx[h.def.fx].w), 0, 'center', true);
-  }
+  // Spell effects over everything, at their own size.
   for (const f of G.fxs) {
     if (f.t < 0) continue;
     const x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
-    drawFx(f.id, x, y, f.t, f.scale, f.rot, f.anchor, false);
+    if (f.alpha) ctx.globalAlpha = f.alpha;
+    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop);
+    ctx.globalAlpha = 1;
   }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
@@ -1441,7 +1463,6 @@ function render(now) {
     outline(t.text, t.x, t.y, t.color);
   }
   ctx.globalAlpha = 1;
-  if (!G.dead) bar(p.x - 12, p.y + 3, 24, 2.5, p.hp / p.maxHp, '#e33');
   if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 6);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1449,7 +1470,7 @@ function render(now) {
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
     const cx = canvas.width / 2, cy = canvas.height / 2;
-    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.3, cx, cy, Math.hypot(cx, cy));
+    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.35, cx, cy, Math.hypot(cx, cy));
     gr.addColorStop(0, 'rgba(0,0,0,0)');
     gr.addColorStop(1, `rgba(0,0,0,${dark})`);
     ctx.fillStyle = gr;
@@ -1463,30 +1484,25 @@ function drawHero(now, hidden) {
   const p = G.player;
   if (G.dead) {
     // The ghost the dead become.
-    const f = M.fx[FX.ghost];
     ctx.globalAlpha = 0.85;
     drawFx(FX.ghost, p.x, p.y - Math.sin(now * 2) * 3, now, 1, 0, 'bottom', true);
     ctx.globalAlpha = 1;
-    return f;
+    return;
   }
-  shadow(p.x, p.y, 7);
+  shadow(p.x, p.y, 12);
   if (G.buffs.guard > G.t) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(255,220,120,0.18)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y - 14, 14, 20, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,120,0.16)';
+    ctx.fillRect(Math.round(p.x - p.img.width / 2 - 2), Math.round(p.y - p.img.height - 2), p.img.width + 4, p.img.height + 4);
     ctx.restore();
   }
   if (G.buffs.shield > G.t) {
-    ctx.strokeStyle = 'rgba(140,200,255,0.6)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y - 14, 15, 21, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(140,200,255,0.7)';
+    ctx.strokeRect(Math.round(p.x - p.img.width / 2 - 3) + 0.5, Math.round(p.y - p.img.height - 3) + 0.5, p.img.width + 6, p.img.height + 6);
   }
-  const blink = p.inv > 0 && Math.floor(p.inv * 20) % 2 === 0;
-  if (!blink) drawWalker(p.img, p.x, p.y, p.face, p.walk, p.moving, 0, 1, hidden ? 0.35 : 1);
+  const blink = p.inv > 0 && Math.floor(p.inv * 30) % 2 === 0;
+  if (!blink) drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
 }
 
 function drawBubble(text, x, y) {

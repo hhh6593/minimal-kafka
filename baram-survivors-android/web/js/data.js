@@ -16,9 +16,9 @@
 //   buff    - a short spell on the hero: more damage, unseen, or untouchable
 
 export const CLASSES = [
-  { id: 'warrior', name: '전사', hero: '1001', hp: 150, mp: 60, speed: 66, armor: 2, start: 'w_slash', ult: 'w_ult',
+  { id: 'warrior', name: '전사', hero: '1001', hp: 180, mp: 60, speed: 66, armor: 3, start: 'w_slash', ult: 'w_ult',
     desc: '체력과 방어가 높은 격수. 연속 공격으로 가까운 적을 베어 낸다.' },
-  { id: 'rogue', name: '도적', hero: '1002', hp: 100, mp: 80, speed: 80, armor: 0, start: 'r_blink', ult: 'r_ult',
+  { id: 'rogue', name: '도적', hero: '1002', hp: 130, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
     desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다.' },
   { id: 'mage', name: '주술사', hero: '1003', hp: 85, mp: 120, speed: 68, armor: 0, start: 'm_fire', ult: 'm_ult',
     desc: '원거리 공격 주술사. 신수마법으로 적을 태우고 마비시킨다.' },
@@ -32,60 +32,60 @@ const tier = base => ['', '', ' 2차', ' 2차', ' 3차', ' 3차', ' 4차', ' 5�
 
 export const SKILLS = {
   // 공통
-  c_heal: { cls: 'all', name: '누리의 기원', kind: 'heal', fx: '150', heal: 10, cd: 11, count: 1,
+  c_heal: { cls: 'all', name: '누리의 기원', kind: 'heal', fx: '150', heal: 10, cd: 11,
     names: ['누리의 기원', '대지의 기원', '바다의 기원', '동해의 기원', '하늘의 기원', '천공의 기원', '구름의 기원', '태양의 기원'],
     desc: '이따금 체력을 회복한다' },
 
-  // 전사: 연속 공격과 체력 비례 필살기
-  w_slash: { cls: 'warrior', name: '기본 공격', kind: 'slash', fx: '22', dmg: 16, cd: 1.0, area: 50, count: 1,
+  // 전사: 붙어 싸우는 연속 공격과 체력 비례 필살기
+  w_slash: { cls: 'warrior', name: '기본 공격', kind: 'slash', fx: '22', dmg: 22, cd: 0.6,
     names: ['기본 공격', '이중공격', '후면 공격', '삼중공격', '측면 공격', '사중공격', '신검합일', '오중공격'],
-    desc: '가장 가까운 적을 크게 벤다' },
-  w_tiger: { cls: 'warrior', name: '백호참', kind: 'strike', fx: '20', dmg: 42, cd: 3.2, area: 30, count: 1,
-    hitAt: 0.45, scaleHp: 0.15, desc: '하늘에서 거대한 검을 내리꽂는다. 체력이 높을수록 강하다' },
-  w_roar: { cls: 'warrior', name: '동귀어진', kind: 'nova', fx: '141', dmg: 34, cd: 7, area: 76, count: 1, stun: 1,
-    hpCost: 0.05, desc: '체력을 조금 깎아 내며, 주위 적에게 큰 피해를 주고 잠시 멈추게 한다' },
+    desc: '바로 옆 칸의 몬스터를 벤다' },
+  w_tiger: { cls: 'warrior', name: '백호참', kind: 'spell', fx: '20', dmg: 44, cd: 2.4, range: 3, count: 1,
+    scaleHp: 0.15, desc: '두 칸 안의 몬스터를 크게 벤다. 체력이 높을수록 강하다' },
+  w_roar: { cls: 'warrior', name: '동귀어진', kind: 'nova', fx: '141', dmg: 36, cd: 7, radius: 1, stun: 1,
+    hpCost: 0.05, desc: '체력을 조금 깎아 내며, 둘러싼 여덟 칸에 큰 피해를 주고 잠시 멈추게 한다' },
   w_buff: { cls: 'warrior', name: '백호령', kind: 'buff', buff: 'power', fx: '138', cd: 12, duration: 5, power: 0.5,
     names: ['백호령', '백호령', '검신검귀', '검신검귀', '대력검신', '대력검신', '대력검신', '대력검신'],
     desc: '잠시 공격력이 크게 오른다' },
   w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '25', hpCost: 0.3,
-    desc: '체력 30%와 마력을 모두 바쳐, 최대 체력에 비례한 일격으로 주위를 쓸어버린다' },
+    desc: '체력 30%와 마력을 모두 바쳐, 최대 체력에 비례한 일격으로 세 칸 안을 쓸어버린다' },
 
   // 도적: 파고들기, 투명, 흡혈
-  r_blink: { cls: 'rogue', name: '비영승보', kind: 'blink', fx: '43', dmg: 14, cd: 0.9, area: 150, count: 1,
-    desc: '가까운 적의 뒤로 파고들어 벤다' },
-  r_bolt: { cls: 'rogue', name: '뇌진주', kind: 'strike', fx: '48', dmg: 22, cd: 1.8, area: 22, count: 1,
-    hitAt: 0.3, names: tier('뇌진주'), desc: '신수마법. 주변 적에게 번개를 떨어뜨린다' },
-  r_stealth: { cls: 'rogue', name: '투명', kind: 'buff', buff: 'stealth', fx: '57', cd: 11, duration: 2.5, power: 2,
-    desc: '잠시 모습을 감춘다. 적이 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
-  r_drain: { cls: 'rogue', name: '흡성대법', kind: 'strike', fx: '9', dmg: 26, cd: 2.6, area: 14, count: 1, hitAt: 0.2,
-    drain: 0.3, weakest: true, desc: '체력이 낮은 적의 기운을 빨아들여 체력을 회복한다' },
-  r_clone: { cls: 'rogue', name: '분신', kind: 'orbit', fx: 'hero', dmg: 10, cd: 5, area: 40, count: 2, duration: 3.5,
-    desc: '분신이 주위를 돌며 벤다' },
+  r_blink: { cls: 'rogue', name: '비영승보', kind: 'blink', fx: '43', dmg: 18, cd: 0.9, range: 5, count: 1,
+    desc: '다섯 칸 안의 몬스터 뒤로 순식간에 옮겨 가며 벤다' },
+  r_bolt: { cls: 'rogue', name: '뇌진주', kind: 'spell', fx: '48', dmg: 20, cd: 1.6, range: 6, count: 1,
+    names: tier('뇌진주'), desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
+  r_stealth: { cls: 'rogue', name: '투명', kind: 'buff', buff: 'stealth', fx: '57', cd: 11, duration: 2.5,
+    desc: '잠시 모습을 감춘다. 몬스터가 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
+  r_drain: { cls: 'rogue', name: '흡성대법', kind: 'spell', fx: '9', dmg: 24, cd: 2.6, range: 5, count: 1,
+    drain: 0.3, weakest: true, desc: '체력이 낮은 몬스터의 기운을 빨아들여 체력을 회복한다' },
+  r_clone: { cls: 'rogue', name: '분신', kind: 'buff', buff: 'power', fx: '56', cd: 14, duration: 4, power: 1,
+    desc: '분신을 만들어 잠시 공격력이 두 배가 된다' },
   r_ult: { cls: 'rogue', name: '필살검무', kind: 'ult', fx: '52', hpCost: 0.2,
-    desc: '체력 20%와 마력을 모두 써서, 주위 모든 적을 순식간에 베어 낸다' },
+    desc: '체력 20%와 마력을 모두 써서, 네 칸 안의 모든 몬스터를 순식간에 베어 낸다' },
 
   // 주술사: 신수마법과 상태이상
-  m_fire: { cls: 'mage', name: '화염주', kind: 'bolt', fx: '92', dmg: 14, cd: 1.0, area: 2.2, count: 1, speed: 170,
-    pierce: 1, names: FIRE, desc: '신수마법. 가장 가까운 적에게 불덩이를 날린다' },
-  m_fire4: { cls: 'mage', name: '화염주첨', kind: 'bolt4', fx: '92', castFx: '95', dmg: 12, cd: 2.2, area: 2.2,
-    count: 1, speed: 160, pierce: 2, names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 방향으로 불덩이를 날린다' },
-  m_ice: { cls: 'mage', name: '백열주', kind: 'strike', fx: '146', dmg: 24, cd: 2.2, area: 22, count: 1, hitAt: 0.5,
-    slow: 2, names: tier('백열주'), desc: '신수마법. 얼음 기둥이 솟아 적을 느리게 한다' },
-  m_para: { cls: 'mage', name: '마비', kind: 'strike', fx: '72', dmg: 6, cd: 4, area: 44, count: 1, hitAt: 0.2,
-    stun: 2, desc: '주위 적을 마비시켜 잠시 움직이지 못하게 한다' },
-  m_curse: { cls: 'mage', name: '저주', kind: 'strike', fx: '61', dmg: 4, cd: 5, area: 60, count: 1, hitAt: 0.3,
-    curse: 4, desc: '적의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
+  m_fire: { cls: 'mage', name: '화염주', kind: 'spell', fx: '92', dmg: 15, cd: 0.9, range: 8, count: 1,
+    names: FIRE, desc: '신수마법. 가까운 몬스터를 불태운다' },
+  m_fire4: { cls: 'mage', name: '화염주첨', kind: 'spell4', fx: '92', dmg: 13, cd: 2, range: 8,
+    names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
+  m_ice: { cls: 'mage', name: '백열주', kind: 'strike', fx: '146', dmg: 24, cd: 2.2, range: 8, radius: 0, count: 1,
+    hitAt: 0.5, slow: 2, names: tier('백열주'), desc: '신수마법. 얼음 기둥이 솟아 몬스터를 느리게 한다' },
+  m_para: { cls: 'mage', name: '마비', kind: 'strike', fx: '72', dmg: 6, cd: 4, range: 7, radius: 1, count: 1,
+    hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
+  m_curse: { cls: 'mage', name: '저주', kind: 'strike', fx: '61', dmg: 4, cd: 5, range: 7, radius: 1, count: 1,
+    hitAt: 0.3, curse: 4, desc: '몬스터와 그 주위의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
   m_ult: { cls: 'mage', name: '헬파이어', kind: 'ult', fx: '148', shield: 5,
-    desc: '마력을 모두 써서 화면의 적을 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
+    desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
 
   // 도사: 회복, 결계, 소환
-  p_orb: { cls: 'poet', name: '자무주', kind: 'bolt', fx: '133', dmg: 12, cd: 1.0, area: 0.5, count: 1, speed: 150,
-    pierce: 2, names: tier('자무주'), desc: '신수마법. 기운의 구슬이 적을 꿰뚫는다' },
-  p_quake: { cls: 'poet', name: '지진', kind: 'nova', fx: '121', dmg: 20, cd: 3.6, area: 70, count: 1,
-    desc: '땅을 흔들어 주위 적을 밀쳐 낸다' },
-  p_barrier: { cls: 'poet', name: '차폐', kind: 'aura', fx: '134', dmg: 5, cd: 0.8, area: 44, count: 1,
-    desc: '결계를 둘러 다가오는 적을 밀어내고 상하게 한다' },
-  p_summon: { cls: 'poet', name: '소혼강신', kind: 'summon', fx: '125', dmg: 9, cd: 9, area: 1, count: 1, duration: 7,
+  p_orb: { cls: 'poet', name: '자무주', kind: 'spell', fx: '133', dmg: 13, cd: 1.0, range: 8, count: 1,
+    names: tier('자무주'), desc: '신수마법. 기운의 구슬로 몬스터를 친다' },
+  p_quake: { cls: 'poet', name: '지진', kind: 'strike', fx: '121', dmg: 18, cd: 3.4, range: 7, radius: 1, count: 1,
+    hitAt: 0.3, desc: '몬스터와 그 주위 여덟 칸을 흔든다' },
+  p_barrier: { cls: 'poet', name: '차폐', kind: 'aura', fx: '134', dmg: 4, cd: 0.8,
+    desc: '결계를 둘러, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
+  p_summon: { cls: 'poet', name: '소혼강신', kind: 'summon', fx: '125', dmg: 9, cd: 9, count: 1, duration: 7,
     allies: ['3013', '3012', '1022', '1023'], desc: '불여우와 맹수를 불러 함께 싸우게 한다' },
   p_guard: { cls: 'poet', name: '금강불체', kind: 'buff', buff: 'guard', fx: '135', cd: 16, duration: 2,
     desc: '잠시 어떤 공격도 받지 않는 몸이 된다' },
@@ -99,8 +99,8 @@ export const PASSIVES = {
   power: { name: '힘', item: 'p_power', max: 5, desc: '모든 피해 +10%' },
   haste: { name: '지력', item: 'p_haste', max: 5, desc: '기술 재사용 대기 -8%' },
   speed: { name: '민첩', item: 'p_speed', max: 5, desc: '이동 속도 +8%' },
-  area: { name: '공력', item: 'p_area', max: 5, desc: '기술 범위 +10%' },
-  magnet: { name: '노획', item: 'magnet', max: 5, desc: '경험치를 줍는 거리 +30%' },
+  area: { name: '공력', item: 'p_area', max: 5, desc: '마법이 닿는 거리와 범위가 늘어난다' },
+  magnet: { name: '노획', item: 'magnet', max: 5, desc: '떨어진 돈과 물건을 더 멀리서 줍는다' },
   armor: { name: '무장', item: 'p_armor', max: 5, desc: '받는 피해 -1' },
   mana: { name: '공력증강', item: 'potion', max: 5, desc: '마력 회복 +25%' },
 };
@@ -171,9 +171,10 @@ export function skillStats(id, level, p) {
   return {
     dmg: (s.dmg || 0) * Math.pow(1.22, l) * (1 + 0.1 * p.power),
     cd: s.cd * Math.pow(0.93, l) * Math.pow(0.92, p.haste),
-    area: (s.area || 0) * (1 + 0.07 * l) * (1 + 0.1 * p.area),
+    // Tiles: reach grows by one every three levels, and with 공력.
+    range: (s.range || 0) + Math.floor(l / 3) + Math.floor(p.area / 2),
+    radius: s.radius === undefined ? 0 : s.radius + Math.floor(level / 4) + Math.floor(p.area / 3),
     count: (s.count || 1) + (level >= 3) + (level >= 5) + (level >= 7),
-    pierce: (s.pierce || 0) + Math.floor(l / 3),
     duration: (s.duration || 0) * (1 + 0.1 * l),
     heal: (s.heal || 0) * (1 + 0.45 * l),
   };
@@ -184,15 +185,14 @@ export function levelText(id, level) {
   const s = SKILLS[id];
   if (level === 1) return s.desc;
   if (s.kind === 'slash') {
-    return ['', '2회 연속 공격', '뒤쪽도 함께 벤다', '3회 연속 공격', '양옆도 함께 벤다', '4회 연속 공격',
-      '공격력 +30%', '5회 연속 공격'][level - 1];
+    return ['', '두 번 연달아 벤다', '뒤쪽 칸도 함께 벤다', '세 번 연달아 벤다', '양옆 칸도 함께 벤다', '네 번 연달아 벤다',
+      '공격력 +30%', '다섯 번 연달아 벤다'][level - 1];
   }
   if (s.kind === 'heal') return '회복량 +45%, 재사용 -7%';
   if (s.kind === 'buff') return '지속 시간 +10%, 재사용 -7%';
   const parts = ['피해 +22%', '재사용 -7%'];
-  if (level === 3 || level === 5 || level === 7) parts.push(s.kind === 'summon' ? '소환 +1' : '개수 +1');
-  if (s.kind === 'bolt' || s.kind === 'bolt4') {
-    if ((level - 1) % 3 === 0) parts.push('관통 +1');
-  } else parts.push('범위 +7%');
+  if (level === 3 || level === 5 || level === 7) parts.push(s.kind === 'summon' ? '소환 +1' : '대상 +1');
+  if (s.range && (level - 1) % 3 === 0) parts.push('거리 +1칸');
+  if (s.radius !== undefined && level % 4 === 0) parts.push('범위 +1칸');
   return parts.join(', ');
 }
