@@ -29,7 +29,8 @@ const SYNTH = {
 // The game plays the same sound many times a second; a little gap keeps it from roaring.
 const MIN_GAP = { hit: 0.12, kill: 0.04, pickup: 0.03, skill_aura: 0.5, click: 0,
   // The last spells come fast but sound long: let each ring out before it starts again.
-  skill_w_sword: 1.6, skill_m_fire3: 1.8, skill_p_wave: 1.4, skill_r_dance: 0.6, skill_r_storm: 0.7 };
+  skill_w_sword: 1.6, skill_m_fire3: 1.8, skill_p_wave: 1.4, skill_r_dance: 0.6, skill_r_storm: 0.7,
+  skill_r_heaven: 0.9, skill_r_formless: 2.0 };
 // Sounds that come many times a second play softer than spells.
 const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6 };
 

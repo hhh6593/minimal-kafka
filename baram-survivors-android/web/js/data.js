@@ -100,7 +100,7 @@ export const SKILLS = {
     desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
 
   // 도사: 회복, 결계, 소환
-  p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 9, cd: 1.2, range: 7, count: 1,
+  p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 11, cd: 1.2, range: 7, count: 1,
     names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
   p_barrier: { cls: 'poet', req: 6, name: '신령지익진', kind: 'aura', fx: '135', dmg: 3, cd: 0.8,
     desc: '진을 펼쳐, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
@@ -116,6 +116,41 @@ export const SKILLS = {
     desc: '지진 8단 + 체력 단련. 화면의 모든 몬스터에 혼마술을 걸어 받는 피해를 늘리고 친다' },
   p_ult: { cls: 'poet', name: '백호의희원', kind: 'ult', fx: '130', guard: 3,
     desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 금강불체 상태가 된다' },
+
+  // 승급으로 열리는 기술 (PROMOS): 1차·2차 승급이 새 기술을, 3차 승급이 두 기술의 합성을 연다.
+  // 합성(union)은 두 기술이 모두 8단일 때 다음 보물 상자에서 하나로 합쳐져 칸 하나가 빈다.
+  w_fly: { cls: 'warrior', req: 6, promo: 1, name: '어검술', kind: 'cleave', fx: '22', dmg: 16, cd: 2.4, depth: 2, max: 4,
+    scaleHp: 0.04, desc: '검을 날려 앞쪽 ㅜ자 역삼각형(네 칸)의 몬스터 넷을 벤다' },
+  w_howl: { cls: 'warrior', req: 12, promo: 2, name: '포효검황', kind: 'screen', fx: '25', dmg: 16, cd: 6, falloff: 0.08,
+    desc: '포효와 함께 화면의 모든 몬스터를 친다. 한 칸 멀어질수록 8%씩 약하다' },
+  w_blood: { cls: 'warrior', req: 18, promo: 3, evolved: true, union: ['w_fly', 'w_howl'], name: '혈겁만파', kind: 'screen',
+    fx: '141', dmg: 24, cd: 4, curse: 3, desc: '어검술 8단 + 포효검황 8단. 피의 물결이 화면을 덮어 모든 몬스터를 치고 저주한다' },
+  r_flysword: { cls: 'rogue', req: 6, promo: 1, name: '이기어검', kind: 'blink', fx: '53', dmg: 13, cd: 1.6, range: 5, count: 2,
+    curse: 2, desc: '다섯 칸 안의 몬스터 뒤로 날아들어 두 번 베고 저주를 건다' },
+  r_formless: { cls: 'rogue', req: 12, promo: 2, name: '무형검', kind: 'line', fx: '55', dmg: 15, cd: 1.8, depth: 4,
+    desc: '보이지 않는 검이 바라보는 쪽 일렬 네 칸을 꿰뚫는다' },
+  r_heaven: { cls: 'rogue', req: 18, promo: 3, evolved: true, union: ['r_flysword', 'r_formless'], name: '파천검무', kind: 'line',
+    fx: '144', dmg: 20, cd: 1.3, depth: 6, dash: true, desc: '이기어검 8단 + 무형검 8단. 일렬 여섯 칸을 지나가며 모두 벤다' },
+  m_magi: { cls: 'mage', req: 6, promo: 1, name: '마기지체', kind: 'buff', buff: 'haste', fx: '98', cd: 14, duration: 4,
+    desc: '마기를 몸에 둘러, 잠시 모든 마법이 1.6배 빨리 돈다' },
+  m_nodo: { cls: 'mage', req: 12, promo: 2, name: '노도성황', kind: 'screen', fx: '97', dmg: 6, cd: 8, stun: 1.2,
+    desc: '노한 물결이 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  m_sammae: { cls: 'mage', req: 18, promo: 3, evolved: true, union: ['m_fire4', 'm_nodo'], name: '삼매진화', kind: 'spell4',
+    fx: '94', dmg: 30, cd: 2.4, range: 8, pierce: true, desc: '화염주첨 8단 + 노도성황 8단. 상하좌우 네 줄로 헬파이어를 쏘아 줄 위를 모두 태운다' },
+  p_reflect: { cls: 'poet', req: 6, promo: 1, name: '반탄공', kind: 'buff', buff: 'reflect', fx: '132', cd: 12, duration: 4,
+    desc: '잠시 때린 몬스터에게 받은 피해의 세 배를 되돌린다' },
+  p_spirit: { cls: 'poet', req: 12, promo: 2, name: '신령의기원', kind: 'heal', fx: '131', heal: 22, cd: 14, shieldT: 3,
+    desc: '체력을 크게 회복하고 3초 동안 받는 피해를 절반으로 줄인다' },
+  p_phoenix: { cls: 'poet', req: 18, promo: 3, evolved: true, union: ['p_reflect', 'p_spirit'], name: '봉황의기원', kind: 'heal',
+    fx: '150', heal: 30, cd: 12, guard: 1.5, desc: '반탄공 8단 + 신령의기원 8단. 봉황이 날아올라 체력을 크게 채우고 잠시 어떤 공격도 받지 않는다' },
+};
+
+// 승급: 각 직업으로 그 사냥터를 정복하면 오른다. 1차·2차는 새 기술, 3차는 합성 기술을 연다.
+export const PROMOS = {
+  warrior: [{ at: 'rat', skill: 'w_fly' }, { at: 'deer', skill: 'w_howl' }, { at: 'haunt', skill: 'w_blood' }],
+  rogue: [{ at: 'rat', skill: 'r_flysword' }, { at: 'deer', skill: 'r_formless' }, { at: 'haunt', skill: 'r_heaven' }],
+  mage: [{ at: 'rat', skill: 'm_magi' }, { at: 'deer', skill: 'm_nodo' }, { at: 'haunt', skill: 'm_sammae' }],
+  poet: [{ at: 'rat', skill: 'p_reflect' }, { at: 'deer', skill: 'p_spirit' }, { at: 'haunt', skill: 'p_phoenix' }],
 };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
@@ -185,6 +220,24 @@ export const STAGES = [
 // The clock of a hunting ground, as D2 Survivors' acts: the boss comes at 6:00; a named
 // leader (with followers) at 2:15 and 4:45; a pack of champions every 90 seconds.
 export const BOSS_AT = 6 * 60;
+
+// 레이드: 키운 직업이 모두 모여 거대한 보스 하나를 친다. 고른 직업으로 들어가고, 나머지 직업은 각자의
+// 최고 기록과 장비만큼 강한 동료로 처음부터 함께한다. 보스는 1:30에 나오며, 바닥에 붉게 예고한 칸을
+// 내리친다(한 칸씩 걸어 피한다). 체력 2/3, 1/3에서 더 사나워지고, 8분 안에 못 잡으면 실패.
+// open: 이 사냥터를 (아무 직업으로든) 정복하면 열린다. 보스 이름은 이 게임에서 붙인 것이다.
+export const RAIDS = [
+  { id: 'raid_hydra', raid: true, name: '삼두룡 레이드', lv: '파티', terrain: 'cave', level: 7, open: 'haunt',
+    monsters: ['1016', '1018', '1019', '1020', '1021', '12016', '12017', '12013'],
+    boss: { id: '10014', name: '삼두룡', scale: 1 }, patterns: ['cross', 'breath'], fx: '140',
+    intro: '세 머리의 용이 깃든 굴. 머리마다 한 줄씩 불을 뿜는다' },
+  { id: 'raid_sorcerer', raid: true, name: '흑술사 레이드', lv: '파티', terrain: 'house', level: 9, open: 'goblin',
+    pages: [312, 1001], boss: { id: '10003', name: '흑술사', scale: 1.3 }, patterns: ['rain', 'ring'], fx: '120',
+    intro: '흉가 깊은 곳에서 혼을 부리는 술사. 하늘에서 저주가 비처럼 떨어진다' },
+  { id: 'raid_fire', raid: true, name: '화령 레이드', lv: '파티', terrain: 'lava', level: 12, open: 'volcano',
+    pages: [1703, 1704, 1707], boss: { id: '5026', name: '화령', scale: 1.4 }, patterns: ['meteor', 'plus'], fx: '92',
+    intro: '화산의 불이 모여 된 혼. 유성과 불기둥이 땅을 가른다' },
+];
+export const RAID_BOSS_AT = 90, RAID_LIMIT = 8 * 60;
 export const MINI_AT = [135, 285];
 export const CHAMPIONS_AT = [90, 180, 270];
 

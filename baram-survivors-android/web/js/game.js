@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX, ELEMENTS,
+  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -26,6 +26,12 @@ let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true, bu
 if (settings.tiles === undefined) settings.tiles = true;
 let best = loadJson('bs_best', {});
 let progress = loadJson('bs_progress', { cleared: {} });
+// Which grounds each class has conquered: its 승급 come from these. Grounds conquered before
+// classes were told apart count for every class.
+if (!progress.byClass) {
+  progress.byClass = {};
+  for (const c of ['warrior', 'rogue', 'mage', 'poet']) progress.byClass[c] = Object.assign({}, progress.cleared);
+}
 // ?speed=N runs the game N times as fast, ?all opens every hunting ground (for trying things out).
 const QUERY = new URLSearchParams(location.search);
 const TEST_SPEED = Math.max(1, Math.min(16, Number(QUERY.get('speed')) || 1));
@@ -306,7 +312,7 @@ function buildSelect() {
     b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
       <em>필살기 ${SKILLS[c.ult].name}</em>
-      <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}</small>`;
+      <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급` : ''}</small>`;
     b.onclick = () => {
       chosenClass = c;
       enterTown(c);
@@ -332,8 +338,24 @@ function buildStages() {
   }
   for (const b of document.querySelectorAll('#map-tabs button')) b.classList.toggle('on', b.dataset.map === mapTab);
   const map = $('#map');
-  map.innerHTML = `<img src="assets/ui/${mapTab}.webp" alt="">`;
   map.classList.toggle('gungnae', mapTab === 'gungnae');
+  map.classList.toggle('raids', mapTab === 'raid');
+  if (mapTab === 'raid') {
+    if (!pickedStage.raid) pickedStage = RAIDS[0];
+    map.innerHTML = '';
+    for (const r of RAIDS) {
+      const b = document.createElement('button');
+      b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
+      const done = (progress.raids || {})[r.id];
+      b.innerHTML = `<img src="assets/mon/${r.boss.id}.png" alt=""><div><b>${r.name}</b><span>${r.intro}</span>`
+        + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</span></div>`;
+      b.onclick = () => { pickedStage = r; buildStages(); };
+      map.append(b);
+    }
+    raidInfo(pickedStage);
+    return;
+  }
+  map.innerHTML = `<img src="assets/ui/${mapTab}.webp" alt="">`;
   STAGES.forEach((s, i) => {
     if (s.map !== mapTab) return;
     const b = document.createElement('button');
@@ -361,9 +383,34 @@ function buildStages() {
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 입장`;
 }
 
+function raidOpen(r) {
+  return QUERY.has('all') || !!progress.cleared[r.open];
+}
+
+/** The raid's card: its boss, and the party that will gather, from each class's best. */
+function raidInfo(r) {
+  const party = CLASSES.filter(c => c !== chosenClass).map(c => {
+    const rec = best[c.id];
+    return `${c.name} ${rec ? `Lv ${rec.lvl}` : '기록 없음'}`;
+  });
+  const rec = best[chosenClass.id], start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
+  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · 1:30에 등장 · 8분 안에</div>
+    <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
+    <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
+    <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
+    <div class="state">${raidOpen(r) ? '키운 직업이 모두 모인다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
+  $('#go').disabled = !raidOpen(r);
+  $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
+}
+
 for (const b of document.querySelectorAll('#map-tabs button')) {
   b.onclick = () => {
     mapTab = b.dataset.map;
+    if (mapTab === 'raid') {
+      pickedStage = RAIDS.find(raidOpen) || RAIDS[0];
+      buildStages();
+      return;
+    }
     pickedStage = STAGES.find((s, i) => s.map === mapTab && unlocked(i) && !progress.cleared[s.id])
       || STAGES.find(s => s.map === mapTab);
     buildStages();
@@ -451,7 +498,7 @@ function startRun(cls, stage) {
   const mons = stageMonsters(stage);
   occ.clear();
   G = {
-    cls, stage, ...mons, level: STAGES.indexOf(stage), ground: makeGround(stage.terrain),
+    cls, stage, ...mons, level: stage.raid ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
     player: {
       hp: Math.round(cls.hp * (1 + 0.1 * up('life'))), maxHp: Math.round(cls.hp * (1 + 0.1 * up('life'))), mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
@@ -460,9 +507,9 @@ function startRun(cls, stage) {
       pose: null, poseT: 0, walkT: 0,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
-    buffs: { power: 0, stealth: 0, guard: 0, shield: 0 },
+    buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
     enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [],
-    bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true,
+    bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
     rerolls: 2 + up('reroll'), skips: 2 + up('skip'), banishes: 2 + up('banish'), banished: new Set(),
     banishing: false, extraLives: up('revive'),
@@ -480,6 +527,7 @@ function startRun(cls, stage) {
   $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
+  if (stage.raid) raidSetup();
   nextChoice();
 }
 
@@ -598,7 +646,14 @@ function treeSpell(id, opts = {}) {
     + (G && !mine && (def.req || 1) > G.player.lvl ? ' lock' : '');
   el.append(fx ? fxIcon(fx) : itemIcon('p_power'));
   const t = document.createElement('div');
-  const grown = !mine && G && G.skills.some(x => x.from === id);
+  const grown = !mine && G && G.skills.some(x => x.from === id || x.from2 === id);
+  // A 승급 spell not yet opened: which conquest opens it.
+  const cls = def.cls === 'all' ? null : def.cls;
+  if (def.promo && cls && promoOf(cls) < def.promo) {
+    const at = STAGES.find(x => x.id === PROMOS[cls][def.promo - 1].at);
+    opts.note = `${def.promo}차 승급 · ${at.name} 정복`;
+    el.classList.add('lock');
+  }
   if (grown) el.classList.add('have');
   const lv = grown ? '완성됨' : mine ? (def.evolved ? '완성' : `${mine.lv}/${MAX_SKILL_LEVEL}단`) : `Lv ${def.req || 1}부터`;
   t.innerHTML = `<b>${def.name}</b><span>${opts.note || lv}</span>`;
@@ -634,6 +689,17 @@ function buildTree(cls, hot = new Set()) {
     row.append(treeSpell(id), plus, treePassive(d.evo.with), arrow,
       treeSpell(d.evo.into, { note: `Lv ${SKILLS[d.evo.into].req}부터` }));
     inChain.add(id).add(d.evo.into);
+    box.append(row);
+  }
+  const unions = mine.filter(([, d]) => d.union);
+  if (unions.length) head(`합성 · ${cls.name} ${promoOf(cls.id)}차 승급`);
+  for (const [id, d] of unions) {
+    const row = document.createElement('div');
+    row.className = 'chain' + (hot.has(d.union[0]) || hot.has(d.union[1]) ? ' hot' : '');
+    const plus = document.createElement('i'); plus.textContent = '+';
+    const arrow = document.createElement('i'); arrow.textContent = '▶';
+    row.append(treeSpell(d.union[0]), plus, treeSpell(d.union[1]), arrow, treeSpell(id, { note: `Lv ${d.req}부터 · 둘 다 8단` }));
+    inChain.add(d.union[0]).add(d.union[1]).add(id);
     box.append(row);
   }
   head('그 밖의 기술');
@@ -679,6 +745,7 @@ function strikePose(kind) {
 
 /** The music key of the ground being hunted. */
 function huntMusic() {
+  if (G.stage.raid) return 'stage_' + G.stage.open;
   return 'stage_' + G.stage.id;
 }
 
@@ -810,7 +877,8 @@ function update(dt) {
   moveEnemies(dt);
   if (!G.dead) {
     for (const s of G.skills) {
-      s.timer -= dt;
+      // 마기지체: every spell turns 1.6 times as fast for a while.
+      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1);
       if (s.timer <= 0) {
         const st = stats(s);
         s.timer += st.cd;
@@ -880,7 +948,136 @@ function floorCount(t) {
   return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 300));
 }
 
+// ---------------------------------------------------------------- raids
+
+/** A raid: the hero starts grown (cards for each level), and every other class joins at once. */
+function raidSetup() {
+  const p = G.player, rec = best[G.cls.id];
+  const start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
+  p.lvl = start;
+  p.next = xpFor(start);
+  G.pendingLevels = start;
+  G.raidT = 3;
+  G.phase = 0;
+  const names = [];
+  for (const c of CLASSES) {
+    if (c.id === G.cls.id) continue;
+    joinParty(c);
+    const m = G.party[G.party.length - 1], r = best[c.id], g = savedGear(c);
+    // As strong as that class has grown: its best level and the weapon it has found.
+    m.baseLv = Math.min(6, 1 + Math.floor((r ? r.lvl : 1) / 6));
+    m.power = 1 + 0.03 * (r ? r.lvl : 1) + 0.08 * Math.max(0, g.weapon + 1);
+    names.push(`${m.name}(${c.name} Lv${r ? r.lvl : 1})`);
+  }
+  say(`레이드에 모였습니다: ${names.join(', ')}`, 'party');
+}
+
+function raidSpawn(dt) {
+  const t = G.t, p = G.player;
+  const b = G.enemies.find(e => e.kind === 'boss');
+  if (G.bossT !== undefined && !b && !G.cleared) {
+    clearStage();
+    return;
+  }
+  if (t > RAID_LIMIT && !G.cleared) {
+    say('시간이 다 되었습니다. 레이드에 실패했습니다.', 'warn');
+    showResults(`${G.stage.name} 실패`);
+    return;
+  }
+  // A steady field, thinner once the boss is out.
+  const floor = G.bossT === undefined ? 30 : 12 + 6 * G.phase;
+  G.spawnT -= dt;
+  if (G.spawnT <= 0) {
+    G.spawnT = 1;
+    for (let i = 0; i < 2 && G.enemies.length < floor; i++) addEnemy(pickMonster());
+  }
+  if (G.bossDue && t >= RAID_BOSS_AT) {
+    const e = addEnemy(G.boss.m, 'boss', G.boss);
+    if (!e) return;
+    // Built for a whole party: about four minutes for a party of grown heroes.
+    e.hp = e.maxHp = 2000 * G.level;
+    G.bossDue = false;
+    G.bossT = t;
+    audio.play('boss');
+    audio.bgm('boss');
+    G.shake = 0.6;
+    say(`${josa(G.boss.name, '이', '가')} 나타났습니다! 붉은 칸을 피하세요.`, 'warn');
+    banner(`레이드 보스 ${G.boss.name}!`);
+  }
+  if (!b) return;
+  const phase = b.hp < b.maxHp / 3 ? 2 : b.hp < b.maxHp * 2 / 3 ? 1 : 0;
+  if (phase > G.phase) {
+    G.phase = phase;
+    banner(`${G.boss.name}이(가) 사나워진다!`);
+    say(`${G.boss.name}의 기세가 거세집니다.`, 'warn');
+    const m = pickMonster(true), pack = ++G.packs;
+    for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+  }
+  G.raidT -= dt;
+  if (G.raidT <= 0) {
+    G.raidT = [4, 3.2, 2.4][G.phase];
+    const pats = G.stage.patterns;
+    raidPattern(b, pats[Math.floor(Math.random() * pats.length)]);
+  }
+}
+
+/** The boss marks tiles in red; a moment later they are struck. Step off them. */
+function raidPattern(b, kind) {
+  const p = G.player, tiles = [];
+  const add = (x, y) => tiles.push([x, y]);
+  if (kind === 'cross') {
+    for (let k = -7; k <= 7; k++) { add(p.tx + k, p.ty); if (k) add(p.tx, p.ty + k); }
+  } else if (kind === 'breath') {
+    const dx = Math.abs(p.tx - b.tx) >= Math.abs(p.ty - b.ty) ? Math.sign(p.tx - b.tx) || 1 : 0;
+    const dy = dx ? 0 : Math.sign(p.ty - b.ty) || 1;
+    tiles.push(...triTiles(b.tx, b.ty, dx, dy, 6));
+  } else if (kind === 'rain') {
+    add(p.tx, p.ty);
+    for (let i = 0; i < 7; i++) {
+      const x = p.tx + Math.floor(rand(-4, 5)), y = p.ty + Math.floor(rand(-3, 4));
+      add(x, y); add(x + 1, y); add(x, y + 1); add(x + 1, y + 1);
+    }
+  } else if (kind === 'ring') {
+    for (let x = -3; x <= 3; x++) for (let y = -3; y <= 3; y++) if (Math.max(Math.abs(x), Math.abs(y)) >= 1) add(b.tx + x, b.ty + y);
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) add(p.tx + x, p.ty + y);
+  } else if (kind === 'meteor') {
+    for (const [cx, cy] of [[p.tx, p.ty], [p.tx + 4, p.ty - 2], [p.tx - 4, p.ty + 2]])
+      for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) add(cx + x, cy + y);
+  } else {
+    tiles.push(...plusTiles(b.tx, b.ty, 9));
+    for (const [dx, dy] of DIRS) add(p.tx + dx, p.ty + dy);
+  }
+  const warn = [1.4, 1.2, 1][G.phase];
+  // A share of the hero's health, so a robed caster and an armoured warrior fear it alike.
+  G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * [0.3, 0.35, 0.4][G.phase] });
+  b.lunge = 0.3;
+}
+
+/** Marked tiles fall due: the hero standing on one is struck. */
+function raidMarks() {
+  const p = G.player;
+  for (const mk of G.marks) {
+    if (mk.done || G.t < mk.at) continue;
+    mk.done = true;
+    G.shake = Math.max(G.shake, 0.2);
+    const fx = G.stage.fx;
+    mk.tiles.filter((_, i) => i % Math.max(1, Math.floor(mk.tiles.length / 10)) === 0).forEach(([x, y]) =>
+      addFx(fx, x * TILE + TILE / 2, y * TILE + TILE / 2, { scale: 0.7 }));
+    if (!G.dead && mk.tiles.some(([x, y]) => x === p.tx && y === p.ty)) {
+      p.inv = 0;
+      hurtPlayer(mk.dmg + p.armor + G.passives.armor);
+      say('붉은 칸에 맞았습니다!', 'warn');
+    }
+  }
+  G.marks = G.marks.filter(mk => !mk.done);
+}
+
 function spawn(dt) {
+  if (G.stage.raid) {
+    raidSpawn(dt);
+    raidMarks();
+    return;
+  }
   const t = G.t, boss = G.bossT !== undefined;
   const floor = boss ? 25 : floorCount(t);
   // Up to the floor at once, a few a frame.
@@ -907,6 +1104,7 @@ function spawn(dt) {
       say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
       banner(`${G.mini.name} 등장`);
     }
+    if (G.events.length && t >= G.events[0].at) huntEvent(G.events.shift().kind);
   }
   if (G.bossDue && t >= BOSS_AT) {
     // The field calms for the boss.
@@ -957,6 +1155,60 @@ function spawn(dt) {
   }
 }
 
+// ---------------------------------------------------------------- hunting-ground events
+//
+// Between the champions and the leaders, something happens: a drive of monsters marching across
+// in one line, a ring closing round the hero, or a golden monster carrying treasure that runs.
+
+function eventPlan() {
+  const kinds = ['march', 'ring', 'treasure'].sort(() => Math.random() - 0.5);
+  kinds.push(['march', 'ring'][Math.floor(Math.random() * 2)]);
+  return [60, 160, 230, 320].map((at, i) => ({ at: at + Math.floor(Math.random() * 10), kind: kinds[i] }));
+}
+
+function huntEvent(kind) {
+  const p = G.player, v = viewTiles();
+  if (kind === 'march') {
+    // From one side, a row of thirteen, walking straight across and on out of sight.
+    const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
+    const m = pickMonster();
+    let n = 0;
+    for (let k = -6; k <= 6; k++) {
+      const tx = dx ? p.tx - dx * v.w : p.tx + k, ty = dy ? p.ty - dy * v.h : p.ty + k;
+      if (!free(tx, ty)) continue;
+      const e = addEnemy(m, null, null, 0, [tx, ty]);
+      if (e) { e.march = [dx, dy]; n++; }
+    }
+    const from = { '1,0': '서쪽', '-1,0': '동쪽', '0,1': '북쪽', '0,-1': '남쪽' }[dx + ',' + dy];
+    say(`${from}에서 몬스터 무리가 몰려옵니다!`, 'warn');
+    banner('몰이: 한 줄로 몰려온다!');
+  } else if (kind === 'ring') {
+    // A ring five tiles out, all at once: break through it.
+    const m = pickMonster();
+    for (let a = 0; a < 24; a++) {
+      const tx = p.tx + Math.round(Math.cos(a / 24 * Math.PI * 2) * 5), ty = p.ty + Math.round(Math.sin(a / 24 * Math.PI * 2) * 5);
+      if (free(tx, ty)) addEnemy(m, null, null, 0, [tx, ty]);
+    }
+    say('몬스터들이 사방을 에워쌌습니다!', 'warn');
+    banner('포위: 뚫고 나가라!');
+  } else {
+    // A golden one with treasure, running from the hero; gone in twenty seconds.
+    // Four tiles from the hero, in sight, so the chase can start.
+    let spot = null;
+    for (let tries = 0; tries < 30 && !spot; tries++) {
+      const a = Math.random() * Math.PI * 2, tx = p.tx + Math.round(Math.cos(a) * 4), ty = p.ty + Math.round(Math.sin(a) * 3);
+      if (free(tx, ty)) spot = [tx, ty];
+    }
+    const e = addEnemy(pickMonster(true), 'treasure', { name: '보물', scale: 1.1 }, 0, spot);
+    if (!e) return;
+    e.flee = G.t + 20;
+    e.hp = e.maxHp = e.maxHp * 0.6;
+    e.stepTime = Math.min(e.stepTime, 0.3);
+    say('보물을 지닌 몬스터가 나타났습니다! 달아나기 전에 잡으세요.', 'warn');
+    banner('보물 도깨비 출현!');
+  }
+}
+
 function pickMonster(strong = false) {
   if (strong) return G.pool[Math.max(0, G.pool.length - 1 - Math.floor(Math.random() * 3))];
   const c = Math.min(1, G.t / (BOSS_AT * 0.9));
@@ -964,8 +1216,8 @@ function pickMonster(strong = false) {
   return G.pool[Math.round(r * (G.pool.length - 1))];
 }
 
-function addEnemy(m, kind = null, named = null, pack = 0) {
-  const at = ringTile(kind === 'boss' || kind === 'mini');
+function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
+  const at = spot || ringTile(kind === 'boss' || kind === 'mini');
   if (!at) return null;
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
@@ -984,7 +1236,9 @@ function addEnemy(m, kind = null, named = null, pack = 0) {
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
     dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 2 + rank * 3.5) + t / 180 + G.level * 0.5)
-      * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1),
+      * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
+      // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
+      * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
     xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 300)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
     face: 1, phase: Math.random() * 6, flash: 0, slow: 0, stun: 0, curse: 0, cd: Math.random() * 0.5, atk: 0.6,
     lunge: 0, hits: new Map(),
@@ -1009,6 +1263,7 @@ function moveEnemies(dt) {
   const p = G.player;
   const v = viewTiles();
   const hidden = G.buffs.stealth > G.t || G.dead;
+  const gone = [];
   for (const e of G.enemies) {
     advance(e, dt);
     e.flash = Math.max(0, e.flash - dt);
@@ -1017,6 +1272,29 @@ function moveEnemies(dt) {
     e.stun = Math.max(0, e.stun - dt);
     e.curse = Math.max(0, e.curse - dt);
     if (e.moving || e.stun > 0) continue;
+    if (e.march || e.flee) {
+      // Event monsters: the drive walks on in its line; the treasure runs from the hero.
+      const far = Math.abs(e.tx - p.tx) > v.w + 3 || Math.abs(e.ty - p.ty) > v.h + 3;
+      if ((e.march && far) || (e.flee && G.t > e.flee)) {
+        gone.push(e);
+        continue;
+      }
+      e.cd -= dt;
+      e.atk -= dt;
+      if (e.march && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1 && !hidden && e.atk <= 0) {
+        e.atk = 1.6;
+        e.lunge = 0.15;
+        hurtPlayer(e.dmg, e);
+      }
+      if (e.cd > 0) continue;
+      e.cd = e.stepTime * (e.slow > 0 ? 2 : 1);
+      if (e.march) step(e, e.march[0], e.march[1], e.cd);
+      else {
+        const away = towards(e, p.tx, p.ty).map(([dx, dy]) => [-dx, -dy]);
+        for (const [dx, dy] of away.concat(DIRS)) if (step(e, dx, dy, e.cd)) break;
+      }
+      continue;
+    }
     if (Math.abs(e.tx - p.tx) > v.w + 4 || Math.abs(e.ty - p.ty) > v.h + 4) {
       // Left far behind: come back from the edge of the screen. Champions, leaders and the
       // boss too: they hunt the hero rather than wait somewhere off the map.
@@ -1036,7 +1314,7 @@ function moveEnemies(dt) {
       if (e.atk <= 0 && !barred(e)) {
         e.atk = 1.6;
         e.lunge = 0.15;
-        hurtPlayer(e.dmg);
+        hurtPlayer(e.dmg, e);
       }
       continue;
     }
@@ -1061,6 +1339,11 @@ function moveEnemies(dt) {
       step(e, dx, dy, st);
     }
   }
+  for (const e of gone) {
+    G.enemies.splice(G.enemies.indexOf(e), 1);
+    occ.delete(key(e.tx, e.ty));
+    if (e.flee) say('보물을 지닌 몬스터가 달아났습니다.');
+  }
 }
 
 /** 차폐: monsters next to the hero cannot touch them while it holds. */
@@ -1068,11 +1351,13 @@ function barred(e) {
   return G.skills.some(s => SKILLS[s.id].kind === 'aura');
 }
 
-function hurtPlayer(dmg) {
+function hurtPlayer(dmg, from = null) {
   const p = G.player;
   if (G.buffs.guard > G.t || p.inv > 0) return;
   let taken = Math.max(1, dmg - p.armor - G.passives.armor);
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
+  // 반탄공: the blow comes back threefold.
+  if (from && from.m && G.buffs.reflect > G.t) later(0.05, () => hurtEnemy(from, taken * 3));
   p.hp -= taken;
   p.inv = 0.25;
   audio.play('hurt');
@@ -1121,6 +1406,10 @@ function killEnemy(e) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
     say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
     if (Math.random() < 0.5) dropGear(e);
+  } else if (e.kind === 'treasure') {
+    G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
+    for (let i = 0; i < 6; i++) G.drops.push({ x: e.x + (i % 3 - 1) * 20, y: e.y + (i < 3 ? -14 : 14), kind: 'coin' });
+    say('보물을 지닌 몬스터를 잡았습니다!');
   } else if (e.kind === 'boss') {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
     dropGear(e, -12);
@@ -1156,10 +1445,21 @@ function clearStage() {
   if (G.cleared) return;
   G.cleared = true;
   audio.play('win');
-  progress.cleared[G.stage.id] = true;
+  if (G.stage.raid) {
+    progress.raids = progress.raids || {};
+    progress.raids[G.stage.id] = (progress.raids[G.stage.id] || 0) + 1;
+    // A raid's spoils: two more pieces of gear and a chest beside the boss's own.
+    const p = G.player;
+    for (const dx of [-36, 36]) dropGear({ x: p.x + dx, y: p.y + 20, kind: 'boss' });
+    G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
+    G.gold += 500;
+  } else {
+    progress.cleared[G.stage.id] = true;
+    promote();
+  }
   saveJson('bs_progress', progress);
   record();
-  const next = STAGES[STAGES.indexOf(G.stage) + 1];
+  const next = G.stage.raid ? null : STAGES[STAGES.indexOf(G.stage) + 1];
   say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, 'sys');
   if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`);
   banner(`${G.stage.name} 정복!`);
@@ -1317,6 +1617,7 @@ function cast(skill, st) {
         later(i * 0.12, () => {
           if (e.hp <= 0) return;
           fxOn(fxid, e);
+          if (def.curse) e.curse = def.curse;
           hurtEnemy(e, st.dmg);
         });
       }
@@ -1347,7 +1648,7 @@ function cast(skill, st) {
             any = true;
             fxOn(fxid, b);
             hurtEnemy(b, st.dmg);
-            break;
+            if (!def.pierce) break; // 삼매진화 burns the whole row
           }
         }
       }
@@ -1401,6 +1702,38 @@ function cast(skill, st) {
       });
       break;
     }
+    case 'line': {
+      // 무형검, 파천검무: a row of tiles ahead, turning to the row with most monsters.
+      let best = null, most = 0;
+      for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
+        if (!dx && !dy) continue;
+        const tiles = [];
+        for (let k = 1; k <= def.depth; k++) tiles.push([p.tx + dx * k, p.ty + dy * k]);
+        const hit = onTiles(tiles);
+        if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+      }
+      if (!best) return retry(0.25);
+      const [dx, dy, hit] = best;
+      p.fdx = dx;
+      p.fdy = dy;
+      if (dx) p.face = dx;
+      hit.forEach((e, i) => fxOn(fxid, e, { delay: i * 0.05 }));
+      later(0.1, () => { for (const e of hit) hurtEnemy(e, st.dmg, [dx, dy]); });
+      if (def.dash) {
+        // Through the row to the farthest open tile along it.
+        for (let k = def.depth + 1; k >= 1; k--) {
+          const tx = p.tx + dx * k, ty = p.ty + dy * k;
+          if (occ.has(key(tx, ty))) continue;
+          p.tx = tx;
+          p.ty = ty;
+          p.x = tx * TILE + TILE / 2;
+          p.y = ty * TILE + TILE - 6;
+          p.stepping = false;
+          break;
+        }
+      }
+      break;
+    }
     case 'screen': {
       // The whole screen, as 지폭지술 and its kind struck.
       const all = onScreen();
@@ -1413,7 +1746,10 @@ function cast(skill, st) {
           if (e.hp <= 0) continue;
           if (def.slow) e.slow = def.slow;
           if (def.curse) e.curse = def.curse;
-          hurtEnemy(e, st.dmg);
+          if (def.stun) e.stun = def.stun;
+          // 포효검황: weaker with every tile away.
+          const far = def.falloff ? Math.max(0.2, 1 - def.falloff * tdist(e, p)) : 1;
+          hurtEnemy(e, st.dmg * far);
         }
       });
       break;
@@ -1457,6 +1793,10 @@ function cast(skill, st) {
     case 'heal': {
       if (p.hp >= p.maxHp) return retry(1);
       heal(st.heal, false);
+      if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
+      if (def.guard) G.buffs.guard = Math.max(G.buffs.guard, G.t + def.guard);
+      // The 기원's own picture for its grade (누리, 대지, 바다 …), over the hero.
+      if (fxid) addFx(fxid, 0, -26, { follow: true });
       audio.play('skill_' + skill.id, def.kind, skill.lv);
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
@@ -1828,7 +2168,7 @@ function updateParty(dt) {
   const p = G.player;
   for (const m of G.party) {
     // Party members grow with the hero, as D2 Survivors' mercenaries share its level.
-    m.lv = Math.min(6, 1 + Math.floor(p.lvl / 6));
+    m.lv = Math.max(m.baseLv || 0, Math.min(6, 1 + Math.floor(p.lvl / 6)));
     // Keep a place around the hero: behind it, spread to the sides.
     // A tile of its own beside the hero, left, right or behind: never on top of it.
     const [ox, oy] = [[-1, 0], [1, 0], [0, 1]][m.slot] || [0, 1];
@@ -1863,7 +2203,7 @@ function updateParty(dt) {
 
 function partyAct(m) {
   // Companions help; the hero carries the hunt, so each hits about as hard as a starting spell.
-  const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + p.lvl * 0.04);
+  const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + p.lvl * 0.04) * (m.power || 1);
   const pose = kind => { m.pose = kind; m.poseT = 0.3; };
   const near = n => {
     const fx = Math.floor(m.x / TILE), fy = Math.floor((m.y - TILE / 2 + 6) / TILE);
@@ -2060,13 +2400,31 @@ function evolve() {
     banner(`${into.name} 각성!`);
     return true;
   }
+  // 합성: two spells at 8단 become one, opened by the class's 3차 승급; a slot comes free.
+  for (const [id, d] of Object.entries(SKILLS)) {
+    if (!d.union || d.cls !== G.cls.id || promoOf(G.cls.id) < d.promo || G.player.lvl < d.req) continue;
+    const a = G.skills.find(x => x.id === d.union[0]), b = G.skills.find(x => x.id === d.union[1]);
+    if (!a || !b || a.lv < MAX_SKILL_LEVEL || b.lv < MAX_SKILL_LEVEL) continue;
+    a.from = a.id;
+    a.from2 = b.id;
+    a.id = id;
+    a.lv = 1;
+    a.timer = 0.2;
+    G.skills.splice(G.skills.indexOf(b), 1);
+    G.shake = 0.5;
+    audio.play('levelup');
+    shout(d.name);
+    say(`${SKILLS[d.union[0]].name}과(와) ${SKILLS[d.union[1]].name}이(가) ${josa(d.name, '으로', '로')} 합쳐졌습니다!`, 'sys');
+    banner(`${d.name} 합성!`);
+    return true;
+  }
   return false;
 }
 
 /** Three cards, as D2 Survivors deals them. */
 function drawCards() {
   const lvl = G.player.lvl, mine = id => SKILLS[id].cls === G.cls.id || SKILLS[id].cls === 'all';
-  const have = id => G.skills.some(x => x.id === id || x.from === id);
+  const have = id => G.skills.some(x => x.id === id || x.from === id || x.from2 === id);
   const banned = o => G.banished.has(o.type + ':' + o.id);
   if (G.firstCard) {
     // The first card: the class's first-tier attacks; the 기원 comes with the next.
@@ -2084,6 +2442,7 @@ function drawCards() {
   if (G.skills.length < MAX_SKILLS) {
     for (const [id, d] of Object.entries(SKILLS)) {
       if (!mine(id) || d.evolved || d.kind === 'ult' || (d.req || 1) > lvl || have(id)) continue;
+      if (d.promo && promoOf(G.cls.id) < d.promo) continue;
       opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
     }
   }
@@ -2271,7 +2630,8 @@ function showResults(title) {
   $('#over-title').textContent = title;
   $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}<br>`
     + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
-    + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ');
+    + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
+    + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '');
   showScreen('over');
 }
 
@@ -2298,6 +2658,28 @@ function record() {
   if (!r || G.player.lvl > r.lvl || (G.player.lvl === r.lvl && G.kills > r.kills)) {
     best[G.cls.id] = { lvl: G.player.lvl, kills: G.kills };
     saveJson('bs_best', best);
+  }
+}
+
+/** How many 승급 a class has: each tier needs its ground conquered by that class, in order. */
+function promoOf(cls) {
+  const done = progress.byClass[cls] || {};
+  let n = 0;
+  while (n < PROMOS[cls].length && done[PROMOS[cls][n].at]) n++;
+  return n;
+}
+
+/** On a conquest: the class's record, and a 승급 when the ground was the next one it needed. */
+function promote() {
+  const cls = G.cls.id, before = promoOf(cls);
+  (progress.byClass[cls] = progress.byClass[cls] || {})[G.stage.id] = true;
+  const after = promoOf(cls);
+  for (let n = before; n < after; n++) {
+    const sk = SKILLS[PROMOS[cls][n].skill];
+    const what = sk.union ? `${sk.union.map(id => SKILLS[id].name).join(' + ')} → ${sk.name} 합성` : `${sk.name}`;
+    say(`${n + 1}차 승급! 이제 ${what}을(를) 익힐 수 있습니다.`, 'sys');
+    G.promoted = (G.promoted || []).concat(`${n + 1}차 승급: ${what}`);
+    later(1.5, () => banner(`${G.cls.name} ${n + 1}차 승급!`));
   }
 }
 
@@ -2547,6 +2929,13 @@ function render(now) {
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
+  // A raid boss's marked tiles, blinking red until they are struck.
+  for (const mk of G.marks) {
+    const blink = Math.floor((G.t - mk.made) * 8) % 2;
+    ctx.fillStyle = blink ? 'rgba(220, 30, 20, 0.45)' : 'rgba(220, 30, 20, 0.28)';
+    for (const [x, y] of mk.tiles) ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
+  }
+
   // Bodies, back to front.
   const bodies = G.enemies.concat(G.allies, G.party);
   bodies.push(p);
@@ -2570,7 +2959,9 @@ function render(now) {
     const kick = b.kickAt !== undefined && G.t - b.kickAt < 0.1 ? 4 : 0;
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
+    if (b.flee) ctx.filter = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
     drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
+    if (b.flee) ctx.filter = 'none';
     if (!b.kind && b.shown && G.t - b.shown < 3) {
       // A struck monster shows its health over its head for a while.
       const bx = Math.round(b.x - 12), by = Math.round(b.y - b.m.h * s - 5);
@@ -3024,7 +3415,11 @@ const GAME_SOUNDS = {
   // The last spell of each tree, to go with today's effect: 쇄혼비무 (a blue sword arc),
   // 포효검황 for 극백호참's tiger claws, 백호검무's blade, 혈겁만파 for 탈명사식'뇌's dark-red burst,
   // a blast for 폭류유성's fire vortex, 지폭지술's stones, 파력무참's golden ring, 파혼술 for 귀염추혼소.
-  skill_w_sword: '100', skill_w_roar2: '101', skill_r_dance: '090', skill_r_storm: '060',
+  skill_w_sword: '100', skill_w_roar2: '087', skill_r_dance: '090', skill_r_storm: '059',
+  // 승급 기술: each its own number from the list (반탄공 has none: 부동력's).
+  skill_w_fly: '088', skill_w_howl: '101', skill_w_blood: '060', skill_r_flysword: '091', skill_r_formless: '103',
+  skill_r_heaven: '096', skill_m_magi: '105', skill_m_nodo: '106', skill_m_sammae: '093', skill_p_reflect: '092',
+  skill_p_spirit: '097', skill_p_phoenix: '111',
   skill_m_fire3: '104', skill_m_quake: '107', skill_p_wave: '109', skill_p_break: '077',
   skill_m_fire: ['040', '040', '041', '041', '042', '042', '043', '044'], // 화염주 계열
   skill_m_fire4: ['040', '040', '041', '041', '042', '042', '043', '044'],
@@ -3265,5 +3660,6 @@ window.__appBack = () => {
 // For testing in a browser console.
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
+window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r]);
 
 boot();
