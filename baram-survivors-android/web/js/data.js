@@ -63,7 +63,7 @@ export const SKILLS = {
   // 도적: 파고들기, 투명, 흡혈
   r_blink: { cls: 'rogue', req: 1, name: '비영승보', kind: 'blink', fx: null, dmg: 12, cd: 1.2, range: 4, count: 1,
     evo: { with: 'speed', into: 'r_dance' }, desc: '네 칸 안의 몬스터 뒤로 순식간에 옮겨 가며 벤다' },
-  r_bolt: { fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31', dmg: 12, cd: 1.8, range: 6, count: 1,
+  r_bolt: { elem: 'thunder', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31', dmg: 12, cd: 1.8, range: 6, count: 1,
     names: tier('뇌진주'), evo: { with: 'haste', into: 'r_storm' }, desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
   r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '36', cd: 12, duration: 2.5,
     desc: '잠시 모습을 감춘다. 몬스터가 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
@@ -79,14 +79,14 @@ export const SKILLS = {
     desc: '체력 20%와 마력을 모두 써서, 네 칸 안의 모든 몬스터를 순식간에 베어 낸다' },
 
   // 주술사: 신수마법과 상태이상
-  m_fire: { fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '31', dmg: 10, cd: 1.1, range: 7, count: 1,
+  m_fire: { elem: 'fire', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '31', dmg: 10, cd: 1.1, range: 7, count: 1,
     names: FIRE, evo: { with: 'haste', into: 'm_fire3' }, desc: '신수마법. 가까운 몬스터를 불태운다' },
-  m_ice: { fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '31', dmg: 14, cd: 2.4, range: 7, radius: 0, count: 1,
+  m_ice: { elem: 'earth', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '31', dmg: 14, cd: 2.4, range: 7, radius: 0, count: 1,
     hitAt: 0.5, slow: 2, names: tier('백열주'), evo: { with: 'area', into: 'm_quake' },
     desc: '신수마법. 백호의 땅 기운으로 몬스터를 치고 느리게 한다' },
   m_curse: { cls: 'mage', req: 6, name: '저주', kind: 'strike', fx: '84', dmg: 3, cd: 5, range: 7, radius: 1, count: 1,
     hitAt: 0.3, curse: 4, desc: '몬스터와 그 주위의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
-  m_fire4: { fxs: ['63', '63', '71', '71', '80', '80', '87', '90'], cls: 'mage', req: 12, name: '화염주첨', kind: 'spell4', fx: '63', dmg: 10, cd: 2.2, range: 7,
+  m_fire4: { elem: 'fire', fxs: ['63', '63', '71', '71', '80', '80', '87', '90'], cls: 'mage', req: 12, name: '화염주첨', kind: 'spell4', fx: '63', dmg: 10, cd: 2.2, range: 7,
     names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '85', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
@@ -98,7 +98,7 @@ export const SKILLS = {
     desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
 
   // 도사: 회복, 결계, 소환
-  p_orb: { fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 9, cd: 1.2, range: 7, count: 1,
+  p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 9, cd: 1.2, range: 7, count: 1,
     names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
   p_barrier: { cls: 'poet', req: 6, name: '차폐', kind: 'aura', fx: '108', dmg: 3, cd: 0.8,
     desc: '결계를 둘러, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
@@ -127,6 +127,9 @@ export const PASSIVES = {
   armor: { name: '무장', item: 'p_armor', max: 5, desc: '받는 피해 -1' },
   mana: { name: '공력증강', item: 'potion', max: 5, desc: '마력 회복 +25%' },
 };
+
+// The four 신수 of 신수마법: the site draws every element alike at each grade, so cards name it.
+export const ELEMENTS = { fire: ['불', '#c8401a'], earth: ['땅', '#8a6a2a'], water: ['물', '#1a5ab0'], thunder: ['풍뢰', '#6a3ab0'] };
 
 export const MAX_SKILLS = 6;
 export const MAX_PASSIVES = 6;

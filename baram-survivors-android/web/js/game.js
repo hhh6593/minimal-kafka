@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX,
+  CHAMPIONS_AT, FX, ELEMENTS,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -1830,7 +1830,8 @@ function nextChoice() {
       icon = !lvFx ? itemIcon('p_power') : fxIcon(lvFx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
-      tag = o.lv === 1 ? '새 마법' : `Lv ${o.lv}`;
+      tag = (o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
+        + (def.elem ? ` <u style="background:${ELEMENTS[def.elem][1]}">${ELEMENTS[def.elem][0]}</u>` : '');
     } else if (o.type === 'passive') {
       const ps = PASSIVES[o.id];
       icon = itemIcon(ps.item);
@@ -2713,7 +2714,10 @@ const GAME_SOUNDS = {
   skill_m_para: '070', skill_m_curse: '069', skill_m_ult: '073', // 마비, 저주, 헬파이어
   skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
   skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084', skill_p_ult: '095',
-  hit: '331', kill: '353', hurt: '116', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
+  // 116 and 353 were only guessed (from an English server's scripts) and are a long hiss:
+  // played on every hit they drowned the hunt. The hero being struck and monsters falling are
+  // silent until a real sound for them is known; plain hits use the weapon sound, softly.
+  hit: '331', kill: '-', hurt: '-', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
   win: '401', lose: '402', revive: '112', click: '408', party_guard: '008',
 };
 
@@ -2762,10 +2766,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 3) {
+  if (settings.soundsVer !== 4) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 3;
+    settings.soundsVer = 4;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});

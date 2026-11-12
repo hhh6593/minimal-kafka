@@ -27,7 +27,9 @@ const SYNTH = {
 };
 
 // The game plays the same sound many times a second; a little gap keeps it from roaring.
-const MIN_GAP = { hit: 0.05, kill: 0.04, pickup: 0.03, skill_aura: 0.5, click: 0 };
+const MIN_GAP = { hit: 0.12, kill: 0.04, pickup: 0.03, skill_aura: 0.5, click: 0 };
+// Sounds that come many times a second play softer than spells.
+const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6 };
 
 export class Audio {
   constructor(manifest) {
@@ -37,7 +39,7 @@ export class Audio {
     this.last = {};
     this.sfxOn = true;
     this.bgmOn = true;
-    this.sfxVolume = 0.8;
+    this.sfxVolume = 0.6;
     this.bgmVolume = 0.5;
     this.ctx = null;
     this.music = null;
@@ -57,10 +59,15 @@ export class Audio {
     if (this.buffers[n]) this.start(this.buffers[n]);
   }
 
-  start(buffer) {
+  start(buffer, gain = 1) {
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.master);
+    if (gain === 1) src.connect(this.master);
+    else {
+      const g = this.ctx.createGain();
+      g.gain.value = gain;
+      src.connect(g).connect(this.master);
+    }
     src.start();
   }
 
@@ -101,7 +108,7 @@ export class Audio {
       if (n === '-') return; // chosen: no sound
       const b = (n && this.buffers[n]) || this.buffers[k];
       if (b) {
-        this.start(b);
+        this.start(b, GAIN[key] ?? 1);
         return;
       }
     }

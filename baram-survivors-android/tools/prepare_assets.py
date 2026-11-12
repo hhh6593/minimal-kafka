@@ -69,7 +69,14 @@ def icon(frames, add):
         if add:
             return f.convert("L").point(lambda v: 255 if v > 40 else 0)
         return f.getchannel("A").point(lambda v: 255 if v > 40 else 0)
-    best = max(frames, key=lambda f: mask(f).histogram()[255])
+    # The fullest frame that is still a picture: frames that flash the whole square white
+    # (기원's burst, for one) would make the icon a blank tile.
+    # So take the frame with the most different colours among its drawn pixels.
+    def richness(f):
+        m = mask(f)
+        px = [c for c, on in zip(f.convert("RGB").getdata(), m.getdata()) if on]
+        return len(set((r >> 3, g >> 3, b >> 3) for r, g, b in px))
+    best = max(frames, key=richness)
     box = mask(best).getbbox() or (0, 0, best.width, best.height)
     out = best.crop(box)
     if add:
