@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turns the downloaded old-Baram images (and optional sound files) into the game's assets.
 
-    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR]
+    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR]
 
 IMAGES_DIR is the unpacked old_images zip (the folder holding image/, magics/,
 itemImage/, _pages.json, ...). OUT_DIR becomes www/assets in the APK.
@@ -158,6 +158,7 @@ def render_midi(audio_src, out, manifest):
 def main():
     src, out = sys.argv[1], sys.argv[2]
     audio_src = sys.argv[3] if len(sys.argv) > 3 else None
+    avatar_src = sys.argv[4] if len(sys.argv) > 4 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
     for d in ("fx", "icon", "mon", "item", "hero", "ui"):
@@ -237,6 +238,11 @@ def main():
             im = Image.open(p).convert("RGB")
             im.save(os.path.join(out, "ui", name + ".webp"), quality=82)
             manifest["ui"][name] = {"w": im.width, "h": im.height}
+
+    if avatar_src and os.path.isdir(avatar_src):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import avatar_assets
+        print("avatar", avatar_assets.build(avatar_src, out, manifest))
 
     if audio_src and os.path.isdir(audio_src):
         render_midi(audio_src, out, manifest)

@@ -28,11 +28,20 @@
 - 몬스터 그림은 정면 한 장씩이라, 걷기는 코드로 표현합니다(들썩임, 좌우 반전, 맞으면 번쩍임).
   마법 이펙트는 GIF의 프레임과 시간을 그대로 쓰고, 검은 배경은 원작처럼 가산 합성으로 지웁니다.
 
+## 캐릭터 외형 (의상실 그림)
+
+의상실 그림 묶음(`oldbaram_avatar_sprites`)을 빌드에 넘기면 캐릭터를 장비로 입힙니다.
+`tools/avatar_assets.py`가 각 그림에서 기본 캐릭터(머리 0, 남자기본)와 다른 부분만 떼어 머리·무기·방패
+층을 만들고, 그림마다 다르게 찍힌 걷기 프레임 순서를 기본 캐릭터 기준으로 맞춥니다. 의상실 그림은
+몬스터 그림보다 크게 그려져 있어 원작 화면 비율(캐릭터 ≈ 처녀귀신 키)에 맞게 0.64배로 줄입니다.
+4방향 × (서기, 공격, 마법, 앉기, 걷기 4프레임)을 씁니다. 직업마다 입는 장비 줄(`web/js/avatar.js`의
+`GEAR`)이 있고, 우두머리·보스의 보물 상자에서 다음 장비가 나오며 찾은 장비는 다음 사냥에도 남습니다.
+
 ## 빌드
 
 ```sh
 sdkmanager "platforms;android-35" "build-tools;35.0.0"
-ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더]
+ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더] [의상실 그림 폴더]
 ```
 
 `oldbaram_images`는 이미지 zip을 푼 폴더입니다(`image/`, `magics/`, `itemImage/`, `maps/`,

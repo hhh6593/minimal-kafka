@@ -3,6 +3,9 @@ import {
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
+import {
+  initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS,
+} from './avatar.js';
 
 const $ = s => document.querySelector(s);
 const canvas = $('#game');
@@ -65,6 +68,7 @@ async function boot() {
     ...M.heroes.map(h => `hero/${h.id}.png`),
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
+    ...avatarPaths(M),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -78,7 +82,8 @@ async function boot() {
   $('#loading').hidden = true;
   resize();
   menuGround = makeGround('field');
-  $('#heroes').innerHTML = CLASSES.map(c => `<img src="assets/hero/${c.hero}.png" alt="${c.name}">`).join('');
+  initAvatars(M, images);
+  $('#heroes').innerHTML = CLASSES.map(c => `<img src="${heroPicture(c)}" alt="${c.name}">`).join('');
   showScreen('title');
   requestAnimationFrame(frame);
 }
@@ -267,7 +272,7 @@ function buildSelect() {
     const b = document.createElement('button');
     b.className = 'card';
     const rec = best[c.id];
-    b.innerHTML = `<div class="slot"><img class="hero" src="assets/hero/${c.hero}.png" alt=""></div>
+    b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
       <em>${SKILLS[c.start].name} · 필살기 ${SKILLS[c.ult].name}</em>
       <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}</small>`;
@@ -409,6 +414,7 @@ function tdist(a, b) {
 
 function startRun(cls, stage) {
   const hero = M.heroes.find(h => h.id === cls.hero);
+  const gear = savedGear(cls);
   const mons = stageMonsters(stage);
   occ.clear();
   G = {
@@ -417,7 +423,8 @@ function startRun(cls, stage) {
     player: {
       hp: cls.hp, maxHp: cls.hp, mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
       face: 1, fdx: 0, fdy: 1, phase: 0, lvl: 1, xp: 0, next: xpFor(1), inv: 0,
-      img: images[`hero/${hero.id}.png`], hero: true,
+      img: images[`hero/${hero.id}.png`], hero: true, gear, av: hasAvatars() ? dress(cls.id, gear) : null,
+      pose: null, poseT: 0, walkT: 0,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0 },
@@ -427,6 +434,7 @@ function startRun(cls, stage) {
   G.player.x = TILE / 2;
   G.player.y = TILE - 6;
   heroTile();
+  applyGear();
   addSkill(cls.start);
   showScreen(null);
   audio.bgm('battle');
@@ -434,6 +442,60 @@ function startRun(cls, stage) {
   $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
+}
+
+// ---------------------------------------------------------------- gear
+//
+// Each class wears its own line of gear (avatar.js GEAR). Chests from middle bosses and bosses
+// hand out the next piece; what a class has found stays for its later hunts, as in the game.
+
+function savedGear(cls) {
+  progress.gear = progress.gear || {};
+  return Object.assign({ armor: 0, weapon: 0, shield: -1 }, progress.gear[cls.id]);
+}
+
+/** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
+function applyGear() {
+  const p = G.player, g = p.gear;
+  const hp = G.cls.hp + g.armor * 20;
+  p.hp += hp - (p.gearHp || G.cls.hp);
+  p.maxHp += hp - (p.gearHp || G.cls.hp);
+  p.gearHp = hp;
+  p.armor = G.cls.armor + Math.max(0, g.shield + 1);
+  p.gearPower = 1 + 0.12 * g.weapon;
+}
+
+/** The next piece of gear from a chest, if any is left; true when one was given. */
+function nextGear() {
+  const p = G.player, g = p.gear, line = GEAR[G.cls.id];
+  // The piece furthest behind along its line comes first, so all three move up together.
+  const order = ['weapon', 'armor', 'shield'].sort((a, b) => (g[a] + 1) / line[a].length - (g[b] + 1) / line[b].length);
+  for (const kind of order) {
+    if (g[kind] + 1 >= line[kind].length) continue;
+    g[kind]++;
+    progress.gear[G.cls.id] = { ...g };
+    saveJson('bs_progress', progress);
+    if (hasAvatars()) p.av = dress(G.cls.id, g);
+    applyGear();
+    const name = gearName(G.cls.id, kind, g[kind]);
+    say(`${josa(name, '을', '를')} 얻었습니다!`, 'sys');
+    note(`${name} 착용`);
+    return true;
+  }
+  return false;
+}
+
+/** A class's figure in the gear it has found, for the menus. */
+function heroPicture(cls) {
+  if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
+  return portrait(dress(cls.id, savedGear(cls)));
+}
+
+/** Shows an attack or casting pose for a moment. */
+function strikePose(kind) {
+  const p = G.player;
+  p.pose = kind;
+  p.poseT = kind === 'attack' ? 0.22 : 0.3;
 }
 
 function xpFor(lvl) {
@@ -452,7 +514,7 @@ function stats(skill) {
 
 /** The hero's damage multiplier right now. */
 function might() {
-  let k = 1;
+  let k = G.player.gearPower || 1;
   if (G.buffs.power > G.t) k *= 1 + (G.buffs.powerK || 0.5);
   if (G.buffs.stealth > G.t) k *= 3;
   return k;
@@ -485,10 +547,12 @@ function update(dt) {
       if (dx) p.face = dx;
       p.x += dx * heroSpeed() * dt;
       p.y += dy * heroSpeed() * dt;
+      p.walkT += dt * 1000;
       p.phase += (heroSpeed() * dt / (TILE / 2)) * Math.PI;
       heroTile();
     }
     p.inv = Math.max(0, p.inv - dt);
+    p.poseT = Math.max(0, p.poseT - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * dt);
   }
   G.shake = Math.max(0, G.shake - dt);
@@ -939,7 +1003,11 @@ function cast(skill, st) {
       break;
     }
   }
-  if (used) audio.play('skill_' + skill.id, def.kind, skill.lv);
+  if (used) {
+    audio.play('skill_' + skill.id, def.kind, skill.lv);
+    const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior');
+    strikePose(melee ? 'attack' : 'magic');
+  }
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
@@ -951,6 +1019,7 @@ function castUlt() {
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   G.bubble = { text: `${def.name}!`, t: G.t };
+  strikePose(G.cls.id === 'warrior' || G.cls.id === 'rogue' ? 'attack' : 'magic');
   say(`${def.name}!`);
   audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
@@ -1061,6 +1130,7 @@ function updatePickups(dt) {
         heal(p.maxHp * 0.3, false);
         audio.play('chest');
         note('보물 상자를 열었습니다.');
+        nextGear();
         G.pendingLevels++;
         nextChoice();
       }
@@ -1559,7 +1629,7 @@ function render(now) {
   }
   ctx.globalAlpha = 1;
   if (!G.dead) {
-    const bx = Math.round(p.x - 14), by = Math.round(p.y - p.img.height - 6);
+    const bx = Math.round(p.x - 14), by = Math.round(p.y - heroHeight() - 6);
     ctx.fillStyle = '#000';
     ctx.fillRect(bx - 1, by - 1, 30, 5);
     ctx.fillStyle = '#1e4a10';
@@ -1569,7 +1639,7 @@ function render(now) {
     ctx.fillStyle = '#2a9a14';
     ctx.fillRect(bx, by + 2, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 1);
   }
-  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - p.img.height - 12, G.t - G.bubble.t);
+  if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - heroHeight() - 12, G.t - G.bubble.t);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const dark = DARK[G.stage.terrain];
@@ -1585,6 +1655,11 @@ function render(now) {
   drawJoystick();
 }
 
+function heroHeight() {
+  const p = G.player;
+  return p.av ? p.av.top : p.img.height;
+}
+
 function drawHero(now, hidden) {
   const p = G.player;
   if (G.dead) {
@@ -1595,7 +1670,15 @@ function drawHero(now, hidden) {
     return;
   }
   const blink = p.inv > 0 && Math.floor(p.inv * 30) % 2 === 0;
-  if (!blink) drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
+  if (blink) return;
+  if (!p.av) {
+    drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
+    return;
+  }
+  // The wardrobe figure: four directions, four walking frames, attack and casting poses.
+  const dir = facing(p.fdx, p.fdy);
+  const pose = p.poseT > 0 ? p.pose : p.moving ? 'walk' : 'idle';
+  drawAvatar(ctx, p.av, p.x, p.y, dir, pose, Math.floor(p.walkT / WALK_MS), hidden ? 0.35 : 1);
 }
 
 // The colour a class shouts its spells in.
@@ -1721,7 +1804,7 @@ function gauge(sel, k, text) {
 // Gear slots around the figure, as on the old panel: two on each side, one above, two below.
 // The gear slots as placed on the old panel: two on the left, the helmet above the figure,
 // two at its feet, three darker ones down the right.
-const SLOT_AT = [[35, 164], [35, 208], [117, 160], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
+const SLOT_AT = [[117, 160], [35, 164], [35, 208], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
 const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12] };
 const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
 
@@ -1754,10 +1837,10 @@ function syncUlt() {
   put('#sd-exp', String(p.total || 0));
   put('#sd-gold', String(G.gold));
   put('#sd-pos', `${String(p.tx + 500).padStart(4, '0')} ${String(p.ty + 500).padStart(4, '0')}`);
-  const hero = `assets/hero/${G.cls.hero}.png`;
-  if (shown.hero !== hero) {
-    shown.hero = hero;
-    $('#side-hero').src = hero;
+  const look = JSON.stringify(p.gear);
+  if (shown.hero !== look) {
+    shown.hero = look;
+    $('#side-hero').src = p.av ? portrait(p.av) : `assets/hero/${G.cls.hero}.png`;
   }
   // The lettered list holds the learned spells, as the magic window lettered them.
   // The scroll's list: effects on the hero with the seconds left, as the client listed them,
@@ -1769,10 +1852,20 @@ function syncUlt() {
     shown.magic = magic;
     $('#magic').innerHTML = magic;
   }
-  const slots = Object.entries(G.passives).map(([id, lv], i) => {
-    const [x, y, dark] = SLOT_AT[i];
-    return `<i class="slot${dark ? ' dark' : ''}" style="left:${x}px;top:${y}px">${lv
-      ? `<img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b>` : ''}</i>`;
+  // Worn gear in the slots by the figure (armor above, weapon and shield at the left), the
+  // trained stats in the others, highest first.
+  const g = p.gear || {};
+  const worn = ['armor', 'weapon', 'shield'].map(k => (p.av ? gearIcon(G.cls.id, k, g[k]) : null));
+  const trained = Object.entries(G.passives).filter(([, lv]) => lv).sort((a, b) => b[1] - a[1]);
+  const slots = SLOT_AT.map(([x, y, dark], i) => {
+    let inner = '';
+    if (i < 3) {
+      if (worn[i]) inner = `<img src="${worn[i]}" alt="">`;
+    } else if (trained[i - 3]) {
+      const [id, lv] = trained[i - 3];
+      inner = `<img src="assets/item/${M.items[PASSIVES[id].item].id}.png" alt=""><b>${lv}</b>`;
+    }
+    return `<i class="slot${dark ? ' dark' : ''}" style="left:${x}px;top:${y}px">${inner}</i>`;
   }).join('');
   if (shown.slots !== slots) {
     shown.slots = slots;

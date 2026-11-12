@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Builds the Baram Survivors APK, for playing alone on your own phone.
 #
-#   ./build.sh IMAGES_DIR [AUDIO_DIR]
+#   ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR]
 #
 # IMAGES_DIR is the unpacked image download (the folder holding image/, magics/, itemImage/,
 # maps/ and _pages.json). AUDIO_DIR holds bgm/ and sfx/ sound files (default: ./audio); see README.
+# AVATAR_DIR is the unpacked wardrobe download (oldbaram_avatar_sprites): the hero is dressed
+# from it, with walking and casting frames. Without it the class pictures stand in.
 # The art and sound go into the APK only, never into the repository.
 #
 # Needs: JDK 17+, python3 with Pillow, and an Android SDK with platforms;android-35 and
@@ -12,8 +14,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR]}"
+IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR]}"
 AUDIO="${2:-$HERE/audio}"
+AVATAR="${3:-}"
 SDK="${ANDROID_HOME:-/opt/android-sdk}"
 BT="$SDK/build-tools/35.0.0"
 JAR="$SDK/platforms/android-35/android.jar"
@@ -28,7 +31,7 @@ done
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
 cp -r "$HERE/web" "$OUT/assets/www"
-python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO"
+python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR
 cp -r "$HERE/res" "$OUT/res"
 
 # Launcher icon: the four classes' faces on a wooden tile.
