@@ -21,6 +21,9 @@ let VW = 320, VH = 180; // view size in game pixels
 let G = null; // the hunt being played
 let chosenClass = null;
 let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true, bubbles: true });
+// Tile movement (one tile a step, as the client moved) is the default from this version on;
+// the menu switches back to free walking.
+if (settings.tiles === undefined) settings.tiles = true;
 let best = loadJson('bs_best', {});
 let progress = loadJson('bs_progress', { cleared: {} });
 // ?speed=N runs the game N times as fast, ?all opens every hunting ground (for trying things out).
@@ -386,7 +389,8 @@ function locate(b) {
 
 function free(tx, ty) {
   const p = G.player;
-  return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty);
+  return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
+    && !(p.stepping && p.sfx === tx && p.sfy === ty);
 }
 
 /** The tile under the hero's feet. */
@@ -701,6 +705,56 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+/**
+ * The hero on the tiles, as the client moved: one tile a step in four directions. A new
+ * direction first turns the hero in place (so a spell can be aimed without stepping), then it
+ * walks. Monsters block the way; pushing into one for half a second squeezes past it.
+ */
+function stepHero(dx, dy, dt) {
+  const p = G.player;
+  if (p.stepping) {
+    p.st += dt;
+    const k = Math.min(1, p.st / p.sdur);
+    p.x = (p.sfx + (p.tx - p.sfx) * k) * TILE + TILE / 2;
+    p.y = (p.sfy + (p.ty - p.sfy) * k) * TILE + TILE - 6;
+    p.walkT += dt * 1000;
+    p.phase += (dt / p.sdur) * Math.PI;
+    if (k < 1) return;
+    p.stepping = false;
+  }
+  p.moving = false;
+  if (!dx && !dy) {
+    p.pushT = 0;
+    p.turnT = 0;
+    return;
+  }
+  if (p.fdx !== dx || p.fdy !== dy) {
+    p.fdx = dx;
+    p.fdy = dy;
+    if (dx) p.face = dx;
+    p.turnT = 0.1;
+    p.pushT = 0;
+    return;
+  }
+  if (p.turnT > 0) {
+    p.turnT -= dt;
+    return;
+  }
+  const nx = p.tx + dx, ny = p.ty + dy, there = occ.get(key(nx, ny));
+  if (there && there.hp > 0) {
+    p.pushT = (p.pushT || 0) + dt;
+    if (p.pushT < 0.5) return;
+  }
+  p.pushT = 0;
+  p.sfx = p.tx;
+  p.sfy = p.ty;
+  p.tx = nx;
+  p.ty = ny;
+  p.st = 0;
+  p.sdur = TILE / heroSpeed();
+  p.stepping = p.moving = true;
+}
+
 /** Pixels a second the hero walks. */
 function heroSpeed() {
   return (TILE / 0.24) * (G.player.speed / 70) * (1 + 0.08 * G.passives.speed);
@@ -712,6 +766,8 @@ function update(dt) {
 
   if (!G.dead) {
     const [dx, dy] = input();
+    if (settings.tiles) stepHero(dx, dy, dt);
+    else {
     p.moving = !!(dx || dy);
     if (p.moving) {
       p.fdx = dx;
@@ -722,6 +778,7 @@ function update(dt) {
       p.walkT += dt * 1000;
       p.phase += (heroSpeed() * dt / (TILE / 2)) * Math.PI;
       heroTile();
+    }
     }
     p.inv = Math.max(0, p.inv - dt);
     p.poseT = Math.max(0, p.poseT - dt);
@@ -983,8 +1040,13 @@ function hurtPlayer(dmg) {
   if (p.hp <= 0) die();
 }
 
-function hurtEnemy(e, dmg) {
+function hurtEnemy(e, dmg, push = null) {
   if (e.hp <= 0) return 0;
+  // A struck monster jerks back a little, away from the blow: each hit of a 오중공격 shows.
+  const p = G.player;
+  e.kickAt = G.t;
+  e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
+  e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1);
   e.hp -= dmg;
   e.flash = 0.12;
@@ -1079,6 +1141,37 @@ function nearestEnemies(n, range, from = G.player) {
 }
 
 /** Monsters within a square of tiles around a tile (radius 1 = the eight around it). */
+/** Monsters on a list of tiles. */
+function onTiles(tiles) {
+  const out = [];
+  for (const [x, y] of tiles) {
+    const b = occ.get(key(x, y));
+    if (b && b.m && b.hp > 0 && !b.ally && !out.includes(b)) out.push(b);
+  }
+  return out;
+}
+
+/** The inverted triangle ahead (백호참, 극백호참, 어검술): row i is 2i-1 tiles wide. */
+function triTiles(tx, ty, dx, dy, depth) {
+  const out = [];
+  for (let i = 1; i <= depth; i++)
+    for (let j = -(i - 1); j <= i - 1; j++) out.push([tx + dx * i + dy * j, ty + dy * i + dx * j]);
+  return out;
+}
+
+/** A tile and arms of r tiles up, down, left and right (지진, 탈명사식). */
+function plusTiles(tx, ty, r) {
+  const out = [[tx, ty]];
+  for (let k = 1; k <= r; k++) for (const [dx, dy] of DIRS) out.push([tx + dx * k, ty + dy * k]);
+  return out;
+}
+
+/** Every monster on the screen (지폭지술, 폭류유성, 귀염추혼소). */
+function onScreen() {
+  const p = G.player, v = viewTiles();
+  return G.enemies.filter(e => e.hp > 0 && Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
+}
+
 function around(tx, ty, r) {
   const out = [];
   for (let x = tx - r; x <= tx + r; x++) {
@@ -1114,14 +1207,32 @@ function cast(skill, st) {
   switch (def.kind) {
     case 'slash': {
       // 기본 공격: the tile ahead; 후면/측면 공격 add the tiles behind and beside; n중공격 hits again.
-      const lv = skill.lv;
-      const hits = 1 + (lv >= 2) + (lv >= 4) + (lv >= 6) + (lv >= 8);
+      const lv = def.evolved ? 8 : skill.lv;
+      // 이중공격 strikes twice; 삼중 (4단), 사중 (6단), 오중 (8단) once more each.
+      const hits = 2 + (lv >= 4) + (lv >= 6) + (lv >= 8);
       const under = occ.get(key(p.tx, p.ty));
       if (under && under.m && !under.ally) {
         if (fxid) fxOn(fxid, under);
         hurtEnemy(under, st.dmg);
       }
-      const near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
+      let near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
+      if (!near.length && def.dash) {
+        // 쇄혼비무: to the first monster up to four tiles away in a straight line.
+        for (const [dx, dy] of DIRS) {
+          let k = 2;
+          while (k <= def.dash && !occ.get(key(p.tx + dx * k, p.ty + dy * k))) k++;
+          const b = occ.get(key(p.tx + dx * k, p.ty + dy * k));
+          if (k > def.dash || !b || !b.m || b.ally || occ.has(key(p.tx + dx * (k - 1), p.ty + dy * (k - 1)))) continue;
+          addFx(fxid, p.x, p.y - 26, { scale: 0.6 });
+          p.tx += dx * (k - 1);
+          p.ty += dy * (k - 1);
+          p.x = p.tx * TILE + TILE / 2;
+          p.y = p.ty * TILE + TILE - 6;
+          p.stepping = false;
+          near = [[dx, dy]];
+          break;
+        }
+      }
       if (!near.length) return under ? undefined : retry(0.12);
       // Turn to face a monster beside the hero, as a player would before swinging.
       if (!near.some(([dx, dy]) => dx === p.fdx && dy === p.fdy)) {
@@ -1138,7 +1249,7 @@ function cast(skill, st) {
             const b = occ.get(key(p.tx + dx, p.ty + dy));
             if (!b || !b.m || b.ally) continue;
             if (fxid) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
-            hurtEnemy(b, dmg);
+            hurtEnemy(b, dmg, [dx, dy]);
           }
         });
       }
@@ -1156,6 +1267,7 @@ function cast(skill, st) {
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
         heroTile();
+        p.stepping = false;
         p.fdx = -Math.sign(bx - e.tx);
         p.fdy = -Math.sign(by - e.ty);
         if (p.fdx) p.face = p.fdx;
@@ -1210,13 +1322,58 @@ function cast(skill, st) {
         const life = fxOn(fxid, e, { delay: i * 0.12 });
         later(i * 0.12 + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
-          for (const o of around(tx, ty, st.radius)) {
+          const hit = def.shape === 'plus' ? onTiles(plusTiles(tx, ty, Math.max(1, st.radius))) : around(tx, ty, st.radius);
+          for (const o of hit) {
             if (def.slow) o.slow = def.slow;
             if (def.stun) o.stun = def.stun;
             if (def.curse) o.curse = def.curse;
             hurtEnemy(o, st.dmg);
           }
         });
+      });
+      break;
+    }
+    case 'cleave': {
+      // Ahead of the hero in an inverted triangle, turning first to where most monsters stand.
+      const depth = def.depth || 1 + st.radius;
+      let best = null, most = 0;
+      for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
+        if (!dx && !dy) continue;
+        const hit = onTiles(triTiles(p.tx, p.ty, dx, dy, depth));
+        if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+      }
+      if (!best) return retry(0.2);
+      const [dx, dy, hit] = best;
+      p.fdx = dx;
+      p.fdy = dy;
+      if (dx) p.face = dx;
+      if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
+      // The picture stands in the middle of the triangle.
+      const mid = (depth + 1) / 2;
+      addFx(fxid, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25) });
+      later(0.12, () => {
+        G.shake = Math.max(G.shake, 0.1);
+        for (const e of hit.slice(0, def.max || 99)) {
+          if (def.stun) e.stun = def.stun;
+          hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
+        }
+      });
+      break;
+    }
+    case 'screen': {
+      // The whole screen, as 지폭지술 and its kind struck.
+      const all = onScreen();
+      if (!all.length) return retry(0.5);
+      addFx(fxid, 0, -26, { follow: true, scale: 1.4 });
+      all.slice(0, 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: 0.6 }));
+      later(0.35, () => {
+        G.shake = Math.max(G.shake, 0.25);
+        for (const e of all) {
+          if (e.hp <= 0) continue;
+          if (def.slow) e.slow = def.slow;
+          if (def.curse) e.curse = def.curse;
+          hurtEnemy(e, st.dmg);
+        }
       });
       break;
     }
@@ -2042,7 +2199,7 @@ function die() {
     p.hp = p.maxHp * 0.5;
     G.buffs.guard = G.t + 3;
     say('성황령의 힘으로 다시 일어났습니다.', 'sys');
-    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
+    addFx(FX.revive, 0, -26, { follow: true });
     audio.play('revive');
     return;
   }
@@ -2052,7 +2209,7 @@ function die() {
     G.buffs.guard = G.t + 3;
     G.bubble = { text: '부활!', t: G.t };
     say('부활 마법으로 다시 일어났습니다.');
-    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
+    addFx(FX.revive, 0, -26, { follow: true });
     audio.play('revive');
     return;
   }
@@ -2368,7 +2525,9 @@ function render(now) {
     }
     const s = b.scale;
     // A monster leans in as it strikes.
-    const lx = b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0, ly = b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0;
+    const kick = b.kickAt !== undefined && G.t - b.kickAt < 0.1 ? 4 : 0;
+    const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
+    const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
     drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
     if (!b.kind && b.shown && G.t - b.shown < 3) {
       // A struck monster shows its health over its head for a while.
@@ -2464,10 +2623,10 @@ function heroHeight() {
 function drawHero(now, hidden) {
   const p = G.player;
   if (G.dead) {
-    // The ghost the dead become.
-    ctx.globalAlpha = 0.85;
-    drawFx(FX.ghost, p.x, p.y - Math.sin(now * 2) * 3, now, 1, 0, 'bottom', true);
-    ctx.globalAlpha = 1;
+    // The ghost the dead become: the hero, pale and see-through, floating.
+    const y = p.y - 4 - Math.sin(now * 2) * 3;
+    if (p.av) drawAvatar(ctx, p.av, p.x, y, facing(p.fdx, p.fdy), 'idle', 0, 0.45);
+    else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
     return;
   }
   const blink = p.inv > 0 && Math.floor(p.inv * 30) % 2 === 0;
@@ -2720,6 +2879,7 @@ function syncSettings() {
   $('#opt-sfx').textContent = '효과음: ' + (settings.sfx ? '켬' : '끔');
   $('#opt-num').textContent = '피해 숫자: ' + (settings.numbers ? '켬' : '끔');
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
+  $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
 }
 
 $('#start-btn').onclick = () => {
@@ -2748,6 +2908,17 @@ $('#opt-sfx').onclick = () => {
   audio.setSfx(settings.sfx);
   saveJson('bs_settings', settings);
   syncSettings();
+};
+$('#opt-tiles').onclick = () => {
+  settings.tiles = !settings.tiles;
+  saveJson('bs_settings', settings);
+  syncSettings();
+  if (G && G.player && !G.player.stepping) {
+    // Stand on the tile's middle when switching.
+    const p = G.player;
+    p.x = p.tx * TILE + TILE / 2;
+    p.y = p.ty * TILE + TILE - 6;
+  }
 };
 $('#opt-bubble').onclick = () => {
   settings.bubbles = !settings.bubbles;
