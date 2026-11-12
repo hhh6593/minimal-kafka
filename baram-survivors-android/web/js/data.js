@@ -40,14 +40,14 @@ export const SKILLS = {
   w_slash: { cls: 'warrior', name: '기본 공격', kind: 'slash', fx: '22', dmg: 16, cd: 1.0, area: 50, count: 1,
     names: ['기본 공격', '이중공격', '후면 공격', '삼중공격', '측면 공격', '사중공격', '신검합일', '오중공격'],
     desc: '가장 가까운 적을 크게 벤다' },
-  w_tiger: { cls: 'warrior', name: '백호참', kind: 'strike', fx: '141', dmg: 42, cd: 3.2, area: 30, count: 1,
+  w_tiger: { cls: 'warrior', name: '백호참', kind: 'strike', fx: '20', dmg: 42, cd: 3.2, area: 30, count: 1,
     hitAt: 0.45, scaleHp: 0.15, desc: '하늘에서 거대한 검을 내리꽂는다. 체력이 높을수록 강하다' },
-  w_roar: { cls: 'warrior', name: '사자후', kind: 'nova', fx: '25', dmg: 12, cd: 6, area: 80, count: 1, stun: 1.2,
-    desc: '크게 외쳐 주위 적을 밀쳐 내고 잠시 움직이지 못하게 한다' },
+  w_roar: { cls: 'warrior', name: '동귀어진', kind: 'nova', fx: '141', dmg: 34, cd: 7, area: 76, count: 1, stun: 1,
+    hpCost: 0.05, desc: '체력을 조금 깎아 내며, 주위 적에게 큰 피해를 주고 잠시 멈추게 한다' },
   w_buff: { cls: 'warrior', name: '백호령', kind: 'buff', buff: 'power', fx: '138', cd: 12, duration: 5, power: 0.5,
     names: ['백호령', '백호령', '검신검귀', '검신검귀', '대력검신', '대력검신', '대력검신', '대력검신'],
     desc: '잠시 공격력이 크게 오른다' },
-  w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '24', hpCost: 0.3,
+  w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '25', hpCost: 0.3,
     desc: '체력 30%와 마력을 모두 바쳐, 최대 체력에 비례한 일격으로 주위를 쓸어버린다' },
 
   // 도적: 파고들기, 투명, 흡혈
@@ -156,7 +156,7 @@ export const BOSS_AT = 8 * 60;
 export const MINI_AT = [3 * 60, 5.5 * 60];
 
 // Shared effects: hit spark, death puff, level-up, heal, shield and the ghost a dead hero becomes.
-export const FX = { hit: '29', death: '3', levelup: '131', heal: '150', ghost: '151', shield: '132', summon: '125' };
+export const FX = { hit: '29', death: '29', levelup: '131', heal: '150', ghost: '151', shield: '132', summon: '125' };
 
 /** A skill's name at a level. */
 export function skillName(id, level) {

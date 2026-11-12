@@ -310,7 +310,7 @@ function buildStages() {
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
       : open ? '아직 정복하지 못한 사냥터' : '앞 사냥터의 보스를 쓰러뜨리면 열린다'}</div>`;
   $('#go').disabled = !open;
-  $('#go').textContent = `${chosenClass.name}(으)로 입장`;
+  $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 입장`;
 }
 
 for (const b of document.querySelectorAll('#map-tabs button')) {
@@ -457,7 +457,7 @@ function spawn(dt) {
   if (G.minis.length && t >= G.minis[0]) {
     G.minis.shift();
     addEnemy(G.mini.m, ringPoint(), 'mini', G.mini);
-    say(`${G.mini.name}이(가) 나타났습니다!`, '#ffb060');
+    say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, '#ffb060');
     banner(`${G.mini.name} 등장`);
   }
   if (G.bossDue && t >= BOSS_AT) {
@@ -466,7 +466,7 @@ function spawn(dt) {
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
-    say(`${G.boss.name}이(가) 나타났습니다!`, '#ff7070');
+    say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, '#ff7070');
     banner(`보스 ${G.boss.name} 등장!`);
   }
 }
@@ -609,7 +609,7 @@ function killEnemy(e) {
   const roll = Math.random();
   if (e.kind) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
-    say(`${e.name}을(를) 쓰러뜨렸습니다!`, '#ffe08a');
+    say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`, '#ffe08a');
     if (e.kind === 'boss') clearStage();
     else if (!G.enemies.some(o => o.kind === 'boss')) audio.bgm('battle');
   } else if (roll < 0.006) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
@@ -631,7 +631,7 @@ function clearStage() {
   saveJson('bs_progress', progress);
   record();
   const next = STAGES[STAGES.indexOf(G.stage) + 1];
-  say(`${G.stage.name}을(를) 정복했습니다!`, '#ffe08a');
+  say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, '#ffe08a');
   if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`, '#c8e0ff');
   banner(`${G.stage.name} 정복!`);
 }
@@ -747,6 +747,7 @@ function cast(skill, st) {
       break;
     }
     case 'nova': {
+      if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
       addFx(def.fx, 0, -10, { scale: (st.area * 2.2) / fx.w, follow: true });
       later(0.1, () => near(p.x, p.y, st.area + 20, e => {
         const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
@@ -839,7 +840,7 @@ function castUlt() {
     case 'w_ult': {
       // 건곤대나이: strength from the warrior's health.
       addFx(def.fx, 0, -10, { follow: true, scale: 300 / M.fx[def.fx].w });
-      addFx('25', 0, -10, { follow: true, scale: 260 / M.fx['25'].w });
+      addFx('24', 0, -10, { follow: true, scale: 200 / M.fx['24'].w });
       later(0.15, () => near(p.x, p.y, 160, e => {
         const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
         if (d < 150 + e.r) hurtEnemy(e, p.maxHp * 2.2 * pw, (dx / d) * 220, (dy / d) * 220);
@@ -984,7 +985,6 @@ function updatePickups(dt) {
       else if (d.kind === 'coin') {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         G.gold += n;
-        say(`${n}전을 주웠습니다.`, '#e8d8a0');
         audio.play('pickup');
       } else if (d.kind === 'magnet') {
         for (const g of G.gems) g.fly = true;
@@ -1095,7 +1095,7 @@ function nextChoice() {
 function choose(o) {
   if (o.type === 'skill') {
     addSkill(o.id);
-    say(`${skillName(o.id, o.lv)}을(를) 익혔습니다.`, '#c8e0ff');
+    say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`, '#c8e0ff');
   } else if (o.type === 'passive') {
     G.passives[o.id]++;
     if (o.id === 'life') {
@@ -1187,6 +1187,13 @@ function banner(text) {
 function say(text, color = '#fff') {
   G.log.push({ text, color, t: G.t });
   if (G.log.length > 5) G.log.shift();
+}
+
+/** The right particle after a Korean word: josa('서생원', '이', '가') -> '서생원이'. */
+function josa(word, withFinal, without) {
+  const c = word.charCodeAt(word.length - 1);
+  const has = c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0;
+  return word + (has ? withFinal : without);
 }
 
 function floatText(x, y, text, color) {
@@ -1514,6 +1521,17 @@ function bar(x, y, w, h, k, color, back = 'rgba(0,0,0,0.65)') {
   ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, k))), h);
 }
 
+/** A gauge of separate blocks, filled from the left. */
+function blocks(x, y, n, h, k, on, off) {
+  const lit = Math.round(Math.max(0, Math.min(1, k)) * n);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x - 1, y - 1, n * 6 + 1, h + 2);
+  for (let i = 0; i < n; i++) {
+    ctx.fillStyle = i < lit ? on : off;
+    ctx.fillRect(x + i * 6, y, 5, h);
+  }
+}
+
 /** A bevelled wooden panel: light edges top-left, dark bottom-right. */
 function panel(x, y, w, h, sunken = false) {
   const hi = '#a07a46', lo = '#0d0703';
@@ -1576,34 +1594,35 @@ function drawHud() {
     x += 17;
   }
 
-  // Bottom: the status window of the old client.
-  const pw = Math.min(300, HW - 240), px = Math.round((HW - pw) / 2), py = HH - 34;
-  panel(px, py, pw, 30);
-  const gx = px + 30, gw = Math.floor((pw - 40) / 2) - 26;
+  // Bottom: the status window of the old client — numbers first, in sunken fields, with
+  // block gauges beside them rather than smooth bars.
+  const pw = 236, ph = 44, px = Math.round((HW - pw) / 2), py = HH - ph - 3;
+  panel(px, py, pw, ph);
+  const row = (label, color, y, cur, max, on, off) => {
+    ctx.font = '10px G9';
+    ctx.textAlign = 'left';
+    outline(label, px + 6, y + 9, color);
+    panel(px + 32, y, 58, 12, true);
+    ctx.font = '10px G9';
+    ctx.textAlign = 'right';
+    outline(`${cur}/${max}`, px + 87, y + 9);
+    blocks(px + 96, y + 2, 20, 8, cur / max, on, off);
+  };
+  row('체력', '#ff8a6a', py + 4, Math.ceil(Math.max(0, p.hp)), p.maxHp, '#d0382c', '#3a120c');
+  row('마력', '#a8d0ff', py + 17, Math.floor(p.mp), p.maxMp, '#3a68d8', '#101a40');
   ctx.font = '10px G9';
   ctx.textAlign = 'left';
-  outline('체력', px + 5, py + 12, '#ff8a6a');
-  bar(gx, py + 4, gw, 8, p.hp / p.maxHp, '#c8302a', '#3a0e0a');
-  outline('마력', gx + gw + 8, py + 12, '#a8d0ff');
-  bar(gx + gw + 34, py + 4, gw, 8, p.mp / p.maxMp, '#2f5ad0', '#0e1638');
-  ctx.font = '8px G7';
-  ctx.textAlign = 'center';
-  outline(`${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}`, gx + gw / 2, py + 11);
-  outline(`${Math.floor(p.mp)}/${p.maxMp}`, gx + gw + 34 + gw / 2, py + 11);
-  ctx.font = '10px G9';
-  ctx.textAlign = 'left';
-  outline(`Lv${p.lvl}`, px + 5, py + 25, '#ffe070');
-  bar(gx, py + 19, pw - 40 - 30, 4, p.xp / p.next, '#d8b030', '#2a2208');
-  ctx.font = '8px G7';
-  ctx.textAlign = 'right';
-  outline(`${Math.floor((100 * p.xp) / p.next)}%`, px + pw - 4, py + 25);
+  outline('레벨', px + 6, py + 39, '#ffe070');
+  outline(String(p.lvl), px + 32, py + 39);
+  outline('경험치', px + 56, py + 39, '#ffe070');
+  blocks(px + 96, py + 32, 20, 6, p.xp / p.next, '#d8b030', '#2a2208');
 
   // The message window.
   ctx.font = '10px G9';
   ctx.textAlign = 'left';
   const lines = G.log.filter(l => G.t - l.t < 10);
   if (lines.length) {
-    const lw = Math.min(px - 12, 200);
+    const lw = Math.min(px - 10, 200);
     let ly = HH - 6 - lines.length * 12;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(4, ly, lw, lines.length * 12 + 3);
