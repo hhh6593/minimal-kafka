@@ -5,7 +5,7 @@ import {
 } from './data.js';
 import { Audio } from './audio.js';
 import {
-  initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS,
+  initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -592,13 +592,33 @@ function wear(kind, tier) {
     G.player.gear = { ...g };
     if (hasAvatars()) G.player.av = dress(cls.id, g);
     applyGear();
-  }
+  } else if (T && T.cls === cls && hasAvatars()) T.av = dress(cls.id, g);
 }
 
 function buildEquip() {
   const cls = G ? G.cls : chosenClass, g = savedGear(cls), b = bag(cls);
   const box = $('#equip-rows');
   box.innerHTML = '';
+  if (hasAvatars()) {
+    // 머리 모양: any of the wardrobe's hair, kept per class, as the 미용실 did.
+    const h = document.createElement('h4');
+    h.textContent = '머리';
+    box.append(h);
+    const row = document.createElement('div');
+    row.className = 'equip-row';
+    const now = g.head || GEAR[cls.id].head;
+    heads().forEach((hd, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'equip' + (hd.name === now ? ' on' : '');
+      btn.innerHTML = `<img src="${hd.icon}" alt=""><span>${hd.name === GEAR[cls.id].head ? '기본' : `모양 ${i + 1}`}</span>`;
+      btn.onclick = () => {
+        wear('head', hd.name);
+        buildEquip();
+      };
+      row.append(btn);
+    });
+    box.append(row);
+  }
   for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패']]) {
     const h = document.createElement('h4');
     h.textContent = label;
@@ -674,18 +694,22 @@ function treePassive(id) {
 }
 
 function buildTree(cls, hot = new Set()) {
-  $('#tree-cls').textContent = `${cls.name} · 8단 + 보조 능력을 갖추면 다음 보물 상자에서 완성`;
+  // Where the class stands: its 승급, and what the next one needs and opens.
+  const tier = promoOf(cls.id), nextP = PROMOS[cls.id][tier];
+  $('#tree-cls').textContent = `${cls.name} · ${tier ? `${tier}차 승급` : '승급 전'}`
+    + (nextP ? ` · 다음: ${josa(STAGES.find(x => x.id === nextP.at).name, '을', '를')} ${josa(cls.name, '으로', '로')} 정복` : ' · 모든 승급 완료');
   const box = $('#tree-rows');
   box.innerHTML = '';
   const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
   const head = text => { const h = document.createElement('h4'); h.textContent = text; box.append(h); };
-  head('조합');
+  head('조합 · 8단 + 보조 능력 + 승급 → 다음 보물 상자에서 각성');
   const inChain = new Set();
   for (const [id, d] of mine.filter(([, d]) => d.evo).sort((a, b) => (a[1].req || 1) - (b[1].req || 1))) {
     const row = document.createElement('div');
     row.className = 'chain' + (hot.has(id) || hot.has(d.evo.with) ? ' hot' : '');
     const plus = document.createElement('i'); plus.textContent = '+';
-    const arrow = document.createElement('i'); arrow.textContent = '▶';
+    const arrow = document.createElement('i');
+    arrow.innerHTML = `▶<small>${SKILLS[d.evo.into].promo}차</small>`;
     row.append(treeSpell(id), plus, treePassive(d.evo.with), arrow,
       treeSpell(d.evo.into, { note: `Lv ${SKILLS[d.evo.into].req}부터` }));
     inChain.add(id).add(d.evo.into);
@@ -697,7 +721,8 @@ function buildTree(cls, hot = new Set()) {
     const row = document.createElement('div');
     row.className = 'chain' + (hot.has(d.union[0]) || hot.has(d.union[1]) ? ' hot' : '');
     const plus = document.createElement('i'); plus.textContent = '+';
-    const arrow = document.createElement('i'); arrow.textContent = '▶';
+    const arrow = document.createElement('i');
+    arrow.innerHTML = '▶<small>3차</small>';
     row.append(treeSpell(d.union[0]), plus, treeSpell(d.union[1]), arrow, treeSpell(id, { note: `Lv ${d.req}부터 · 둘 다 8단` }));
     inChain.add(d.union[0]).add(d.union[1]).add(id);
     box.append(row);
@@ -874,6 +899,8 @@ function update(dt) {
     p.inv = Math.max(0, p.inv - dt);
     p.poseT = Math.max(0, p.poseT - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * dt);
+    // Health comes back slowly by itself, as it did in the old game.
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.005 * dt);
   }
   G.shake = Math.max(0, G.shake - dt);
 
@@ -944,7 +971,8 @@ function ringTile(must = false) {
 // champions every 90 seconds and a named leader with followers twice a ground. At 6:00 the
 // boss comes and the field calms to 25; the boss weakens after 1:30 and is surely down by
 // 2:50. The grounds map onto the five acts in order.
-const FLOOR_OPEN = [8, 45, 60, 70, 80], FLOOR_FIVE = [80, 90, 110, 115, 125];
+// A hero hunting alone: the first act opens lighter (6 rising to 60) than D2 Survivors' party-sized one.
+const FLOOR_OPEN = [6, 40, 55, 65, 75], FLOOR_FIVE = [60, 85, 105, 110, 120];
 const FIELD_MAX = 220;
 
 function floorCount(t) {
@@ -1247,8 +1275,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
-  // Even the first rabbits take a few blows: the start should feel weak, as in D2 Survivors.
-  let hp = (6 + m.area / 70) * tough * 1.35;
+  let hp = (6 + m.area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
   // ×12, ×1.25, ×5; followers ×2 life.
   const base = hp;
@@ -1260,7 +1287,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1,
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
-    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 2 + rank * 3.5) + t / 180 + G.level * 0.5)
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 180 + G.level * 0.5)
       * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
@@ -1488,8 +1515,8 @@ function killEnemy(e) {
   } else if (G.t >= G.plainDropAt && roll < 0.02) {
     G.plainDropAt = G.t + 180;
     dropGear(e);
-  } else if (roll < 0.026) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
-  else if (roll < 0.06) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
+  } else if (roll < 0.035) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
+  else if (roll < 0.07) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
 }
 
 /** With the boss, the whole field falls (over two seconds), giving its experience. */
@@ -2248,7 +2275,7 @@ function partyBodies() {
 
 /** A companion struck. At nothing left it falls, a ghost, until 부활 or ten seconds pass. */
 function hurtMember(m, dmg) {
-  if (m.down || G.dead) return;
+  if (m.down || G.dead || m.hidden > G.t) return;
   if (G.buffs.shield > G.t) dmg /= 2;
   if (G.buffs.guard > G.t) return;
   m.hp -= dmg;
@@ -2289,29 +2316,40 @@ function neediest() {
   return [best, k];
 }
 
-/** Where a companion wants to stand: around the boss in a boss fight, at the fight otherwise. */
+/**
+ * Where a companion stands, as each class fought in the old game: the warrior in the front line
+ * between the hero and the foe; the rogue at the foe's back; the mage four tiles off, to the
+ * side; the poet well behind the fight (three tiles back from the hero), backing away from any
+ * monster that comes within two tiles, and supporting from there.
+ */
 function memberAnchor(m) {
   const p = G.player, cls = m.cls.id;
   const boss = G.enemies.find(e => (e.kind === 'boss' || e.kind === 'mini') && tdist(e, p) < 10);
-  const slot = [[-1, 0], [1, 0], [0, 1]][m.slot] || [0, 1];
-  let at = [p.tx + slot[0], p.ty + slot[1]];
-  if (boss) {
-    // The warrior in front of the boss (between it and the hero), the rogue at its back,
-    // the mage three tiles off its side, the poet behind the hero.
-    const sx = Math.sign(p.tx - boss.tx) || 1, sy = Math.sign(p.ty - boss.ty);
-    if (cls === 'warrior') at = [boss.tx + sx, boss.ty];
-    else if (cls === 'rogue') at = [boss.tx - sx, boss.ty];
-    else if (cls === 'mage') at = [boss.tx + sx * 2, boss.ty + (sy || 1) * 3];
-    else at = [p.tx + sx * 2, p.ty];
-  } else if (cls === 'warrior' || cls === 'rogue') {
-    // The fighters step out to the nearest monster close to the hero.
-    const e = nearestEnemies(1, 4)[0];
-    if (e) {
-      const sx = Math.sign(e.tx - p.tx) || 1;
-      at = cls === 'warrior' ? [e.tx - sx, e.ty] : [e.tx + sx, e.ty];
-      if (at[0] === p.tx && at[1] === p.ty) at = [e.tx, e.ty + 1];
+  const foe = boss || nearestEnemies(1, 5)[0];
+  const side = m.slot % 2 ? 1 : -1;
+  let at;
+  if (!foe) {
+    // Nothing near: a loose group around the hero, the casters a little apart.
+    at = cls === 'poet' ? [p.tx - 2 * side, p.ty + 2] : cls === 'mage' ? [p.tx + 2 * side, p.ty + 1] : [p.tx + side, p.ty];
+  } else {
+    // From the foe toward the hero: the side the party fights from.
+    let ax = Math.sign(p.tx - foe.tx), ay = Math.sign(p.ty - foe.ty);
+    if (!ax && !ay) ax = 1;
+    if (cls === 'warrior') at = ax ? [foe.tx + ax, foe.ty] : [foe.tx, foe.ty + ay];
+    else if (cls === 'rogue') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
+    else if (cls === 'mage') at = ax ? [foe.tx + ax * 3, foe.ty + 2 * side] : [foe.tx + 2 * side, foe.ty + ay * 3];
+    else at = [p.tx + ax * 3, p.ty + ay * 3 + (ax ? side : 0)];
+  }
+  if (cls === 'poet' || cls === 'mage') {
+    // Casters keep their distance: a monster within two tiles pushes the spot further off.
+    for (let i = 0; i < 3; i++) {
+      const close = nearestEnemies(1, 2, { tx: at[0], ty: at[1] })[0];
+      if (!close) break;
+      at = [at[0] + (Math.sign(at[0] - close.tx) || side) * 2, at[1] + (Math.sign(at[1] - close.ty) || 1)];
     }
   }
+  // Never out of reach of the hero: four tiles at most.
+  at = [Math.max(p.tx - 4, Math.min(p.tx + 4, at[0])), Math.max(p.ty - 4, Math.min(p.ty + 4, at[1]))];
   // Off a red tile before it falls.
   if (G.marks.some(mk => mk.tiles.some(([x, y]) => x === at[0] && y === at[1]))) {
     const free2 = [[2, 0], [-2, 0], [0, 2], [0, -2], [3, 1], [-3, -1]].map(([dx, dy]) => [at[0] + dx, at[1] + dy])
@@ -2510,6 +2548,14 @@ function partyAct(m) {
       const t = boss || near(1)[0];
       if (!t) break;
       face(t);
+      if (m.cd.c <= 0) {
+        // 투명: gone from sight a moment; nothing strikes it, and its next blows land harder.
+        m.cd.c = 12;
+        m.hidden = G.t + 2.5;
+        addFx(SKILLS.r_stealth.fx, m.x, m.y - 26, { scale: 0.7 });
+        audio.play('skill_r_stealth', 'buff');
+        partySay(m, '투명');
+      }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 15;
         fxOn(SKILLS.r_ult.fx, t);
@@ -2524,7 +2570,7 @@ function partyAct(m) {
           m.y = t.y;
         }
         fxOn(SKILLS.r_blink.fx, t);
-        hurtEnemy(t, 12 * pw);
+        hurtEnemy(t, 12 * pw * (m.hidden > G.t ? 2 : 1));
         audio.play('skill_r_blink', 'blink');
         if (Math.random() < 0.25) partySay(m, '비영승보');
         pose('attack');
@@ -2536,7 +2582,7 @@ function partyAct(m) {
 
 function drawParty(m) {
   const dir = facing(m.fdx, m.fdy);
-  const alpha = m.down ? 0.4 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
+  const alpha = m.down ? 0.4 : m.hidden > G.t ? 0.35 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
   if (m.av) {
     const pose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
     drawAvatar(ctx, m.av, m.x, y, dir, pose, Math.floor(m.walkT / WALK_MS), alpha);
@@ -2599,6 +2645,8 @@ function heal(n, sound, quiet = false) {
 
 function gainXp(v) {
   const p = G.player;
+  // Alone, the hero grows a little faster: more cards, sooner.
+  v *= 1.4;
   p.xp += v;
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
@@ -2612,8 +2660,9 @@ function gainXp(v) {
     if (joinAt >= 0) {
       const order = ['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id);
       const c = CLASSES.find(x => x.id === order[joinAt]);
+      // Only in 동료 모드 (the menu): a hunting ground is the hero's alone otherwise.
       // They come once the card is picked, announced, so no card seems to have called them.
-      if (c && !G.party.some(m => m.cls.id === c.id)) (G.joining = G.joining || []).push(c);
+      if (c && settings.party && !G.party.some(m => m.cls.id === c.id)) (G.joining = G.joining || []).push(c);
     }
   }
   if (G.pendingLevels && !G.choosing) nextChoice();
@@ -2631,6 +2680,16 @@ function evolve() {
     if (!d.evo || s.lv < MAX_SKILL_LEVEL || !G.passives[d.evo.with]) continue;
     const into = SKILLS[d.evo.into];
     if (G.player.lvl < into.req) continue;
+    if (into.promo && promoOf(G.cls.id) < into.promo) {
+      // Ready but not yet allowed: say once what is missing.
+      G.told = G.told || {};
+      if (!G.told[into.name]) {
+        G.told[into.name] = true;
+        const at = STAGES.find(x => x.id === PROMOS[G.cls.id][into.promo - 1].at);
+        say(`${josa(into.name, '으로', '로')} 거듭나려면 ${into.promo}차 승급이 필요합니다. (${at.name} 정복)`, 'sys');
+      }
+      continue;
+    }
     const from = d.names ? d.names[7] : d.name;
     s.from = s.id;
     s.id = d.evo.into;
@@ -2924,7 +2983,9 @@ function promote() {
   const after = promoOf(cls);
   for (let n = before; n < after; n++) {
     const sk = SKILLS[PROMOS[cls][n].skill];
-    const what = sk.union ? `${sk.union.map(id => SKILLS[id].name).join(' + ')} → ${sk.name} 합성` : `${sk.name}`;
+    const evos = Object.values(SKILLS).filter(d => d.cls === cls && d.evolved && !d.union && d.promo === n + 1).map(d => d.name);
+    const what = sk.union ? `${sk.union.map(id => SKILLS[id].name).join(' + ')} → ${sk.name} 합성`
+      : `${sk.name}${evos.length ? `, ${evos.join('·')} 각성` : ''}`;
     say(`${n + 1}차 승급! 이제 ${what}을(를) 익힐 수 있습니다.`, 'sys');
     G.promoted = (G.promoted || []).concat(`${n + 1}차 승급: ${what}`);
     later(1.5, () => banner(`${G.cls.name} ${n + 1}차 승급!`));
@@ -3572,7 +3633,43 @@ function syncSettings() {
   $('#opt-num').textContent = '피해 숫자: ' + (settings.numbers ? '켬' : '끔');
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
+  $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
 }
+
+// ---------------------------------------------------------------- backup
+//
+// Everything the game keeps (records, gold, gear, hair, 승급, raids, settings) as one line of
+// text: copied out, it comes back even after the app was removed and installed again.
+
+const SAVE_KEYS = ['bs_progress', 'bs_best', 'bs_settings'];
+
+$('#backup-btn').onclick = () => {
+  const data = {};
+  for (const k of SAVE_KEYS) data[k] = localStorage.getItem(k);
+  $('#backup-text').value = 'BARAM1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  $('#backup-note').textContent = '이 글 전체를 복사해 메모장 같은 곳에 두세요. 불러올 때는 붙여 넣고 불러오기.';
+  $('#backup').hidden = false;
+};
+$('#backup-copy').onclick = () => {
+  const ta = $('#backup-text');
+  ta.select();
+  const done = () => { $('#backup-note').textContent = '복사했습니다.'; };
+  if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(done, () => { document.execCommand('copy'); done(); });
+  else { document.execCommand('copy'); done(); }
+};
+$('#backup-load').onclick = () => {
+  const text = $('#backup-text').value.trim();
+  try {
+    if (!text.startsWith('BARAM1:')) throw new Error();
+    const data = JSON.parse(decodeURIComponent(escape(atob(text.slice(7)))));
+    for (const k of SAVE_KEYS) if (typeof data[k] === 'string') localStorage.setItem(k, data[k]);
+    $('#backup-note').textContent = '불러왔습니다. 다시 시작합니다…';
+    setTimeout(() => location.reload(), 800);
+  } catch (e) {
+    $('#backup-note').textContent = '기록 백업 글이 아닙니다. 처음부터 끝까지 그대로 붙여 넣으세요.';
+  }
+};
+$('#backup-close').onclick = () => { $('#backup').hidden = true; };
 
 $('#start-btn').onclick = () => {
   audio.unlock();
@@ -3598,6 +3695,11 @@ $('#opt-bgm').onclick = () => {
 $('#opt-sfx').onclick = () => {
   settings.sfx = !settings.sfx;
   audio.setSfx(settings.sfx);
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+$('#opt-party').onclick = () => {
+  settings.party = !settings.party;
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -3900,6 +4002,10 @@ window.__appPause = on => {
 // Back: opens or closes the pause menu, or steps back through the menus; false when there is
 // nothing left to go back to (the app then exits on a second press).
 window.__appBack = () => {
+  if (!$('#backup').hidden) {
+    $('#backup').hidden = true;
+    return true;
+  }
   if (!$('#tree').hidden) {
     $('#tree').hidden = true;
     return true;

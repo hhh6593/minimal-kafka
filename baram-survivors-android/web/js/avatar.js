@@ -46,6 +46,8 @@ export function avatarPaths(manifest) {
     pick('head', g.head);
     for (const kind of ['armor', 'weapon', 'shield']) for (const n of g[kind]) pick(kind, n);
   }
+  // Every hair the wardrobe has: any class may wear any of them (머리 모양 in the equip window).
+  a.head.forEach((h, i) => out.push(`avatar/head/${i}.png`, `avatar/head/${i}_icon.png`));
   return [...new Set(out)];
 }
 
@@ -57,6 +59,11 @@ function index(kind, name) {
 export function gearName(cls, kind, tier) {
   const list = GEAR[cls][kind];
   return tier >= 0 && tier < list.length ? list[tier] : null;
+}
+
+/** Every hair style, by its wardrobe name, with its icon. */
+export function heads() {
+  return M ? M.head.map((h, i) => ({ name: h.name, icon: `assets/avatar/head/${i}_icon.png` })) : [];
 }
 
 export function gearIcon(cls, kind, tier) {
@@ -101,7 +108,7 @@ export function dress(cls, gear) {
       dst[p + 3] = a;
     }
   };
-  lay('head', GEAR[cls].head);
+  lay('head', gear.head || GEAR[cls].head);
   lay('shield', gearName(cls, 'shield', gear.shield));
   lay('weapon', gearName(cls, 'weapon', gear.weapon));
   g.putImageData(out, 0, 0);

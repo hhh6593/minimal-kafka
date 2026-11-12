@@ -55,9 +55,9 @@ export const SKILLS = {
     desc: '잠시 공격력이 크게 오른다' },
   w_roar: { cls: 'warrior', req: 12, name: '동귀어진', kind: 'cleave', fx: '19', dmg: 70, cd: 6, depth: 1, stun: 1, scaleHp: 0.15,
     hpCost: 0.08, desc: '체력을 깎아 바치며 정면 한 칸의 몬스터에게 아주 큰 피해를 준다' },
-  w_sword: { cls: 'warrior', req: 12, evolved: true, name: '쇄혼비무', kind: 'slash', fx: '23', dmg: 16, cd: 0.7, dash: 4,
+  w_sword: { promo: 1, cls: 'warrior', req: 12, evolved: true, name: '쇄혼비무', kind: 'slash', fx: '23', dmg: 16, cd: 0.7, dash: 4,
     desc: '이중공격 8단 + 힘. 네 칸 앞의 몬스터에게 순식간에 날아들고, 앞뒤 양옆을 다섯 번씩 벤다' },
-  w_roar2: { cls: 'warrior', req: 18, evolved: true, name: '극백호참', kind: 'cleave', fx: '140', dmg: 24, cd: 3, radius: 0, max: 9,
+  w_roar2: { promo: 2, cls: 'warrior', req: 18, evolved: true, name: '극백호참', kind: 'cleave', fx: '140', dmg: 24, cd: 3, radius: 0, max: 9,
     scaleHp: 0.1, desc: '백호참 8단 + 체력 단련. 앞쪽 역삼각형(아홉 칸)의 몬스터 아홉을 한꺼번에 벤다' },
   w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '14', hpCost: 0.3,
     desc: '체력 30%와 마력을 모두 바쳐, 앞쪽 네 칸(폭 세 칸)의 적을 최대 체력에 비례한 일격으로 벤다' },
@@ -73,9 +73,9 @@ export const SKILLS = {
     drain: 0.3, weakest: true, desc: '체력이 낮은 몬스터의 기운을 빨아들여 체력을 회복한다' },
   r_clone: { cls: 'rogue', req: 12, name: '분신', kind: 'buff', buff: 'power', fx: '51', cd: 14, duration: 4, power: 1,
     desc: '분신을 만들어 잠시 공격력이 두 배가 된다' },
-  r_dance: { cls: 'rogue', req: 12, evolved: true, name: '백호검무', kind: 'blink', fx: '52', dmg: 7, cd: 0.9, range: 5,
+  r_dance: { promo: 1, cls: 'rogue', req: 12, evolved: true, name: '백호검무', kind: 'blink', fx: '52', dmg: 7, cd: 0.9, range: 5,
     count: 4, desc: '비영승보 8단 + 민첩. 네 몬스터 사이를 오가며 벤다' },
-  r_storm: { cls: 'rogue', req: 18, evolved: true, name: '탈명사식\'뇌', kind: 'strike', fx: '143', dmg: 10, cd: 2, range: 6,
+  r_storm: { promo: 2, cls: 'rogue', req: 18, evolved: true, name: '탈명사식\'뇌', kind: 'strike', fx: '143', dmg: 10, cd: 2, range: 6,
     radius: 1, count: 3, hitAt: 0.3, shape: 'plus', desc: '뇌진주 8단 + 지력. 번개 세 줄기가 몬스터와 그 상하좌우를 친다' },
   r_ult: { cls: 'rogue', name: '필살검무', kind: 'ult', fx: '43', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 네 칸 안의 모든 몬스터를 순식간에 베어 낸다' },
@@ -92,9 +92,9 @@ export const SKILLS = {
     names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '85', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
-  m_fire3: { cls: 'mage', req: 12, evolved: true, name: '폭류유성', kind: 'screen', fx: '148', dmg: 10, cd: 4,
+  m_fire3: { promo: 1, cls: 'mage', req: 12, evolved: true, name: '폭류유성', kind: 'screen', fx: '148', dmg: 10, cd: 4,
     desc: '화염주 8단 + 지력. 유성이 쏟아져 화면의 모든 몬스터를 친다' },
-  m_quake: { cls: 'mage', req: 18, evolved: true, name: '지폭지술', kind: 'screen', fx: '96', dmg: 15, cd: 5, slow: 2,
+  m_quake: { promo: 2, cls: 'mage', req: 18, evolved: true, name: '지폭지술', kind: 'screen', fx: '96', dmg: 15, cd: 5, slow: 2,
     desc: '백열주 8단 + 공력. 땅이 터지며 화면의 모든 몬스터를 치고 느리게 한다' },
   m_ult: { cls: 'mage', name: '헬파이어', kind: 'ult', fx: '92', shield: 5,
     desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
@@ -110,9 +110,9 @@ export const SKILLS = {
     allies: ['3013', '3012', '1022', '1023'], desc: '불여우와 맹수를 불러 함께 싸우게 한다' },
   p_guard: { cls: 'poet', req: 18, name: '금강불체', kind: 'buff', buff: 'guard', fx: '126', cd: 16, duration: 2,
     desc: '잠시 어떤 공격도 받지 않는 몸이 된다' },
-  p_wave: { cls: 'poet', req: 12, evolved: true, name: '파력무참진', kind: 'nova', fx: '134', dmg: 12, cd: 1.6, radius: 0,
+  p_wave: { promo: 1, cls: 'poet', req: 12, evolved: true, name: '파력무참진', kind: 'nova', fx: '134', dmg: 12, cd: 1.6, radius: 0,
     desc: '자무주 8단 + 공력. 발밑에 진을 펼쳐 둘레 두 칸 안의 몬스터를 친다' },
-  p_break: { cls: 'poet', req: 18, evolved: true, name: '귀염추혼소', kind: 'screen', fx: '120', dmg: 12, cd: 5, curse: 4,
+  p_break: { promo: 2, cls: 'poet', req: 18, evolved: true, name: '귀염추혼소', kind: 'screen', fx: '120', dmg: 12, cd: 5, curse: 4,
     desc: '지진 8단 + 체력 단련. 화면의 모든 몬스터에 혼마술을 걸어 받는 피해를 늘리고 친다' },
   p_ult: { cls: 'poet', name: '백호의희원', kind: 'ult', fx: '130', guard: 3,
     desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 금강불체 상태가 된다' },
@@ -179,7 +179,8 @@ export const MAX_PASSIVE_LEVEL = 5;
 // bgm: the tune for the ground: official OST tracks from baram.nexon.com/MultiMedia/Music (see README).
 export const STAGES = [
   { id: 'novice', bgm: 'nx_08_1_Buyeo', name: '왕초보사냥터', lv: '1~6', terrain: 'field', map: 'gungnae', at: [0.19, 0.8],
-    monsters: ['1001', '1002', '1003', '1004'], boss: { id: '1003', name: '우두머리 사슴', scale: 1.8 },
+    monsters: ['1001', '1002', '1003', '1004'], mini: { id: '1002', name: '왕토끼', scale: 1.7 },
+    boss: { id: '1003', name: '사슴왕', scale: 1.8 },
     intro: '다람쥐와 토끼가 뛰노는 첫 사냥터' },
   { id: 'rat', bgm: 'nx_13_Underground_prison', name: '쥐굴', lv: '6~16', terrain: 'cave', map: 'gungnae', at: [0.2, 0.535],
     monsters: ['1005', '1007', '1008', '1009', '1010', '1011', '1012', '1013'],
@@ -261,7 +262,9 @@ export function skillStats(id, level, p) {
   if (s0.evolved) level = 8;
   const l = level - 1;
   return {
-    dmg: (s.dmg || 0) * Math.pow(1.22, l) * (1 + 0.1 * p.power),
+    // A grown spell reaches as far as 8단 does, but strikes as a 5단 would: its own power is in
+    // its shape (a triangle, the whole screen), not in a number grown four times over.
+    dmg: (s.dmg || 0) * Math.pow(1.22, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
     cd: s.cd * Math.pow(0.93, l) * Math.pow(0.92, p.haste),
     // Tiles: reach grows by one every three levels, and with 공력.
     range: (s.range || 0) + Math.floor(l / 3) + Math.floor(p.area / 2),
@@ -275,7 +278,7 @@ export function skillStats(id, level, p) {
 /** What the next level brings, for the level-up choices. */
 export function levelText(id, level) {
   const s = SKILLS[id];
-  if (level === 1) return s.desc + (s.evo ? ` (8단 + ${PASSIVES[s.evo.with].name} → ${SKILLS[s.evo.into].name})` : '');
+  if (level === 1) return s.desc + (s.evo ? ` (8단 + ${PASSIVES[s.evo.with].name} → ${SKILLS[s.evo.into].name}, ${SKILLS[s.evo.into].promo}차 승급 후)` : '');
   if (s.kind === 'slash') {
     return ['', '피해 +22%', '후면 공격: 뒤 칸도 함께 벤다', '삼중공격: 세 번 연달아 벤다', '측면 공격: 양옆 칸도 함께 벤다',
       '사중공격: 네 번 연달아 벤다', '신검합일: 공격력 +30%', '오중공격: 다섯 번 연달아 벤다'][level - 1];
