@@ -3666,7 +3666,9 @@ function soundKinds() {
 // 040-044). Numbers missing from the build fall back to the sorting below.
 const GAME_SOUNDS = {
   skill_c_heal: ['003', '005', '010', '010', '034', '034', '066', '076'], // 누리·대지·바다·…·천공·구름·태양의 기원
-  skill_w_slash: ['331', '004', '007', '009', '007', '013', '013', '017'], // 타격음, 이중·후면·삼중·측면·사중·오중공격
+  // 이중공격 and its line are plain blows in the client: no sound of their own, only the
+  // weapon striking (the 'hit' each blow plays).
+  skill_w_slash: '-',
   skill_w_tiger: '087', skill_w_roar: '018', skill_w_ult: '014', // 백호참, 동귀어진, 건곤대나이
   skill_w_buff: ['012', '012', '012', '012', '089', '089', '089', '089'], // 백호령, 진백호령
   skill_r_blink: '030', skill_r_stealth: '028', skill_r_drain: '038', skill_r_clone: '039', skill_r_ult: '035',
@@ -3706,7 +3708,8 @@ function soundDefaults() {
     });
   }
   for (const [use, n] of Object.entries(GAME_SOUNDS)) {
-    if ((Array.isArray(n) ? n : [n]).every(x => bank.has(x))) d[use] = n;
+    // '-' is a choice too: no sound at all.
+    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x))) d[use] = n;
   }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
