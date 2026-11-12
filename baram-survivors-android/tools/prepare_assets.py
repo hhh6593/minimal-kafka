@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Turns the downloaded old-Baram images (and optional sound files) into the game's assets.
 
-    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR]
+    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR] [MODERN_DIR]
+
+MODERN_DIR holds today's client effects for the last spells of each tree, named
+new_<skill id>.gif (for example new_m_fire3.gif), captured on a white background.
 
 IMAGES_DIR is the unpacked old_images zip (the folder holding image/, magics/,
 itemImage/, _pages.json, ...). OUT_DIR becomes www/assets in the APK.
@@ -48,6 +51,35 @@ def frames_of(path):
         frames.append(im.convert("RGBA").copy())
         durs.append(int(im.info.get("duration", 100) or 100))
     return frames, durs
+
+
+def unwhite(frames):
+    """Effects captured on white: take the white back out, so each pixel keeps its own colour
+    with the coverage it had (a = 1 - darkest channel), cropped to what ever shows."""
+    out = []
+    for f in frames:
+        px = f.convert("RGB").load()
+        w, h = f.size
+        im = Image.new("RGBA", (w, h))
+        o = im.load()
+        for y in range(h):
+            for x in range(w):
+                r, g, b = px[x, y]
+                a = 255 - min(r, g, b)
+                if a < 12:
+                    continue
+                k = 255 - a
+                o[x, y] = (min(255, (r - k) * 255 // a), min(255, (g - k) * 255 // a), min(255, (b - k) * 255 // a), a)
+        out.append(im)
+    box = None
+    for im in out:
+        b = im.getbbox()
+        if b:
+            box = b if not box else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+    if box:
+        out = [im.crop(box) for im in out]
+    # Today's client draws at about twice the old one's pixel size.
+    return [im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS) for im in out]
 
 
 def is_additive(frames):
@@ -168,6 +200,7 @@ def main():
     avatar_src = sys.argv[4] if len(sys.argv) > 4 else None
     town_src = sys.argv[5] if len(sys.argv) > 5 else None
     skill_fx = sys.argv[6] if len(sys.argv) > 6 else None
+    modern = sys.argv[7] if len(sys.argv) > 7 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
     for d in ("fx", "icon", "mon", "item", "hero", "ui"):
@@ -197,6 +230,18 @@ def main():
         icon(frames, add).save(os.path.join(out, "icon", fid + ".png"))
         manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),
                                "durs": durs, "add": add, "cls": owner.get("magics/" + name, "magic")}
+
+    # The last spell of each tree has today's effect as well, a nod to the game as it is now.
+    if modern and os.path.isdir(modern):
+        for n in sorted(os.listdir(modern)):
+            if not (n.startswith("new_") and n.endswith(".gif")):
+                continue
+            fid = n[:-4]
+            frames, durs = frames_of(os.path.join(modern, n))
+            frames = unwhite(frames)
+            strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+            manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),
+                                   "durs": [90] * len(frames), "add": False, "cls": "modern"}
 
     for fid in HEROES:
         im = Image.open(os.path.join(src, "magics", fid + ".gif"))

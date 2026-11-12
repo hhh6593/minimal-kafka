@@ -568,6 +568,80 @@ $('#open-equip').onclick = () => {
 };
 $('#close-equip').onclick = () => { $('#equip').hidden = true; };
 
+// ---------------------------------------------------------------- spell tree
+//
+// Each class's spells as chains: a spell at 8단 with its passive becomes the last spell of the
+// tree at the next chest. Shown from the menu, and from the level-up cards with the chains of
+// the offered cards marked.
+
+function treeSpell(id, opts = {}) {
+  const def = SKILLS[id];
+  const el = document.createElement('div');
+  const fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
+  const mine = G && G.skills.find(x => x.id === id);
+  el.className = 'spell' + (def.evolved ? ' final' : '') + (mine ? ' have' : '')
+    + (G && !mine && (def.req || 1) > G.player.lvl ? ' lock' : '');
+  el.append(fx ? fxIcon(fx) : itemIcon('p_power'));
+  const t = document.createElement('div');
+  const grown = !mine && G && G.skills.some(x => x.from === id);
+  if (grown) el.classList.add('have');
+  const lv = grown ? '완성됨' : mine ? (def.evolved ? '완성' : `${mine.lv}/${MAX_SKILL_LEVEL}단`) : `Lv ${def.req || 1}부터`;
+  t.innerHTML = `<b>${def.name}</b><span>${opts.note || lv}</span>`;
+  el.append(t);
+  el.title = def.desc || '';
+  return el;
+}
+
+function treePassive(id) {
+  const ps = PASSIVES[id], have = G ? G.passives[id] || 0 : 0;
+  const el = document.createElement('div');
+  el.className = 'spell' + (have ? ' have' : '');
+  el.append(itemIcon(ps.item));
+  const t = document.createElement('div');
+  t.innerHTML = `<b>${ps.name}</b><span>${have ? `${have}/${MAX_PASSIVE_LEVEL}` : '보조 능력'}</span>`;
+  el.append(t);
+  return el;
+}
+
+function buildTree(cls, hot = new Set()) {
+  $('#tree-cls').textContent = `${cls.name} · 8단 + 보조 능력을 갖추면 다음 보물 상자에서 완성`;
+  const box = $('#tree-rows');
+  box.innerHTML = '';
+  const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
+  const head = text => { const h = document.createElement('h4'); h.textContent = text; box.append(h); };
+  head('조합');
+  const inChain = new Set();
+  for (const [id, d] of mine.filter(([, d]) => d.evo).sort((a, b) => (a[1].req || 1) - (b[1].req || 1))) {
+    const row = document.createElement('div');
+    row.className = 'chain' + (hot.has(id) || hot.has(d.evo.with) ? ' hot' : '');
+    const plus = document.createElement('i'); plus.textContent = '+';
+    const arrow = document.createElement('i'); arrow.textContent = '▶';
+    row.append(treeSpell(id), plus, treePassive(d.evo.with), arrow,
+      treeSpell(d.evo.into, { note: `Lv ${SKILLS[d.evo.into].req}부터` }));
+    inChain.add(id).add(d.evo.into);
+    box.append(row);
+  }
+  head('그 밖의 기술');
+  const rest = document.createElement('div');
+  rest.className = 'others';
+  for (const [id, d] of mine) {
+    if (inChain.has(id)) continue;
+    const el = treeSpell(id, d.kind === 'ult' ? { note: '마력이 차면 · 필살' } : {});
+    if (hot.has(id)) el.style.outline = '1px solid #7a1800';
+    rest.append(el);
+  }
+  box.append(rest);
+  $('#tree').hidden = false;
+}
+
+$('#open-tree').onclick = () => buildTree(G ? G.cls : CLASSES[0]);
+$('#lv-tree').onclick = () => {
+  if (!G) return;
+  const hot = new Set([...$('#choices').children].map(b => b.dataset.id).filter(Boolean));
+  buildTree(G.cls, hot);
+};
+$('#close-tree').onclick = () => { $('#tree').hidden = true; };
+
 /** A class's figure in the gear it has found, for the menus. */
 function heroPicture(cls) {
   if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
@@ -800,7 +874,8 @@ function addEnemy(m, kind = null, named = null, pack = 0) {
   const t = G.t;
   const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
-  let hp = (6 + m.area / 70) * tough;
+  // Even the first rabbits take a few blows: the start should feel weak, as in D2 Survivors.
+  let hp = (6 + m.area / 70) * tough * 1.35;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
   // ×12, ×1.25, ×5; followers ×2 life.
   const base = hp;
@@ -1027,7 +1102,9 @@ function fxOn(id, b, o = {}) {
 function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
-  const fxid = def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
+  // The last spell of a tree shows today's client effect when the build has it: a small nod.
+  const fxid = def.evolved && M.fx['new_' + skill.id] ? 'new_' + skill.id
+    : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
   const p = G.player;
   let used = true;
   const retry = t => {
@@ -1523,11 +1600,11 @@ function joinParty(cls) {
   const slot = G.party.length;
   const m = {
     cls, name, lv: 1, gear, av: hasAvatars() ? dress(cls.id, gear) : null, img: images[`hero/${cls.hero}.png`],
-    x: p.x - 30 + slot * 30, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
+    // Walks in from the edge of the view, as another player would.
+    x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
     cd: { a: 1, b: 3, c: 6 }, bubble: null, slot,
   };
   G.party.push(m);
-  addFx(FX.summon, m.x, m.y - 26, { scale: 0.8 });
   say(`${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
 }
 
@@ -1541,6 +1618,15 @@ function partySay(m, spell) {
 }
 
 function updateParty(dt) {
+  if (G.joining && G.joining.length && !G.choosing && !G.paused) {
+    G.joinWait = (G.joinWait || 0) + dt;
+    if (G.joinWait > 0.8) {
+      G.joinWait = 0;
+      const c = G.joining.shift();
+      joinParty(c);
+      banner(`동료 ${G.party[G.party.length - 1].name}(${c.name}) 합류`);
+    }
+  }
   const p = G.player;
   for (const m of G.party) {
     // Party members grow with the hero, as D2 Survivors' mercenaries share its level.
@@ -1743,7 +1829,8 @@ function gainXp(v) {
     if (joinAt >= 0) {
       const order = ['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id);
       const c = CLASSES.find(x => x.id === order[joinAt]);
-      if (c && !G.party.some(m => m.cls.id === c.id)) joinParty(c);
+      // They come once the card is picked, announced, so no card seems to have called them.
+      if (c && !G.party.some(m => m.cls.id === c.id)) (G.joining = G.joining || []).push(c);
     }
   }
   if (G.pendingLevels && !G.choosing) nextChoice();
@@ -1863,6 +1950,7 @@ function nextChoice() {
     t.innerHTML = `<b>${name}</b> <i>${tag}</i><span>${text}</span>`;
     b.append(t);
     b.onclick = () => choose(o);
+    b.dataset.id = o.id;
     box.append(b);
   }
   $('#lv-reroll').textContent = `다시 뽑기 ${G.rerolls}`;
@@ -2720,6 +2808,11 @@ const GAME_SOUNDS = {
   skill_w_buff: ['012', '012', '012', '012', '089', '089', '089', '089'], // 백호령, 진백호령
   skill_r_blink: '030', skill_r_stealth: '028', skill_r_drain: '038', skill_r_clone: '039', skill_r_ult: '035',
   skill_r_bolt: ['055', '055', '056', '056', '057', '057', '058', '059'], // 뢰진주 계열
+  // The last spell of each tree, to go with today's effect: 쇄혼비무 (a blue sword arc),
+  // 포효검황 for 극백호참's tiger claws, 백호검무's blade, 혈겁만파 for 탈명사식'뇌's dark-red burst,
+  // a blast for 폭류유성's fire vortex, 지폭지술's stones, 파력무참's golden ring, 파혼술 for 귀염추혼소.
+  skill_w_sword: '100', skill_w_roar2: '101', skill_r_dance: '090', skill_r_storm: '060',
+  skill_m_fire3: '104', skill_m_quake: '107', skill_p_wave: '109', skill_p_break: '077',
   skill_m_fire: ['040', '040', '041', '041', '042', '042', '043', '044'], // 화염주 계열
   skill_m_fire4: ['040', '040', '041', '041', '042', '042', '043', '044'],
   skill_m_ice: ['050', '050', '051', '051', '052', '052', '053', '054'], // 백열주 계열
@@ -2937,6 +3030,10 @@ window.__appPause = on => {
 // Back: opens or closes the pause menu, or steps back through the menus; false when there is
 // nothing left to go back to (the app then exits on a second press).
 window.__appBack = () => {
+  if (!$('#tree').hidden) {
+    $('#tree').hidden = true;
+    return true;
+  }
   if (G && !G.over) {
     if (!G.choosing) togglePause();
     return true;

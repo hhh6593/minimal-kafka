@@ -82,7 +82,7 @@
 
 ```sh
 sdkmanager "platforms;android-35" "build-tools;35.0.0"
-ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더] [의상실 그림 폴더] [마을 맵 폴더]
+ANDROID_HOME=/path/to/sdk ./build.sh /path/to/oldbaram_images [오디오 폴더] [의상실 그림 폴더] [마을 맵 폴더] [기술 이펙트 폴더] [현대 이펙트 폴더]
 ```
 
 `oldbaram_images`는 이미지 zip을 푼 폴더입니다(`image/`, `magics/`, `itemImage/`, `maps/`,
@@ -139,3 +139,12 @@ git에 올라가지 않습니다. 파일이 없는 마법은 소리를 내지 �
 ## 글꼴
 
 UI 글꼴은 [갈무리](https://github.com/quiple/galmuri)(SIL OFL 1.1, `web/fonts/OFL.md`)입니다.
+
+### 기술 트리와 현대 이펙트
+
+메뉴와 레벨업 창의 `기술 트리` 버튼으로 직업의 조합(8단 기술 + 보조 능력 → 마지막 기술)과
+나머지 기술을 볼 수 있습니다. 레벨업 창에서 열면 지금 나온 카드가 들어 있는 조합이 표시됩니다.
+
+각 트리의 마지막 기술(쇄혼비무, 극백호참, 백호검무, 탈명사식'뇌, 폭류유성, 지폭지술, 파력무참진,
+귀염추혼소)은 지금의 바람의나라 이펙트를 씁니다. `build.sh`의 여섯 번째 인자 폴더에
+`new_<기술 id>.gif`(예: `new_m_fire3.gif`)로 넣으면 흰 배경을 빼서 넣고, 없으면 옛 이펙트를 씁니다.

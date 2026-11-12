@@ -138,6 +138,30 @@
   .trade-row b { display: block; color: #7a1800; }
   .trade-row span { display: block; font: 10px/13px G9, monospace; }
   .trade-row .btn { min-width: 72px; }
+  /* The spell tree, laid out like the client's 마법 window: an icon in a sunken slot with its
+     name, one chain to a line, the final spell at the right end. */
+  #tree { position: fixed; inset: 0; z-index: 21; display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, .6); }
+  #tree-box { width: min(96vw, 600px); max-height: 94vh; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
+      background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
+      box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; }
+  #tree-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
+  #tree-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  #tree-rows h4 { margin: 4px 0 0; font: 700 11px G11, monospace; color: #7a1800; }
+  .chain { display: grid; grid-template-columns: 1fr 12px 1fr 18px 1fr; align-items: center; gap: 2px;
+      padding: 2px; border: 1px solid transparent; }
+  .chain.hot { background: #f0d8a0; border-color: #7a1800; }
+  .chain > i { font: 700 12px G11, monospace; color: #6a3e16; text-align: center; font-style: normal; }
+  .others { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 2px; }
+  .spell { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 2px; background: #e0c088;
+      border: 2px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
+  .spell img { flex: none; width: 28px; height: 28px; object-fit: contain; background: #1a0e06; image-rendering: pixelated; }
+  .spell div { min-width: 0; font: 10px/12px G9, monospace; }
+  .spell b { display: block; font: 700 11px/13px G11, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spell span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6a3e16; }
+  .spell.lock { opacity: .55; }
+  .spell.have { background: #fff0c0; }
+  .spell.final b { color: #7a1800; }
   #equip { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
   #equip-box { width: min(96vw, 560px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
@@ -336,7 +360,7 @@
   <div id="lv-box">
     <div class="caption" id="lv-title"></div>
     <div id="choices"></div>
-    <div class="row lv-keys"><button id="lv-reroll" class="btn"></button><button id="lv-skip" class="btn"></button><button id="lv-banish" class="btn"></button></div>
+    <div class="row lv-keys"><button id="lv-reroll" class="btn"></button><button id="lv-skip" class="btn"></button><button id="lv-banish" class="btn"></button><button id="lv-tree" class="btn">기술 트리</button></div>
   </div>
 </div>
 
@@ -344,7 +368,7 @@
   <div id="pause-box">
     <div class="caption">메뉴</div>
     <div class="row"><button id="resume" class="btn">계속하기</button><button id="quit" class="btn">사냥터 나가기</button></div>
-    <div class="row"><button id="open-equip" class="btn">장비</button><button id="open-sounds" class="btn">소리 맞추기</button></div>
+    <div class="row"><button id="open-equip" class="btn">장비</button><button id="open-sounds" class="btn">소리 맞추기</button><button id="open-tree" class="btn">기술 트리</button></div>
     <div class="row">
       <button id="opt-bgm" class="btn"></button>
       <button id="opt-sfx" class="btn"></button>
@@ -396,6 +420,14 @@
     <div class="row"><button id="start-sort" class="btn">빠르게 나누기</button><button id="close-sounds" class="btn">닫기</button></div>
   </div>
 </div>
+<div id="tree" hidden>
+  <div id="tree-box">
+    <div class="caption">기술 트리 <small id="tree-cls"></small></div>
+    <div id="tree-rows"></div>
+    <div class="row"><button id="close-tree" class="btn">닫기</button></div>
+  </div>
+</div>
+
 <div id="equip" hidden>
   <div id="equip-box">
     <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
