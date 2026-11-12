@@ -278,6 +278,7 @@ function showScreen(name) {
   resize();
   if (name === 'title') audio.bgm('title');
   if (name !== 'town' && name !== null && !['equip', 'trade'].includes(name)) $('#talk').hidden = true;
+  if (name === 'select' || name === 'stages') audio.bgm(audio.pickBgm('select') ? 'select' : 'title');
   if (name === 'select') buildSelect();
   if (name === 'stages') buildStages();
 }
@@ -2668,7 +2669,7 @@ document.addEventListener('click', e => {
 
 const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
   ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활'], ['click', '버튼 누름']];
-const MUSIC = [['title', '처음 화면'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
+const MUSIC = [['title', '처음 화면'], ['select', '직업·사냥터 선택'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
 
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
 const SOUND_KINDS = [
@@ -2738,6 +2739,8 @@ function soundDefaults() {
   // 공성전 for bosses, and each ground's own track.
   const all = M.audio.bgm.map(b => b.key), has = k => all.includes(k);
   if (has('nx_04_Winds_take2')) d.bgm_title = 'nx_04_Winds_take2';
+  if (has('bs_login')) d.bgm_title = 'bs_login';
+  if (has('bs_charcreate')) d.bgm_select = 'bs_charcreate';
   if (has('nx_08_2_Goguryeo')) d.bgm_town = 'nx_08_2_Goguryeo';
   if (has('nx_10_4way_battle')) d.bgm_boss = 'nx_10_4way_battle';
   for (const st of STAGES) if (has(st.bgm)) d['bgm_stage_' + st.id] = st.bgm;
