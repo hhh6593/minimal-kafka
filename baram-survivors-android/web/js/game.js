@@ -1477,6 +1477,8 @@ function update(dt) {
         if (s.timer < 0) s.timer = st.cd;
         // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
         if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
+        // In a raid the 전사 is the party's main blade: its strikes cut the boss half again as deep.
+        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.5;
         cast(s, st);
       }
     }
@@ -1558,9 +1560,12 @@ function applyBuild(start) {
   if (!list.length) {
     // No record yet: the class's open spells, the ones that strike first (a raid boss is not
     // felled by buffs), the newest of them, each as high as the level allows.
+    // A 도사 keeps two of its heals: in a raid it is the party's healer.
     const hits = d => (d.dmg ? 0 : 1);
-    list = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls)
-      .sort((a, b) => hits(a[1]) - hits(b[1]) || (b[1].req || 1) - (a[1].req || 1)).slice(0, 5).map(([id, d]) => [id, 8]);
+    const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
+    const heals = cls === 'poet' ? open.filter(([, d]) => d.kind === 'heal').sort((a, b) => (b[1].req || 1) - (a[1].req || 1)).slice(0, 2) : [];
+    list = heals.concat(open.filter(e => !heals.includes(e))
+      .sort((a, b) => hits(a[1]) - hits(b[1]) || (b[1].req || 1) - (a[1].req || 1))).slice(0, 5).map(([id]) => [id, 8]);
     list.push(['c_heal', 8]);
   }
   G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
@@ -2811,6 +2816,8 @@ function cast(skill, st) {
       if (p.hp >= p.maxHp && (!low || low === p)) return retry(1);
       heal(st.heal, false);
       if (low && low !== p) healMember(low, st.heal, fxid);
+      // A 도사 hero in a raid is the party's healer: its 기원 reach everyone standing.
+      if (G.stage.raid && G.cls.id === 'poet') for (const m of G.party) if (m !== low && !m.down) healMember(m, m.maxHp * st.heal / p.maxHp * 0.6);
       if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
       if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
       if (def.guard) G.buffs.guard = Math.max(G.buffs.guard, G.t + def.guard);
@@ -5409,6 +5416,7 @@ window.__appBack = () => {
 // For testing in a browser console.
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
+window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
 
