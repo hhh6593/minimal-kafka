@@ -402,7 +402,7 @@ function raidInfo(r) {
     return `${c.name} ${rec ? `Lv ${rec.lvl}` : '기록 없음'}`;
   });
   const rec = best[chosenClass.id], start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
-  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · 1:30에 등장 · 8분 안에</div>
+  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · 8분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
@@ -412,6 +412,14 @@ function raidInfo(r) {
       return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(있음)' : ''}`;
     }).join(' · ')}</div>
     <div class="state">${raidOpen(r) ? '키운 직업이 모두 모인다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
+  // How the hero starts: its recorded build, or picking cards as on a hunting ground.
+  const built = (progress.builds || {})[chosenClass.id];
+  const sw = document.createElement('button');
+  sw.className = 'btn';
+  sw.style.marginTop = '4px';
+  sw.textContent = settings.raidManual ? '시작 기술: 직접 고르기' : `시작 기술: ${built ? '지난 빌드' : '자동 빌드'}`;
+  sw.onclick = () => { settings.raidManual = !settings.raidManual; saveJson('bs_settings', settings); raidInfo(r); };
+  $('#stage-info').append(sw);
   $('#go').disabled = !raidOpen(r);
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
 }
@@ -1072,7 +1080,10 @@ function frame(now) {
   for (let i = 0; i < TEST_SPEED * fast; i++) {
     if (!G || G.paused || G.choosing || G.over) continue;
     if (G.hitstop > 0) G.hitstop -= dt;
-    else update(dt);
+    else if (G.slowmo > 0) {
+      G.slowmo -= dt;
+      update(dt * 0.35);
+    } else update(dt);
   }
   if (T && !G && !$('#town').hidden) updateTown(dt);
   render(now / 1000);
@@ -1251,6 +1262,39 @@ function floorCount(t) {
 
 // ---------------------------------------------------------------- raids
 
+/** The class's skills fitted to a level: its recorded build, or one made from its open spells. */
+function applyBuild(start) {
+  const cls = G.cls.id, rec = (progress.builds || {})[cls];
+  const fits = (id, d) => d && (d.cls === cls || d.cls === 'all') && d.kind !== 'ult' && promoOf(cls) >= (d.promo || 0)
+    && (d.req || 1) <= start;
+  let list = rec ? rec.skills.filter(([id]) => fits(id, SKILLS[id])) : [];
+  if (!list.length) {
+    // No record yet: the class's open spells, attacks first, each as high as the level allows.
+    list = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls)
+      .sort((a, b) => (a[1].req || 1) - (b[1].req || 1)).slice(0, 5).map(([id, d]) => [id, 8]);
+    list.push(['c_heal', 8]);
+  }
+  G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
+    const d = SKILLS[id];
+    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(lv, start - (d.req || 1) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
+  });
+  const cap = Math.max(1, Math.floor(start / 4));
+  for (const k of Object.keys(G.passives)) G.passives[k] = Math.min(cap, rec ? rec.passives[k] || 0 : (k === 'life' || k === 'power' ? cap : 0));
+  // 체력 단련 gives its health as when picked on a card.
+  G.player.maxHp += 20 * G.passives.life;
+  G.player.hp = G.player.maxHp;
+  say(`${rec ? '지난 빌드' : '자동 빌드'}로 시작: ${G.skills.map(s => skillName(s.id, s.lv)).join(', ')}`, 'sys');
+}
+
+/** A hunt's build, kept for the class when it went well (its raids start from it). */
+function keepBuild() {
+  if (!G || G.stage.raid || G.player.lvl < 8) return;
+  progress.builds = progress.builds || {};
+  const old = progress.builds[G.cls.id];
+  if (old && !G.cleared && old.lvl > G.player.lvl) return;
+  progress.builds[G.cls.id] = { lvl: G.player.lvl, skills: G.skills.map(s => [s.id, s.lv]), passives: { ...G.passives } };
+}
+
 /** How hard a raid's boss strikes, by its rung: 0.58 for the first, 1 for 화령. */
 function raidK() {
   return Math.min(1, 0.5 + G.level / 24);
@@ -1268,7 +1312,14 @@ function raidSetup() {
   const start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
   p.lvl = start;
   p.next = xpFor(start);
-  G.pendingLevels = start;
+  // The hero's own route: the build of its best hunt (or one made from its open spells),
+  // fitted to the raid's level; no cards to pick unless the player asks for them.
+  if (settings.raidManual) G.pendingLevels = start;
+  else {
+    G.pendingLevels = 0;
+    G.firstCard = false;
+    applyBuild(start);
+  }
   G.raidT = 3;
   G.phase = 0;
   const names = [];
@@ -1282,6 +1333,48 @@ function raidSetup() {
     names.push(`${m.name}(${c.name} Lv${r ? r.lvl : 1})`);
   }
   say(`레이드에 모였습니다: ${names.join(', ')}`, 'party');
+}
+
+/**
+ * The boss speaks: a box with its face, name and line over the chat, as an NPC's talk in the
+ * client, and the line in the chat. kind: enter, p1, p2, summon, kill, low, enrage, death.
+ */
+function bossSay(kind) {
+  const L = G.stage.lines;
+  if (!L || !L[kind]) return;
+  if (kind === 'kill' || kind === 'summon' || kind === 'killHealer') {
+    if (G.t - (G.saidAt || -99) < 8) return; // the taunts not too often
+  }
+  G.saidAt = G.t;
+  const text = Array.isArray(L[kind]) ? L[kind][Math.floor(Math.random() * L[kind].length)] : L[kind];
+  const b = G.enemies.find(e => e.kind === 'boss');
+  if (b) b.bubble = { text: text.length > 14 ? text.slice(0, 13) + '…' : text, t: G.t };
+  say(`${G.boss.name}: ${text}`, 'warn');
+  const box = $('#dialog');
+  $('#dlg-name').textContent = G.boss.name;
+  $('#dlg-text').textContent = text;
+  // The face: the top of the boss's picture, squared.
+  const c = $('#dlg-face'), g = c.getContext('2d'), im = G.boss.m.img;
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, c.width, c.height);
+  const side = Math.min(im.width, im.height);
+  g.drawImage(im, (im.width - side) / 2, 0, side, side, 0, 0, c.width, c.height);
+  box.hidden = false;
+  box.classList.remove('show');
+  void box.offsetWidth;
+  box.classList.add('show');
+  clearTimeout(bossSay.t);
+  bossSay.t = setTimeout(() => { box.hidden = true; }, kind === 'enter' || kind === 'death' ? 4200 : 3200);
+}
+
+/** A crowd of the raid's monsters around the boss: on its call, and at a phase. */
+function raidWave(b, n) {
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, r = 3 + (i % 2);
+    const tx = b.tx + Math.round(Math.cos(a) * r), ty = b.ty + Math.round(Math.sin(a) * r);
+    if (free(tx, ty)) addEnemy(pickMonster(i % 4 === 0), null, null, 0, [tx, ty]);
+  }
+  addFx(G.stage.fx, b.x, b.y - 30, { scale: 1.2 });
 }
 
 function raidSpawn(dt) {
@@ -1307,26 +1400,58 @@ function raidSpawn(dt) {
     const e = addEnemy(G.boss.m, 'boss', G.boss);
     if (!e) return;
     // Built for a whole party: about four minutes for a party of grown heroes.
-    e.hp = e.maxHp = 5000 * G.level;
+    e.hp = e.maxHp = 11000 * G.level;
     // Its bite takes a sixth of the hero's health.
     e.dmg = G.player.maxHp * 0.16 * raidK() + G.player.armor + G.passives.armor;
     G.aggroT = 0;
     G.bossDue = false;
     G.bossT = t;
+    // The entrance: it speaks, untouchable a moment, before the first blow.
+    e.guardT = t + 2.5;
+    G.raidT = 4;
+    G.waveT = t + 30;
+    bossSay('enter');
     audio.play('boss');
     // The raid's own music plays on: no switch to the hunting grounds' boss track.
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다! 붉은 칸을 피하세요.`, 'warn');
-    banner(`레이드 보스 ${G.boss.name}!`);
+    // Its name card: the name and what it is called.
+    banner(`${G.boss.name} · ${G.stage.title || '레이드 보스'}`);
   }
   if (!b) return;
-  const phase = b.hp < b.maxHp / 3 ? 2 : b.hp < b.maxHp * 2 / 3 ? 1 : 0;
+  // Phases at 70% and 40%; a frenzy below 25% (quicker strikes).
+  const phase = b.hp < b.maxHp * 0.4 ? 2 : b.hp < b.maxHp * 0.7 ? 1 : 0;
+  if (!G.frenzy && b.hp < b.maxHp * 0.25) {
+    G.frenzy = true;
+    banner(`${josa(G.boss.name, '이', '가')} 날뛴다!`);
+  }
   if (phase > G.phase) {
+    // A phase: it speaks, stands untouchable a moment, and calls a big wave (champions too).
     G.phase = phase;
     banner(`${josa(G.boss.name, '이', '가')} 사나워진다!`);
-    say(`${G.boss.name}의 기세가 거세집니다.`, 'warn');
+    bossSay(phase === 1 ? 'p1' : 'p2');
+    b.guardT = t + 2;
+    G.raidT = Math.max(G.raidT, 2.5);
+    raidWave(b, 8 + phase * 2);
     const m = pickMonster(true), pack = ++G.packs;
-    for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+    for (let i = 0; i < 1 + phase; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+  }
+  // Every half minute it calls its own.
+  if (t >= G.waveT) {
+    G.waveT = t + 30;
+    bossSay('summon');
+    raidWave(b, 5 + G.phase * 2);
+  }
+  if (!G.saidLow && b.hp < b.maxHp * 0.1) {
+    G.saidLow = true;
+    bossSay('low');
+  }
+  // The last minute before the time runs out: enraged, it strikes harder and faster.
+  if (!G.enraged && t > RAID_LIMIT - 60) {
+    G.enraged = true;
+    bossSay('enrage');
+    banner(`${G.boss.name} 광폭화!`);
+    b.dmg *= 1.3;
   }
   // Every six seconds the boss turns on someone: the warrior most, the hero next.
   G.aggroT -= dt;
@@ -1342,7 +1467,7 @@ function raidSpawn(dt) {
   }
   G.raidT -= dt;
   if (G.raidT <= 0) {
-    G.raidT = [4, 3.2, 2.4][G.phase];
+    G.raidT = [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * (G.frenzy ? 0.85 : 1);
     const pats = G.stage.patterns;
     raidPattern(b, pats[Math.floor(Math.random() * pats.length)]);
   }
@@ -1762,8 +1887,13 @@ function hurtPlayer(dmg, from = null) {
 
 function hurtEnemy(e, dmg, push = null) {
   if (e.hp <= 0) return 0;
+  if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
   // A heavy blow on a big one stops the world for a blink.
-  if (e.kind && dmg > 40) G.hitstop = Math.max(G.hitstop || 0, 0.05);
+  // Not in a raid, where the party's blows fall all the time, and not more than once in 0.6 s.
+  if (e.kind && dmg > 40 && !G.stage.raid && G.t - (G.hitstopAt || -9) > 0.6) {
+    G.hitstop = 0.05;
+    G.hitstopAt = G.t;
+  }
   // A struck monster jerks back a little, away from the blow: each hit of a 오중공격 shows.
   const p = G.player;
   e.kickAt = G.t;
@@ -1878,6 +2008,9 @@ function clearStage() {
   if (G.stage.raid) st.raids[G.stage.id] = (st.raids[G.stage.id] || 0) + 1;
   else st.clears[G.stage.id] = (st.clears[G.stage.id] || 0) + 1;
   if (G.stage.raid) {
+    bossSay('death');
+    // The kill: a moment in slow motion before the spoils.
+    G.slowmo = 1.2;
     progress.raids = progress.raids || {};
     progress.raids[G.stage.id] = (progress.raids[G.stage.id] || 0) + 1;
     // A raid's spoils: pieces of its set (weapon, armor, shield) the hero does not have yet —
@@ -2722,6 +2855,8 @@ function joinParty(cls) {
   m.hp = m.maxHp;
   m.tx = Math.floor(m.x / TILE);
   m.ty = Math.floor((m.y - TILE / 2 + 6) / TILE);
+  m.x = m.tx * TILE + TILE / 2;
+  m.y = m.ty * TILE + TILE - 6;
   G.party.push(m);
   say(`${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
 }
@@ -2759,6 +2894,8 @@ function hurtMember(m, dmg) {
   m.bubble = { text: '으윽…', t: G.t };
   say(`${josa(m.name, '이', '가')} 쓰러졌습니다!`, 'warn');
   if (G.aggro === m) G.aggro = null;
+  // The particular line first: downing the healer has its own.
+  if (G.stage.raid && G.enemies.some(e => e.kind === 'boss')) bossSay(m.cls.id === 'poet' && G.stage.lines.killHealer && !G.saidHealer ? (G.saidHealer = 'killHealer') : 'kill');
 }
 
 /** Healing a companion: its 기원's picture over its head. */
@@ -2859,30 +2996,7 @@ function updateParty(dt) {
         m.bubble = { text: '다시 간다!', t: G.t };
       }
     } else m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.01 * dt);
-    const [ax, ay] = memberAnchor(m);
-    const tx = ax * TILE + TILE / 2, ty = ay * TILE + TILE - 6;
-    const dx = tx - m.x, dy = ty - m.y;
-    const d = Math.hypot(dx, dy);
-    m.moving = d > 6;
-    if (d > 300) {
-      m.x = tx;
-      m.y = ty;
-    } else if (m.moving) {
-      // Four directions, like everyone else: the longer way first.
-      const sp = heroSpeed() * (d > 80 ? 1.3 : 1) * dt;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        m.x += Math.sign(dx) * Math.min(sp, Math.abs(dx));
-        m.fdx = Math.sign(dx);
-        m.fdy = 0;
-      } else {
-        m.y += Math.sign(dy) * Math.min(sp, Math.abs(dy));
-        m.fdx = 0;
-        m.fdy = Math.sign(dy);
-      }
-      m.walkT += dt * 1000;
-    }
-    m.tx = Math.floor(m.x / TILE);
-    m.ty = Math.floor((m.y - TILE / 2 + 6) / TILE);
+    stepMember(m, dt);
     m.poseT = Math.max(0, m.poseT - dt);
     if (m.bubble && G.t - m.bubble.t > 1.3) m.bubble = null;
     if (G.dead || m.down) continue;
@@ -2891,6 +3005,53 @@ function updateParty(dt) {
     for (const k of Object.keys(m.cd)) m.cd[k] -= tick;
     partyAct(m);
   }
+}
+
+/**
+ * A companion walks as everyone does: a tile a step, four ways. Where it means to stand is
+ * chosen every 0.6 s and kept unless the new spot is two tiles off or a red tile falls on it,
+ * so it does not jitter between spots. Only when it is beyond the view does it come at once.
+ */
+function stepMember(m, dt) {
+  const p = G.player;
+  const red = a => G.marks.some(mk => mk.tiles.some(([x, y]) => x === a[0] && y === a[1]));
+  m.anchorT = (m.anchorT || 0) - dt;
+  if (!m.anchor || m.anchorT <= 0 || red(m.anchor)) {
+    m.anchorT = 0.6;
+    const a = memberAnchor(m);
+    if (!m.anchor || red(m.anchor) || Math.abs(a[0] - m.anchor[0]) + Math.abs(a[1] - m.anchor[1]) >= 2) m.anchor = a;
+  }
+  if (m.stepping) {
+    m.st += dt;
+    const k = Math.min(1, m.st / m.sdur);
+    m.x = (m.sfx + (m.tx - m.sfx) * k) * TILE + TILE / 2;
+    m.y = (m.sfy + (m.ty - m.sfy) * k) * TILE + TILE - 6;
+    m.walkT += dt * 1000;
+    if (k >= 1) m.stepping = false;
+  }
+  if (!m.stepping) {
+    if (Math.abs(m.tx - p.tx) > 14 || Math.abs(m.ty - p.ty) > 10) {
+      [m.tx, m.ty] = m.anchor;
+    }
+    const ddx = m.anchor[0] - m.tx, ddy = m.anchor[1] - m.ty;
+    if (ddx || ddy) {
+      const [sx, sy] = Math.abs(ddx) >= Math.abs(ddy) ? [Math.sign(ddx), 0] : [0, Math.sign(ddy)];
+      m.sfx = m.tx;
+      m.sfy = m.ty;
+      m.tx += sx;
+      m.ty += sy;
+      m.st = 0;
+      // A little quicker when far behind, so it keeps up without leaping.
+      m.sdur = TILE / heroSpeed() * (Math.abs(ddx) + Math.abs(ddy) > 4 ? 0.75 : 1);
+      m.stepping = true;
+      m.fdx = sx;
+      m.fdy = sy;
+    } else {
+      m.x = m.tx * TILE + TILE / 2;
+      m.y = m.ty * TILE + TILE - 6;
+    }
+  }
+  m.moving = !!m.stepping;
 }
 
 const KIWON = ['누리의기원', '대지의기원', '바다의기원', '동해의기원', '하늘의기원', '천공의기원', '구름의기원', '태양의기원'];
@@ -3037,10 +3198,6 @@ function partyAct(m) {
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.6;
-        if (!boss) {
-          m.x = t.x + (t.x > p.x ? 18 : -18);
-          m.y = t.y;
-        }
         fxOn(SKILLS.r_blink.fx, t);
         hurtEnemy(t, 12 * pw * (m.hidden > G.t ? 2 : 1));
         audio.play('skill_r_blink', 'blink');
@@ -3416,6 +3573,7 @@ function showResults(title) {
   G.choosing = false;
   G.pendingLevels = 0;
   bankGold();
+  keepBuild();
   if (G.endless) {
     const st = qstats();
     st.endless = Math.max(st.endless, G.t - G.clearT);

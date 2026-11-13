@@ -289,30 +289,37 @@ export const BOSS_AT = 6 * 60;
 export const RAIDS = [
   // A ladder, the low rungs open from the middle grounds: level sets the monsters, the boss's
   // life (5000 a level) and how hard its red tiles strike.
-  { id: 'raid_boar', bgm: 'nx_24_Memory_of_battle', raid: true, name: '멧돼지왕 레이드', lv: '파티', terrain: 'field', level: 2, open: 'snake',
+  { id: 'raid_boar', bgm: 'nx_24_Memory_of_battle', raid: true, title: '들판의 폭군',
+    lines: {'enter': '꿀꿀… 내 들판을 짓밟는 놈들이 누구냐!', 'p1': '어디 한번 받아 봐라! 얘들아, 몰려나와라!', 'p2': '크르르… 엄니가 부러져도 물러서지 않는다!', 'summon': ['새끼들아, 저놈들 발을 물어라!', '들판의 형제들이여, 모여라!'], 'kill': ['하나 들이받았다! 다음은 누구냐!', '꿀꿀, 약하구나!'], 'killHealer': '풀 뜯는 놈부터 짓밟아 주마! 고쳐 주는 녀석은 끝이다!', 'low': '이 들판은… 내 것이었는데…', 'enrage': '더는 못 참는다! 모조리 들이받아 주마!', 'death': '꾸에에엑…! 들판을… 지켜라…'}, name: '멧돼지왕 레이드', lv: '파티', terrain: 'field', level: 2, open: 'snake',
     monsters: ['12020', '12021', '12022', '12023', '12024'], boss: { id: '6008', name: '멧돼지왕', scale: 1.3 },
     patterns: ['cross', 'meteor'], fx: '20', intro: '들판을 짓밟는 거대한 멧돼지. 일직선으로 들이받는다' },
-  { id: 'raid_tiger', bgm: 'nx_07_The_great_Wall', raid: true, name: '산군 레이드', lv: '파티', terrain: 'cave', level: 3, open: 'deer',
+  { id: 'raid_tiger', bgm: 'nx_07_The_great_Wall', raid: true, title: '산의 주인',
+    lines: {'enter': '어흥… 이 산의 주인을 찾아온 겁 없는 것들이로구나.', 'p1': '산이 울린다. 내 새끼들아, 나와라!', 'p2': '발톱이 무디다고 얕보지 마라!', 'summon': ['곰이며 범이며, 모두 내려오너라!', '산의 짐승들아, 저들을 에워싸라!'], 'kill': ['산은 약한 자를 품지 않는다.', '한 놈 쓰러졌구나.'], 'killHealer': '상처를 핥아 주던 놈이 먼저 쓰러졌구나.', 'low': '제법이구나, 사람들…', 'enrage': '산군의 노여움을 받아라!', 'death': '산이… 고요해지는구나…'}, name: '산군 레이드', lv: '파티', terrain: 'cave', level: 3, open: 'deer',
     monsters: ['1022', '1023', '1027', '1036', '1037'], boss: { id: '1027', name: '산군', scale: 1.7 },
     patterns: ['cross', 'ring'], fx: '20', intro: '산의 주인이라 불리는 호랑이. 사방을 할퀴며 달려든다' },
-  { id: 'raid_goblin', bgm: 'nx_22_Burning_the_angry', raid: true, name: '도깨비대장 레이드', lv: '파티', terrain: 'cave', level: 5, open: 'fox',
+  { id: 'raid_goblin', bgm: 'nx_22_Burning_the_angry', raid: true, title: '방망이의 왕',
+    lines: {'enter': '히히! 금 나와라 뚝딱, 손님 나와라 뚝딱!', 'p1': '얘들아, 방망이 들고 나와라! 놀이 시간이다!', 'p2': '내 방망이를 화나게 했겠다?!', 'summon': ['뚝딱! 도깨비 나와라!', '히히, 더 놀자! 얘들아!'], 'kill': ['히히, 하나 뚝딱!', '방망이 맛이 어떠냐!'], 'killHealer': '히히, 치료하는 놈부터 뚝딱!', 'low': '어, 어라? 이게 아닌데…', 'enrage': '뚝딱! 뚝딱! 다 부숴 버려라!', 'death': '내… 방망이… 돌려줘…'}, name: '도깨비대장 레이드', lv: '파티', terrain: 'cave', level: 5, open: 'fox',
     pages: [801, 802, 804], boss: { id: '8017', name: '도깨비대장', scale: 1.1 },
     patterns: ['rain', 'plus'], fx: '96', intro: '도깨비들을 거느린 대장. 방망이를 휘두르면 땅이 솟는다' },
-  { id: 'raid_hydra', bgm: 'nx_31_Sealed_Hwanse', raid: true, name: '삼두룡 레이드', lv: '파티', terrain: 'cave', level: 7, open: 'haunt',
+  { id: 'raid_hydra', bgm: 'nx_31_Sealed_Hwanse', raid: true, title: '세 머리의 재앙',
+    lines: {'enter': '「셋이서 한 번에 먹어 주마.」「아니, 내가 먼저다!」「조용히들 해라.」', 'p1': '머리 하나가 다쳤다고 멈출 줄 아느냐!', 'p2': '세 머리가 모두 깨어났다. 불길이 마르지 않으리라!', 'summon': ['뱀들아, 비늘 아래에서 기어 나와라!', '굴의 뱀들아, 먹이다!'], 'kill': ['한 입 거리도 안 되는군.', '「내 거다!」「아니, 내 거다!」'], 'killHealer': '「치유하는 놈부터 먹어라.」「맛있군.」', 'low': '이럴 수가… 세 머리가… 모두…', 'enrage': '다 태워 버려라!', 'death': '용의… 시대가… 끝나는가…'}, name: '삼두룡 레이드', lv: '파티', terrain: 'cave', level: 7, open: 'haunt',
     monsters: ['1016', '1018', '1019', '1020', '1021', '12016', '12017', '12013'],
     boss: { id: '10014', name: '삼두룡', scale: 1 }, patterns: ['cross', 'breath'], fx: '140',
     intro: '세 머리의 용이 깃든 굴. 머리마다 한 줄씩 불을 뿜는다' },
-  { id: 'raid_sorcerer', bgm: 'nx_32_An_ancient_ghost', raid: true, name: '흑술사 레이드', lv: '파티', terrain: 'house', level: 9, open: 'goblin',
+  { id: 'raid_sorcerer', bgm: 'nx_32_An_ancient_ghost', raid: true, title: '혼을 부리는 자',
+    lines: {'enter': '흐흐… 혼을 거두러 제 발로 왔구나.', 'p1': '일어나라, 원혼들아. 저들을 데려가라.', 'p2': '저주는 비처럼 내리고, 너희는 젖으리라.', 'summon': ['떠도는 혼들아, 내 부름에 답하라.', '흐흐, 혼은 얼마든지 있다.'], 'kill': ['그 혼, 잘 쓰마.', '하나 더 거두었다.'], 'killHealer': '기원을 올리던 그 혼, 특히 맛있겠구나.', 'low': '내 술법이… 흐트러진다…', 'enrage': '모든 혼이 내 것이다!', 'death': '흑… 혼들이… 나를…'}, name: '흑술사 레이드', lv: '파티', terrain: 'house', level: 9, open: 'goblin',
     pages: [312, 1001], boss: { id: '10003', name: '흑술사', scale: 1.3 }, patterns: ['rain', 'ring'], fx: '120',
     intro: '흉가 깊은 곳에서 혼을 부리는 술사. 하늘에서 저주가 비처럼 떨어진다' },
-  { id: 'raid_sea', bgm: 'nx_10_4way_battle', raid: true, name: '해왕 레이드', lv: '파티', terrain: 'sea', level: 11, open: 'sea',
+  { id: 'raid_sea', bgm: 'nx_10_4way_battle', raid: true, title: '깊은 바다의 왕',
+    lines: {'enter': '바다를 더럽히는 뭍것들아, 물속에서 숨이나 쉬어 보거라.', 'p1': '파도야, 일어라! 수병들은 앞으로!', 'p2': '소용돌이에 휘말려 가라앉아라!', 'summon': ['수병들아, 창을 들어라!', '깊은 곳의 것들아, 올라오너라!'], 'kill': ['물거품이 되었구나.', '바다는 넓고, 너희는 작다.'], 'killHealer': '상처를 씻어 주던 자도 물거품이 되었다.', 'low': '바다가… 나를 떠나는가…', 'enrage': '온 바다가 너희를 삼키리라!', 'death': '깊은… 바다로… 돌아간다…'}, name: '해왕 레이드', lv: '파티', terrain: 'sea', level: 11, open: 'sea',
     pages: [701, 702, 703, 704, 705, 706, 707, 708], boss: { id: '3076', name: '해왕', scale: 1.2 },
     patterns: ['ring', 'breath'], fx: '123', intro: '바닷속 깊은 곳의 큰 뱀. 물결이 소용돌이친다' },
-  { id: 'raid_fire', bgm: 'nx_27_4beast_born_from_the_lava', raid: true, name: '화령 레이드', lv: '파티', terrain: 'lava', level: 12, open: 'volcano',
+  { id: 'raid_fire', bgm: 'nx_27_4beast_born_from_the_lava', raid: true, title: '천 년의 불',
+    lines: {'enter': '…뜨겁지? 이 불은 화산이 천 년 품은 것이다.', 'p1': '불씨들아, 깨어나라!', 'p2': '용암이 끓어오른다. 녹아 버려라!', 'summon': ['불의 혼들아, 타올라라!', '화산이 너희를 부른다.'], 'kill': ['재가 되었구나.', '불은 가리지 않는다.'], 'killHealer': '치유의 빛도 불 앞에서는 꺼지는 법.', 'low': '불꽃이… 사그라든다…', 'enrage': '모든 것을 재로!', 'death': '다시… 타오를… 날까지…'}, name: '화령 레이드', lv: '파티', terrain: 'lava', level: 12, open: 'volcano',
     pages: [1703, 1704, 1707], boss: { id: '5026', name: '화령', scale: 1.4 }, patterns: ['meteor', 'plus'], fx: '92',
     intro: '화산의 불이 모여 된 혼. 유성과 불기둥이 땅을 가른다' },
 ];
-export const RAID_BOSS_AT = 90, RAID_LIMIT = 8 * 60;
+export const RAID_BOSS_AT = 15, RAID_LIMIT = 8 * 60;
 export const MINI_AT = [135, 285];
 export const CHAMPIONS_AT = [90, 180, 270];
 

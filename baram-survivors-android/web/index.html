@@ -82,6 +82,17 @@
   .pin.on span { color: #000; background: var(--gold); border-color: #fff4c0; }
   .pin.on i { border-top-color: #fff4c0; }
   /* On the 국내성 map the caves carry their own painted labels: a marker only, named when picked. */
+  /* A boss speaking: its face in a sunken frame, its name and line on parchment, over the chat. */
+  #dialog { position: absolute; left: 12px; bottom: 112px; width: min(60%, 420px); z-index: 4; display: grid;
+      grid-template-columns: 52px 1fr; gap: 8px; align-items: center; padding: 5px 8px; pointer-events: none; color: #2a1606;
+      background: #e8d0a0; border: 3px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a; box-shadow: 0 0 0 1px #000; }
+  #dialog.show { animation: dlg-in .25s ease-out; }
+  @keyframes dlg-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  #dialog[hidden] { display: none; }
+  #dialog canvas { position: static; inset: auto; width: 48px; height: 48px; image-rendering: pixelated; background: #2a1408;
+      border: 2px solid; border-color: #2a1004 #a0602a #a0602a #2a1004; }
+  #dialog b { display: block; font: 700 12px/15px G11, monospace; color: #8a1800; }
+  #dialog span { display: block; font: 11px/15px G9, monospace; }
   /* The boss's bar under the map's name: dark wood, a red fill, the numbers on it. */
   #bossbar { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: min(40%, 300px); z-index: 3;
       padding: 2px 6px 4px; background: #2a1408; border: 2px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
@@ -459,6 +470,7 @@
   <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
+  <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>
   <div id="bossbar" hidden><b id="bb-name"></b><i><s id="bb-fill"></s></i><span id="bb-num"></span></div>
 </div>
 <div id="side" hidden><div id="panel">
