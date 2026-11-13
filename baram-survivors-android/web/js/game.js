@@ -1230,8 +1230,8 @@ function buildTree(cls, hot = new Set()) {
   const box = $('#tree-rows');
   box.innerHTML = '';
   const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
-  // One row per 승급: 일반, the old game's 1차 to 4차, and today's 5차 to 7차.
-  for (let t = 0; t <= 7; t++) {
+  // One row per 승급: 일반, the old game's 1차 to 4차, and today's 5차 to 9차.
+  for (let t = 0; t <= 9; t++) {
     const row = mine.filter(([, d]) => (d.promo || 0) === t);
     if (!row.length) continue;
     const h = document.createElement('h4');
@@ -1453,6 +1453,8 @@ function update(dt) {
         const st = stats(s);
         s.timer += st.cd;
         if (s.timer < 0) s.timer = st.cd;
+        // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
+        if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
         cast(s, st);
       }
     }
@@ -1462,7 +1464,6 @@ function update(dt) {
   updateAllies(dt);
   updateParty(dt);
   updateShots(dt);
-  updateTrial(dt);
   for (const sp of G.sparks) { sp.t += dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; }
   G.sparks = G.sparks.filter(sp => sp.t < 0.28);
   if (!G.dead) updatePickups(dt);
@@ -1533,9 +1534,11 @@ function applyBuild(start) {
     && (d.req || 1) <= start;
   let list = rec ? rec.skills.filter(([id]) => fits(id, SKILLS[id])) : [];
   if (!list.length) {
-    // No record yet: the class's open spells, attacks first, each as high as the level allows.
+    // No record yet: the class's open spells, the ones that strike first (a raid boss is not
+    // felled by buffs), the newest of them, each as high as the level allows.
+    const hits = d => (d.dmg ? 0 : 1);
     list = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls)
-      .sort((a, b) => (a[1].req || 1) - (b[1].req || 1)).slice(0, 5).map(([id, d]) => [id, 8]);
+      .sort((a, b) => hits(a[1]) - hits(b[1]) || (b[1].req || 1) - (a[1].req || 1)).slice(0, 5).map(([id, d]) => [id, 8]);
     list.push(['c_heal', 8]);
   }
   G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
@@ -1580,7 +1583,7 @@ function raidSetup() {
   // fitted to the raid's level; no cards to pick unless the player asks for them.
   if (settings.raidManual) G.pendingLevels = start;
   else {
-    G.pendingLevels = 1; // the 시련 능력 card only
+    G.pendingLevels = 0;
     G.firstCard = false;
     applyBuild(start);
   }
@@ -2051,16 +2054,7 @@ function towards(b, tx, ty) {
   return out;
 }
 
-// 시련 능력, after today's 환상의시련 (on entering, one power of three: 뇌정벼락, 암석낙하,
-// 추가공격 …): the first card of every hunt and raid offers three; the one taken works by itself.
-const TRIALS = {
-  thunder: { name: '뇌정벼락', fx: '89', desc: '2초마다 벼락이 화면의 몬스터 둘에게 떨어진다' },
-  rock: { name: '암석낙하', fx: '123', desc: '3초마다 바위가 몬스터 무리 위로 떨어져 3×3을 친다' },
-  extra: { name: '추가공격', fx: '25', desc: '기술로 친 몬스터를 20% 확률로 한 번 더 친다(절반 피해)' },
-  orbit: { name: '화염고리', fx: '63', desc: '불구슬 셋이 몸 둘레를 돌며 닿는 몬스터를 태운다' },
-  whirl: { name: '회오리', fx: '52', desc: '5초마다 바라보는 쪽으로 회오리가 날아가 길 위의 몬스터를 휩쓴다' },
-};
-// 규약, as the trial's pledges: harder monsters for richer spoils (돈·경험치·재료).
+// 규약, as today's 환상의시련 rules (강인한육체 …): harder monsters for richer spoils (돈·경험치·재료).
 const PACTS = {
   hp: { name: '강인한육체', desc: '몬스터 체력 +40%', reward: 0.2 },
   swift: { name: '광폭한무리', desc: '몬스터 걸음 +20%', reward: 0.15 },
@@ -2073,60 +2067,6 @@ function pactOn(id) {
 function pactReward() {
   return 1 + Object.keys(PACTS).filter(pactOn).reduce((a, id) => a + PACTS[id].reward, 0);
 }
-/** The trial power at work, each frame. */
-function updateTrial(dt) {
-  const p = G.player, lvl = p.lvl, tr = G.trial;
-  if (!tr || G.dead) return;
-  G.trialT = (G.trialT || 0) - dt;
-  const onScreen = () => G.enemies.filter(e => Math.abs(e.x - p.x) < 300 && Math.abs(e.y - p.y) < 170);
-  if (tr === 'thunder' && G.trialT <= 0) {
-    G.trialT = 2;
-    const es = onScreen().sort(() => Math.random() - 0.5).slice(0, 2);
-    for (const e of es) { fxOn(TRIALS.thunder.fx, e); later(0.15, () => hurtEnemy(e, 10 + lvl * 1.4)); }
-    if (es.length) { G.shake = Math.max(G.shake, 0.06); audio.play('skill_r_bolt', 'spell', 4); }
-  } else if (tr === 'rock' && G.trialT <= 0) {
-    G.trialT = 3;
-    const es = onScreen();
-    if (es.length) {
-      const c = es[Math.floor(Math.random() * es.length)];
-      addFx(TRIALS.rock.fx, c.x, c.y - 10, { scale: 0.9 });
-      later(0.3, () => { G.shake = Math.max(G.shake, 0.12); for (const e of around(c.tx, c.ty, 1)) hurtEnemy(e, 14 + lvl * 1.6); });
-    }
-  } else if (tr === 'whirl' && G.trialT <= 0) {
-    G.trialT = 5;
-    const dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = p.fdy || 0;
-    G.whirls = (G.whirls || []).concat({ x: p.x, y: p.y - 16, dx, dy, t: 0, hit: new Set() });
-  } else if (tr === 'orbit') {
-    G.orbitA = (G.orbitA || 0) + dt * 3.2;
-    if (G.trialT <= 0) {
-      G.trialT = 0.45;
-      for (let i = 0; i < 3; i++) {
-        const a = G.orbitA + (i * Math.PI * 2) / 3, ox = p.x + Math.cos(a) * 52, oy = p.y - 16 + Math.sin(a) * 34;
-        for (const e of G.enemies) if (Math.hypot(e.x - ox, e.y - 10 - oy) < 22) hurtEnemy(e, 6 + lvl * 0.7);
-      }
-    }
-  }
-  for (const w of G.whirls || []) {
-    w.t += dt;
-    w.x += w.dx * 360 * dt;
-    w.y += w.dy * 360 * dt;
-    for (const e of G.enemies) if (!w.hit.has(e) && Math.hypot(e.x - w.x, e.y - 10 - w.y) < 30) { w.hit.add(e); hurtEnemy(e, 16 + lvl * 1.5); }
-  }
-  G.whirls = (G.whirls || []).filter(w => w.t < 0.9);
-}
-function drawTrial(now) {
-  const p = G.player;
-  if (G.trial === 'orbit') {
-    for (let i = 0; i < 3; i++) {
-      const a = (G.orbitA || 0) + (i * Math.PI * 2) / 3, ox = p.x + Math.cos(a) * 52, oy = p.y - 16 + Math.sin(a) * 34;
-      ctx.globalAlpha = 0.45; ctx.fillStyle = '#ffb030'; ctx.beginPath(); ctx.arc(ox, oy, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = '#ff6a10'; ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff2b0'; ctx.beginPath(); ctx.arc(ox - 1, oy - 1, 2, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-  for (const w of G.whirls || []) drawFx(TRIALS.whirl.fx, w.x, w.y + 16, w.t, 0.8, w.t * 12, 'center', true);
-}
-
 // How each kind of monster carries itself, after the original server's monster table (RTK-Server
 // Mobs: MobMoveTime 3000 ms a step for rabbits, squirrels and deer, 2000 for most, 1250 for dogs;
 // MobAttackTime 1000-3000) and its AI (mob_ai_basic): a monster with no target turns to a random
@@ -2305,9 +2245,8 @@ function hurtPlayer(dmg, from = null) {
   if (p.hp <= 0) die();
 }
 
-function hurtEnemy(e, dmg, push = null, extra = false) {
+function hurtEnemy(e, dmg, push = null) {
   e.provoked = true;
-  if (G.trial === 'extra' && !extra && Math.random() < 0.2) later(0.12, () => { if (e.hp > 0) { fxOn(TRIALS.extra.fx, e); hurtEnemy(e, dmg * 0.5, null, true); } });
   // Sparks off the struck monster (a few, and never too many on screen).
   if (G.sparks.length < 140) {
     for (let i = 0; i < 3; i++) {
@@ -2574,6 +2513,15 @@ function cast(skill, st) {
   const fxid = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
   const p = G.player;
+  // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
+  // (in a raid the boss is the fight; a warrior's 백호참 or 동귀어진 should not cut the air).
+  if (['cleave', 'line', 'slash', 'blink'].includes(def.kind) && !p.stepping) {
+    const bo = G.enemies.find(e => e.kind === 'boss' && tdist(e, p) <= 4);
+    if (bo) {
+      const dx = bo.tx - p.tx, dy = bo.ty - p.ty;
+      if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
+    }
+  }
   let used = true;
   const retry = t => {
     used = false;
@@ -3134,6 +3082,7 @@ const QUESTS = [
   { id: 'q_goblin', title: '도깨비 잡이', text: '도깨비굴 정복', gold: 1000, need: 1, have: s => s.clears.goblin || 0 },
   { id: 'q_promo1', title: '승급자', text: '아무 직업이나 1차 승급', gold: 300, need: 1, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
   { id: 'q_promo4', title: '탈명의 경지', text: '아무 직업이나 4차 승급', gold: 3000, need: 4, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_promo9', title: '천하의 지존', text: '아무 직업이나 9차 승급', gold: 20000, need: 9, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
   { id: 'q_promo7', title: '현세의 고수', text: '아무 직업이나 7차 승급', gold: 9000, need: 7, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
   { id: 'q_raid1', title: '레이드 대원', text: '레이드 한 번 이기기', gold: 500, need: 1, have: s => Object.values(s.raids).reduce((a, b) => a + b, 0) },
   { id: 'q_raid7', title: '전설의 용사', text: '레이드 일곱 곳 모두 이기기', gold: 5000, need: RAIDS.length, have: s => RAIDS.filter(r => s.raids[r.id]).length },
@@ -3936,11 +3885,6 @@ function drawCards() {
   const lvl = G.player.lvl, mine = id => SKILLS[id].cls === G.cls.id || SKILLS[id].cls === 'all';
   const have = id => G.skills.some(x => x.id === id || x.from === id || x.from2 === id);
   const banned = o => G.banished.has(o.type + ':' + o.id);
-  if (!G.trial && !G.trialOffered) {
-    // 시련 능력 first: three of the five, one to take.
-    G.trialOffered = true;
-    return Object.keys(TRIALS).sort(() => Math.random() - 0.5).slice(0, 3).map(id => ({ type: 'trial', id }));
-  }
   if (G.firstCard) {
     // The first card: the class's first-tier attacks, and a mastered spell or two (숙련),
     // whatever level it usually opens at; the 기원 comes with the next.
@@ -4013,12 +3957,6 @@ function nextChoice() {
       name = ps.name;
       text = ps.desc;
       tag = `Lv ${o.lv}`;
-    } else if (o.type === 'trial') {
-      const tr = TRIALS[o.id];
-      icon = fxIcon(tr.fx);
-      name = tr.name;
-      text = tr.desc;
-      tag = '시련 능력';
     } else if (o.type === 'heal') {
       icon = itemIcon('heal');
       name = '회복';
@@ -4090,12 +4028,6 @@ function choose(o) {
       G.player.maxHp += 20;
       G.player.hp += 20;
     }
-  } else if (o.type === 'trial') {
-    G.trial = o.id;
-    say(`시련 능력: ${TRIALS[o.id].name} — ${TRIALS[o.id].desc}`, 'sys');
-    banner(`시련 능력 · ${TRIALS[o.id].name}`);
-    // The trial card does not use up the hunt's first card (a raid on its recorded build has none).
-    if (!G.stage.raid || settings.raidManual) G.pendingLevels++;
   } else if (o.type === 'heal') heal(50, true);
   else G.gold += 100;
   $('#levelup').hidden = true;
@@ -4631,7 +4563,6 @@ function render(now) {
   }
 
   drawShots();
-  drawTrial(now);
   for (const sp of G.sparks) {
     ctx.globalAlpha = 1 - sp.t / 0.28;
     ctx.fillStyle = sp.c;

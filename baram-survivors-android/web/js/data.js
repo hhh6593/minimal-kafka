@@ -232,6 +232,57 @@ export const SKILLS = {
   p_dragongod: { promo: 7, cls: 'poet', req: 27, name: '용신의가호', kind: 'buff', buff: 'shield', fx: '150', modern: 'new_p_phoenix',
     cd: 15, duration: 6, desc: '용신의 가호로 오래 받는 피해가 절반이 된다' },
 
+  // 8차·9차 승급: today's client's own (the 8차 비급 list at 습득레벨 800-850, the 9차 list at 900),
+  // three a class each; each 9차 ends in the class's 궁극기 with today's effect.
+  w_blackdragon: { promo: 8, cls: 'warrior', req: 30, name: '흑룡광참', kind: 'nova', fx: '141', dmg: 32, cd: 2.4, radius: 1,
+    desc: '검은 용의 칼바람이 몸 둘레를 휘감아 벤다' },
+  w_sentence: { promo: 8, cls: 'warrior', req: 30, name: '사형선고', kind: 'strike', fx: '20', dmg: 28, cd: 3.5, range: 6, radius: 1,
+    count: 1, hitAt: 0.3, stun: 2, desc: '몬스터와 그 둘레에 사형을 선고해 붙잡아 두고 벤다' },
+  w_dawn: { promo: 8, cls: 'warrior', req: 30, name: '조광', kind: 'buff', buff: 'power', fx: '21', cd: 18, duration: 6, power: 1.2,
+    desc: '아침 햇살 같은 기세로 잠시 공격력이 두 배를 넘는다' },
+  w_swords: { promo: 9, cls: 'warrior', req: 33, name: '호기어검', kind: 'spell', fx: '22', dmg: 30, cd: 1.5, range: 7, count: 4,
+    desc: '떠도는 검 넷이 가까운 몬스터 넷을 쉼 없이 벤다' },
+  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'line', fx: '139', dmg: 42, cd: 3, depth: 6,
+    desc: '압도적인 기세로 바라보는 쪽 일렬 여섯 칸을 짓밟는다' },
+  w_myriad: { promo: 9, cls: 'warrior', req: 33, name: '만검귀종', kind: 'screen', fx: '141', modern: 'new_w_roar2', dmg: 62, cd: 9,
+    falloff: 0.03, desc: '궁극기. 만 개의 검이 화면의 모든 몬스터를 벤다' },
+  r_flamesword: { promo: 8, cls: 'rogue', req: 30, name: '멸화의검', kind: 'blink', fx: '144', dmg: 30, cd: 1.6, range: 5, count: 2,
+    desc: '불꽃을 두른 검으로 바라보는 쪽 몬스터에게 날아들어 두 번 벤다' },
+  r_shadowstar: { promo: 8, cls: 'rogue', req: 30, name: '그림자표창', kind: 'spell', fx: '53', dmg: 24, cd: 1.4, range: 7, count: 3,
+    desc: '그림자 표창 셋을 던져 가까운 몬스터 셋을 맞힌다' },
+  r_shadowclone: { promo: 8, cls: 'rogue', req: 30, name: '그림자분신', kind: 'buff', buff: 'power', fx: '51', cd: 18, duration: 6, power: 1,
+    desc: '그림자 분신이 함께 싸워 잠시 공격력이 두 배가 된다' },
+  r_bloodslash: { promo: 9, cls: 'rogue', req: 33, name: '묵혈파광참', kind: 'cleave', fx: '145', dmg: 42, cd: 2.6, radius: 0, max: 9,
+    curse: 3, desc: '검은 피의 빛으로 앞쪽 역삼각형을 베고 받는 피해를 늘린다' },
+  r_chainstar: { promo: 9, cls: 'rogue', req: 33, name: "묵마수리검'쇄", kind: 'strike', fx: '145', dmg: 30, cd: 3, range: 6, radius: 2,
+    count: 3, hitAt: 0.3, shape: 'plus', desc: '사슬 수리검 셋이 몬스터와 그 상하좌우 두 칸을 휘감는다' },
+  r_gale: { promo: 9, cls: 'rogue', req: 33, name: '질풍난무', kind: 'screen', fx: '144', modern: 'new_r_bunhon', dmg: 62, cd: 9,
+    falloff: 0.03, desc: '궁극기. 질풍처럼 화면을 누비며 모든 몬스터를 벤다' },
+  m_thunderball: { promo: 8, cls: 'mage', req: 30, name: '뇌격구', kind: 'spell', fx: '89', dmg: 34, cd: 1.6, range: 7, count: 2,
+    desc: '번개 구슬 둘이 가까운 몬스터 둘을 지진다' },
+  m_shift: { promo: 8, cls: 'mage', req: 30, name: '이형환위', kind: 'blink', fx: '98', dmg: 24, cd: 2, range: 5, count: 1,
+    desc: '바라보는 쪽 몬스터 너머로 몸을 옮기며 친다' },
+  m_coldveil: { promo: 8, cls: 'mage', req: 30, name: '한랭장막', kind: 'screen', fx: '96', dmg: 20, cd: 7, slow: 3, stun: 0.6,
+    desc: '차가운 장막이 화면을 덮어 모든 몬스터를 얼리고 느리게 한다' },
+  m_gale: { promo: 9, cls: 'mage', req: 33, name: '회선격풍', kind: 'strike', fx: '148', dmg: 34, cd: 2.4, range: 7, radius: 2, count: 2,
+    hitAt: 0.3, desc: '회오리바람 둘이 몬스터와 그 둘레 두 칸을 찢는다' },
+  m_shards: { promo: 9, cls: 'mage', req: 33, name: '서리파편', kind: 'spell', fx: '96', dmg: 22, cd: 1.5, range: 7, count: 5,
+    desc: '서리 파편 다섯이 가까운 몬스터 다섯을 꿰뚫는다' },
+  m_kalpa: { promo: 9, cls: 'mage', req: 33, name: '겁화', kind: 'screen', fx: '148', modern: 'new_raid_fire', dmg: 66, cd: 9,
+    falloff: 0.03, desc: '궁극기. 세상을 태우는 겁화가 화면의 모든 몬스터를 삼킨다' },
+  p_flash: { promo: 8, cls: 'poet', req: 30, name: '섬광', kind: 'spell', fx: '131', dmg: 28, cd: 1.6, range: 7, count: 2, drain: 0.15,
+    desc: '섬광이 몬스터 둘을 치고 그 빛으로 체력을 조금 되찾는다' },
+  p_bind: { promo: 8, cls: 'poet', req: 30, name: '결박', kind: 'strike', fx: '117', dmg: 18, cd: 4, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, stun: 2.5, desc: '몬스터 둘과 그 둘레를 묶어 움직이지 못하게 한다' },
+  p_warmth: { promo: 8, cls: 'poet', req: 30, name: '신의온기', kind: 'heal', fx: '125', heal: 34, cd: 12,
+    desc: '신의 온기로 체력을 크게 회복한다' },
+  p_thunderbomb: { promo: 9, cls: 'poet', req: 33, name: '폭렬천뢰탄', kind: 'line', fx: '149', dmg: 36, cd: 2.2, depth: 6,
+    desc: '천뢰탄이 바라보는 쪽 일렬 여섯 칸을 터뜨리며 퍼진다' },
+  p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'heal', fx: '135', heal: 30, cd: 12, mana: 0.4,
+    desc: '천신의 기운이 체력과 마력을 함께 채운다' },
+  p_taiji: { promo: 9, cls: 'poet', req: 33, name: '태극팔괘진', kind: 'screen', fx: '134', modern: 'new_p_talm', dmg: 58, cd: 9,
+    falloff: 0.03, desc: '궁극기. 태극팔괘진이 화면의 모든 몬스터를 짓누른다' },
+
   // 대격변: the rest of the original lists (oldbaram skill list, with each skill's own picture),
   // beside the ones already here as another skill's 단 (신검합일, 검신검귀, 대력검신, 후면·측면).
   c_kick: { cls: 'all', req: 3, name: '금강퇴', kind: 'cleave', fx: '137', dmg: 11, cd: 1.6, radius: 0,
@@ -285,9 +336,9 @@ export const SKILLS = {
   p_baekho2: { promo: 3, cls: 'poet', req: 14, name: "백호의희원'첨", kind: 'heal', fx: '133', heal: 26, cd: 11, guard: 1,
     desc: '백호의희원의 더 높은 단. 크게 회복하고 1초 동안 공격을 받지 않는다' },
 };
-// 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 기린산.
+// 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
-export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'kirin'];
+export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet'].map(c => [c, PROMO_AT.map(at => ({ at }))]));
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
