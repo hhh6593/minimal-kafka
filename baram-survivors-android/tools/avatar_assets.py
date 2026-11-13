@@ -95,7 +95,7 @@ def build(src, out, manifest, modern=None):
     """modern: today's dress-room captures (tools/fetch_gear.py's coordi folder), drawn on their
     own plain figure: armors keep the whole figure, weapons and shields become layers."""
     base, _ = load(os.path.join(src, "heads", "sheets", "head_0.png"))
-    items = {"armor": [], "head": [], "weapon": [], "shield": []}
+    items = {"armor": [], "head": [], "weapon": [], "shield": [], "helmet": [], "cape": []}
     sheets = {}
     for kind, folder in (("armor", "armors"), ("head", "heads"), ("weapon", "weapons"), ("shield", "shields")):
         for path in sorted(glob.glob(os.path.join(src, folder, "sheets", "*.png"))):
@@ -115,10 +115,18 @@ def build(src, out, manifest, modern=None):
         # Today's plain figure, its walk put in the old figure's step order; each piece is then
         # matched to it, so every layer steps with every armor.
         mbase = align(load(os.path.join(modern, "base.png"))[0], base, silhouette_score)
-        for kind, folder in (("armor", "armors"), ("weapon", "weapons"), ("shield", "shields")):
+        for kind, folder in (("armor", "armors"), ("weapon", "weapons"), ("shield", "shields"), ("helmet", "helmets"),
+                             ("cape", "capes")):
             for path in sorted(glob.glob(os.path.join(modern, folder, "sheets", "*.png"))):
                 x, meta = load(path)
                 s = align(x, mbase, silhouette_score) if kind == "armor" else layer(x, mbase)
+                # A dress-room sheet named like an old wardrobe piece replaces that capture (a
+                # piece that captured badly is fixed by fetching it again: fetch_gear.py --fix).
+                same = [i for i, it in enumerate(items[kind]) if it["name"] == meta["name"] and not it.get("modern")]
+                if same:
+                    sheets[(kind, same[0])] = s
+                    items[kind][same[0]]["src"] = "coordi"
+                    continue
                 sheets[(kind, len(items[kind]))] = s
                 items[kind].append({"name": meta["name"], "src": "coordi", "modern": True})
     # One crop for all, so every layer lines up with every armor.

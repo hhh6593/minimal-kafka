@@ -232,9 +232,9 @@ def main():
     gear_src = sys.argv[8] if len(sys.argv) > 8 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
-    for d in ("fx", "icon", "mon", "item", "hero", "ui", "gear"):
+    for d in ("fx", "icon", "mon", "item", "hero", "ui", "gear", "emote", "beast"):
         os.makedirs(os.path.join(out, d), exist_ok=True)
-    manifest = {"fx": {}, "monsters": [], "items": {}, "gear": {}, "heroes": [], "ui": {}, "audio": {"bgm": [], "sfx": {}}}
+    manifest = {"fx": {}, "monsters": [], "items": {}, "gear": {}, "emote": {}, "beast": {}, "heroes": [], "ui": {}, "audio": {"bgm": [], "sfx": {}}}
 
     # Effects, with the class page each one was listed on.
     owner = {}
@@ -325,6 +325,46 @@ def main():
             im = trim(Image.open(os.path.join(gear_src, n)).convert("RGBA"))
             im.save(os.path.join(out, "gear", f"g{i}.png"), optimize=True)
             manifest["gear"][n[:-4]] = {"id": f"g{i}", "w": im.width, "h": im.height}
+
+    # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
+    # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
+    edir = os.path.join(gear_src, "emote") if gear_src else None
+    if edir and os.path.isdir(edir):
+        for n in sorted(x for x in os.listdir(edir) if x.endswith(".gif")):
+            frames, durs = frames_of(os.path.join(edir, n))
+            frames = [f.resize((64, 64), Image.LANCZOS) for f in frames]
+            strip = Image.new("RGBA", (64 * len(frames), 64))
+            for i, f in enumerate(frames):
+                strip.paste(f, (64 * i, 0))
+            strip.save(os.path.join(out, "emote", n[:-4] + ".png"), optimize=True)
+            manifest["emote"][n[:-4]] = {"n": len(frames), "dur": durs[0] or 150}
+
+    # 괴수의상 from the dress room (GEAR_DIR/beast/<key>.png: 4 rows front, right, back, left by
+    # walk 0-3 and strike 0-1): cropped to one box for all frames, at the wardrobe's 0.64.
+    bdir = os.path.join(gear_src, "beast") if gear_src else None
+    if bdir and os.path.isdir(bdir):
+        for n in sorted(x for x in os.listdir(bdir) if x.endswith(".png")):
+            meta = json.load(open(os.path.join(bdir, n[:-4] + ".json"), encoding="utf-8"))
+            sheet = Image.open(os.path.join(bdir, n)).convert("RGBA")
+            cw, ch = meta["cell"]
+            cols, rows = sheet.width // cw, sheet.height // ch
+            cells = [[sheet.crop((c * cw, r * ch, (c + 1) * cw, (r + 1) * ch)) for c in range(cols)] for r in range(rows)]
+            box = None
+            for row in cells:
+                for c in row:
+                    b = c.getbbox()
+                    if b:
+                        box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+            k = 0.64
+            w, h = round((box[2] - box[0]) * k), round((box[3] - box[1]) * k)
+            outs = Image.new("RGBA", (w * cols, h * rows))
+            for r, row in enumerate(cells):
+                for c, cell in enumerate(row):
+                    outs.paste(cell.crop(box).resize((w, h), Image.LANCZOS), (c * w, r * h))
+            outs.save(os.path.join(out, "beast", n), optimize=True)
+            fx, fy = meta["feet"]
+            manifest["beast"][n[:-4]] = {"name": meta["name"], "cell": [w, h], "cols": cols,
+                                        "feet": [round((fx - box[0]) * k), round((fy - box[1]) * k)]}
 
     # The wardrobe's backdrop (the island seen from the sea), behind the class figures.
     p = os.path.join(src, "wardrobeB", "wback3.png")

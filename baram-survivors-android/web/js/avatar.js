@@ -24,6 +24,8 @@ export const GEAR = {
     weapon: ['흑단부채', '대붓', '백운장', '하늘개비', '자월초롱'],
     shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
 };
+// 투구 and 망토: only today's crafted pieces (items.js), worn from the dress room's looks.
+for (const g of Object.values(GEAR)) { g.helmet = []; g.cape = []; }
 
 // Raid spoils: one piece a class a raid, beyond anything a hunting ground drops, after the boss
 // it comes from — dragons' gear from 삼두룡, the judging and the cursed from 흑술사, fire from 화령.
@@ -197,7 +199,9 @@ export function dress(cls, gear) {
       dst[p + 3] = a;
     }
   };
+  lay('cape', pick('cape'));
   lay('head', gear.head || GEAR[cls].head);
+  lay('helmet', pick('helmet'));
   lay('shield', pick('shield'));
   lay('weapon', pick('weapon'));
   g.putImageData(out, 0, 0);

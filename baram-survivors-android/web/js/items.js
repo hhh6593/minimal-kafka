@@ -35,7 +35,7 @@ export const OPTIONS = [
 ];
 
 const KINDS = ['weapon', 'armor', 'shield'];
-export const KIND_NAME = { weapon: '무기', armor: '갑옷', shield: '방패' };
+export const KIND_NAME = { weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' };
 
 /** Every special: id, where it drops, its kind and option. */
 export const SPECIALS = [];
@@ -179,6 +179,19 @@ export const CRAFTS = [
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_steel_shield', kind: 'shield', name: '무신귀면방', look: '거울방패', pow: 12, opt: 'boss',
     mats: { steel: 12, scroll: 1 }, gold: 8000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  // 투구·망토 (today's legendary sets): new slots, worn in the dress room's look.
+  { id: 'cr_maryeong_helm', kind: 'helmet', name: { warrior: "고대마령투구", rogue: "고대마령투구", mage: "고대마령모자", poet: "고대마령모자" }, look: { warrior: "고대마령투구1성", rogue: "고대마령투구1성", mage: "고대마령모자1성", poet: "고대마령모자1성" }, pow: 10, opt: 'life', mats: { soul: 8, scroll: 1 }, gold: 4000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  { id: 'cr_gold_helm', kind: 'helmet', name: { warrior: "금린화월관", rogue: "금린화월관", mage: "금린추월관", poet: "금린추월관" }, look: { warrior: "금린화월관1성", rogue: "금린화월관1성", mage: "금린추월관1성", poet: "금린추월관1성" }, pow: 11, opt: 'guard', mats: { gold: 10, scroll: 1 }, gold: 6000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  { id: 'cr_gold_cape', kind: 'cape', name: { warrior: "금린화월", rogue: "금린화월", mage: "금린추월", poet: "금린추월" }, look: { warrior: "금린화월1성", rogue: "금린화월1성", mage: "금린추월1성", poet: "금린추월1성" }, pow: 11, opt: 'speed', mats: { gold: 10, scroll: 1 }, gold: 6000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  { id: 'cr_steel_helm', kind: 'helmet', name: { warrior: "태염무신금잠", rogue: "태염무신금잠", mage: "태광천신금잠", poet: "태광천신금잠" }, look: { warrior: "태염무신금잠1성", rogue: "태염무신금잠1성", mage: "태광천신금잠1성", poet: "태광천신금잠1성" }, pow: 12, opt: 'mana', mats: { steel: 12, scroll: 1 }, gold: 8000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  { id: 'cr_steel_cape', kind: 'cape', name: { warrior: "무신귀갑주", rogue: "무신귀갑주", mage: "천신부금장", poet: "천신부금장" }, look: { warrior: "무신귀갑주1성", rogue: "무신귀갑주1성", mage: "천신부금장1성", poet: "천신부금장1성" }, pow: 12, opt: 'boss', mats: { steel: 12, scroll: 1 }, gold: 8000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
+  { id: 'cr_dragon_helm', kind: 'helmet', name: { warrior: "용아투구'천", rogue: "용아투구'마", mage: "용아천관'겸", poet: "용아천관'랑" }, look: { warrior: "용아투구'천1성", rogue: "용아투구'마1성", mage: "용아천관'겸1성", poet: "용아천관'랑1성" }, pow: 13, opt: 'power', mats: { essence: 12, scale: 15, pearl: 1 }, gold: 15000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon2', kind: 'weapon', name: { warrior: '마곡검', rogue: '패협검', mage: '백선마봉', poet: '암혈홍접선' },
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채' }, pow: 13, opt: 'boss', from: 'cr_gold_weapon',
     mats: { gold: 20, kalpa: 15, scroll: 2 }, gold: 15000, pic: 'name', legend: true },

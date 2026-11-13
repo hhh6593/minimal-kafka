@@ -100,6 +100,13 @@ def fetch_coordi(out):
         json.dump(meta(""), open(os.path.join(root, "base.json"), "w", encoding="utf-8"), ensure_ascii=False)
     js = "import('./web/js/items.js').then(m => console.log(JSON.stringify(m.coordiPieces())))"
     pieces = json.loads(subprocess.check_output(["node", "-e", js], cwd=HERE))
+    # --fix kind:name ... : old wardrobe pieces to take again from the dress room (they replace
+    # their capture in tools/avatar_assets.py), e.g. --fix weapon:칠지도 armor:해골갑옷
+    if "--fix" in sys.argv:
+        for arg in sys.argv[sys.argv.index("--fix") + 1:]:
+            if ":" in arg:
+                kind, name = arg.split(":", 1)
+                pieces.append({"kind": kind, "name": name})
     counts = {}
 
     def one(p):
@@ -123,6 +130,46 @@ def fetch_coordi(out):
     print("dress-room sheets:", counts)
 
 
+# 괴수의상 (the client's beast costumes, 세트옷): whole figures, walk and strike, for summons.
+BEASTS = {"jinmyo": "진묘수", "saryeong": "사령웅", "josajang": "조사장", "bihyeong": "비형랑", "heukhwa": "흑화랑",
+          "ogutai": "오구타이", "kurakan": "쿠라칸", "garuda": "가루다", "ganesha": "가네샤", "dohwa": "도화랑",
+          "sadaham": "사다함", "varuna": "바루나", "agni": "아그니", "airavata": "아이라바타"}
+BEAST_COLS = [(2, 0), (2, 1), (2, 2), (2, 3), (3, 0), (3, 1)]   # walk 0-3, strike 0-1
+
+
+def fetch_beasts(out):
+    from io import BytesIO
+    from PIL import Image
+    d = os.path.join(out, "beast")
+    os.makedirs(d, exist_ok=True)
+
+    def one(item):
+        key, name = item
+        path = os.path.join(d, key + ".png")
+        if os.path.exists(path):
+            return key, "kept"
+        w, h = CANVAS
+        sheet = Image.new("RGBA", (w * len(BEAST_COLS), h * 4))
+        try:
+            for r, cd in enumerate(ROWS):
+                for mt in {mt for mt, _ in BEAST_COLS}:
+                    im = Image.open(BytesIO(render(f"[괴수의상]{name}1성", cd, mt)))
+                    for c, (m, f) in enumerate(BEAST_COLS):
+                        if m == mt:
+                            im.seek(f % im.n_frames)
+                            sheet.paste(im.convert("RGBA"), (c * w, r * h))
+        except Exception as e:  # noqa: BLE001
+            return key, f"failed: {e}"
+        sheet.save(path, optimize=True)
+        json.dump({"name": name, "cell": [w, h], "feet": list(FEET)}, open(path[:-4] + ".json", "w", encoding="utf-8"),
+                  ensure_ascii=False)
+        return key, "saved"
+
+    with cf.ThreadPoolExecutor(3) as ex:
+        res = list(ex.map(one, BEASTS.items()))
+    print("beasts:", {k: v for k, v in res})
+
+
 def main():
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
@@ -134,6 +181,7 @@ def main():
     print(f"{sum(h in ('kept', 'saved') for _, h in results)}/{len(results)} pictures in {out}")
     if "--no-coordi" not in sys.argv:
         fetch_coordi(out)
+        fetch_beasts(out)
 
 
 if __name__ == "__main__":

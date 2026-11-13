@@ -86,6 +86,8 @@ async function boot() {
     ...avatarPaths(M),
     ...(M.npc || []).map(n => `npc/${n}.png`),
     ...(M.ui.town ? ['ui/town.png'] : []),
+    ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
+    ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -582,7 +584,7 @@ $('#speed-btn').onclick = () => {
 
 function savedGear(cls) {
   progress.gear = progress.gear || {};
-  return Object.assign({ armor: 0, weapon: 0, shield: -1 }, progress.gear[cls.id]);
+  return Object.assign({ armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 }, progress.gear[cls.id]);
 }
 
 /** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
@@ -593,15 +595,17 @@ function applyGear() {
   const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(G.cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 ? -1 : gearPower(c, k, g[k]) + 0.5 * (starOf(G.cls, `${k}:${g[k]}`) - 1));
   const bonus = p.bonus = {};
-  for (const k of ['weapon', 'armor', 'shield']) {
+  for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (sp) bonus[sp.opt.id] = (bonus[sp.opt.id] || 0) + 1;
   }
-  const hp = G.cls.hp + pow('armor') * 20 + 40 * (bonus.life || 0);
+  // 투구 adds health, 망토 guards (both only from today's crafted sets).
+  const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
+  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0);
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + 3 * (bonus.guard || 0);
+  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0);
   p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0));
 }
 
@@ -671,7 +675,7 @@ function pieceIcon(cls, kind, t, spId) {
  */
 function wornLooks(cls, gear) {
   const looks = {};
-  for (const kind of ['armor', 'weapon', 'shield']) {
+  for (const kind of ['armor', 'weapon', 'shield', 'helmet', 'cape']) {
     const id = gear[kind + 'Sp'], sp = id && SPECIAL[id];
     const name = sp ? craftPicture(sp, cls.id, starOf(cls, 'sp:' + id))
       : kind === 'weapon' && gear.weapon === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${gear.weapon}`)) : null;
@@ -779,14 +783,16 @@ function buildEquip() {
     });
     box.append(row);
   }
-  for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패']]) {
+  for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패'], ['helmet', '투구'], ['cape', '망토']]) {
+    // 투구·망토 rows only once one is owned.
+    if ((kind === 'helmet' || kind === 'cape') && !b.some(x => x.startsWith('sp:') && SPECIAL[x.slice(3)] && SPECIAL[x.slice(3)].kind === kind)) continue;
     const h = document.createElement('h4');
     h.textContent = label;
     box.append(h);
     const row = document.createElement('div');
     row.className = 'equip-row';
     const tiers = b.filter(x => x.startsWith(kind + ':')).map(x => +x.split(':')[1]).sort((x, y) => x - y);
-    if (kind === 'shield') tiers.unshift(-1);
+    if (kind === 'shield' || kind === 'helmet' || kind === 'cape') tiers.unshift(-1);
     for (const t of tiers) {
       const btn = document.createElement('button');
       btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
@@ -817,8 +823,10 @@ function buildEquip() {
   }
   const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
-  const opts = ['weapon', 'armor', 'shield'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
-  $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20} · 방어 +${Math.max(0, pw('shield') + 1)}`
+  const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
+  const ex = k => (g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
+  $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
+    + ` · 방어 +${Math.max(0, pw('shield') + 1) + Math.round(ex('cape') / 3)}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '');
 }
 
@@ -1574,6 +1582,7 @@ function raidSpawn(dt) {
   if (!G.enraged && t > RAID_LIMIT - 60) {
     G.enraged = true;
     bossSay('enrage');
+    emote('rage');
     banner(`${G.boss.name} 광폭화!`);
     b.dmg *= 1.3;
   }
@@ -1700,6 +1709,7 @@ function spawn(dt) {
       const m = pickMonster(true), pack = ++G.packs;
       for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
       say(`챔피언 무리가 나타났습니다!`, 'warn');
+      if (Math.random() < 0.6) emote('surprise');
     }
     if (G.minis.length && t >= G.minis[0] && addEnemy(G.mini.m, 'mini', G.mini)) {
       G.minis.shift();
@@ -1734,6 +1744,7 @@ function spawn(dt) {
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, 'warn');
     banner(`보스 ${G.boss.name} 등장!`);
+    emote(Math.random() < 0.5 ? 'ready' : 'popcorn');
   }
   if (boss) {
     // After 1:30 the boss loses life on its own, and from 2:50 takes twice the damage every
@@ -1844,8 +1855,10 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
     xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 300)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
     face: 1, phase: Math.random() * 6, flash: 0, slow: 0, stun: 0, curse: 0, cd: Math.random() * 0.5, atk: 0.6,
-    lunge: 0, hits: new Map(),
+    lunge: 0, hits: new Map(), temper: kind && kind !== 'minion' ? (kind === 'champ' ? 'fierce' : 'normal') : temperOf(m),
   };
+  const tp = TEMPERS[e.temper];
+  e.stepTime *= tp.step;
   place(e, at[0], at[1]);
   G.enemies.push(e);
   return e;
@@ -1860,6 +1873,33 @@ function towards(b, tx, ty) {
   if (first[0] || first[1]) out.push(first);
   if (second[0] || second[1]) out.push(second);
   return out;
+}
+
+// How each kind of monster carries itself, after the original server's monster table (RTK-Server
+// Mobs: MobMoveTime 3000 ms a step for rabbits, squirrels and deer, 2000 for most, 1250 for dogs;
+// MobAttackTime 1000-3000) and its AI (mob_ai_basic): a monster with no target turns to a random
+// side most of the time and steps only when it already faced that way, else walks on; a passive
+// one (MobBehavior 0) leaves people alone until struck.
+const TEMPERS = {
+  timid: { step: 1.45, atk: 2.4, sight: 3 },    // 겁 많은: wanders, fights back when struck or crowded
+  normal: { step: 1, atk: 1.6, sight: 99 },
+  fierce: { step: 0.8, atk: 1.1, sight: 99 },   // 사나운: quicker steps and blows
+};
+/** A kind's temper, fixed by its picture: small, low monsters on the early grounds are often timid. */
+function temperOf(m) {
+  const h = [...String(m.id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7) % 10;
+  if (!G.stage.raid && G.level <= 9 && h < (m.rank < 0.5 ? 4 : 2)) return 'timid';
+  return h >= 8 ? 'fierce' : 'normal';
+}
+/** The original wander: turn to a random side (and step only if already facing it), or walk on. */
+function wander(e, st) {
+  if (Math.random() < 0.6) {
+    const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
+    if (dx === e.mdx && dy === e.mdy) step(e, dx, dy, st);
+    else { e.mdx = dx; e.mdy = dy; if (dx) e.face = dx; }
+  } else if (!step(e, e.mdx || 0, e.mdy || (e.mdx ? 0 : 1), st)) {
+    e.mdx = -(e.mdx || 0); e.mdy = -(e.mdy || 0);
+  }
 }
 
 function moveEnemies(dt) {
@@ -1885,7 +1925,7 @@ function moveEnemies(dt) {
       e.cd -= dt;
       e.atk -= dt;
       if (e.march && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1 && !hidden && e.atk <= 0) {
-        e.atk = 1.6;
+        e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
         hurtPlayer(e.dmg, e);
       }
@@ -1918,7 +1958,7 @@ function moveEnemies(dt) {
       // in passing.
       const by = G.party.find(m => !m.down && Math.abs(e.tx - m.tx) + Math.abs(e.ty - m.ty) <= 1);
       if (by && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > 1 && e.atk <= 0) {
-        e.atk = 1.6;
+        e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
         faceTo(e, by.tx, by.ty);
         hurtMember(by, e.dmg * 0.8);
@@ -1938,7 +1978,7 @@ function moveEnemies(dt) {
       if (Math.abs(e.tx - tgt.tx) + Math.abs(e.ty - tgt.ty) <= 1) {
         faceTo(e, tgt.tx, tgt.ty);
         if (e.atk <= 0) {
-          e.atk = 1.6;
+          e.atk = TEMPERS[e.temper || 'normal'].atk;
           e.lunge = 0.15;
           hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * 0.16 * raidK() : e.dmg * 0.8);
         }
@@ -1955,7 +1995,7 @@ function moveEnemies(dt) {
       // Beside the hero: strike, as monsters do, from the next tile.
       faceTo(e, p.tx, p.ty);
       if (e.atk <= 0 && !barred(e)) {
-        e.atk = 1.6;
+        e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
         hurtPlayer(e.dmg, e);
       }
@@ -1965,9 +2005,9 @@ function moveEnemies(dt) {
     const st = e.stepTime * (e.slow > 0 ? 2 : 1);
     // Not in step with each other: a crowd that moves like one block looks stiff.
     e.cd = st * (0.85 + Math.random() * 0.35);
-    if (hidden) {
-      const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
-      step(e, dx, dy, st);
+    const calm = e.temper === 'timid' && !e.provoked && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > TEMPERS.timid.sight;
+    if (hidden || calm) {
+      wander(e, st);
       continue;
     }
     let moved = false;
@@ -2010,6 +2050,7 @@ function hurtPlayer(dmg, from = null) {
 }
 
 function hurtEnemy(e, dmg, push = null) {
+  e.provoked = true;
   if (e.hp <= 0) return 0;
   if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
   // A heavy blow on a big one stops the world for a blink.
@@ -2044,6 +2085,7 @@ function rollSpecial(e) {
   const sp = mine[Math.floor(Math.random() * mine.length)];
   G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id } });
   say('어디선가 빛나는 물건이 떨어졌습니다!', 'warn');
+  emote(Math.random() < 0.5 ? 'really' : 'hehe', G.player);
 }
 
 /** Materials of the ground's kind: a few from bosses, sometimes from the strong ones. */
@@ -2125,6 +2167,7 @@ function clearStage() {
   if (G.cleared) return;
   G.cleared = true;
   audio.play('win');
+  emote(G.stage.raid ? 'godgame' : ['godgame', 'gains', 'cute'][Math.floor(Math.random() * 3)]);
   const st = qstats();
   if (G.stage.raid) st.raids[G.stage.id] = (st.raids[G.stage.id] || 0) + 1;
   else st.clears[G.stage.id] = (st.clears[G.stage.id] || 0) + 1;
@@ -2488,7 +2531,14 @@ function cast(skill, st) {
         const spot = DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy]).find(([x, y]) => free(x, y));
         if (!m || !spot) continue;
         const a = { m, ally: true, scale: 1, t: 0, life: st.duration, dmg: st.dmg, face: 1, phase: 0, cd: 0, atk: 0,
-          hp: 1, flash: 0 };
+          hp: 1, flash: 0, mdx: 0, mdy: 1 };
+        // From 3단 the call brings one of the client's 괴수 (the dress room's 괴수의상), stronger by 단.
+        const bk = def.beasts && def.beasts[skill.lv - 1];
+        if (bk && M.beast && M.beast[bk] && images[`beast/${bk}.png`]) {
+          a.beast = bk;
+          a.dmg = st.dmg * 1.3;
+          if (i === 0) say(`${josa(M.beast[bk].name, '이', '가')} 나타났습니다!`, 'party');
+        }
         place(a, spot[0], spot[1]);
         addFx(fxid, a.x, a.y - 20, { scale: 0.8 });
         G.allies.push(a);
@@ -2638,8 +2688,10 @@ function updateAllies(dt) {
     const beside = DIRS.map(([dx, dy]) => occ.get(key(a.tx + dx, a.ty + dy))).find(b => b && b.m && !b.ally && b.hp > 0);
     if (beside) {
       a.face = beside.tx >= a.tx ? 1 : -1;
+      faceTo(a, beside.tx, beside.ty);
       if (a.atk <= 0) {
         a.atk = 0.6;
+        a.hitT = G.t;
         hurtEnemy(beside, a.dmg);
       }
       continue;
@@ -3013,6 +3065,8 @@ function hurtMember(m, dmg) {
   m.hp = 0;
   m.down = G.t + 10;
   m.bubble = { text: '으윽…', t: G.t };
+  const mate = G.party.find(o => o !== m && !o.down);
+  emote(Math.random() < 0.5 ? 'annoyed' : 'gone', mate || G.player);
   say(`${josa(m.name, '이', '가')} 쓰러졌습니다!`, 'warn');
   if (G.aggro === m) G.aggro = null;
   // The particular line first: downing the healer has its own.
@@ -3412,6 +3466,7 @@ function gainXp(v) {
     p.next = xpFor(p.lvl);
     G.pendingLevels++;
     say(`레벨이 올랐습니다. (Lv ${p.lvl})`, 'sys');
+    if (p.lvl % 10 === 0) emote('grind', p);
     // Party members join at levels 3, 9 and 15, as D2 Survivors' mercenaries do.
     const joinAt = [3, 9, 15].indexOf(p.lvl);
     if (joinAt >= 0) {
@@ -3968,6 +4023,20 @@ const TOP_DOWN = new Set(['1005', '1007', '1012', '1013', '1022', '1023', '1025'
 const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', '5055', '12013', '12014', '12016', '12017', '8027']);
 
 /** A monster as it moves: turned (top-down kinds), or leaning (upright kinds). */
+/** A summoned 괴수: its own four ways, walking or striking, from the dress-room sheet. */
+function drawBeast(b, alpha) {
+  const d = M.beast[b.beast], im = images[`beast/${b.beast}.png`];
+  const [cw, ch] = d.cell, k = 0.62;
+  const row = b.mdy > 0 ? 0 : b.mdx > 0 ? 1 : b.mdy < 0 ? 2 : b.mdx < 0 ? 3 : 0;
+  const col = b.hitT !== undefined && G.t - b.hitT < 0.3 ? 4 + (G.t - b.hitT < 0.15 ? 0 : 1)
+    : b.moving ? Math.floor(b.phase / (Math.PI / 2)) % 4 : Math.floor(G.t * 2.5) % 4;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  ctx.drawImage(im, col * cw, row * ch, cw, ch, Math.round(b.x - d.feet[0] * k), Math.round(b.y - d.feet[1] * k),
+    Math.round(cw * k), Math.round(ch * k));
+  ctx.restore();
+}
+
 function drawMonster(b, x, y, s, alpha = 1) {
   const img = b.m.img, id = b.m.id, dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
   const turn = TOP_DOWN.has(id) ? 0 : SNAKES.has(id) ? Math.PI : null;
@@ -4081,6 +4150,10 @@ function render(now) {
       drawParty(b);
       continue;
     }
+    if (b.ally && b.beast) {
+      drawBeast(b, Math.min(1, (b.life - b.t) * 2, b.t * 4));
+      continue;
+    }
     if (b.ally) {
       drawMonster(b, b.x, b.y, 1, Math.min(1, (b.life - b.t) * 2) * 0.85);
       continue;
@@ -4161,8 +4234,10 @@ function render(now) {
     ctx.fillRect(bx, by + 2, Math.round(28 * Math.max(0, p.hp / p.maxHp)), 1);
   }
   if (G.bubble) drawBubble(G.bubble.text, p.x, p.y - heroHeight() - 12, G.t - G.bubble.t);
+  drawEmote(p, p.x, p.y - heroHeight() - (G.bubble ? 36 : 10));
   for (const m of G.party) {
     if (m.bubble) drawBubble(m.bubble.text, m.x, m.y - (m.av ? m.av.top : 50) - 12, G.t - m.bubble.t);
+    drawEmote(m, m.x, m.y - (m.av ? m.av.top : 50) - (m.bubble ? 36 : 10));
   }
   for (const e of G.enemies) {
     if (e.bubble && G.t - e.bubble.t < 1.6) drawBubble(e.bubble.text, e.x, e.y - e.m.h * e.scale - 16, G.t - e.bubble.t);
@@ -4209,6 +4284,33 @@ function drawHero(now, hidden) {
 
 // The colour a class shouts its spells in.
 // Kept for reference: the newer game colours shouts by class; the old client does not.
+
+/**
+ * A reaction from the official emoticons over someone's head (who: the hero or a companion;
+ * without a party the hero reacts). Each lasts two seconds, one at a time.
+ */
+function emote(key, who = null) {
+  if (!G || !M.emote || !M.emote[key] || !settings.bubbles) return;
+  if (!who) {
+    const up = G.party.filter(m => !m.down);
+    who = up.length && Math.random() < 0.75 ? up[Math.floor(Math.random() * up.length)] : G.player;
+  }
+  if (who.emo && G.t - who.emo.t < 2.2) return;
+  who.emo = { key, t: G.t };
+}
+function drawEmote(who, x, y) {
+  const e = who.emo;
+  if (!e || !settings.bubbles) return;
+  const age = G.t - e.t, def = M.emote[e.key], im = images[`emote/${e.key}.png`];
+  if (age > 2.2 || !def || !im) return;
+  const f = Math.floor((age * 1000) / def.dur) % def.n, size = 44;
+  ctx.save();
+  ctx.globalAlpha = age < 1.9 ? 1 : Math.max(0, 1 - (age - 1.9) / 0.3);
+  const pop = Math.min(1, age / 0.12);
+  const s = size * (0.6 + 0.4 * pop);
+  ctx.drawImage(im, f * 64, 0, 64, 64, Math.round(x - s / 2), Math.round(y - s), Math.round(s), Math.round(s));
+  ctx.restore();
+}
 
 function drawBubble(text, x, y, age = 0) {
   // A shout over a character's head, drawn as the old client drew them (see the 노획 capture):
@@ -4399,8 +4501,8 @@ function syncUlt() {
   // Worn gear in the slots by the figure (weapon and shield at the left), the
   // trained stats in the others, highest first.
   const g = p.gear || {};
-  // The top slot is the helmet's, and no helmet is worn; the armor shows on the figure itself.
-  const worn = [null, ...['weapon', 'shield'].map(k => (p.av && g[k] >= 0 ? pieceIcon(G.cls, k, g[k], g[k + 'Sp']) : null))];
+  // The top slot is the helmet's; the armor shows on the figure itself.
+  const worn = ['helmet', 'weapon', 'shield'].map(k => (p.av && (g[k] >= 0 || g[k + 'Sp']) ? pieceIcon(G.cls, k, g[k], g[k + 'Sp']) : null));
   const trained = Object.entries(G.passives).filter(([, lv]) => lv).sort((a, b) => b[1] - a[1]);
   const slots = SLOT_AT.map(([x, y, dark], i) => {
     let inner = '';
