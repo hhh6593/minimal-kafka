@@ -30,128 +30,159 @@ export const CLASSES = [
 const FIRE = ['화염주', '화염주', '화영열주', '화영열주', '화열참주', '화열참주', '진 화열참주', '극진 화열참주'];
 const tier = base => ['', '', ' 2차', ' 2차', ' 3차', ' 3차', ' 4차', ' 5차'].map(t => base + t);
 
-// Growth follows D2 Survivors: a run starts with no spell, only the weapon's plain attack, and
-// the first level-up offers the class's first-tier spells. Spells open by character level
-// (req: 1, 6, 12, 18) and a spell's level can never pass (character level − req + 1). A spell at
-// level 8 with its catalyst passive (evo.with) turns, at the next chest, into its evolved form
-// (evo.into), once the character has reached that form's req. Evolved spells are never offered
-// on cards. dmg is per hit at level 1; evolved forms count as level 8.
+// The spell tree follows the old game's 승급 (the site's list: 일반, then 1차 to 4차 승급).
+// 일반 spells are on the cards from the start (opening by character level, req 1/6/12/18, as
+// in D2 Survivors). A 승급 spell (promo: 1-4) joins the cards once the class has that 승급,
+// which comes from conquering 쥐굴, 사슴굴, 흉가 and 도깨비굴 with it (PROMOS). Some spells
+// grow into a higher 승급's spell of the same line (up: 백호참 → 극백호참): at 8단, with that
+// 승급, at the next chest. Grown spells (evolved) are never on the cards and count as 8단 for
+// reach; their damage grows as 5단 would. dmg is per hit at 1단. A spell's 단 can never pass
+// (character level − req + 1).
 export const SKILLS = {
-  // 공통
-  c_heal: { fxs: ['3', '4', '64', '32', '10', '42', '79', '93'], cls: 'all', req: 1, name: '누리의 기원', kind: 'heal', fx: '3', heal: 10, cd: 11,
-    names: ['누리의 기원', '대지의 기원', '바다의 기원', '동해의 기원', '하늘의 기원', '천공의 기원', '구름의 기원', '태양의 기원'],
+  // 공통: 기원 — 누리, 대지, 바다 … 구름 (태양의기원 is the mage's 1차 승급 of its own).
+  c_heal: { fxs: ['3', '4', '64', '32', '10', '42', '79', '79'], cls: 'all', req: 1, name: '누리의 기원', kind: 'heal', fx: '3', heal: 10, cd: 11,
+    names: ['누리의 기원', '대지의 기원', '바다의 기원', '동해의 기원', '하늘의 기원', '천공의 기원', '구름의 기원', '구름의 기원'],
     desc: '이따금 체력을 회복한다' },
 
-  // 전사: 붙어 싸우는 연속 공격과 체력 비례 필살기
+  // 전사 — 일반: 이중공격 계열(후면·측면·삼중·사중·오중은 이중공격의 단), 백호령 계열, 동귀어진, 건곤대나이
   w_slash: { cls: 'warrior', req: 1, name: '이중공격', kind: 'slash', fx: null, dmg: 12, cd: 0.8,
     names: ['이중공격', '이중공격', '후면 공격', '삼중공격', '측면 공격', '사중공격', '신검합일', '오중공격'],
-    evo: { with: 'power', into: 'w_sword' },
     desc: '바라보는 앞 칸을 두 번 벤다. 단이 오르면 뒤(후면)·양옆(측면)도 함께, 최대 다섯 번(오중)' },
-  w_tiger: { cls: 'warrior', req: 1, name: '백호참', kind: 'cleave', fx: '20', dmg: 20, cd: 2.6, radius: 0,
-    scaleHp: 0.06, evo: { with: 'life', into: 'w_roar2' },
-    desc: '정면 한 칸을 크게 벤다. 4단부터 앞쪽 역삼각형으로 넓어진다. 체력이 높을수록 강하다' },
-  w_buff: { fxs: ['12', '12', '15', '15', '21', '21', '21', '21'], cls: 'warrior', req: 6, name: '백호령', kind: 'buff', buff: 'power', fx: '12', cd: 14, duration: 4, power: 0.4,
-    names: ['백호령', '백호령', '검신검귀', '검신검귀', '진백호령', '진백호령', '진백호령', '진백호령'],
+  w_buff: { fxs: ['12', '12', '15', '15', '16', '16', '16', '16'], cls: 'warrior', req: 6, name: '백호령', kind: 'buff', buff: 'power', fx: '12',
+    cd: 14, duration: 4, power: 0.4, names: ['백호령', '백호령', '검신검귀', '검신검귀', '대력검신', '대력검신', '대력검신', '대력검신'],
     desc: '잠시 공격력이 크게 오른다' },
-  w_roar: { cls: 'warrior', req: 12, name: '동귀어진', kind: 'cleave', fx: '19', dmg: 70, cd: 6, depth: 1, stun: 1, scaleHp: 0.15,
+  w_roar: { cls: 'warrior', req: 12, name: '동귀어진', kind: 'cleave', fx: '19', dmg: 60, cd: 6, depth: 1, stun: 1, scaleHp: 0.12,
     hpCost: 0.08, desc: '체력을 깎아 바치며 정면 한 칸의 몬스터에게 아주 큰 피해를 준다' },
-  w_sword: { promo: 1, cls: 'warrior', req: 12, evolved: true, name: '쇄혼비무', kind: 'slash', fx: '23', dmg: 16, cd: 0.7, dash: 4,
-    desc: '이중공격 8단 + 힘. 네 칸 앞의 몬스터에게 순식간에 날아들고, 앞뒤 양옆을 다섯 번씩 벤다' },
-  w_roar2: { promo: 2, cls: 'warrior', req: 18, evolved: true, name: '극백호참', kind: 'cleave', fx: '140', dmg: 24, cd: 3, radius: 0, max: 9,
-    scaleHp: 0.1, desc: '백호참 8단 + 체력 단련. 앞쪽 역삼각형(아홉 칸)의 몬스터 아홉을 한꺼번에 벤다' },
+  // 1차 승급
+  w_tiger: { promo: 1, cls: 'warrior', req: 6, name: '백호참', kind: 'cleave', fx: '20', dmg: 20, cd: 2.6, radius: 0, scaleHp: 0.05,
+    up: 'w_roar2', desc: '정면 한 칸을 크게 벤다. 4단부터 앞쪽 역삼각형으로 넓어진다. 체력이 높을수록 강하다' },
+  // 2차 승급
+  w_fly: { promo: 2, cls: 'warrior', req: 10, name: '어검술', kind: 'cleave', fx: '22', dmg: 16, cd: 2.4, depth: 2, max: 4,
+    scaleHp: 0.04, desc: '검을 날려 앞쪽 ㅜ자 역삼각형(네 칸)의 몬스터 넷을 벤다' },
+  w_jin: { promo: 2, cls: 'warrior', req: 10, name: '진백호령', kind: 'buff', buff: 'power', fx: '21', cd: 16, duration: 5, power: 0.8,
+    desc: '백호의 힘이 깃들어, 잠시 공격력이 두 배 가까이 된다' },
+  // 3차 승급
+  w_howl: { promo: 3, cls: 'warrior', req: 14, name: '포효검황', kind: 'screen', fx: '25', dmg: 16, cd: 6, falloff: 0.08,
+    desc: '포효와 함께 화면의 모든 몬스터를 친다. 한 칸 멀어질수록 8%씩 약하다' },
+  w_sword: { promo: 3, cls: 'warrior', req: 14, name: '쇄혼비무', kind: 'slash', fx: '23', dmg: 14, cd: 1.4, dash: 4, hitsMax: 3,
+    desc: '바라보는 쪽 네 칸 안의 몬스터에게 날아들어 앞뒤 양옆을 세 번 벤다' },
+  w_chohon: { promo: 3, cls: 'warrior', req: 14, name: '초혼비무', kind: 'nova', fx: '24', dmg: 18, cd: 3, radius: 0,
+    desc: '혼을 부르는 검무로 둘러싼 칸을 벤다' },
+  // 4차 승급
+  w_roar2: { promo: 4, cls: 'warrior', req: 18, evolved: true, name: '극백호참', kind: 'cleave', fx: '140', dmg: 24, cd: 3, radius: 0, max: 9,
+    scaleHp: 0.08, desc: '백호참 8단 + 4차 승급. 앞쪽 역삼각형(아홉 칸)의 몬스터 아홉을 한꺼번에 벤다' },
+  w_blood: { promo: 4, cls: 'warrior', req: 18, name: '혈겁만파', kind: 'screen', fx: '141', dmg: 20, cd: 5, curse: 3,
+    desc: '피의 물결이 화면을 덮어 모든 몬스터를 치고 저주한다' },
+  w_talm: { promo: 4, cls: 'warrior', req: 18, name: '탈명사식\'염', kind: 'strike', fx: '139', dmg: 30, cd: 3.5, range: 7, radius: 1,
+    count: 1, hitAt: 0.3, shape: 'plus', desc: '불의 탈명사식. 먼 몬스터와 그 상하좌우를 불사른다' },
   w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '14', hpCost: 0.3,
     desc: '체력 30%와 마력을 모두 바쳐, 앞쪽 네 칸(폭 세 칸)의 적을 최대 체력에 비례한 일격으로 벤다' },
 
-  // 도적: 파고들기, 투명, 흡혈
+  // 도적 — 일반: 비영승보, 뇌진주(신수마법), 투명, 흡성대법, 분신, 필살검무
   r_blink: { cls: 'rogue', req: 1, name: '비영승보', kind: 'blink', fx: null, dmg: 12, cd: 1.2, range: 4, count: 1,
-    evo: { with: 'speed', into: 'r_dance' }, desc: '네 칸 안의 몬스터 뒤로 순식간에 옮겨 가며 벤다' },
-  r_bolt: { elem: 'thunder', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31', dmg: 12, cd: 1.8, range: 6, count: 1,
-    names: tier('뇌진주'), evo: { with: 'haste', into: 'r_storm' }, desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
+    desc: '바라보는 쪽 네 칸 안의 몬스터 등 뒤로 순식간에 옮겨 가며 벤다' },
+  r_bolt: { elem: 'thunder', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31',
+    dmg: 12, cd: 1.8, range: 6, count: 1, names: tier('뇌진주'), up: 'r_storm', desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
   r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '36', cd: 12, duration: 2.5,
     desc: '잠시 모습을 감춘다. 몬스터가 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
   r_drain: { cls: 'rogue', req: 6, name: '흡성대법', kind: 'spell', fx: '49', dmg: 16, cd: 2.8, range: 5, count: 1,
     drain: 0.3, weakest: true, desc: '체력이 낮은 몬스터의 기운을 빨아들여 체력을 회복한다' },
   r_clone: { cls: 'rogue', req: 12, name: '분신', kind: 'buff', buff: 'power', fx: '51', cd: 14, duration: 4, power: 1,
     desc: '분신을 만들어 잠시 공격력이 두 배가 된다' },
-  r_dance: { promo: 1, cls: 'rogue', req: 12, evolved: true, name: '백호검무', kind: 'blink', fx: '52', dmg: 7, cd: 0.9, range: 5,
-    count: 4, desc: '비영승보 8단 + 민첩. 네 몬스터 사이를 오가며 벤다' },
-  r_storm: { promo: 2, cls: 'rogue', req: 18, evolved: true, name: '탈명사식\'뇌', kind: 'strike', fx: '143', dmg: 10, cd: 2, range: 6,
-    radius: 1, count: 3, hitAt: 0.3, shape: 'plus', desc: '뇌진주 8단 + 지력. 번개 세 줄기가 몬스터와 그 상하좌우를 친다' },
+  // 1차 승급
+  r_dance: { promo: 1, cls: 'rogue', req: 6, name: '백호검무', kind: 'blink', fx: '52', dmg: 8, cd: 1.6, range: 5, count: 3,
+    desc: '바라보는 쪽의 몬스터에게 날아들어 세 번 벤다' },
+  // 2차 승급
+  r_flysword: { promo: 2, cls: 'rogue', req: 10, name: '이기어검', kind: 'blink', fx: '53', dmg: 13, cd: 1.8, range: 5, count: 2,
+    curse: 2, desc: '바라보는 쪽 다섯 칸 안의 몬스터 뒤로 날아들어 두 번 베고 저주를 건다' },
+  r_budong: { promo: 2, cls: 'rogue', req: 10, name: '부동력', kind: 'buff', buff: 'guard', fx: '54', cd: 18, duration: 1.5,
+    desc: '잠시 어떤 공격에도 꿈쩍하지 않는다' },
+  // 3차 승급
+  r_formless: { promo: 3, cls: 'rogue', req: 14, name: '무형검', kind: 'line', fx: '55', dmg: 15, cd: 1.8, depth: 4,
+    desc: '보이지 않는 검이 바라보는 쪽 일렬 네 칸을 꿰뚫는다' },
+  // 4차 승급
+  r_heaven: { promo: 4, cls: 'rogue', req: 18, name: '파천검무', kind: 'line', fx: '144', dmg: 18, cd: 2, depth: 6, dash: true,
+    desc: '바라보는 쪽 일렬 여섯 칸을 지나가며 모두 벤다' },
+  r_storm: { promo: 4, cls: 'rogue', req: 18, evolved: true, name: '탈명사식\'뇌', kind: 'strike', fx: '143', dmg: 10, cd: 2, range: 6,
+    radius: 1, count: 3, hitAt: 0.3, shape: 'plus', desc: '뇌진주 8단 + 4차 승급. 번개 세 줄기가 몬스터와 그 상하좌우를 친다' },
+  r_bunhon: { promo: 4, cls: 'rogue', req: 18, name: '분혼경천', kind: 'screen', fx: '145', dmg: 10, cd: 7, stun: 1,
+    desc: '혼을 흩어 하늘을 놀라게 한다. 화면의 모든 몬스터를 치고 잠시 멈춘다' },
   r_ult: { cls: 'rogue', name: '필살검무', kind: 'ult', fx: '43', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 네 칸 안의 모든 몬스터를 순식간에 베어 낸다' },
 
-  // 주술사: 신수마법과 상태이상
-  m_fire: { elem: 'fire', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '31', dmg: 12, cd: 1.1, range: 7, count: 1,
-    names: FIRE, evo: { with: 'haste', into: 'm_fire3' }, desc: '신수마법. 가까운 몬스터를 불태운다' },
-  m_ice: { elem: 'earth', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '31', dmg: 17, cd: 2.4, range: 7, radius: 0, count: 1,
-    hitAt: 0.5, slow: 2, names: tier('백열주'), evo: { with: 'area', into: 'm_quake' },
+  // 주술사 — 일반: 신수마법(화염주·백열주), 화염주첨, 저주, 마비, 헬파이어
+  m_fire: { elem: 'fire', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '화염주', kind: 'spell', fx: '31',
+    dmg: 12, cd: 1.1, range: 7, count: 1, names: FIRE, up: 'm_fire3', desc: '신수마법. 가까운 몬스터를 불태운다' },
+  m_ice: { elem: 'earth', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'mage', req: 1, name: '백열주', kind: 'strike', fx: '31',
+    dmg: 17, cd: 2.4, range: 7, radius: 0, count: 1, hitAt: 0.5, slow: 2, names: tier('백열주'), up: 'm_quake',
     desc: '신수마법. 백호의 땅 기운으로 몬스터를 치고 느리게 한다' },
   m_curse: { cls: 'mage', req: 6, name: '저주', kind: 'strike', fx: '84', dmg: 3, cd: 5, range: 7, radius: 1, count: 1,
     hitAt: 0.3, curse: 4, desc: '몬스터와 그 주위의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
-  m_fire4: { elem: 'fire', fxs: ['63', '63', '71', '71', '80', '80', '87', '90'], cls: 'mage', req: 12, name: '화염주첨', kind: 'spell4', fx: '63', dmg: 10, cd: 2.2, range: 7,
-    names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다' },
+  m_fire4: { elem: 'fire', fxs: ['63', '63', '71', '71', '80', '80', '87', '90'], cls: 'mage', req: 6, name: '화염주첨', kind: 'spell4', fx: '63',
+    dmg: 10, cd: 2.2, range: 5, names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다(사정거리가 짧다)' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '85', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
-  m_fire3: { promo: 1, cls: 'mage', req: 12, evolved: true, name: '폭류유성', kind: 'screen', fx: '148', dmg: 10, cd: 4,
-    desc: '화염주 8단 + 지력. 유성이 쏟아져 화면의 모든 몬스터를 친다' },
-  m_quake: { promo: 2, cls: 'mage', req: 18, evolved: true, name: '지폭지술', kind: 'screen', fx: '96', dmg: 15, cd: 5, slow: 2,
-    desc: '백열주 8단 + 공력. 땅이 터지며 화면의 모든 몬스터를 치고 느리게 한다' },
+  // 1차 승급
+  m_sun: { promo: 1, cls: 'mage', req: 6, name: '태양의 기원', kind: 'heal', fx: '93', heal: 18, cd: 13, mana: 0.3,
+    desc: '태양의 기운으로 체력을 크게 회복하고 마력도 조금 채운다' },
+  // 2차 승급
+  m_sammae: { promo: 2, cls: 'mage', req: 10, name: '삼매진화', kind: 'spell4', fx: '94', dmg: 22, cd: 3, range: 6, pierce: true,
+    desc: '상하좌우 네 줄로 헬파이어를 쏘아 줄 위를 모두 태운다' },
+  m_hoche: { promo: 2, cls: 'mage', req: 10, name: '호체주술', kind: 'buff', buff: 'shield', fx: '95', cd: 15, duration: 4,
+    desc: '주술로 몸을 감싸 잠시 받는 피해를 절반으로 줄인다' },
+  // 3차 승급
+  m_quake: { promo: 3, cls: 'mage', req: 14, evolved: true, name: '지폭지술', kind: 'screen', fx: '96', dmg: 14, cd: 5, slow: 2,
+    desc: '백열주 8단 + 3차 승급. 땅이 터지며 화면의 모든 몬스터를 치고 느리게 한다' },
+  m_magi: { promo: 3, cls: 'mage', req: 14, name: '마기지체', kind: 'buff', buff: 'haste', fx: '98', cd: 14, duration: 4,
+    desc: '마기를 몸에 둘러, 잠시 모든 마법이 1.6배 빨리 돈다' },
+  m_nodo: { promo: 3, cls: 'mage', req: 14, name: '노도성황', kind: 'screen', fx: '97', dmg: 6, cd: 8, stun: 1.2,
+    desc: '노한 물결이 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  // 4차 승급
+  m_fire3: { promo: 4, cls: 'mage', req: 18, evolved: true, name: '폭류유성', kind: 'screen', fx: '148', dmg: 12, cd: 4,
+    desc: '화염주 8단 + 4차 승급. 유성이 쏟아져 화면의 모든 몬스터를 친다' },
+  m_talm: { promo: 4, cls: 'mage', req: 18, name: '탈명사식\'지', kind: 'strike', fx: '147', dmg: 26, cd: 3.5, range: 7, radius: 1,
+    count: 2, hitAt: 0.3, shape: 'plus', desc: '땅의 탈명사식. 몬스터 둘과 그 상하좌우를 땅에서 터뜨린다' },
   m_ult: { cls: 'mage', name: '헬파이어', kind: 'ult', fx: '92', shield: 5,
     desc: '마력을 모두 써서 화면의 몬스터를 불사르고, 5초 동안 받는 피해를 절반으로 줄이는 보호막을 두른다' },
 
-  // 도사: 회복, 결계, 소환
-  p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31', dmg: 11, cd: 1.2, range: 7, count: 1,
-    names: tier('자무주'), evo: { with: 'area', into: 'p_wave' }, desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
-  p_barrier: { cls: 'poet', req: 6, name: '신령지익진', kind: 'aura', fx: '135', dmg: 3, cd: 0.8,
-    desc: '진을 펼쳐, 바로 옆 칸의 몬스터가 공격하지 못하고 조금씩 상하게 한다' },
-  p_quake: { cls: 'poet', req: 12, name: '지진', kind: 'strike', fx: '123', dmg: 14, cd: 3.6, range: 6, radius: 1, count: 1,
-    hitAt: 0.3, shape: 'plus', evo: { with: 'life', into: 'p_break' }, desc: '몬스터와 그 상하좌우(+자)를 흔든다. 단이 오를수록 길어진다' },
+  // 도사 — 일반: 신수마법(자무주), 차폐, 소혼강신, 지진, 금강불체, 태양의희원
+  p_orb: { elem: 'water', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'poet', req: 1, name: '자무주', kind: 'spell', fx: '31',
+    dmg: 11, cd: 1.2, range: 7, count: 1, names: tier('자무주'), desc: '신수마법. 현무의 물 기운으로 몬스터를 친다' },
   p_summon: { cls: 'poet', req: 1, name: '소혼강신', kind: 'summon', fx: null, dmg: 6, cd: 9, count: 1, duration: 7,
     allies: ['3013', '3012', '1022', '1023'], desc: '불여우와 맹수를 불러 함께 싸우게 한다' },
+  p_barrier: { cls: 'poet', req: 6, name: '차폐', kind: 'aura', fx: '108', dmg: 3, cd: 0.8,
+    desc: '바로 옆 칸의 몬스터가 공격하지 못하게 막고 조금씩 상하게 한다' },
+  p_quake: { cls: 'poet', req: 12, name: '지진', kind: 'strike', fx: '123', dmg: 14, cd: 3.6, range: 6, radius: 1, count: 1,
+    hitAt: 0.3, shape: 'plus', up: 'p_break', desc: '몬스터와 그 상하좌우(+자)를 흔든다. 단이 오를수록 길어진다' },
   p_guard: { cls: 'poet', req: 18, name: '금강불체', kind: 'buff', buff: 'guard', fx: '126', cd: 16, duration: 2,
     desc: '잠시 어떤 공격도 받지 않는 몸이 된다' },
-  p_wave: { promo: 1, cls: 'poet', req: 12, evolved: true, name: '파력무참진', kind: 'nova', fx: '134', dmg: 12, cd: 1.6, radius: 0,
-    desc: '자무주 8단 + 공력. 발밑에 진을 펼쳐 둘레 두 칸 안의 몬스터를 친다' },
-  p_break: { promo: 2, cls: 'poet', req: 18, evolved: true, name: '귀염추혼소', kind: 'screen', fx: '120', dmg: 12, cd: 5, curse: 4,
-    desc: '지진 8단 + 체력 단련. 화면의 모든 몬스터에 혼마술을 걸어 받는 피해를 늘리고 친다' },
-  p_ult: { cls: 'poet', name: '백호의희원', kind: 'ult', fx: '130', guard: 3,
-    desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 금강불체 상태가 된다' },
-
-  // 승급으로 열리는 기술 (PROMOS): 1차·2차 승급이 새 기술을, 3차 승급이 두 기술의 합성을 연다.
-  // 합성(union)은 두 기술이 모두 8단일 때 다음 보물 상자에서 하나로 합쳐져 칸 하나가 빈다.
-  w_fly: { cls: 'warrior', req: 6, promo: 1, name: '어검술', kind: 'cleave', fx: '22', dmg: 16, cd: 2.4, depth: 2, max: 4,
-    scaleHp: 0.04, desc: '검을 날려 앞쪽 ㅜ자 역삼각형(네 칸)의 몬스터 넷을 벤다' },
-  w_howl: { cls: 'warrior', req: 12, promo: 2, name: '포효검황', kind: 'screen', fx: '25', dmg: 16, cd: 6, falloff: 0.08,
-    desc: '포효와 함께 화면의 모든 몬스터를 친다. 한 칸 멀어질수록 8%씩 약하다' },
-  w_blood: { cls: 'warrior', req: 18, promo: 3, evolved: true, union: ['w_fly', 'w_howl'], name: '혈겁만파', kind: 'screen',
-    fx: '141', dmg: 24, cd: 4, curse: 3, desc: '어검술 8단 + 포효검황 8단. 피의 물결이 화면을 덮어 모든 몬스터를 치고 저주한다' },
-  r_flysword: { cls: 'rogue', req: 6, promo: 1, name: '이기어검', kind: 'blink', fx: '53', dmg: 13, cd: 1.6, range: 5, count: 2,
-    curse: 2, desc: '다섯 칸 안의 몬스터 뒤로 날아들어 두 번 베고 저주를 건다' },
-  r_formless: { cls: 'rogue', req: 12, promo: 2, name: '무형검', kind: 'line', fx: '55', dmg: 15, cd: 1.8, depth: 4,
-    desc: '보이지 않는 검이 바라보는 쪽 일렬 네 칸을 꿰뚫는다' },
-  r_heaven: { cls: 'rogue', req: 18, promo: 3, evolved: true, union: ['r_flysword', 'r_formless'], name: '파천검무', kind: 'line',
-    fx: '144', dmg: 20, cd: 1.3, depth: 6, dash: true, desc: '이기어검 8단 + 무형검 8단. 일렬 여섯 칸을 지나가며 모두 벤다' },
-  m_magi: { cls: 'mage', req: 6, promo: 1, name: '마기지체', kind: 'buff', buff: 'haste', fx: '98', cd: 14, duration: 4,
-    desc: '마기를 몸에 둘러, 잠시 모든 마법이 1.6배 빨리 돈다' },
-  m_nodo: { cls: 'mage', req: 12, promo: 2, name: '노도성황', kind: 'screen', fx: '97', dmg: 6, cd: 8, stun: 1.2,
-    desc: '노한 물결이 화면의 모든 몬스터를 치고 잠시 멈춘다' },
-  m_sammae: { cls: 'mage', req: 18, promo: 3, evolved: true, union: ['m_fire4', 'm_nodo'], name: '삼매진화', kind: 'spell4',
-    fx: '94', dmg: 30, cd: 2.4, range: 8, pierce: true, desc: '화염주첨 8단 + 노도성황 8단. 상하좌우 네 줄로 헬파이어를 쏘아 줄 위를 모두 태운다' },
-  p_reflect: { cls: 'poet', req: 6, promo: 1, name: '반탄공', kind: 'buff', buff: 'reflect', fx: '132', cd: 12, duration: 4,
+  // 1차 승급
+  p_baekho: { promo: 1, cls: 'poet', req: 6, name: '백호의희원', kind: 'heal', fx: '130', heal: 20, cd: 12,
+    desc: '백호의 힘으로 체력을 크게 회복한다' },
+  // 2차 승급
+  p_reflect: { promo: 2, cls: 'poet', req: 10, name: '반탄공', kind: 'buff', buff: 'reflect', fx: '132', cd: 12, duration: 4,
     desc: '잠시 때린 몬스터에게 받은 피해의 세 배를 되돌린다' },
-  p_spirit: { cls: 'poet', req: 12, promo: 2, name: '신령의기원', kind: 'heal', fx: '131', heal: 22, cd: 14, shieldT: 3,
+  p_spirit: { promo: 2, cls: 'poet', req: 10, name: '신령의기원', kind: 'heal', fx: '131', heal: 22, cd: 14, shieldT: 3, up: 'p_phoenix',
     desc: '체력을 크게 회복하고 3초 동안 받는 피해를 절반으로 줄인다' },
-  p_phoenix: { cls: 'poet', req: 18, promo: 3, evolved: true, union: ['p_reflect', 'p_spirit'], name: '봉황의기원', kind: 'heal',
-    fx: '150', heal: 30, cd: 12, guard: 1.5, desc: '반탄공 8단 + 신령의기원 8단. 봉황이 날아올라 체력을 크게 채우고 잠시 어떤 공격도 받지 않는다' },
+  // 3차 승급
+  p_aegis: { promo: 3, cls: 'poet', req: 14, name: '신령지익진', kind: 'buff', buff: 'shield', fx: '135', cd: 14, duration: 5,
+    desc: '진을 펼쳐 잠시 받는 피해를 절반으로 줄인다' },
+  p_wave: { promo: 3, cls: 'poet', req: 14, name: '파력무참진', kind: 'nova', fx: '134', dmg: 12, cd: 1.8, radius: 1,
+    desc: '발밑에 진을 펼쳐 둘레 두 칸 안의 몬스터를 친다' },
+  // 4차 승급
+  p_phoenix: { promo: 4, cls: 'poet', req: 18, evolved: true, name: '봉황의기원', kind: 'heal', fx: '150', heal: 30, cd: 12, guard: 1.5,
+    desc: '신령의기원 8단 + 4차 승급. 봉황이 날아올라 체력을 크게 채우고 잠시 어떤 공격도 받지 않는다' },
+  p_break: { promo: 4, cls: 'poet', req: 18, evolved: true, name: '귀염추혼소', kind: 'screen', fx: '120', dmg: 12, cd: 5, curse: 4,
+    desc: '지진 8단 + 4차 승급. 화면의 모든 몬스터에 혼마술을 걸어 받는 피해를 늘리고 친다' },
+  p_talm: { promo: 4, cls: 'poet', req: 18, name: '탈명사식\'풍', kind: 'strike', fx: '149', dmg: 22, cd: 3.5, range: 7, radius: 1,
+    count: 2, hitAt: 0.3, shape: 'plus', desc: '바람의 탈명사식. 몬스터 둘과 그 상하좌우를 휩쓴다' },
+  p_ult: { cls: 'poet', name: '태양의희원', kind: 'ult', fx: '124', guard: 3,
+    desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 어떤 공격도 받지 않는다' },
 };
 
-// 승급: 각 직업으로 그 사냥터를 정복하면 오른다. 1차·2차는 새 기술, 3차는 합성 기술을 연다.
-export const PROMOS = {
-  warrior: [{ at: 'rat', skill: 'w_fly' }, { at: 'deer', skill: 'w_howl' }, { at: 'haunt', skill: 'w_blood' }],
-  rogue: [{ at: 'rat', skill: 'r_flysword' }, { at: 'deer', skill: 'r_formless' }, { at: 'haunt', skill: 'r_heaven' }],
-  mage: [{ at: 'rat', skill: 'm_magi' }, { at: 'deer', skill: 'm_nodo' }, { at: 'haunt', skill: 'm_sammae' }],
-  poet: [{ at: 'rat', skill: 'p_reflect' }, { at: 'deer', skill: 'p_spirit' }, { at: 'haunt', skill: 'p_phoenix' }],
-};
+// 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
+export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin'];
+export const PROMOS = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet'].map(c => [c, PROMO_AT.map(at => ({ at }))]));
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {
@@ -264,12 +295,14 @@ export function skillStats(id, level, p) {
   return {
     // A grown spell reaches as far as 8단 does, but strikes as a 5단 would: its own power is in
     // its shape (a triangle, the whole screen), not in a number grown four times over.
-    dmg: (s.dmg || 0) * Math.pow(1.22, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
+    // +15% a 단 (8단 is 2.7 times 1단).
+    dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
     cd: s.cd * Math.pow(0.93, l) * Math.pow(0.92, p.haste),
     // Tiles: reach grows by one every three levels, and with 공력.
     range: (s.range || 0) + Math.floor(l / 3) + Math.floor(p.area / 2),
-    radius: s.radius === undefined ? 0 : s.radius + Math.floor(level / 4) + Math.floor(p.area / 3),
-    count: (s.count || 1) + (level >= 3) + (level >= 5) + (level >= 7),
+    // Only a spell that already strikes an area grows it; a single blow stays single.
+    radius: !s.radius ? 0 : s.radius + Math.floor(level / 4) + Math.floor(p.area / 3),
+    count: (s.count || 1) + (level >= 4) + (level >= 7),
     duration: (s.duration || 0) * (1 + 0.1 * l),
     heal: (s.heal || 0) * (1 + 0.45 * l),
   };
@@ -278,19 +311,19 @@ export function skillStats(id, level, p) {
 /** What the next level brings, for the level-up choices. */
 export function levelText(id, level) {
   const s = SKILLS[id];
-  if (level === 1) return s.desc + (s.evo ? ` (8단 + ${PASSIVES[s.evo.with].name} → ${SKILLS[s.evo.into].name}, ${SKILLS[s.evo.into].promo}차 승급 후)` : '');
+  if (level === 1) return s.desc + (s.up ? ` (8단 + ${SKILLS[s.up].promo}차 승급 → ${SKILLS[s.up].name})` : '');
   if (s.kind === 'slash') {
-    return ['', '피해 +22%', '후면 공격: 뒤 칸도 함께 벤다', '삼중공격: 세 번 연달아 벤다', '측면 공격: 양옆 칸도 함께 벤다',
+    return ['', '피해 +15%', '후면 공격: 뒤 칸도 함께 벤다', '삼중공격: 세 번 연달아 벤다', '측면 공격: 양옆 칸도 함께 벤다',
       '사중공격: 네 번 연달아 벤다', '신검합일: 공격력 +30%', '오중공격: 다섯 번 연달아 벤다'][level - 1];
   }
   if (s.kind === 'heal') return '회복량 +45%, 재사용 -7%';
   if (s.kind === 'buff') return '지속 시간 +10%, 재사용 -7%';
-  const parts = ['피해 +22%', '재사용 -7%'];
-  if ((level === 3 || level === 5 || level === 7) && s.kind !== 'cleave' && s.kind !== 'nova')
+  const parts = ['피해 +15%', '재사용 -7%'];
+  if ((level === 4 || level === 7) && s.kind !== 'cleave' && s.kind !== 'nova')
     parts.push(s.kind === 'summon' ? '소환 +1' : '대상 +1');
   if (s.range && (level - 1) % 3 === 0) parts.push('거리 +1칸');
   if (s.kind === 'cleave' && !s.depth && level % 4 === 0) parts.push('앞쪽 역삼각형이 한 줄 깊어진다');
   else if (s.shape === 'plus' && level % 4 === 0) parts.push('+자 팔이 한 칸 길어진다');
-  else if (s.radius !== undefined && level % 4 === 0) parts.push('범위 +1칸');
+  else if (s.radius && level % 4 === 0) parts.push('범위 +1칸');
   return parts.join(', ');
 }

@@ -36,6 +36,8 @@ ITEMS = {
     "coin": "1022", "heal": "11", "potion": "1125", "magnet": "1161",
     "p_armor": "1165", "p_power": "1116", "p_haste": "1208", "p_speed": "1215",
     "p_life": "1304", "p_area": "1141", "chest": "16",
+    # Dropped armor lies on the ground as a folded armor, not as a figure wearing it.
+    "armor": "203",
 }
 HEROES = ["1001", "1002", "1003", "1004"]
 HERO_HEIGHT = 56

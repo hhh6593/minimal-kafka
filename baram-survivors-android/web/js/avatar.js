@@ -11,15 +11,33 @@ export const WALK_MS = 135;
 // What each class wears, tier by tier: chests in the hunting grounds hand out the next one.
 // Names are the wardrobe's.
 export const GEAR = {
-  warrior: { head: '17', armor: ['남자갑옷', '남자갑주', '비늘남자갑주', '궁중무사갑주', '불의갑주'],
-    weapon: ['목검', '철검', '백화검', '환두대도', '칠지도', '용천제일검'], shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
-  rogue: { head: '56', armor: ['호위무사옷', '흑영협객도복', '무도가옷', '해골갑옷', '황혼의갑주'],
-    weapon: ['비늘단도', '가시철단도', '저주의단검', '진아광검', '용마제일검'], shield: ['보라방패', '월광방패', '일광방패'] },
-  mage: { head: '20', armor: ['남자신관복', '남자성광법의', '자개망토옷', '용왕의용포'],
-    weapon: ['해룡의지팡이', '흑단화염장', '원혼의낫', '월광천봉', '심판의낫'], shield: ['주술방패', '거울방패', '정화의방패'] },
-  poet: { head: '19', armor: ['도포', '장삼', '남자제사장의상', '여명의치마'],
-    weapon: ['흑단부채', '대붓', '백운장', '하늘개비'], shield: ['신선비급', '호리병', '연등', '여신의방패'] },
+  warrior: { head: '17', armor: ['남자갑옷', '남자갑주', '비늘남자갑주', '궁중무사갑주', '남자무사옷', '불의갑주'],
+    weapon: ['목검', '철검', '백화검', '환두대도', '칠지도', '용천제일검', '청룡의검', '참마도'],
+    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+  rogue: { head: '56', armor: ['호위무사옷', '흑영협객도복', '무도가옷', '해골갑옷', '중국풍남자옷', '황혼의갑주'],
+    weapon: ['비늘단도', '가시철단도', '철도', '진아광검', '도룡보도', '용마제일검', '저주의단검'],
+    shield: ['보라방패', '월광방패', '일광방패'] },
+  mage: { head: '20', armor: ['남자신관복', '남자성광법의', '자개망토옷', '곤룡포', '용왕의용포'],
+    weapon: ['해룡의지팡이', '월광천봉', '원혼의낫', '일월대도', '현랑부', '심판의낫', '흑단화염장'],
+    shield: ['주술방패', '거울방패', '정화의방패'] },
+  poet: { head: '19', armor: ['도포', '장삼', '남자도복', '남자제사장의상', '여명의치마'],
+    weapon: ['흑단부채', '대붓', '백운장', '하늘개비', '자월초롱'],
+    shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
 };
+
+// Raid spoils: one piece a class a raid, beyond anything a hunting ground drops, after the boss
+// it comes from — dragons' gear from 삼두룡, the judging and the cursed from 흑술사, fire from 화령.
+export const RAID_GEAR = {
+  raid_hydra: { warrior: ['weapon', '청룡의검'], rogue: ['weapon', '용마제일검'], mage: ['armor', '용왕의용포'], poet: ['shield', '백룡현갑'] },
+  raid_sorcerer: { warrior: ['weapon', '참마도'], rogue: ['weapon', '저주의단검'], mage: ['weapon', '심판의낫'], poet: ['weapon', '자월초롱'] },
+  raid_fire: { warrior: ['armor', '불의갑주'], rogue: ['armor', '황혼의갑주'], mage: ['weapon', '흑단화염장'], poet: ['armor', '여명의치마'] },
+};
+
+/** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
+export function plainTiers(cls, kind) {
+  const raid = new Set(Object.values(RAID_GEAR).map(r => r[cls]).filter(([k]) => k === kind).map(([, n]) => n));
+  return GEAR[cls][kind].filter(n => !raid.has(n)).length;
+}
 
 let M, images;
 

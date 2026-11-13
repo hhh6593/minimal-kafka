@@ -6,6 +6,7 @@ import {
 import { Audio } from './audio.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
+  RAID_GEAR, plainTiers,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -398,6 +399,7 @@ function raidInfo(r) {
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
+    <div class="boss">전용 장비: <b>${RAID_GEAR[r.id][chosenClass.id][1]}</b> (${chosenClass.name})</div>
     <div class="state">${raidOpen(r) ? '키운 직업이 모두 모인다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
   $('#go').disabled = !raidOpen(r);
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
@@ -562,6 +564,9 @@ function bag(cls) {
 }
 
 function gearImage(g) {
+  // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
+  // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
+  if (g.kind === 'armor' && M.items.armor) return images[`item/${M.items.armor.id}.png`];
   const path = hasAvatars() && gearIcon(G.cls.id, g.kind, g.tier);
   return path ? images[path.slice('assets/'.length)] : images[`item/${M.items.chest.id}.png`];
 }
@@ -694,49 +699,39 @@ function treePassive(id) {
 }
 
 function buildTree(cls, hot = new Set()) {
-  // Where the class stands: its 승급, and what the next one needs and opens.
+  // Where the class stands: its 승급, and what the next one needs.
   const tier = promoOf(cls.id), nextP = PROMOS[cls.id][tier];
   $('#tree-cls').textContent = `${cls.name} · ${tier ? `${tier}차 승급` : '승급 전'}`
-    + (nextP ? ` · 다음: ${josa(STAGES.find(x => x.id === nextP.at).name, '을', '를')} ${josa(cls.name, '으로', '로')} 정복` : ' · 모든 승급 완료');
+    + (nextP ? ` · 다음: ${josa(STAGES.find(x => x.id === nextP.at).name, '을', '를')} ${josa(cls.name, '으로', '로')} 정복`
+      : ' · 모든 승급 완료');
   const box = $('#tree-rows');
   box.innerHTML = '';
   const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
-  const head = text => { const h = document.createElement('h4'); h.textContent = text; box.append(h); };
-  head('조합 · 8단 + 보조 능력 + 승급 → 다음 보물 상자에서 각성');
-  const inChain = new Set();
-  for (const [id, d] of mine.filter(([, d]) => d.evo).sort((a, b) => (a[1].req || 1) - (b[1].req || 1))) {
-    const row = document.createElement('div');
-    row.className = 'chain' + (hot.has(id) || hot.has(d.evo.with) ? ' hot' : '');
-    const plus = document.createElement('i'); plus.textContent = '+';
-    const arrow = document.createElement('i');
-    arrow.innerHTML = `▶<small>${SKILLS[d.evo.into].promo}차</small>`;
-    row.append(treeSpell(id), plus, treePassive(d.evo.with), arrow,
-      treeSpell(d.evo.into, { note: `Lv ${SKILLS[d.evo.into].req}부터` }));
-    inChain.add(id).add(d.evo.into);
-    box.append(row);
+  // One row per 승급, as the old game listed its spells: 일반, then 1차 to 4차.
+  for (let t = 0; t <= 4; t++) {
+    const row = mine.filter(([, d]) => (d.promo || 0) === t);
+    if (!row.length) continue;
+    const h = document.createElement('h4');
+    const at = t ? STAGES.find(x => x.id === PROMOS[cls.id][t - 1].at) : null;
+    h.textContent = t ? `${t}차 승급 · ${at.name} 정복${tier >= t ? '' : ' (아직)'}` : '일반 · 처음부터';
+    if (t && tier < t) h.style.opacity = 0.6;
+    box.append(h);
+    const grid = document.createElement('div');
+    grid.className = 'others';
+    for (const [id, d] of row) {
+      let note;
+      if (d.kind === 'ult') note = '마력이 차면 · 필살';
+      else if (d.evolved) {
+        const from = mine.find(([, x]) => x.up === id);
+        note = `${from ? from[1].name : ''} 8단에서 각성`;
+      } else if (d.up) note = `8단 → ${SKILLS[d.up].name}(${SKILLS[d.up].promo}차)`;
+      if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 나옴';
+      const el = treeSpell(id, note ? { note } : {});
+      if (hot.has(id)) el.style.outline = '2px solid #7a1800';
+      grid.append(el);
+    }
+    box.append(grid);
   }
-  const unions = mine.filter(([, d]) => d.union);
-  if (unions.length) head(`합성 · ${cls.name} ${promoOf(cls.id)}차 승급`);
-  for (const [id, d] of unions) {
-    const row = document.createElement('div');
-    row.className = 'chain' + (hot.has(d.union[0]) || hot.has(d.union[1]) ? ' hot' : '');
-    const plus = document.createElement('i'); plus.textContent = '+';
-    const arrow = document.createElement('i');
-    arrow.innerHTML = '▶<small>3차</small>';
-    row.append(treeSpell(d.union[0]), plus, treeSpell(d.union[1]), arrow, treeSpell(id, { note: `Lv ${d.req}부터 · 둘 다 8단` }));
-    inChain.add(d.union[0]).add(d.union[1]).add(id);
-    box.append(row);
-  }
-  head('그 밖의 기술');
-  const rest = document.createElement('div');
-  rest.className = 'others';
-  for (const [id, d] of mine) {
-    if (inChain.has(id)) continue;
-    const el = treeSpell(id, d.kind === 'ult' ? { note: '마력이 차면 · 필살' } : {});
-    if (hot.has(id)) el.style.outline = '1px solid #7a1800';
-    rest.append(el);
-  }
-  box.append(rest);
   $('#tree').hidden = false;
 }
 
@@ -784,6 +779,21 @@ function addSkill(id) {
   const have = G.skills.find(s => s.id === id);
   if (have) have.lv++;
   else G.skills.push({ id, lv: 1, timer: 0.3 });
+  // 숙련: a spell once raised to 8단 is the class's for good (it may open later runs).
+  if (have && have.lv >= MAX_SKILL_LEVEL) {
+    progress.mastered = progress.mastered || {};
+    const m = progress.mastered[G.cls.id] = progress.mastered[G.cls.id] || [];
+    if (!m.includes(id)) {
+      m.push(id);
+      saveJson('bs_progress', progress);
+      say(`${josa(SKILLS[id].name, '을', '를')} 숙련했습니다. 다음 사냥부터 첫 카드에 나올 수 있습니다.`, 'sys');
+    }
+  }
+}
+
+/** The spells a class has mastered (8단 once), still open to it by 승급. */
+function mastered(cls) {
+  return ((progress.mastered || {})[cls] || []).filter(id => SKILLS[id] && promoOf(cls) >= (SKILLS[id].promo || 0));
 }
 
 function stats(skill) {
@@ -1112,7 +1122,7 @@ function raidMarks() {
     if (mk.done || G.t < mk.at) continue;
     mk.done = true;
     G.shake = Math.max(G.shake, 0.2);
-    const fx = G.stage.fx;
+    const fx = M.fx['new_' + G.stage.id] ? 'new_' + G.stage.id : G.stage.fx;
     mk.tiles.filter((_, i) => i % Math.max(1, Math.floor(mk.tiles.length / 10)) === 0).forEach(([x, y]) =>
       addFx(fx, x * TILE + TILE / 2, y * TILE + TILE / 2, { scale: 0.7 }));
     for (const m of G.party) if (mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) hurtMember(m, m.maxHp * mk.share);
@@ -1529,7 +1539,8 @@ function fieldFalls() {
 function dropGear(e, dx = 0) {
   const line = GEAR[G.cls.id], kinds = ['weapon', 'armor', 'shield'];
   const kind = kinds[Math.floor(Math.random() * 3)];
-  const top = line[kind].length - 1;
+  // Hunting grounds never drop a raid's piece.
+  const top = plainTiers(G.cls.id, kind) - 1;
   const tier = Math.max(0, Math.min(top, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0)
     + (e.kind === 'boss' ? 1 : 0)));
   G.drops.push({ x: e.x + dx, y: e.y, kind: 'gear', gear: { kind, tier } });
@@ -1543,9 +1554,12 @@ function clearStage() {
   if (G.stage.raid) {
     progress.raids = progress.raids || {};
     progress.raids[G.stage.id] = (progress.raids[G.stage.id] || 0) + 1;
-    // A raid's spoils: two more pieces of gear and a chest beside the boss's own.
-    const p = G.player;
-    for (const dx of [-36, 36]) dropGear({ x: p.x + dx, y: p.y + 20, kind: 'boss' });
+    // A raid's spoils: the class's own piece from this boss, beside the boss's own drops.
+    const p = G.player, [kind, name] = RAID_GEAR[G.stage.id][G.cls.id];
+    const tier = GEAR[G.cls.id][kind].indexOf(name);
+    G.drops.push({ x: p.x, y: p.y + 24, kind: 'gear', gear: { kind, tier } });
+    say(`레이드 전용 장비 ${josa(name, '이', '가')} 떨어졌습니다!`, 'sys');
+    later(1.2, () => banner(`레이드 전용 · ${name}`));
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
     G.gold += 500;
   } else {
@@ -1637,8 +1651,8 @@ function fxOn(id, b, o = {}) {
 function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
-  // The last spell of a tree shows today's client effect when the build has it: a small nod.
-  const fxid = def.evolved && M.fx['new_' + skill.id] ? 'new_' + skill.id
+  // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
+  const fxid = def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
   const p = G.player;
   let used = true;
@@ -1651,40 +1665,39 @@ function cast(skill, st) {
       // 기본 공격: the tile ahead; 후면/측면 공격 add the tiles behind and beside; n중공격 hits again.
       const lv = def.evolved ? 8 : skill.lv;
       // 이중공격 strikes twice; 삼중 (4단), 사중 (6단), 오중 (8단) once more each.
-      const hits = 2 + (lv >= 4) + (lv >= 6) + (lv >= 8);
+      const hits = Math.min(def.hitsMax || 5, 2 + (lv >= 4) + (lv >= 6) + (lv >= 8));
       const under = occ.get(key(p.tx, p.ty));
       if (under && under.m && !under.ally) {
         if (fxid) fxOn(fxid, under);
         hurtEnemy(under, st.dmg);
       }
-      let near = DIRS.filter(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
+      const foeAt = (dx, dy) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; };
+      const fx0 = p.fdx || 0, fy0 = fx0 ? 0 : p.fdy || 1;
+      let near = DIRS.filter(([dx, dy]) => foeAt(dx, dy));
       if (!near.length && def.dash) {
-        // 쇄혼비무: to the first monster up to four tiles away in a straight line.
-        for (const [dx, dy] of DIRS) {
-          let k = 2;
-          while (k <= def.dash && !occ.get(key(p.tx + dx * k, p.ty + dy * k))) k++;
-          const b = occ.get(key(p.tx + dx * k, p.ty + dy * k));
-          if (k > def.dash || !b || !b.m || b.ally || occ.has(key(p.tx + dx * (k - 1), p.ty + dy * (k - 1)))) continue;
+        // 쇄혼비무: only the way the hero faces, to the first monster up to four tiles off.
+        let k = 2;
+        while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
+        const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
+        if (k <= def.dash && b && b.m && !b.ally && !occ.has(key(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1)))) {
           addFx(fxid, p.x, p.y - 26, { scale: 0.6 });
-          p.tx += dx * (k - 1);
-          p.ty += dy * (k - 1);
+          p.tx += fx0 * (k - 1);
+          p.ty += fy0 * (k - 1);
           p.x = p.tx * TILE + TILE / 2;
           p.y = p.ty * TILE + TILE - 6;
           p.stepping = false;
-          near = [[dx, dy]];
-          break;
+          near = [[fx0, fy0]];
         }
       }
       if (!near.length) return under ? undefined : retry(0.12);
-      // Turn to face a monster beside the hero, as a player would before swinging.
-      if (!near.some(([dx, dy]) => dx === p.fdx && dy === p.fdy)) {
-        [p.fdx, p.fdy] = near[0];
-        if (p.fdx) p.face = p.fdx;
-      }
-      const dirs = [[p.fdx, p.fdy]];
-      if (lv >= 3) dirs.push([-p.fdx, -p.fdy]);
-      if (lv >= 5) dirs.push([p.fdy, p.fdx], [-p.fdy, -p.fdx]);
-      const dmg = st.dmg * (lv >= 7 ? 1.3 : 1) / Math.sqrt(hits);
+      // The blow goes the way the hero faces when a monster is there, else to the one beside;
+      // the hero's own facing is left alone, so walking stays the player's.
+      const [ax, ay] = near.find(([dx, dy]) => dx === fx0 && dy === fy0) || near[0];
+      const dirs = [[ax, ay]];
+      if (lv >= 3) dirs.push([-ax, -ay]);
+      if (lv >= 5) dirs.push([ay, ax], [-ay, -ax]);
+      // The blows share one strike's worth (and a half): more blows, not more of everything.
+      const dmg = st.dmg * (lv >= 7 ? 1.3 : 1) * 1.6 / hits;
       for (let h = 0; h < hits; h++) {
         later(h * 0.14, () => {
           for (const [dx, dy] of dirs) {
@@ -1698,21 +1711,23 @@ function cast(skill, st) {
       break;
     }
     case 'blink': {
-      // 비영승보: to the tile behind the nearest monster, striking it.
-      const e = nearestEnemies(1, st.range)[0];
+      // 비영승보 and its kind: to a monster in front (the facing way, a lane three tiles wide),
+      // landing at its back, still facing on. Nothing ahead, nothing happens: no jumping off
+      // somewhere the player did not mean to go.
+      const fx0 = p.fdx || 0, fy0 = fx0 ? 0 : p.fdy || 1;
+      const ahead = G.enemies.filter(e => {
+        const f = (e.tx - p.tx) * fx0 + (e.ty - p.ty) * fy0, side = Math.abs((e.tx - p.tx) * fy0 + (e.ty - p.ty) * fx0);
+        return e.hp > 0 && f >= 1 && f <= st.range && side <= 1;
+      }).sort((a, b) => tdist(a, p) - tdist(b, p));
+      const e = ahead[0];
       if (!e) return retry(0.25);
-      const dx = Math.sign(e.tx - p.tx), dy = Math.sign(e.ty - p.ty);
-      const [bx, by] = Math.abs(e.tx - p.tx) >= Math.abs(e.ty - p.ty) ? [e.tx + dx, e.ty] : [e.tx, e.ty + dy];
-      // Not into the middle of a pack: 비영승보 is for getting behind one, not into many.
-      if (!occ.has(key(bx, by)) && around(bx, by, 1).length < 3) {
+      const bx = e.tx + fx0, by = e.ty + fy0;
+      if (!occ.has(key(bx, by))) {
         addFx(fxid, p.x, p.y - 26, { scale: 0.7 });
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
         heroTile();
         p.stepping = false;
-        p.fdx = -Math.sign(bx - e.tx);
-        p.fdy = -Math.sign(by - e.ty);
-        if (p.fdx) p.face = p.fdx;
       }
       for (let i = 0; i < st.count; i++) {
         later(i * 0.12, () => {
@@ -1778,7 +1793,8 @@ function cast(skill, st) {
     }
     case 'cleave': {
       // Ahead of the hero in an inverted triangle, turning first to where most monsters stand.
-      const depth = def.depth || 1 + st.radius;
+      // The triangle deepens a row at 4단 and 8단 (1 → 4 → 9 tiles); grown spells count as 8단.
+      const depth = def.depth || 1 + Math.floor((def.evolved ? 8 : skill.lv) / 4);
       let best = null, most = 0;
       for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
         if (!dx && !dy) continue;
@@ -1787,9 +1803,6 @@ function cast(skill, st) {
       }
       if (!best) return retry(0.2);
       const [dx, dy, hit] = best;
-      p.fdx = dx;
-      p.fdy = dy;
-      if (dx) p.face = dx;
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
       // The picture stands in the middle of the triangle.
       const mid = (depth + 1) / 2;
@@ -1805,8 +1818,11 @@ function cast(skill, st) {
     }
     case 'line': {
       // 무형검, 파천검무: a row of tiles ahead, turning to the row with most monsters.
+      // A row that carries the hero (파천검무) goes only the way it faces; one that does not
+      // (무형검) may strike the row with most monsters. The hero is not turned either way.
       let best = null, most = 0;
-      for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
+      const ways = def.dash ? [[p.fdx || 0, p.fdx ? 0 : p.fdy || 1]] : [[p.fdx, p.fdy], ...DIRS];
+      for (const [dx, dy] of ways) {
         if (!dx && !dy) continue;
         const tiles = [];
         for (let k = 1; k <= def.depth; k++) tiles.push([p.tx + dx * k, p.ty + dy * k]);
@@ -1815,9 +1831,6 @@ function cast(skill, st) {
       }
       if (!best) return retry(0.25);
       const [dx, dy, hit] = best;
-      p.fdx = dx;
-      p.fdy = dy;
-      if (dx) p.face = dx;
       hit.forEach((e, i) => fxOn(fxid, e, { delay: i * 0.05 }));
       later(0.1, () => { for (const e of hit) hurtEnemy(e, st.dmg, [dx, dy]); });
       if (def.dash) {
@@ -1898,6 +1911,7 @@ function cast(skill, st) {
       heal(st.heal, false);
       if (low && low !== p) healMember(low, st.heal, fxid);
       if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
+      if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
       if (def.guard) G.buffs.guard = Math.max(G.buffs.guard, G.t + def.guard);
       // The 기원's own picture for its grade (누리, 대지, 바다 …), over the hero.
       if (fxid) addFx(fxid, 0, -26, { follow: true });
@@ -1937,7 +1951,8 @@ function plainAttack(dt) {
   if (!t) return;
   p.atkT = 0.75;
   const dx = t.tx - p.tx, dy = t.ty - p.ty;
-  if (dx || dy) {
+  // Walking a tile at a time, the facing is the player's: a swing does not turn the hero.
+  if ((dx || dy) && !settings.tiles) {
     p.fdx = Math.sign(dx);
     p.fdy = dx ? 0 : Math.sign(dy);
     if (p.fdx) p.face = p.fdx;
@@ -2675,50 +2690,33 @@ function levelCap(id) {
 
 /** Evolves the first spell that is ready: level 8, its catalyst passive, its form's level. */
 function evolve() {
+  // 각성: a spell at 8단 grows into the higher 승급's spell of its line, once the class has
+  // that 승급 (백호참 → 극백호참 at 4차). No passive is needed: the 승급 is the key.
   for (const s of G.skills) {
     const d = SKILLS[s.id];
-    if (!d.evo || s.lv < MAX_SKILL_LEVEL || !G.passives[d.evo.with]) continue;
-    const into = SKILLS[d.evo.into];
+    if (!d.up || s.lv < MAX_SKILL_LEVEL) continue;
+    const into = SKILLS[d.up];
     if (G.player.lvl < into.req) continue;
-    if (into.promo && promoOf(G.cls.id) < into.promo) {
+    if (promoOf(G.cls.id) < into.promo) {
       // Ready but not yet allowed: say once what is missing.
       G.told = G.told || {};
       if (!G.told[into.name]) {
         G.told[into.name] = true;
         const at = STAGES.find(x => x.id === PROMOS[G.cls.id][into.promo - 1].at);
-        say(`${josa(into.name, '으로', '로')} 거듭나려면 ${into.promo}차 승급이 필요합니다. (${at.name} 정복)`, 'sys');
+        say(`${josa(into.name, '으로', '로')} 거듭나려면 ${into.promo}차 승급이 필요합니다. (${josa(at.name, '을', '를')} ${josa(G.cls.name, '으로', '로')} 정복)`, 'sys');
       }
       continue;
     }
     const from = d.names ? d.names[7] : d.name;
     s.from = s.id;
-    s.id = d.evo.into;
+    s.id = d.up;
     s.lv = 1;
     s.timer = 0.2;
     G.shake = 0.4;
-    addFx(FX.levelup, 0, -26, { follow: true, scale: 1.4 });
     audio.play('levelup');
     shout(into.name);
     say(`${josa(from, '이', '가')} ${josa(into.name, '으로', '로')} 거듭났습니다!`, 'sys');
     banner(`${into.name} 각성!`);
-    return true;
-  }
-  // 합성: two spells at 8단 become one, opened by the class's 3차 승급; a slot comes free.
-  for (const [id, d] of Object.entries(SKILLS)) {
-    if (!d.union || d.cls !== G.cls.id || promoOf(G.cls.id) < d.promo || G.player.lvl < d.req) continue;
-    const a = G.skills.find(x => x.id === d.union[0]), b = G.skills.find(x => x.id === d.union[1]);
-    if (!a || !b || a.lv < MAX_SKILL_LEVEL || b.lv < MAX_SKILL_LEVEL) continue;
-    a.from = a.id;
-    a.from2 = b.id;
-    a.id = id;
-    a.lv = 1;
-    a.timer = 0.2;
-    G.skills.splice(G.skills.indexOf(b), 1);
-    G.shake = 0.5;
-    audio.play('levelup');
-    shout(d.name);
-    say(`${josa(SKILLS[d.union[0]].name, '과', '와')} ${josa(SKILLS[d.union[1]].name, '이', '가')} ${josa(d.name, '으로', '로')} 합쳐졌습니다!`, 'sys');
-    banner(`${d.name} 합성!`);
     return true;
   }
   return false;
@@ -2730,17 +2728,23 @@ function drawCards() {
   const have = id => G.skills.some(x => x.id === id || x.from === id || x.from2 === id);
   const banned = o => G.banished.has(o.type + ':' + o.id);
   if (G.firstCard) {
-    // The first card: the class's first-tier attacks; the 기원 comes with the next.
+    // The first card: the class's first-tier attacks, and a mastered spell or two (숙련),
+    // whatever level it usually opens at; the 기원 comes with the next.
     G.firstCard = false;
-    return Object.entries(SKILLS).filter(([id, d]) => mine(id) && d.req === 1 && !d.evolved && d.kind !== 'ult' && d.kind !== 'heal')
-      .map(([id]) => ({ type: 'skill', id, lv: 1 })).slice(0, 3);
+    const first = Object.entries(SKILLS).filter(([id, d]) => mine(id) && d.req === 1 && !d.evolved && d.kind !== 'ult' && d.kind !== 'heal')
+      .map(([id]) => ({ type: 'skill', id, lv: 1 }));
+    const known = mastered(G.cls.id).filter(id => SKILLS[id].req > 1 && SKILLS[id].kind !== 'heal')
+      .sort(() => Math.random() - 0.5).slice(0, 1).map(id => ({ type: 'skill', id, lv: 1, mastered: true }));
+    return known.concat(first).slice(0, 3);
   }
   const opts = [];
   // Spells and passives that lead to an evolution the hero is working toward weigh more.
-  const wanted = new Set(G.skills.map(x => SKILLS[x.id].evo).filter(Boolean).map(e => e.with));
+  const wanted = new Set();
   for (const s of G.skills) {
     if (SKILLS[s.id].evolved || s.lv >= levelCap(s.id)) continue;
-    opts.push({ type: 'skill', id: s.id, lv: s.lv + 1, w: SKILLS[s.id].evo && G.passives[SKILLS[s.id].evo.with] ? 4 : 3 });
+    // A spell that grows (up) with the 승급 already won weighs a little more.
+    const d = SKILLS[s.id], ready = d.up && promoOf(G.cls.id) >= SKILLS[d.up].promo;
+    opts.push({ type: 'skill', id: s.id, lv: s.lv + 1, w: ready ? 4 : 3 });
   }
   if (G.skills.length < MAX_SKILLS) {
     for (const [id, d] of Object.entries(SKILLS)) {
@@ -2787,7 +2791,7 @@ function nextChoice() {
       icon = !lvFx ? itemIcon('p_power') : fxIcon(lvFx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
-      tag = (o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
+      tag = (o.mastered ? '숙련' : o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
         + (def.elem ? ` <u style="background:${ELEMENTS[def.elem][1]}">${ELEMENTS[def.elem][0]}</u>` : '');
     } else if (o.type === 'passive') {
       const ps = PASSIVES[o.id];
@@ -2982,11 +2986,12 @@ function promote() {
   (progress.byClass[cls] = progress.byClass[cls] || {})[G.stage.id] = true;
   const after = promoOf(cls);
   for (let n = before; n < after; n++) {
-    const sk = SKILLS[PROMOS[cls][n].skill];
-    const evos = Object.values(SKILLS).filter(d => d.cls === cls && d.evolved && !d.union && d.promo === n + 1).map(d => d.name);
-    const what = sk.union ? `${sk.union.map(id => SKILLS[id].name).join(' + ')} → ${sk.name} 합성`
-      : `${sk.name}${evos.length ? `, ${evos.join('·')} 각성` : ''}`;
-    say(`${n + 1}차 승급! 이제 ${what}을(를) 익힐 수 있습니다.`, 'sys');
+    // What the 승급 opens: its spells on the cards, and the spells that can now grow into it.
+    const tierSpells = Object.values(SKILLS).filter(d => d.cls === cls && d.promo === n + 1);
+    const cards = tierSpells.filter(d => !d.evolved).map(d => d.name);
+    const grown = tierSpells.filter(d => d.evolved).map(d => d.name + ' 각성');
+    const what = cards.concat(grown).join(', ');
+    say(`${n + 1}차 승급! 이제 ${what}.`, 'sys');
     G.promoted = (G.promoted || []).concat(`${n + 1}차 승급: ${what}`);
     later(1.5, () => banner(`${G.cls.name} ${n + 1}차 승급!`));
   }
@@ -3556,7 +3561,7 @@ function syncUlt() {
   put('#sd-dex', String(bd + p.lvl + G.passives.speed * 3));
   gauge('#g-hp', p.hp / p.maxHp, String(Math.ceil(Math.max(0, p.hp))));
   gauge('#g-mp', p.mp / p.maxMp, String(Math.floor(p.mp)));
-  put('#sd-exp', String(p.total || 0));
+  put('#sd-exp', String(Math.floor(p.total || 0)));
   put('#sd-gold', String(G.gold));
   put('#sd-pos', `${String(p.tx + 500).padStart(4, '0')} ${String(p.ty + 500).padStart(4, '0')}`);
   const look = JSON.stringify(p.gear);
@@ -3778,18 +3783,20 @@ const GAME_SOUNDS = {
   // The last spell of each tree, to go with today's effect: 쇄혼비무 (a blue sword arc),
   // 포효검황 for 극백호참's tiger claws, 백호검무's blade, 혈겁만파 for 탈명사식'뇌's dark-red burst,
   // a blast for 폭류유성's fire vortex, 지폭지술's stones, 파력무참's golden ring, 파혼술 for 귀염추혼소.
-  skill_w_sword: '100', skill_w_roar2: '087', skill_r_dance: '090', skill_r_storm: '059',
+  skill_w_sword: '100', skill_w_roar2: '087', skill_r_dance: '090', skill_r_storm: '059', skill_w_jin: '089',
+  skill_w_chohon: '102', skill_w_talm: '700', skill_r_budong: '092', skill_r_bunhon: '064', skill_m_sun: '076',
+  skill_m_hoche: '094', skill_m_talm: '701', skill_p_baekho: '095', skill_p_aegis: '108', skill_p_talm: '702',
   // 승급 기술: each its own number from the list (반탄공 has none: 부동력's).
   skill_w_fly: '088', skill_w_howl: '101', skill_w_blood: '060', skill_r_flysword: '091', skill_r_formless: '103',
-  skill_r_heaven: '096', skill_m_magi: '105', skill_m_nodo: '106', skill_m_sammae: '093', skill_p_reflect: '092',
-  skill_p_spirit: '097', skill_p_phoenix: '111',
+  skill_r_heaven: '096', skill_m_magi: '105', skill_m_nodo: '106', skill_m_sammae: '093', skill_p_reflect: '099',
+  skill_p_spirit: '097', skill_p_phoenix: '111', skill_p_ult: '076',
   skill_m_fire3: '104', skill_m_quake: '107', skill_p_wave: '109', skill_p_break: '077',
   skill_m_fire: ['040', '040', '041', '041', '042', '042', '043', '044'], // 화염주 계열
   skill_m_fire4: ['040', '040', '041', '041', '042', '042', '043', '044'],
   skill_m_ice: ['050', '050', '051', '051', '052', '052', '053', '054'], // 백열주 계열
   skill_m_para: '070', skill_m_curse: '069', skill_m_ult: '073', // 마비, 저주, 헬파이어
   skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
-  skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084', skill_p_ult: '095',
+  skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084',
   // 116 and 353 were only guessed (from an English server's scripts) and are a long hiss:
   // played on every hit they drowned the hunt. The hero being struck and monsters falling are
   // silent until a real sound for them is known; plain hits use the weapon sound, softly.
