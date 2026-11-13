@@ -238,6 +238,17 @@ export function craftPicture(sp, cls, star = 1) {
   return c.steps ? name + c.steps[Math.max(1, Math.min(c.steps.length, star)) - 1] + '성' : name;
 }
 
+/** Every piece worn in today's look (its name at each star, kind), for the dress-room renders. */
+export function coordiPieces() {
+  const out = new Map();
+  for (const cls of Object.keys(DRAGON_LINE)) for (let i = 1; i <= DRAGON_MAX; i++) out.set(dragonName(cls, i), 'weapon');
+  for (const c of CRAFTS) {
+    if (!c.pic) continue;
+    for (const cls of Object.keys(DRAGON_LINE)) for (let st = 1; st <= 5; st++) out.set(craftPicture(SPECIAL[c.id], cls, st), c.kind);
+  }
+  return [...out].map(([name, kind]) => ({ name, kind }));
+}
+
 /** Every picture the gear can use, for tools/fetch_gear.py. */
 export function gearPictures() {
   const out = new Set();

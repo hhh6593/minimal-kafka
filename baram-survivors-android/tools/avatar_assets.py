@@ -19,7 +19,9 @@ import os
 import numpy as np
 from PIL import Image
 
-W, H, AX, AY = 194, 180, 97, 131   # a cell big enough for the largest captures (weapons)
+# A cell big enough for the largest captures: the old wardrobe's weapons, and today's dress-room
+# pieces (wings, big blades), with the feet at (AX, AY).
+W, H, AX, AY = 260, 230, 130, 165
 # The wardrobe draws characters larger than the game's monster pictures: in captures of the old
 # client a character stands about as tall as a 처녀귀신 (52 pixels here), the wardrobe's 82.
 SCALE = 0.64
@@ -30,11 +32,13 @@ def load(path):
     meta = json.load(open(os.path.splitext(path)[0] + ".json", encoding="utf-8"))["meta"]
     cw, ch = meta["cell"]["w"], meta["cell"]["h"]
     ax, ay = meta["anchorFeet"]["x"], meta["anchorFeet"]["y"]
-    im = np.asarray(Image.open(path).convert("RGBA"))
+    im = Image.open(path).convert("RGBA")
     out = np.zeros((4, 8, H, W, 4), np.uint8)
     for r in range(4):
         for c in range(8):
-            out[r, c, AY - ay:AY - ay + ch, AX - ax:AX - ax + cw] = im[r * ch:(r + 1) * ch, c * cw:(c + 1) * cw]
+            cell = Image.new("RGBA", (W, H))
+            cell.paste(im.crop((c * cw, r * ch, (c + 1) * cw, (r + 1) * ch)), (AX - ax, AY - ay))
+            out[r, c] = np.asarray(cell)
     return out, meta
 
 
@@ -87,7 +91,9 @@ def silhouette_score(a, b):
     return np.logical_xor(a[..., 3] > 0, b[..., 3] > 0).sum()
 
 
-def build(src, out, manifest):
+def build(src, out, manifest, modern=None):
+    """modern: today's dress-room captures (tools/fetch_gear.py's coordi folder), drawn on their
+    own plain figure: armors keep the whole figure, weapons and shields become layers."""
     base, _ = load(os.path.join(src, "heads", "sheets", "head_0.png"))
     items = {"armor": [], "head": [], "weapon": [], "shield": []}
     sheets = {}
@@ -105,6 +111,16 @@ def build(src, out, manifest):
                 s = layer(x, base)
             sheets[(kind, len(items[kind]))] = s
             items[kind].append({"name": name, "src": stem})
+    if modern and os.path.exists(os.path.join(modern, "base.png")):
+        # Today's plain figure, its walk put in the old figure's step order; each piece is then
+        # matched to it, so every layer steps with every armor.
+        mbase = align(load(os.path.join(modern, "base.png"))[0], base, silhouette_score)
+        for kind, folder in (("armor", "armors"), ("weapon", "weapons"), ("shield", "shields")):
+            for path in sorted(glob.glob(os.path.join(modern, folder, "sheets", "*.png"))):
+                x, meta = load(path)
+                s = align(x, mbase, silhouette_score) if kind == "armor" else layer(x, mbase)
+                sheets[(kind, len(items[kind]))] = s
+                items[kind].append({"name": meta["name"], "src": "coordi", "modern": True})
     # One crop for all, so every layer lines up with every armor.
     mask = np.zeros((H, W), bool)
     for s in sheets.values():

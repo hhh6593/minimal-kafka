@@ -375,7 +375,8 @@ def main():
     if avatar_src and os.path.isdir(avatar_src):
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import avatar_assets
-        print("avatar", avatar_assets.build(avatar_src, out, manifest))
+        coordi = os.path.join(gear_src, "coordi") if gear_src else None
+        print("avatar", avatar_assets.build(avatar_src, out, manifest, coordi if coordi and os.path.isdir(coordi) else None))
 
     if audio_src and os.path.isdir(audio_src):
         # Names of the numbered sounds, when the sound files come with a list of them.

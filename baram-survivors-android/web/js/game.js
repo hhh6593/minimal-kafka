@@ -9,7 +9,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
 } from './items.js';
 import {
-  initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
+  initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
   RAID_GEAR, plainTiers, plainList, gearPower, raidSet, CRAFT_GEAR, CRAFT_POWER,
 } from './avatar.js';
 
@@ -533,7 +533,7 @@ function startRun(cls, stage) {
     player: {
       hp: Math.round(cls.hp * (1 + 0.1 * up('life'))), maxHp: Math.round(cls.hp * (1 + 0.1 * up('life'))), mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
       face: 1, fdx: 0, fdy: 1, phase: 0, lvl: 1, xp: 0, next: xpFor(1), inv: 0,
-      img: images[`hero/${hero.id}.png`], hero: true, gear, av: hasAvatars() ? dress(cls.id, gear) : null,
+      img: images[`hero/${hero.id}.png`], hero: true, gear, av: hasAvatars() ? dressed(cls, gear) : null,
       pose: null, poseT: 0, walkT: 0,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
@@ -665,6 +665,39 @@ function pieceIcon(cls, kind, t, spId) {
   return t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
 }
 
+/**
+ * Today's dress-room look of each worn piece, when the build has it: a crafted legendary piece at
+ * its star (금린천화갑5성), the 용무기 at its step (용천제삼검). The rest wear their old look.
+ */
+function wornLooks(cls, gear) {
+  const looks = {};
+  for (const kind of ['armor', 'weapon', 'shield']) {
+    const id = gear[kind + 'Sp'], sp = id && SPECIAL[id];
+    const name = sp ? craftPicture(sp, cls.id, starOf(cls, 'sp:' + id))
+      : kind === 'weapon' && gear.weapon === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${gear.weapon}`)) : null;
+    if (name && hasLook(kind, name)) looks[kind] = name;
+  }
+  return looks;
+}
+
+/** A hero dressed in its gear, today's looks loaded on first wear (the old look until then). */
+function dressed(cls, gear) {
+  const looks = wornLooks(cls, gear);
+  loadLooks(looks, refreshAvatars);
+  return dress(cls.id, { ...gear, looks });
+}
+
+/** Dress again everyone on screen, once a look has loaded. */
+function refreshAvatars() {
+  if (!hasAvatars()) return;
+  if (G) {
+    G.player.av = dressed(G.cls, G.player.gear);
+    for (const m of G.party) if (m.gear) m.av = dressed(m.cls, m.gear);
+  }
+  if (T) T.av = dressed(T.cls, savedGear(T.cls));
+  if (!$('#equip').hidden) buildEquip();
+}
+
 function gearImage(g) {
   // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
   // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
@@ -717,9 +750,9 @@ function wear(kind, tier, sp = null) {
   saveJson('bs_progress', progress);
   if (G) {
     G.player.gear = { ...g };
-    if (hasAvatars()) G.player.av = dress(cls.id, g);
+    if (hasAvatars()) G.player.av = dressed(cls, g);
     applyGear();
-  } else if (T && T.cls === cls && hasAvatars()) T.av = dress(cls.id, g);
+  } else if (T && T.cls === cls && hasAvatars()) T.av = dressed(cls, g);
 }
 
 function buildEquip() {
@@ -899,6 +932,7 @@ function openCraft() {
       saveJson('bs_progress', progress);
       if ($('#town-gold')) $('#town-gold').textContent = `${progress.gold || 0}전`;
       if (G) applyGear();
+      refreshAvatars();
       openCraft();
     };
     r.append(btn);
@@ -1099,7 +1133,7 @@ $('#close-tree').onclick = () => { $('#tree').hidden = true; };
 /** A class's figure in the gear it has found, for the menus. */
 function heroPicture(cls) {
   if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
-  return portrait(dress(cls.id, savedGear(cls)));
+  return portrait(dressed(cls, savedGear(cls)));
 }
 
 /** The hero calls out a spell, as players typed it: a bubble over the head. */
@@ -2653,7 +2687,7 @@ function enterTown(cls) {
     return;
   }
   const gear = savedGear(cls);
-  T = { cls, av: hasAvatars() ? dress(cls.id, gear) : null, x: 7.5 * TOWN_TILE, y: 5 * TOWN_TILE - 6,
+  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: 7.5 * TOWN_TILE, y: 5 * TOWN_TILE - 6,
     fdx: 0, fdy: 1, moving: false, walkT: 0, near: null };
   showScreen('town');
   audio.bgm('town');
@@ -2933,7 +2967,7 @@ function joinParty(cls) {
   const gear = savedGear(cls);
   const slot = G.party.length;
   const m = {
-    cls, name, lv: 1, gear, av: hasAvatars() ? dress(cls.id, gear) : null, img: images[`hero/${cls.hero}.png`],
+    cls, name, lv: 1, gear, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
     // Walks in from the edge of the view, as another player would.
     x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
     cd: { a: 1, b: 3, c: 6, d: 9, r: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,

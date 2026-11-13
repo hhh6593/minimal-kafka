@@ -164,7 +164,10 @@ export function gearIcon(cls, kind, tier) {
  */
 export function dress(cls, gear) {
   const [cw, ch] = M.cell;
-  const armor = images[`avatar/armor/${index('armor', gearName(cls, 'armor', gear.armor))}.png`];
+  // gear.looks: today's dress-room look of a piece (its name), when its sheet is loaded.
+  const looks = gear.looks || {};
+  const pick = kind => (looks[kind] && lookReady(kind, looks[kind]) ? looks[kind] : gearName(cls, kind, gear[kind]));
+  const armor = images[`avatar/armor/${index('armor', pick('armor'))}.png`];
   const c = document.createElement('canvas');
   c.width = cw * 8;
   c.height = ch * 4;
@@ -195,10 +198,39 @@ export function dress(cls, gear) {
     }
   };
   lay('head', gear.head || GEAR[cls].head);
-  lay('shield', gearName(cls, 'shield', gear.shield));
-  lay('weapon', gearName(cls, 'weapon', gear.weapon));
+  lay('shield', pick('shield'));
+  lay('weapon', pick('weapon'));
   g.putImageData(out, 0, 0);
   return { sheet: c, cw, ch, fx: M.feet[0], fy: M.feet[1], top: bodyTop(out, cw, ch) };
+}
+
+/** Whether the build has today's dress-room look of that name (a sheet, maybe not loaded yet). */
+export function hasLook(kind, name) {
+  return !!M && !!M[kind] && index(kind, name) >= 0;
+}
+function lookReady(kind, name) {
+  const im = images[`avatar/${kind}/${index(kind, name)}.png`];
+  return index(kind, name) >= 0 && !!im && im.complete && im.naturalWidth > 0;
+}
+
+/**
+ * Loads the sheets of today's looks when first worn (there are many; loading them all at the
+ * start would take hundreds of MB), then calls done once if any was missing.
+ */
+export function loadLooks(looks, done) {
+  const want = Object.entries(looks).filter(([k, n]) => n && hasLook(k, n) && !lookReady(k, n));
+  if (!want.length) return;
+  let left = want.length;
+  for (const [kind, name] of want) {
+    const path = `avatar/${kind}/${index(kind, name)}.png`;
+    const im = images[path] || new Image();
+    images[path] = im;
+    const end = () => { if (--left === 0) done(); };
+    if (im.src && !im.complete) { im.addEventListener('load', end); im.addEventListener('error', end); continue; }
+    im.onload = end;
+    im.onerror = end;
+    im.src = `assets/${path}`;
+  }
 }
 
 /** How far above the feet the figure's head is, in the front idle pose (for bars and bubbles). */
