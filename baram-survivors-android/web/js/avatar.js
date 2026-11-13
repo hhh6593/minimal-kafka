@@ -28,30 +28,47 @@ export const GEAR = {
 // Raid spoils: one piece a class a raid, beyond anything a hunting ground drops, after the boss
 // it comes from — dragons' gear from 삼두룡, the judging and the cursed from 흑술사, fire from 화령.
 export const RAID_GEAR = {
-  // [kind, wardrobe name, power]: power is the tier it counts as (a hunting ground's best is
-  // about 4-5), so a middling raid gives a middling piece and the last raids the best.
-  raid_boar: { warrior: ['weapon', '곤봉', 3], rogue: ['armor', '원주민의옷', 3], mage: ['weapon', '횃불', 3], poet: ['shield', '대나무방패', 3] },
-  raid_tiger: { warrior: ['weapon', '백호의검', 4], rogue: ['weapon', '얼음칼', 4], mage: ['weapon', '건곤권', 4], poet: ['shield', '떡갈나무방패', 4] },
-  raid_goblin: { warrior: ['weapon', '도깨비방망이', 5], rogue: ['weapon', '용겸제일봉', 5], mage: ['weapon', '용랑제일봉', 5], poet: ['shield', '문신방패', 5] },
-  raid_hydra: { warrior: ['weapon', '청룡의검', 7], rogue: ['weapon', '용마제일검', 7], mage: ['armor', '용왕의용포', 7], poet: ['shield', '백룡현갑', 7] },
-  raid_sorcerer: { warrior: ['weapon', '참마도', 8], rogue: ['weapon', '저주의단검', 8], mage: ['weapon', '심판의낫', 8], poet: ['weapon', '자월초롱', 8] },
-  raid_sea: { warrior: ['weapon', '현무의검', 8], rogue: ['weapon', '탁조', 8], mage: ['armor', '선녀의옷', 8], poet: ['shield', '거문고', 8] },
-  raid_fire: { warrior: ['armor', '불의갑주', 9], rogue: ['armor', '황혼의갑주', 9], mage: ['weapon', '흑단화염장', 9], poet: ['armor', '여명의치마', 9] },
+  // A set for each raid: an armor and a shield any class may wear, and a weapon for each
+  // class. pow is the tier the set counts as (a hunting ground's best is about 4-5): a middling
+  // raid gives middling pieces, the last raids the best.
+  raid_boar: { pow: 3, armor: '원주민의옷', shield: '대나무방패',
+    weapon: { warrior: '곤봉', rogue: '삼첨도', mage: '횃불', poet: '나비채' } },
+  raid_tiger: { pow: 4, armor: '여자무사옷', shield: '떡갈나무방패',
+    weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱' } },
+  raid_goblin: { pow: 5, armor: '여자갑옷', shield: '문신방패',
+    weapon: { warrior: '도깨비방망이', rogue: '용겸제일봉', mage: '용랑제일봉', poet: '검정깃발' } },
+  raid_hydra: { pow: 7, armor: '용왕의용포', shield: '백룡현갑',
+    weapon: { warrior: '청룡의검', rogue: '용마제일검', mage: '용겸제일봉', poet: '탁조' } },
+  raid_sorcerer: { pow: 8, armor: '무녀복', shield: '팔세지도',
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
+  raid_sea: { pow: 8, armor: '선녀의옷', shield: '거문고',
+    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '용랑제일봉' } },
+  raid_fire: { pow: 9, armor: '불의갑주', shield: '일광방패',
+    weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권' } },
 };
-// Every raid piece has a place in its class's line, after the hunting grounds' own.
-for (const r of Object.values(RAID_GEAR))
-  for (const [cls, [kind, name]] of Object.entries(r)) if (!GEAR[cls][kind].includes(name)) GEAR[cls][kind].push(name);
 
-/** The tier a worn piece counts as: its place in the line, or a raid piece's own power. */
+/** A raid's three pieces for a class: [kind, name]. */
+export function raidSet(id, cls) {
+  const r = RAID_GEAR[id];
+  return [['weapon', r.weapon[cls]], ['armor', r.armor], ['shield', r.shield]];
+}
+
+// Every raid piece has a place in each class's line, after the hunting grounds' own.
+for (const id of Object.keys(RAID_GEAR))
+  for (const cls of Object.keys(GEAR))
+    for (const [kind, name] of raidSet(id, cls)) if (!GEAR[cls][kind].includes(name)) GEAR[cls][kind].push(name);
+
+/** The tier a worn piece counts as: its place in the line, or its raid set's power. */
 export function gearPower(cls, kind, tier) {
   const name = GEAR[cls][kind][tier];
-  for (const r of Object.values(RAID_GEAR)) if (r[cls][1] === name) return r[cls][2];
+  for (const id of Object.keys(RAID_GEAR))
+    if (raidSet(id, cls).some(([k, n]) => k === kind && n === name)) return RAID_GEAR[id].pow;
   return tier;
 }
 
 /** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
 export function plainTiers(cls, kind) {
-  const raid = new Set(Object.values(RAID_GEAR).map(r => r[cls]).filter(([k]) => k === kind).map(([, n]) => n));
+  const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
   return GEAR[cls][kind].filter(n => !raid.has(n)).length;
 }
 

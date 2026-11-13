@@ -5,8 +5,11 @@ import {
 } from './data.js';
 import { Audio } from './audio.js';
 import {
+  SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
+} from './items.js';
+import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
-  RAID_GEAR, plainTiers, gearPower,
+  RAID_GEAR, plainTiers, gearPower, raidSet,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -399,7 +402,11 @@ function raidInfo(r) {
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
-    <div class="boss">난이도 ${raidStars(r)} · 보상: <b>${RAID_GEAR[r.id][chosenClass.id][1]}</b> (${RAID_GEAR[r.id][chosenClass.id][2]}등급) · ${120 * r.level}전</div>
+    <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${120 * r.level}전</div>
+    <div class="party">${raidSet(r.id, chosenClass.id).map(([k, n]) => {
+      const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
+      return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(있음)' : ''}`;
+    }).join(' · ')}</div>
     <div class="state">${raidOpen(r) ? '키운 직업이 모두 모인다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
   $('#go').disabled = !raidOpen(r);
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
@@ -554,15 +561,26 @@ function savedGear(cls) {
 
 /** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
 function applyGear() {
-  const p = G.player, g = p.gear;
-  const c = G.cls.id, ap = gearPower(c, 'armor', g.armor), wp = gearPower(c, 'weapon', g.weapon);
-  const sp = g.shield < 0 ? -1 : gearPower(c, 'shield', g.shield);
-  const hp = G.cls.hp + ap * 20;
+  const p = G.player, g = p.gear, c = G.cls.id;
+  // A special worn counts a rank above its look, and adds its option.
+  const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c)
+    : g[k] < 0 ? -1 : gearPower(c, k, g[k]));
+  const bonus = p.bonus = {};
+  for (const k of ['weapon', 'armor', 'shield']) {
+    const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+    if (sp) bonus[sp.opt.id] = (bonus[sp.opt.id] || 0) + 1;
+  }
+  const hp = G.cls.hp + pow('armor') * 20 + 40 * (bonus.life || 0);
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + Math.max(0, sp + 1);
-  p.gearPower = 1 + 0.12 * wp;
+  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + 3 * (bonus.guard || 0);
+  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0));
+}
+
+/** A special option's count on the hero (0 when none is worn). */
+function opt(id) {
+  return (G && G.player.bonus && G.player.bonus[id]) || 0;
 }
 
 // The bag: every piece found is kept for the class (as in D2 Survivors, gear stays even after
@@ -583,6 +601,21 @@ function gearImage(g) {
 }
 
 function pickGear(g) {
+  if (g.sp) {
+    // A special: kept by its own id; a second one sells well.
+    const b = bag(G.cls), id = 'sp:' + g.sp, sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id);
+    audio.play('chest');
+    if (b.includes(id)) {
+      G.gold += 1000;
+      note(`${name}: 이미 가진 스페셜이라 1000전에 팔았습니다.`);
+      return;
+    }
+    b.push(id);
+    saveJson('bs_progress', progress);
+    say(`스페셜 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text})`, 'sys');
+    banner(`★ 스페셜: ${name}`);
+    return;
+  }
   const b = bag(G.cls), id = `${g.kind}:${g.tier}`;
   const name = gearName(G.cls.id, g.kind, g.tier) || '장비';
   audio.play('pickup');
@@ -597,11 +630,11 @@ function pickGear(g) {
   note(`${name} 획득`);
 }
 
-/** Puts on a piece from the bag (or takes off a shield with tier -1). */
-function wear(kind, tier) {
+/** Puts on a piece from the bag (or takes off a shield with tier -1); sp: a special's id. */
+function wear(kind, tier, sp = null) {
   const cls = G ? G.cls : chosenClass;
   progress.gear = progress.gear || {};
-  const g = Object.assign(savedGear(cls), { [kind]: tier });
+  const g = Object.assign(savedGear(cls), { [kind]: tier, [kind + 'Sp']: sp });
   progress.gear[cls.id] = g;
   saveJson('bs_progress', progress);
   if (G) {
@@ -645,7 +678,7 @@ function buildEquip() {
     if (kind === 'shield') tiers.unshift(-1);
     for (const t of tiers) {
       const btn = document.createElement('button');
-      btn.className = 'equip' + (g[kind] === t ? ' on' : '');
+      btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
       const icon = t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : gearName(cls.id, kind, t)}</span>`;
       btn.onclick = () => {
@@ -654,13 +687,102 @@ function buildEquip() {
       };
       row.append(btn);
     }
+    // The specials found of this kind: gold-framed, with their option.
+    for (const id of b.filter(x => x.startsWith('sp:')).map(x => x.slice(3))) {
+      const sp = SPECIAL[id];
+      if (!sp || sp.kind !== kind) continue;
+      const t = specialBase(sp, cls.id), btn = document.createElement('button');
+      btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
+      const icon = hasAvatars() ? gearIcon(cls.id, kind, t) : null;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>★${specialName(sp, cls.id)}</span><small>${sp.opt.text}</small>`;
+      btn.onclick = () => {
+        wear(kind, t, id);
+        buildEquip();
+      };
+      row.append(btn);
+    }
     box.append(row);
   }
-  const p = G && G.player;
-  const pw = k => (g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]));
+  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id)
+    : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]));
+  const opts = ['weapon', 'armor', 'shield'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20} · 방어 +${Math.max(0, pw('shield') + 1)}`
-    + (p ? '' : '');
+    + (opts.length ? ` · ${opts.join(' · ')}` : '');
 }
+
+// ---------------------------------------------------------------- 도감
+//
+// Every piece a class can have: the hunting grounds' line, the raids' sets and the specials,
+// with where each drops and whether it is found. Searchable, filtered by grade.
+
+let codexCls = null, codexGrade = 'all', codexOwned = false;
+
+function codexItems(cls) {
+  const b = bag(cls), out = [];
+  for (const kind of ['weapon', 'armor', 'shield']) {
+    GEAR[cls.id][kind].forEach((name, t) => {
+      const raid = raidOf(cls.id, kind, t);
+      out.push({ grade: raid ? 'raid' : 'plain', kind, name, icon: gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
+        owned: b.includes(`${kind}:${t}`), from: raid ? raid.name : tierSources(cls.id, kind, t) });
+    });
+  }
+  for (const sp of SPECIALS) {
+    const t = specialBase(sp, cls.id);
+    out.push({ grade: 'special', kind: sp.kind, name: specialName(sp, cls.id), icon: gearIcon(cls.id, sp.kind, t),
+      pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from: sp.srcName, opt: sp.opt.text });
+  }
+  return out;
+}
+
+function buildCodex() {
+  const cls = codexCls || (G ? G.cls : chosenClass) || CLASSES[0];
+  codexCls = cls;
+  $('#codex-cls').innerHTML = '';
+  for (const c of CLASSES) {
+    const btn = document.createElement('button');
+    btn.textContent = c.name;
+    btn.className = c === cls ? 'on' : '';
+    btn.onclick = () => { codexCls = c; buildCodex(); };
+    $('#codex-cls').append(btn);
+  }
+  const grades = $('#codex-grades');
+  grades.innerHTML = '';
+  for (const [g, label] of [['all', '전체'], ['plain', '일반'], ['raid', '레이드'], ['special', '★ 스페셜']]) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.className = codexGrade === g ? 'on' : '';
+    btn.onclick = () => { codexGrade = g; buildCodex(); };
+    grades.append(btn);
+  }
+  const own = document.createElement('button');
+  own.textContent = '가진 것만';
+  own.className = codexOwned ? 'on' : '';
+  own.onclick = () => { codexOwned = !codexOwned; buildCodex(); };
+  grades.append(own);
+  const q = $('#codex-search').value.trim();
+  const all = codexItems(cls);
+  const list = all.filter(it => (codexGrade === 'all' || it.grade === codexGrade) && (!codexOwned || it.owned)
+    && (!q || [it.name, KIND_NAME[it.kind], it.opt || '', ...[].concat(it.from)].some(x => x.includes(q))));
+  $('#codex-count').textContent = `${cls.name} · 모은 것 ${all.filter(x => x.owned).length}/${all.length}`;
+  const box = $('#codex-rows');
+  box.innerHTML = '';
+  for (const it of list) {
+    const row = document.createElement('div');
+    row.className = 'codex-item ' + it.grade + (it.owned ? '' : ' missing');
+    const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
+    const grade = { plain: '일반', raid: '레이드', special: '스페셜' }[it.grade];
+    row.innerHTML = (it.icon ? `<img src="${it.icon}" alt="">` : '<span></span>')
+      + `<div><b>${it.grade === 'special' ? '★' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
+      + `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span></div>`;
+    box.append(row);
+  }
+  if (!list.length) box.innerHTML = '<div class="note">찾는 장비가 없습니다.</div>';
+}
+
+$('#codex-search').oninput = () => buildCodex();
+$('#open-codex').onclick = () => { codexCls = null; buildCodex(); $('#codex').hidden = false; };
+$('#equip-codex').onclick = () => { codexCls = null; buildCodex(); $('#codex').hidden = false; };
+$('#close-codex').onclick = () => { $('#codex').hidden = true; };
 
 $('#open-equip').onclick = () => {
   buildEquip();
@@ -777,7 +899,8 @@ function strikePose(kind) {
 
 /** The music key of the ground being hunted. */
 function huntMusic() {
-  if (G.stage.raid) return 'stage_' + G.stage.open;
+  // Each raid its own grand track, from the start to the end of the fight.
+  if (G.stage.raid) return 'raid_' + G.stage.id;
   return 'stage_' + G.stage.id;
 }
 
@@ -895,7 +1018,7 @@ function stepHero(dx, dy, dt) {
 
 /** Pixels a second the hero walks. */
 function heroSpeed() {
-  return (TILE / 0.24) * (G.player.speed / 70) * (1 + 0.08 * G.passives.speed);
+  return (TILE / 0.24) * (G.player.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed'));
 }
 
 function update(dt) {
@@ -920,9 +1043,9 @@ function update(dt) {
     }
     p.inv = Math.max(0, p.inv - dt);
     p.poseT = Math.max(0, p.poseT - dt);
-    p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * dt);
+    p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * (1 + 0.3 * opt('mana')) * dt);
     // Health comes back slowly by itself, as it did in the old game.
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.005 * dt);
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.005 * (1 + opt('regen')) * dt);
   }
   G.shake = Math.max(0, G.shake - dt);
 
@@ -931,7 +1054,7 @@ function update(dt) {
   if (!G.dead) {
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
-      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1);
+      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste'));
       if (s.timer <= 0) {
         const st = stats(s);
         s.timer += st.cd;
@@ -1067,7 +1190,7 @@ function raidSpawn(dt) {
     G.bossDue = false;
     G.bossT = t;
     audio.play('boss');
-    audio.bgm('boss');
+    // The raid's own music plays on: no switch to the hunting grounds' boss track.
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다! 붉은 칸을 피하세요.`, 'warn');
     banner(`레이드 보스 ${G.boss.name}!`);
@@ -1500,7 +1623,8 @@ function hurtEnemy(e, dmg, push = null) {
   e.kickAt = G.t;
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
-  dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1);
+  dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
+    * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   e.hp -= dmg;
   e.flash = 0.12;
@@ -1511,8 +1635,20 @@ function hurtEnemy(e, dmg, push = null) {
   return dmg;
 }
 
+/** The very rare special of this ground or raid: a little likelier from the strong ones. */
+function rollSpecial(e) {
+  const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.0003;
+  if (Math.random() >= chance) return;
+  const mine = SPECIALS.filter(s => s.src === G.stage.id);
+  if (!mine.length) return;
+  const sp = mine[Math.floor(Math.random() * mine.length)];
+  G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id } });
+  say('어디선가 빛나는 물건이 떨어졌습니다!', 'warn');
+}
+
 function killEnemy(e) {
   G.kills++;
+  rollSpecial(e);
   G.enemies.splice(G.enemies.indexOf(e), 1);
   occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
@@ -1577,12 +1713,18 @@ function clearStage() {
   if (G.stage.raid) {
     progress.raids = progress.raids || {};
     progress.raids[G.stage.id] = (progress.raids[G.stage.id] || 0) + 1;
-    // A raid's spoils: the class's own piece from this boss, beside the boss's own drops.
-    const p = G.player, [kind, name] = RAID_GEAR[G.stage.id][G.cls.id];
-    const tier = GEAR[G.cls.id][kind].indexOf(name);
-    G.drops.push({ x: p.x, y: p.y + 24, kind: 'gear', gear: { kind, tier } });
-    say(`레이드 전용 장비 ${josa(name, '이', '가')} 떨어졌습니다!`, 'sys');
-    later(1.2, () => banner(`레이드 전용 · ${name}`));
+    // A raid's spoils: pieces of its set (weapon, armor, shield) the hero does not have yet —
+    // two from 삼두룡 up — beside the boss's own drops. With the set complete, any piece (a
+    // second one sells, as always).
+    const p = G.player, b = bag(G.cls);
+    const set = raidSet(G.stage.id, G.cls.id).map(([kind, name]) => ({ kind, name, tier: GEAR[G.cls.id][kind].indexOf(name) }));
+    const missing = set.filter(g => !b.includes(`${g.kind}:${g.tier}`)).sort(() => Math.random() - 0.5);
+    const pool = missing.length ? missing : set.slice().sort(() => Math.random() - 0.5);
+    const got = pool.slice(0, G.level >= 7 ? 2 : 1);
+    got.forEach((g, i) => G.drops.push({ x: p.x + (i ? 40 : -40), y: p.y + 24, kind: 'gear', gear: { kind: g.kind, tier: g.tier } }));
+    const names = got.map(g => g.name).join(', ');
+    say(`레이드 전용 장비가 떨어졌습니다: ${names}`, 'sys');
+    later(1.2, () => banner(`레이드 전용 · ${names}`));
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
     G.gold += 120 * G.level;
   } else {
@@ -2644,7 +2786,7 @@ function drawParty(m) {
 function updatePickups(dt) {
   const p = G.player;
   // 노획 reaches for dropped things from further away.
-  const reach = TILE * (0.7 + 0.5 * G.passives.magnet);
+  const reach = TILE * (0.7 + 0.5 * G.passives.magnet + opt('magnet'));
   for (const d of G.drops) {
     if (Math.hypot(d.x - p.x, d.y - p.y) < reach) {
       d.taken = true;
@@ -2953,8 +3095,18 @@ function die() {
   setTimeout(() => showResults('유령이 되었습니다'), 1800);
 }
 
+/** Gear still lying on the ground when a hunt ends goes to the bag: no spoils are lost. */
+function gatherGear() {
+  for (const d of G.drops) {
+    if (d.kind !== 'gear' || d.taken) continue;
+    d.taken = true;
+    pickGear(d.gear);
+  }
+}
+
 function showResults(title) {
   if (!G || G.over) return;
+  gatherGear();
   G.over = true;
   // Whatever was open goes: the results are on top of nothing.
   $('#levelup').hidden = true;
@@ -2971,6 +3123,7 @@ function showResults(title) {
 
 function leaveHunt() {
   if (G) {
+    if (!G.over) gatherGear();
     record();
     bankGold();
   }
@@ -3302,6 +3455,16 @@ function render(now) {
   for (const d of G.drops) {
     const im = d.kind === 'gear' ? gearImage(d.gear) : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
+    if (d.gear && d.gear.sp) {
+      // A special shimmers gold where it lies.
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now * 6);
+      ctx.fillStyle = '#ffd040';
+      ctx.beginPath();
+      ctx.ellipse(Math.round(d.x), Math.round(d.y - im.height / 2), im.width * 0.9, im.height * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
@@ -3806,7 +3969,8 @@ document.addEventListener('click', e => {
 
 const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
   ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활'], ['click', '버튼 누름']];
-const MUSIC = [['title', '처음 화면'], ['select', '직업·사냥터 선택'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name])];
+const MUSIC = [['title', '처음 화면'], ['select', '직업·사냥터 선택'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name]),
+  ...RAIDS.map(r => ['raid_' + r.id, r.name])];
 
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
 const SOUND_KINDS = [
@@ -3898,6 +4062,7 @@ function soundDefaults() {
   if (has('nx_08_2_Goguryeo')) d.bgm_town = 'nx_08_2_Goguryeo';
   if (has('nx_10_4way_battle')) d.bgm_boss = 'nx_10_4way_battle';
   for (const st of STAGES) if (has(st.bgm)) d['bgm_stage_' + st.id] = st.bgm;
+  for (const r of RAIDS) if (has(r.bgm)) d['bgm_raid_' + r.id] = r.bgm;
   return d;
 }
 
@@ -4059,7 +4224,7 @@ $('#sort-done').onclick = () => {
 };
 $('#close-sounds').onclick = () => {
   $('#sounds').hidden = true;
-  audio.bgm(G ? (G.enemies.some(e => e.kind === 'boss') ? 'boss' : huntMusic()) : 'title');
+  audio.bgm(G ? (G.enemies.some(e => e.kind === 'boss') && !G.stage.raid ? 'boss' : huntMusic()) : 'title');
 };
 
 // Hooks for the Android app (MainActivity).
@@ -4071,6 +4236,10 @@ window.__appPause = on => {
 // Back: opens or closes the pause menu, or steps back through the menus; false when there is
 // nothing left to go back to (the app then exits on a second press).
 window.__appBack = () => {
+  if (!$('#codex').hidden) {
+    $('#codex').hidden = true;
+    return true;
+  }
   if (!$('#backup').hidden) {
     $('#backup').hidden = true;
     return true;
