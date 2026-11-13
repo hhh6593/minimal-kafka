@@ -265,6 +265,10 @@
   .equip.special span { color: #7a3a00; font-weight: 700; }
   .equip.special small { display: block; width: 100%; font: 9px/11px G9, monospace; color: #2a5a10; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  .pacts { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 4px; }
+  .pacts small { font: 10px G9, monospace; color: #6a3e16; margin-right: 2px; }
+  .pact { font: 10px G9, monospace; padding: 2px 5px; background: #e8d0a0; color: #5a3010; border: 1px solid #a0602a; cursor: pointer; }
+  .pact.on { background: #8a1800; color: #ffe8c0; border-color: #3a0800; }
   #equip-stats { margin: 6px 0; font: 10px G9, monospace; color: #6a3e16; }
   #sort { padding: 4px 0 8px; }
   .sort-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -551,7 +555,7 @@
     <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
     <div id="equip-rows"></div>
     <div id="equip-stats"></div>
-    <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="close-equip" class="btn">닫기</button></div>
+    <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="equip-cards" class="btn">괴력난신</button><button id="close-equip" class="btn">닫기</button></div>
   </div>
 </div>
 <div id="banner" hidden></div>

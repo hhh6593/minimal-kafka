@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT,
+  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -390,8 +390,74 @@ function buildStages() {
     <div class="boss">보스: <b>${boss.name}</b></div>
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
       : open ? '아직 정복하지 못한 사냥터' : '앞 사냥터의 보스를 쓰러뜨리면 열린다'}</div>`;
+  pactRow(buildStages);
   $('#go').disabled = !open;
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 입장`;
+}
+
+/** The 규약 toggles under a ground's or raid's card: harder monsters for richer spoils. */
+function pactRow(redraw) {
+  const box = document.createElement('div');
+  box.className = 'pacts';
+  const k = Math.round((pactReward() - 1) * 100);
+  box.innerHTML = `<small>규약 (보상 +${k}%)</small>`;
+  for (const [id, pc] of Object.entries(PACTS)) {
+    const b = document.createElement('button');
+    b.className = 'pact' + (pactOn(id) ? ' on' : '');
+    b.textContent = pc.name;
+    b.title = `${pc.desc} · 보상 +${Math.round(pc.reward * 100)}%`;
+    b.onclick = () => {
+      settings.pacts = settings.pacts || {};
+      settings.pacts[id] = !settings.pacts[id];
+      saveJson('bs_settings', settings);
+      redraw();
+    };
+    box.append(b);
+  }
+  $('#stage-info').append(box);
+}
+
+/** 괴력난신 spoils: two ★ cards of this week's 괴수, three clears a week. */
+function gwoeCards() {
+  const wk = gwoeWeek();
+  if (!progress.gwoe || progress.gwoe.week !== wk) progress.gwoe = { week: wk, n: 0 };
+  if (progress.gwoe.n >= 3) { say('이번 주 괴력난신 보상은 모두 받았습니다.', 'sys'); return; }
+  progress.gwoe.n++;
+  const key = G.boss.beast || G.stage.boss.beast;
+  progress.cards = progress.cards || {};
+  const mine = progress.cards[key] = progress.cards[key] || {};
+  const got = [];
+  for (let i = 0; i < 2; i++) {
+    const slot = CARD_SLOTS[Math.floor(Math.random() * CARD_SLOTS.length)], r = Math.random();
+    const star = r < 0.1 ? 3 : r < 0.4 ? 2 : 1;
+    mine[slot] = Math.max(mine[slot] || 0, star);
+    got.push(`[★${star}]${G.boss.name}의광기:${slot}`);
+  }
+  say(`괴력난신 효과: ${got.join(', ')}`, 'sys');
+  const cs = cardSet();
+  later(1.6, () => banner(`★ 효과 ${cs.stars}개 · 피해 +${Math.round(cs.dmg * 100)}%`));
+}
+
+/** The ★ cards: by 괴수, slot by slot, and the set they add up to. */
+function openCards() {
+  const box = $('#trade-rows'), cs = cardSet();
+  const wk = gwoeWeek(), [, wname] = GWOE_BEASTS[wk % GWOE_BEASTS.length];
+  const left = 3 - (progress.gwoe && progress.gwoe.week === wk ? progress.gwoe.n : 0);
+  $('#trade-gold').textContent = `이번 주 괴수 ${wname} · 남은 보상 ${left}/3번 · 한 번에 카드 2장`;
+  $('#trade-title').textContent = `괴력난신 ★ 효과 · ★${cs.stars}` + (cs.next ? ` · 다음 ★${cs.next[0]}` : ' · 모두 열림');
+  box.innerHTML = '';
+  const row = (name, desc) => {
+    const r = document.createElement('div');
+    r.className = 'trade-row';
+    r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
+    box.append(r);
+  };
+  row('신력개방', CARD_SETS.map(([n, d, a, h]) => `${cs.stars >= n ? '●' : '○'}★${n} 피해 +${Math.round(d * 100)}%${a ? ` 방어 +${a}` : ''}${h ? ` 체력 +${h}` : ''}`).join(' · '));
+  for (const [key, name] of GWOE_BEASTS) {
+    const mine = (progress.cards || {})[key] || {};
+    row(`${name}의광기`, CARD_SLOTS.map(sl => `${sl} ${mine[sl] ? '★'.repeat(mine[sl]) : '-'}`).join(' · '));
+  }
+  $('#trade').hidden = false;
 }
 
 function raidOpen(r) {
@@ -409,7 +475,8 @@ function raidInfo(r) {
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
-    <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${120 * r.level}전</div>
+    <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${120 * r.level}전 · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>
+    <div class="party" style="color:${combatPower(chosenClass) >= raidPower(r) ? '#1e6a10' : '#9a1800'}">권장 전투력 ${raidPower(r).toLocaleString()} · 내 전투력 ${combatPower(chosenClass).toLocaleString()}</div>
     <div class="party">${raidSet(r.id, chosenClass.id).map(([k, n]) => {
       const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
       return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(있음)' : ''}`;
@@ -423,6 +490,7 @@ function raidInfo(r) {
   sw.textContent = settings.raidManual ? '시작 기술: 직접 고르기' : `시작 기술: ${built ? '지난 빌드' : '자동 빌드'}`;
   sw.onclick = () => { settings.raidManual = !settings.raidManual; saveJson('bs_settings', settings); raidInfo(r); };
   $('#stage-info').append(sw);
+  pactRow(() => raidInfo(r));
   $('#go').disabled = !raidOpen(r);
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
 }
@@ -589,6 +657,34 @@ function savedGear(cls) {
   return Object.assign({ armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 }, progress.gear[cls.id]);
 }
 
+// 괴력난신 ★ 효과: cards by 괴수 and slot (★1-★3, the best kept), all classes share them; the
+// stars summed open set effects at ★12/18/27/36/40/45, as today's 신력개방.
+const CARD_SLOTS = ['무기', '갑옷', '투구', '방패', '망토', '반지'];
+const CARD_SETS = [[12, 0.05, 0, 0], [18, 0.1, 1, 0], [27, 0.15, 2, 0], [36, 0.2, 3, 30], [40, 0.25, 3, 40], [45, 0.3, 5, 60]];
+function cardStars() {
+  let n = 0;
+  for (const b of Object.values(progress.cards || {})) for (const v of Object.values(b)) n += v;
+  return n;
+}
+function cardSet() {
+  const n = cardStars();
+  let at = null;
+  for (const c of CARD_SETS) if (n >= c[0]) at = c;
+  return { stars: n, dmg: at ? at[1] : 0, armor: at ? at[2] : 0, hp: at ? at[3] : 0, next: CARD_SETS.find(c => n < c[0]) };
+}
+/** 전투력, as today's client shows it: the gear's ranks and stars, the 승급, the best level, the cards. */
+function combatPower(cls) {
+  const g = savedGear(cls), c = cls.id;
+  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
+    : g[k] < 0 || g[k] === undefined ? 0 : gearPower(c, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
+  const gear = pw('weapon') * 3 + pw('armor') * 2 + pw('shield') + pw('helmet') + pw('cape');
+  const set = cardSet(), rec = best[c];
+  return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) + set.hp * 20);
+}
+function raidPower(r) {
+  return 1200 * r.level + 3000;
+}
+
 /** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
 function applyGear() {
   const p = G.player, g = p.gear, c = G.cls.id;
@@ -603,12 +699,13 @@ function applyGear() {
   }
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
-  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0);
+  const cs = cardSet();
+  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0) + cs.hp;
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0);
-  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0));
+  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
+  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg);
 }
 
 /** A special option's count on the hero (0 when none is worn). */
@@ -828,7 +925,7 @@ function buildEquip() {
   const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
   const ex = k => (g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
-    + ` · 방어 +${Math.max(0, pw('shield') + 1) + Math.round(ex('cape') / 3)}`
+    + ` · 방어 +${Math.max(0, pw('shield') + 1) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '');
 }
 
@@ -970,6 +1067,17 @@ function openCraft() {
       say(`${josa(dragon, '을', '를')} 조합했습니다!`, 'sys');
       banner(`조합 성공 · ${dragon}`);
     });
+  // 레이드 상점: 레이드주화 for today's makers' goods, as the client's raid shop.
+  head(`레이드 상점 · 레이드주화 ${progress.coins || 0}개`);
+  const SHOP = [['scroll', 1, 5], ['kalpa', 5, 8], ['silver1', 5, 6], ['silver2', 2, 15], ['essence', 3, 20], ['silver3', 1, 120], ['pearl', 1, 60]];
+  for (const [id, n, price] of SHOP) {
+    row(`${MATS[id].name} ${n}개`, `레이드주화 ${price}개`, '교환', (progress.coins || 0) >= price, () => {
+      progress.coins -= price;
+      mats[id] = (mats[id] || 0) + n;
+      progress.mats = mats;
+      say(`${MATS[id].name} ${n}개로 바꿨습니다.`, 'sys');
+    });
+  }
   head('조합 · 재료 장비');
   const have = m => Object.entries(m).every(([id, n]) => (mats[id] || 0) >= n);
   const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
@@ -997,6 +1105,13 @@ function openCraft() {
       });
   }
   head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
+  // 확률 강화 (today's way, optional): half the materials, but it can fail — 손상 (spent for
+  // nothing) or 부식 (a star back) — at 90% … 10% from 제일 to 제구.
+  row(`확률 강화 ${settings.chanceUp ? '켜짐' : '꺼짐'}`, settings.chanceUp ? '재료 절반 · 성공 90%→10% · 실패 시 손상(재료만 잃음) 또는 부식(별 -1)'
+    : '켜면 조합 장비·용무기 별을 절반 재료로, 대신 확률로 올린다', settings.chanceUp ? '끄기' : '켜기', true, () => {
+    settings.chanceUp = !settings.chanceUp;
+    saveJson('bs_settings', settings);
+  });
   const owned = b.filter(k => !k.startsWith('sp:') || SPECIAL[k.slice(3)]);
   let any = false;
   for (const key of owned) {
@@ -1011,16 +1126,26 @@ function openCraft() {
     const crafted = !!csp || key === `weapon:${GEAR[cls.id].weapon.indexOf(CRAFT_GEAR[cls.id])}`;
     if (crafted) {
       any = true;
-      const sc = starMats(csp, star);
+      const sc0 = starMats(csp, star), chance = settings.chanceUp ? Math.max(0.1, 0.9 - 0.1 * (star - 1)) : 1;
+      const sc = settings.chanceUp ? { mats: Object.fromEntries(Object.entries(sc0.mats).map(([k, v]) => [k, Math.max(1, Math.ceil(v / 2))])), gold: Math.ceil(sc0.gold / 2) } : sc0;
       icon = pieceIcon(cls, kind, +t, csp && csp.id);
       const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
-      row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전 · 반 등급 오름`,
+      row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전`
+        + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
         star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
           progress.gold -= sc.gold;
           for (const [id, n] of Object.entries(sc.mats)) mats[id] -= n;
           progress.mats = mats;
           progress.stars = progress.stars || {};
           const st = progress.stars[cls.id] = progress.stars[cls.id] || {};
+          if (Math.random() >= chance) {
+            // 손상 or 부식, as today's 강화 fails.
+            const rust = Math.random() < 0.3 && star > 1;
+            if (rust) st[key] = star - 1;
+            say(rust ? `강화 실패 — 부식! ${name} 별이 하나 내려갔습니다.` : `강화 실패 — 손상. 재료만 사라졌습니다.`, 'warn');
+            banner(rust ? '강화 실패 · 부식' : '강화 실패 · 손상');
+            return;
+          }
           st[key] = star + 1;
           say(dragon ? `${dragonName(cls.id, star + 1)} 승급!` : `${name} ★${star + 1} 강화!`, 'sys');
           if (dragon || (csp && csp.craft.legend)) banner(dragon ? `승급 성공 · ${dragonName(cls.id, star + 1)}` : `강화 성공 · ${name} ★${star + 1}`);
@@ -1046,6 +1171,7 @@ function openCraft() {
 }
 
 $('#equip-craft').onclick = () => openCraft();
+$('#equip-cards').onclick = () => openCards();
 
 $('#open-equip').onclick = () => {
   buildEquip();
@@ -1104,8 +1230,8 @@ function buildTree(cls, hot = new Set()) {
   const box = $('#tree-rows');
   box.innerHTML = '';
   const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
-  // One row per 승급, as the old game listed its spells: 일반, then 1차 to 4차.
-  for (let t = 0; t <= 4; t++) {
+  // One row per 승급: 일반, the old game's 1차 to 4차, and today's 5차 to 7차.
+  for (let t = 0; t <= 7; t++) {
     const row = mine.filter(([, d]) => (d.promo || 0) === t);
     if (!row.length) continue;
     const h = document.createElement('h4');
@@ -1336,6 +1462,7 @@ function update(dt) {
   updateAllies(dt);
   updateParty(dt);
   updateShots(dt);
+  updateTrial(dt);
   for (const sp of G.sparks) { sp.t += dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; }
   G.sparks = G.sparks.filter(sp => sp.t < 0.28);
   if (!G.dead) updatePickups(dt);
@@ -1453,7 +1580,7 @@ function raidSetup() {
   // fitted to the raid's level; no cards to pick unless the player asks for them.
   if (settings.raidManual) G.pendingLevels = start;
   else {
-    G.pendingLevels = 0;
+    G.pendingLevels = 1; // the 시련 능력 card only
     G.firstCard = false;
     applyBuild(start);
   }
@@ -1738,7 +1865,7 @@ function spawn(dt) {
     return;
   }
   const t = G.t, boss = G.bossT !== undefined;
-  const floor = boss ? 25 : floorCount(t);
+  const floor = Math.round((boss ? 25 : floorCount(t)) * (pactOn('horde') ? 1.35 : 1));
   // Up to the floor at once, a few a frame.
   for (let i = 0; i < 4 && G.enemies.length < floor; i++) addEnemy(pickMonster());
   if (!boss) {
@@ -1905,7 +2032,9 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     lunge: 0, hits: new Map(), temper: kind && kind !== 'minion' ? (kind === 'champ' ? 'fierce' : 'normal') : temperOf(m),
   };
   const tp = TEMPERS[e.temper];
-  e.stepTime *= tp.step;
+  e.stepTime *= tp.step * (pactOn('swift') ? 0.83 : 1);
+  if (pactOn('hp')) { e.hp *= 1.4; e.maxHp *= 1.4; }
+  if (pactOn('fang')) e.dmg *= 1.35;
   place(e, at[0], at[1]);
   G.enemies.push(e);
   return e;
@@ -1920,6 +2049,82 @@ function towards(b, tx, ty) {
   if (first[0] || first[1]) out.push(first);
   if (second[0] || second[1]) out.push(second);
   return out;
+}
+
+// 시련 능력, after today's 환상의시련 (on entering, one power of three: 뇌정벼락, 암석낙하,
+// 추가공격 …): the first card of every hunt and raid offers three; the one taken works by itself.
+const TRIALS = {
+  thunder: { name: '뇌정벼락', fx: '89', desc: '2초마다 벼락이 화면의 몬스터 둘에게 떨어진다' },
+  rock: { name: '암석낙하', fx: '123', desc: '3초마다 바위가 몬스터 무리 위로 떨어져 3×3을 친다' },
+  extra: { name: '추가공격', fx: '25', desc: '기술로 친 몬스터를 20% 확률로 한 번 더 친다(절반 피해)' },
+  orbit: { name: '화염고리', fx: '63', desc: '불구슬 셋이 몸 둘레를 돌며 닿는 몬스터를 태운다' },
+  whirl: { name: '회오리', fx: '52', desc: '5초마다 바라보는 쪽으로 회오리가 날아가 길 위의 몬스터를 휩쓴다' },
+};
+// 규약, as the trial's pledges: harder monsters for richer spoils (돈·경험치·재료).
+const PACTS = {
+  hp: { name: '강인한육체', desc: '몬스터 체력 +40%', reward: 0.2 },
+  swift: { name: '광폭한무리', desc: '몬스터 걸음 +20%', reward: 0.15 },
+  horde: { name: '탐욕의무리', desc: '몬스터 수 +35%', reward: 0.25 },
+  fang: { name: '날카로운이빨', desc: '몬스터 피해 +35%', reward: 0.2 },
+};
+function pactOn(id) {
+  return !!(settings.pacts && settings.pacts[id]);
+}
+function pactReward() {
+  return 1 + Object.keys(PACTS).filter(pactOn).reduce((a, id) => a + PACTS[id].reward, 0);
+}
+/** The trial power at work, each frame. */
+function updateTrial(dt) {
+  const p = G.player, lvl = p.lvl, tr = G.trial;
+  if (!tr || G.dead) return;
+  G.trialT = (G.trialT || 0) - dt;
+  const onScreen = () => G.enemies.filter(e => Math.abs(e.x - p.x) < 300 && Math.abs(e.y - p.y) < 170);
+  if (tr === 'thunder' && G.trialT <= 0) {
+    G.trialT = 2;
+    const es = onScreen().sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const e of es) { fxOn(TRIALS.thunder.fx, e); later(0.15, () => hurtEnemy(e, 10 + lvl * 1.4)); }
+    if (es.length) { G.shake = Math.max(G.shake, 0.06); audio.play('skill_r_bolt', 'spell', 4); }
+  } else if (tr === 'rock' && G.trialT <= 0) {
+    G.trialT = 3;
+    const es = onScreen();
+    if (es.length) {
+      const c = es[Math.floor(Math.random() * es.length)];
+      addFx(TRIALS.rock.fx, c.x, c.y - 10, { scale: 0.9 });
+      later(0.3, () => { G.shake = Math.max(G.shake, 0.12); for (const e of around(c.tx, c.ty, 1)) hurtEnemy(e, 14 + lvl * 1.6); });
+    }
+  } else if (tr === 'whirl' && G.trialT <= 0) {
+    G.trialT = 5;
+    const dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = p.fdy || 0;
+    G.whirls = (G.whirls || []).concat({ x: p.x, y: p.y - 16, dx, dy, t: 0, hit: new Set() });
+  } else if (tr === 'orbit') {
+    G.orbitA = (G.orbitA || 0) + dt * 3.2;
+    if (G.trialT <= 0) {
+      G.trialT = 0.45;
+      for (let i = 0; i < 3; i++) {
+        const a = G.orbitA + (i * Math.PI * 2) / 3, ox = p.x + Math.cos(a) * 52, oy = p.y - 16 + Math.sin(a) * 34;
+        for (const e of G.enemies) if (Math.hypot(e.x - ox, e.y - 10 - oy) < 22) hurtEnemy(e, 6 + lvl * 0.7);
+      }
+    }
+  }
+  for (const w of G.whirls || []) {
+    w.t += dt;
+    w.x += w.dx * 360 * dt;
+    w.y += w.dy * 360 * dt;
+    for (const e of G.enemies) if (!w.hit.has(e) && Math.hypot(e.x - w.x, e.y - 10 - w.y) < 30) { w.hit.add(e); hurtEnemy(e, 16 + lvl * 1.5); }
+  }
+  G.whirls = (G.whirls || []).filter(w => w.t < 0.9);
+}
+function drawTrial(now) {
+  const p = G.player;
+  if (G.trial === 'orbit') {
+    for (let i = 0; i < 3; i++) {
+      const a = (G.orbitA || 0) + (i * Math.PI * 2) / 3, ox = p.x + Math.cos(a) * 52, oy = p.y - 16 + Math.sin(a) * 34;
+      ctx.globalAlpha = 0.45; ctx.fillStyle = '#ffb030'; ctx.beginPath(); ctx.arc(ox, oy, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#ff6a10'; ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff2b0'; ctx.beginPath(); ctx.arc(ox - 1, oy - 1, 2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  for (const w of G.whirls || []) drawFx(TRIALS.whirl.fx, w.x, w.y + 16, w.t, 0.8, w.t * 12, 'center', true);
 }
 
 // How each kind of monster carries itself, after the original server's monster table (RTK-Server
@@ -2100,8 +2305,9 @@ function hurtPlayer(dmg, from = null) {
   if (p.hp <= 0) die();
 }
 
-function hurtEnemy(e, dmg, push = null) {
+function hurtEnemy(e, dmg, push = null, extra = false) {
   e.provoked = true;
+  if (G.trial === 'extra' && !extra && Math.random() < 0.2) later(0.12, () => { if (e.hp > 0) { fxOn(TRIALS.extra.fx, e); hurtEnemy(e, dmg * 0.5, null, true); } });
   // Sparks off the struck monster (a few, and never too many on screen).
   if (G.sparks.length < 140) {
     for (let i = 0; i < 3; i++) {
@@ -2151,7 +2357,8 @@ function rollSpecial(e) {
 function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
     if (!m.from.includes(G.stage.id)) continue;
-    const n = matCount(id, e.kind, !!G.stage.raid);
+    let n = matCount(id, e.kind, !!G.stage.raid);
+    if (n && Math.random() < pactReward() - 1) n++; // 규약: richer spoils
     for (let i = 0; i < n; i++) G.drops.push({ x: e.x + (i - n / 2) * 14, y: e.y + 6, kind: 'mat', mat: id });
   }
 }
@@ -2265,6 +2472,11 @@ function clearStage() {
     later(1.2, () => banner(`레이드 전용 · ${names}`));
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
     G.gold += 120 * G.level;
+    // 레이드주화 for the raid shop (in the smith's window).
+    const coins = 10 * G.level + (G.stage.gwoe ? 30 : 0);
+    progress.coins = (progress.coins || 0) + coins;
+    say(`레이드주화 ${coins}개를 받았습니다.`, 'sys');
+    if (G.stage.gwoe) gwoeCards();
   } else {
     progress.cleared[G.stage.id] = true;
     promote();
@@ -2359,7 +2571,7 @@ function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
-  const fxid = def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
+  const fxid = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
   const p = G.player;
   let used = true;
@@ -2918,6 +3130,7 @@ const QUESTS = [
   { id: 'q_goblin', title: '도깨비 잡이', text: '도깨비굴 정복', gold: 1000, need: 1, have: s => s.clears.goblin || 0 },
   { id: 'q_promo1', title: '승급자', text: '아무 직업이나 1차 승급', gold: 300, need: 1, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
   { id: 'q_promo4', title: '탈명의 경지', text: '아무 직업이나 4차 승급', gold: 3000, need: 4, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_promo7', title: '현세의 고수', text: '아무 직업이나 7차 승급', gold: 9000, need: 7, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
   { id: 'q_raid1', title: '레이드 대원', text: '레이드 한 번 이기기', gold: 500, need: 1, have: s => Object.values(s.raids).reduce((a, b) => a + b, 0) },
   { id: 'q_raid7', title: '전설의 용사', text: '레이드 일곱 곳 모두 이기기', gold: 5000, need: RAIDS.length, have: s => RAIDS.filter(r => s.raids[r.id]).length },
   { id: 'q_sp1', title: '빛을 본 자', text: '스페셜 아이템 1개 얻기', gold: 500, need: 1, have: () => specialsOwned() },
@@ -3653,7 +3866,7 @@ function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
   v *= 1.4;
-  p.xp += v;
+  p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
     p.xp -= p.next;
@@ -3719,6 +3932,11 @@ function drawCards() {
   const lvl = G.player.lvl, mine = id => SKILLS[id].cls === G.cls.id || SKILLS[id].cls === 'all';
   const have = id => G.skills.some(x => x.id === id || x.from === id || x.from2 === id);
   const banned = o => G.banished.has(o.type + ':' + o.id);
+  if (!G.trial && !G.trialOffered) {
+    // 시련 능력 first: three of the five, one to take.
+    G.trialOffered = true;
+    return Object.keys(TRIALS).sort(() => Math.random() - 0.5).slice(0, 3).map(id => ({ type: 'trial', id }));
+  }
   if (G.firstCard) {
     // The first card: the class's first-tier attacks, and a mastered spell or two (숙련),
     // whatever level it usually opens at; the 기원 comes with the next.
@@ -3791,6 +4009,12 @@ function nextChoice() {
       name = ps.name;
       text = ps.desc;
       tag = `Lv ${o.lv}`;
+    } else if (o.type === 'trial') {
+      const tr = TRIALS[o.id];
+      icon = fxIcon(tr.fx);
+      name = tr.name;
+      text = tr.desc;
+      tag = '시련 능력';
     } else if (o.type === 'heal') {
       icon = itemIcon('heal');
       name = '회복';
@@ -3862,6 +4086,12 @@ function choose(o) {
       G.player.maxHp += 20;
       G.player.hp += 20;
     }
+  } else if (o.type === 'trial') {
+    G.trial = o.id;
+    say(`시련 능력: ${TRIALS[o.id].name} — ${TRIALS[o.id].desc}`, 'sys');
+    banner(`시련 능력 · ${TRIALS[o.id].name}`);
+    // The trial card does not use up the hunt's first card (a raid on its recorded build has none).
+    if (!G.stage.raid || settings.raidManual) G.pendingLevels++;
   } else if (o.type === 'heal') heal(50, true);
   else G.gold += 100;
   $('#levelup').hidden = true;
@@ -3977,6 +4207,7 @@ function leaveHunt() {
 function bankGold() {
   if (!G || G.banked) return;
   G.banked = true;
+  G.gold = Math.round(G.gold * pactReward());
   progress.gold = (progress.gold || 0) + G.gold;
   saveJson('bs_progress', progress);
 }
@@ -4396,6 +4627,7 @@ function render(now) {
   }
 
   drawShots();
+  drawTrial(now);
   for (const sp of G.sparks) {
     ctx.globalAlpha = 1 - sp.t / 0.28;
     ctx.fillStyle = sp.c;
@@ -5218,7 +5450,7 @@ window.__appBack = () => {
 // For testing in a browser console.
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
-window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r]);
+window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
 
 boot();

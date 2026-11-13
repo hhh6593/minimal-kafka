@@ -180,6 +180,58 @@ export const SKILLS = {
   p_ult: { cls: 'poet', name: '태양의희원', kind: 'ult', fx: '124', guard: 3,
     desc: '마력을 모두 써서 체력을 가득 회복하고, 3초 동안 어떤 공격도 받지 않는다' },
 
+  // 5차~7차 승급: today's client's skills (the 신화 기술능력부여 lists by class; 8차·9차 left out:
+  // 흑룡광참, 멸화의검, 뇌격구, 섬광 … are 8차). Which of 5·6·7차 each was is not listed, so they
+  // stand by strength. The 7차 skills show today's effects.
+  w_rush: { promo: 5, cls: 'warrior', req: 21, name: '회선돌격', kind: 'line', fx: '22', dmg: 22, cd: 2.2, depth: 5,
+    desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  w_stone: { promo: 5, cls: 'warrior', req: 21, name: '석갑', kind: 'buff', buff: 'shield', fx: '21', cd: 15, duration: 4,
+    desc: '몸을 돌처럼 굳혀 잠시 받는 피해가 절반이 된다' },
+  w_dragon: { promo: 6, cls: 'warrior', req: 24, name: '황룡승천', kind: 'nova', fx: '140', dmg: 30, cd: 4, radius: 2,
+    desc: '황룡이 솟구쳐 둘레 두 칸 안의 몬스터를 모두 친다' },
+  w_frenzy: { promo: 6, cls: 'warrior', req: 24, name: '광폭', kind: 'buff', buff: 'power', fx: '25', cd: 18, duration: 5, power: 1,
+    desc: '광폭해져 잠시 공격력이 두 배가 된다' },
+  w_thunder: { promo: 7, cls: 'warrior', req: 27, name: '천둥낙뢰', kind: 'screen', fx: '141', modern: 'new_w_talm', dmg: 34, cd: 7,
+    stun: 0.8, falloff: 0.04, desc: '하늘에서 천둥이 떨어져 화면의 모든 몬스터를 치고 잠시 멈추게 한다' },
+  w_flash: { promo: 7, cls: 'warrior', req: 27, name: '섬광일섬', kind: 'line', fx: '139', modern: 'new_w_blood', dmg: 40, cd: 3, depth: 8,
+    desc: '빛처럼 한 번 베어 바라보는 쪽 일렬 여덟 칸을 가른다' },
+  r_venom: { promo: 5, cls: 'rogue', req: 21, name: '맹독표창', kind: 'spell', fx: '53', dmg: 14, cd: 1.6, range: 7, count: 3, curse: 3,
+    desc: '독 묻은 표창 셋을 던져 맞은 몬스터가 받는 피해를 늘린다' },
+  r_phantom: { promo: 5, cls: 'rogue', req: 21, name: '환영분신', kind: 'buff', buff: 'power', fx: '51', cd: 16, duration: 5, power: 0.8,
+    desc: '환영 분신이 함께 싸워 잠시 공격력이 크게 오른다' },
+  r_shuriken: { promo: 6, cls: 'rogue', req: 24, name: '묵마십자수리검', kind: 'strike', fx: '145', dmg: 22, cd: 2.8, range: 6, radius: 2,
+    count: 2, hitAt: 0.3, shape: 'plus', desc: '거대한 십자 수리검이 몬스터 둘과 그 상하좌우 두 칸을 친다' },
+  r_hidden: { promo: 6, cls: 'rogue', req: 24, name: '은형참절도', kind: 'blink', fx: '144', dmg: 16, cd: 1.8, range: 5, count: 4,
+    desc: '모습을 감춘 채 바라보는 쪽 몬스터에게 날아들어 네 번 벤다' },
+  r_bloom: { promo: 7, cls: 'rogue', req: 27, name: '화무십일홍', kind: 'screen', fx: '145', modern: 'new_r_storm', dmg: 34, cd: 6.5,
+    falloff: 0.04, desc: '꽃잎처럼 흩날리는 검기가 화면의 모든 몬스터를 벤다' },
+  r_kill: { promo: 7, cls: 'rogue', req: 27, name: '대살격', kind: 'cleave', fx: '144', modern: 'new_r_heaven', dmg: 40, cd: 3,
+    radius: 0, max: 9, desc: '앞쪽 역삼각형(아홉 칸)의 몬스터를 단숨에 벤다' },
+  m_frost: { promo: 5, cls: 'mage', req: 21, name: '서리한파', kind: 'screen', fx: '96', dmg: 18, cd: 5, slow: 3,
+    desc: '서리 바람이 화면을 덮어 모든 몬스터를 치고 느리게 한다' },
+  m_wisdom: { promo: 5, cls: 'mage', req: 21, name: '술사의지혜', kind: 'buff', buff: 'haste', fx: '98', cd: 16, duration: 6,
+    desc: '지혜가 깨어 잠시 기술을 훨씬 빨리 쓴다' },
+  m_desert: { promo: 6, cls: 'mage', req: 24, name: '열사지대', kind: 'strike', fx: '148', dmg: 20, cd: 3.5, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, curse: 3, desc: '불타는 모래땅을 펼쳐 넓은 곳을 태우고 받는 피해를 늘린다' },
+  m_twin: { promo: 6, cls: 'mage', req: 24, name: '천뢰마옥쌍구', kind: 'spell', fx: '89', dmg: 22, cd: 2, range: 7, count: 3,
+    desc: '천뢰의 구슬 셋이 가까운 몬스터 셋을 친다' },
+  m_cross: { promo: 7, cls: 'mage', req: 27, name: '십자소상파환겁', kind: 'strike', fx: '147', modern: 'new_m_talm', dmg: 34, cd: 4,
+    range: 8, radius: 3, count: 2, hitAt: 0.35, shape: 'plus', desc: '거대한 십자 불꽃이 몬스터 둘과 그 상하좌우 세 칸을 태운다' },
+  m_inferno: { promo: 7, cls: 'mage', req: 27, name: '염화지옥', kind: 'screen', fx: '148', modern: 'new_m_fire3', dmg: 38, cd: 7,
+    falloff: 0.03, desc: '지옥의 불길이 화면의 모든 몬스터를 태운다' },
+  p_judge: { promo: 5, cls: 'poet', req: 21, name: '천벌', kind: 'strike', fx: '149', dmg: 18, cd: 2.5, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '하늘의 벌이 몬스터 셋과 그 둘레에 떨어진다' },
+  p_wargod: { promo: 5, cls: 'poet', req: 21, name: '무신의가호', kind: 'buff', buff: 'power', fx: '132', cd: 16, duration: 6, power: 0.6,
+    desc: '무신의 가호로 잠시 공격력이 오른다' },
+  p_burst: { promo: 6, cls: 'poet', req: 24, name: '천광폭기', kind: 'spell', fx: '131', dmg: 18, cd: 2.2, range: 7, count: 4,
+    desc: '하늘빛이 터지며 가까운 몬스터 넷을 친다' },
+  p_realm: { promo: 6, cls: 'poet', req: 24, name: '선인의영역', kind: 'heal', fx: '135', heal: 30, cd: 13, guard: 1.5,
+    desc: '선인의 영역을 펼쳐 크게 회복하고 잠시 공격을 받지 않는다' },
+  p_bagua: { promo: 7, cls: 'poet', req: 27, name: '천신팔괘진', kind: 'screen', fx: '134', modern: 'new_p_break', dmg: 30, cd: 6,
+    falloff: 0.04, desc: '팔괘진을 펼쳐 화면의 모든 몬스터를 친다' },
+  p_dragongod: { promo: 7, cls: 'poet', req: 27, name: '용신의가호', kind: 'buff', buff: 'shield', fx: '150', modern: 'new_p_phoenix',
+    cd: 15, duration: 6, desc: '용신의 가호로 오래 받는 피해가 절반이 된다' },
+
   // 대격변: the rest of the original lists (oldbaram skill list, with each skill's own picture),
   // beside the ones already here as another skill's 단 (신검합일, 검신검귀, 대력검신, 후면·측면).
   c_kick: { cls: 'all', req: 3, name: '금강퇴', kind: 'cleave', fx: '137', dmg: 11, cd: 1.6, radius: 0,
@@ -233,9 +285,9 @@ export const SKILLS = {
   p_baekho2: { promo: 3, cls: 'poet', req: 14, name: "백호의희원'첨", kind: 'heal', fx: '133', heal: 26, cd: 11, guard: 1,
     desc: '백호의희원의 더 높은 단. 크게 회복하고 1초 동안 공격을 받지 않는다' },
 };
-
+// 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 기린산.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
-export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin'];
+export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'kirin'];
 export const PROMOS = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet'].map(c => [c, PROMO_AT.map(at => ({ at }))]));
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
@@ -431,6 +483,24 @@ export const RAIDS = [
     monsters: ['2019', '2020', '2021', '2032', '2033', '2034'], boss: { id: '2037', name: '아이라바타', scale: 1.2, beast: 'airavata' },
     patterns: ['cross', 'rain', 'ring', 'meteor'], fx: '140', intro: '인드라를 태운 하늘 코끼리. 가장 강한 레이드' },
 ];
+// 괴력난신 (today's weekly co-op beast hunt): one 괴수 a week, in turn, its ★ cards for the
+// collection (game.js). The week is counted from a fixed Monday, so it turns over on Mondays.
+export const GWOE_BEASTS = [
+  ['saryeong', '사령웅', '3074'], ['josajang', '조사장', '10013'], ['bihyeong', '비형랑', '4006'], ['heukhwa', '흑화랑', '3074'],
+  ['ogutai', '오구타이', '10013'], ['kurakan', '쿠라칸', '12046'], ['garuda', '가루다', '2037'], ['ganesha', '가네샤', '2037'],
+  ['dohwa', '도화랑', '3074'], ['sadaham', '사다함', '4006'], ['jinmyo', '진묘수', '12046'],
+];
+export function gwoeWeek(now = Date.now()) {
+  return Math.floor((now - Date.UTC(2024, 0, 1)) / (7 * 864e5));
+}
+const [gKey, gName, gHit] = GWOE_BEASTS[gwoeWeek() % GWOE_BEASTS.length];
+RAIDS.push({ id: 'raid_gwoe', v2: true, gwoe: true, bgm: 'nx_23_Burning_the_passion', raid: true, title: '이번 주의 괴수',
+  lines: {'enter': '크르르… 신력을 탐하는 자들이 또 왔구나.', 'p1': '괴수의 피가 끓는다!', 'p2': '이제 진짜 모습을 보여 주마!', 'summon': ['따르는 것들아, 덮쳐라!', '괴수의 무리여!'], 'kill': ['약하다, 약해!', '하나 쓰러졌다!'], 'killHealer': '치유하던 자부터 먹어 치웠다!', 'low': '이 힘이… 빠져나간다…', 'enrage': '모조리 찢어 주마!', 'death': '내 신력을… 가져가라…'},
+  name: `괴력난신 · ${gName}`, lv: '파티', terrain: 'cave', level: 14, open: 'royal',
+  monsters: ['3066', '3067', '3068', '12026', '12039', '9014'], boss: { id: gHit, name: gName, scale: 1.2, beast: gKey },
+  patterns: ['ring', 'cross', 'meteor'], fx: '140',
+  intro: `이번 주의 괴수 ${gName}. 쓰러뜨리면 ${gName}의 ★ 효과 카드를 얻는다(주 3번, 월요일에 바뀜)` });
+
 // The ladder in order of strength, whatever order they were written in.
 RAIDS.sort((a, b) => a.level - b.level);
 
