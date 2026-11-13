@@ -4595,6 +4595,12 @@ const GAME_SOUNDS = {
   skill_m_para: '070', skill_m_curse: '069', skill_m_ult: '073', // 마비, 저주, 헬파이어
   skill_p_orb: ['045', '045', '046', '046', '047', '047', '048', '049'], // 자무주 계열
   skill_p_quake: '082', skill_p_barrier: '094', skill_p_summon: '081', skill_p_guard: '084',
+  // 대격변 skills, by the sound list's names.
+  skill_c_kick: '331', skill_w_bless: '006', skill_w_lion: '020', skill_w_ungong: '063', skill_r_muyoung: '024',
+  skill_r_nuri: '021', skill_r_forget: '032', skill_r_jiok: '103', skill_r_gimun: '096', skill_r_gaehyeol: '063',
+  skill_m_gongryeok: '065', skill_m_arm: '008', skill_m_toema: '067', skill_m_poison: '068', skill_m_despair: '071',
+  skill_m_chaos: '020', skill_m_manpa: '068', skill_m_sage: '098', skill_p_toema: '067', skill_p_protect: '008',
+  skill_p_pahon: '077', skill_p_sky: '034', skill_p_weaken: '085', skill_p_life: '098', skill_p_baekho2: '110',
   // 116 and 353 were only guessed (from an English server's scripts) and are a long hiss:
   // played on every hit they drowned the hunt. The hero being struck and monsters falling are
   // silent until a real sound for them is known; plain hits use the weapon sound, softly.

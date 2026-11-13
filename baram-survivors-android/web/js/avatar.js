@@ -45,6 +45,12 @@ export const RAID_GEAR = {
     weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검' } },
   raid_fire: { pow: 9, armor: '불의갑주', shield: '일광방패',
     weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권' } },
+  raid_wukong: { pow: 10, armor: '장삼', shield: '연등',
+    weapon: { warrior: '삼첨도', rogue: '진아광검', mage: '백운장', poet: '하늘개비' } },
+  raid_musin: { pow: 11, armor: '남자기모노', shield: '월광방패',
+    weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채' } },
+  raid_brit: { pow: 12, armor: '황혼의갑주', shield: '천성대방패',
+    weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
 };
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).

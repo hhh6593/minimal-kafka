@@ -17,6 +17,8 @@ const PREFIX = {
   skull: '해골왕의', steppe: '초원의', yogoe: '요괴왕의', palace: '용왕의', royal: '왕궁의',
   raid_boar: '멧돼지왕의', raid_tiger: '산군의', raid_goblin: '대장의', raid_hydra: '삼두룡의',
   raid_sorcerer: '흑술사의', raid_sea: '해왕의', raid_fire: '화령의',
+  hwagwa: '화과산의', murim: '무림의', musin: '무신의', deepsea: '심해의', kirin: '기린의', tagye: '타계의',
+  raid_wukong: '제천대성의', raid_musin: '태염무신의', raid_brit: '브리트라의',
 };
 
 // The extra options, in turn. Each special has one.
@@ -37,8 +39,10 @@ export const KIND_NAME = { weapon: '무기', armor: '갑옷', shield: '방패' }
 
 /** Every special: id, where it drops, its kind and option. */
 export const SPECIALS = [];
-const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false })),
-  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true }))];
+// The 대격변 places (v2) come last, so the older specials keep the options they had.
+const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false, v2: s.v2 })),
+  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2 }))]
+  .sort((a, b) => !!a.v2 - !!b.v2);
 SOURCES.forEach((src, n) => KINDS.forEach((kind, k) => {
   SPECIALS.push({ id: `${src.id}:${kind}`, src: src.id, srcName: src.raid ? `${src.name} 레이드` : src.name, raid: src.raid,
     kind, opt: OPTIONS[(n * 3 + k) % OPTIONS.length], rank: src.i });
@@ -92,26 +96,26 @@ export function raidOf(cls, kind, tier) {
 
 // Materials for the smith's 조합: dropped by the grounds and raids of their kind.
 export const MATS = {
-  fur: { name: '짐승 가죽', icon: 'm_fur', from: ['deer', 'bear', 'bearman', 'steppe', 'raid_boar', 'raid_tiger'] },
-  horn: { name: '도깨비 탈', icon: 'm_horn', from: ['goblin', 'yogoe', 'raid_goblin'] },
-  bone: { name: '해골 조각', icon: 'm_bone', from: ['haunt', 'skull', 'raid_sorcerer'] },
+  fur: { name: '짐승 가죽', icon: 'm_fur', from: ['deer', 'bear', 'bearman', 'steppe', 'raid_boar', 'raid_tiger', 'hwagwa'] },
+  horn: { name: '도깨비 탈', icon: 'm_horn', from: ['goblin', 'yogoe', 'raid_goblin', 'hwagwa'] },
+  bone: { name: '해골 조각', icon: 'm_bone', from: ['haunt', 'skull', 'raid_sorcerer', 'tagye'] },
   ember: { name: '불씨 단지', icon: 'm_ember', from: ['volcano', 'raid_fire'] },
-  jade: { name: '백옥', icon: 'm_jade', from: ['island', 'palace', 'royal'] },
-  scale: { name: '용의 비늘', icon: 'gem2', from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea'] },
-  pearl: { name: '여의주', icon: 'gem4', from: ['raid_hydra', 'palace'] },
+  jade: { name: '백옥', icon: 'm_jade', from: ['island', 'palace', 'royal', 'kirin'] },
+  scale: { name: '용의 비늘', icon: 'gem2', from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea', 'deepsea'] },
+  pearl: { name: '여의주', icon: 'gem4', from: ['raid_hydra', 'palace', 'deepsea'] },
   // Today's client's materials, as its smith asks for them: 금린 for the 중국전설 set, 순수의 강철
   // for the 일본전설 set, 조화의 정수 for the 용 set, 거마족의 영혼석 for 고대마령, a 제작 고문서
   // for every legendary piece, 겁화의 파편 for their stars, and the 은나무 파편·조각·가지 that
   // raise the 용무기 from 제일 to 제십.
-  gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin'] },
-  steel: { name: '순수의 강철', icon: 'm_steel', from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire'] },
-  essence: { name: '조화의 정수', icon: 'm_essence', from: ['raid_hydra', 'raid_sea', 'raid_fire'] },
-  soul: { name: '거마족의 영혼석', icon: 'm_soul', from: ['skull', 'yogoe', 'raid_sorcerer'] },
-  scroll: { name: '제작 고문서', icon: 'm_scroll', from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire'] },
-  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire'] },
-  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire'] },
-  silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire'] },
-  silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire'] },
+  gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong'] },
+  steel: { name: '순수의 강철', icon: 'm_steel', from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin'] },
+  essence: { name: '조화의 정수', icon: 'm_essence', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit'] },
+  soul: { name: '거마족의 영혼석', icon: 'm_soul', from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit'] },
+  scroll: { name: '제작 고문서', icon: 'm_scroll', from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit'] },
+  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit'] },
+  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit'] },
+  silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit'] },
+  silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit'] },
 };
 /** How many of a material a kill drops: most fall from bosses (3-5), some from mini bosses. */
 export function matCount(id, kind, raid) {
