@@ -6,7 +6,7 @@ import {
 import { Audio } from './audio.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
-  RAID_GEAR, plainTiers,
+  RAID_GEAR, plainTiers, gearPower,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -348,7 +348,7 @@ function buildStages() {
       const b = document.createElement('button');
       b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
       const done = (progress.raids || {})[r.id];
-      b.innerHTML = `<img src="assets/mon/${r.boss.id}.png" alt=""><div><b>${r.name}</b><span>${r.intro}</span>`
+      b.innerHTML = `<img src="assets/mon/${r.boss.id}.png" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
         + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</span></div>`;
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
@@ -399,7 +399,7 @@ function raidInfo(r) {
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
-    <div class="boss">전용 장비: <b>${RAID_GEAR[r.id][chosenClass.id][1]}</b> (${chosenClass.name})</div>
+    <div class="boss">난이도 ${raidStars(r)} · 보상: <b>${RAID_GEAR[r.id][chosenClass.id][1]}</b> (${RAID_GEAR[r.id][chosenClass.id][2]}등급) · ${120 * r.level}전</div>
     <div class="state">${raidOpen(r) ? '키운 직업이 모두 모인다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
   $('#go').disabled = !raidOpen(r);
   $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 레이드`;
@@ -474,7 +474,16 @@ function step(b, dx, dy, dur) {
   b.dur = dur;
   b.moving = true;
   if (dx) b.face = dx > 0 ? 1 : -1;
+  b.mdx = dx;
+  b.mdy = dy;
   return true;
+}
+
+/** A monster turns to whoever it strikes: the longer way between them. */
+function faceTo(e, tx, ty) {
+  const dx = tx - e.tx, dy = ty - e.ty;
+  if (Math.abs(dx) >= Math.abs(dy)) { e.mdx = Math.sign(dx) || 1; e.mdy = 0; } else { e.mdx = 0; e.mdy = Math.sign(dy); }
+  if (e.mdx) e.face = e.mdx;
 }
 
 function advance(b, dt) {
@@ -546,12 +555,14 @@ function savedGear(cls) {
 /** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
 function applyGear() {
   const p = G.player, g = p.gear;
-  const hp = G.cls.hp + g.armor * 20;
+  const c = G.cls.id, ap = gearPower(c, 'armor', g.armor), wp = gearPower(c, 'weapon', g.weapon);
+  const sp = g.shield < 0 ? -1 : gearPower(c, 'shield', g.shield);
+  const hp = G.cls.hp + ap * 20;
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + Math.max(0, g.shield + 1);
-  p.gearPower = 1 + 0.12 * g.weapon;
+  p.armor = G.cls.armor + Math.max(0, sp + 1);
+  p.gearPower = 1 + 0.12 * wp;
 }
 
 // The bag: every piece found is kept for the class (as in D2 Survivors, gear stays even after
@@ -646,7 +657,8 @@ function buildEquip() {
     box.append(row);
   }
   const p = G && G.player;
-  $('#equip-stats').textContent = `공격력 +${Math.round(12 * g.weapon)}% · 체력 +${g.armor * 20} · 방어 +${Math.max(0, g.shield + 1)}`
+  const pw = k => (g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]));
+  $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20} · 방어 +${Math.max(0, pw('shield') + 1)}`
     + (p ? '' : '');
 }
 
@@ -992,6 +1004,17 @@ function floorCount(t) {
 
 // ---------------------------------------------------------------- raids
 
+/** How hard a raid's boss strikes, by its rung: 0.58 for the first, 1 for 화령. */
+function raidK() {
+  return Math.min(1, 0.5 + G.level / 24);
+}
+
+/** Difficulty as stars, for the raid list. */
+function raidStars(r) {
+  const n = Math.max(1, Math.min(5, Math.round(r.level / 2.4)));
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
 /** A raid: the hero starts grown (cards for each level), and every other class joins at once. */
 function raidSetup() {
   const p = G.player, rec = best[G.cls.id];
@@ -1008,7 +1031,7 @@ function raidSetup() {
     const m = G.party[G.party.length - 1], r = best[c.id], g = savedGear(c);
     // As strong as that class has grown: its best level and the weapon it has found.
     m.baseLv = Math.min(6, 1 + Math.floor((r ? r.lvl : 1) / 6));
-    m.power = 1 + 0.03 * (r ? r.lvl : 1) + 0.08 * Math.max(0, g.weapon + 1);
+    m.power = 1 + 0.03 * (r ? r.lvl : 1) + 0.08 * Math.max(0, gearPower(c.id, 'weapon', g.weapon) + 1);
     names.push(`${m.name}(${c.name} Lv${r ? r.lvl : 1})`);
   }
   say(`레이드에 모였습니다: ${names.join(', ')}`, 'party');
@@ -1039,7 +1062,7 @@ function raidSpawn(dt) {
     // Built for a whole party: about four minutes for a party of grown heroes.
     e.hp = e.maxHp = 5000 * G.level;
     // Its bite takes a sixth of the hero's health.
-    e.dmg = G.player.maxHp * 0.16 + G.player.armor + G.passives.armor;
+    e.dmg = G.player.maxHp * 0.16 * raidK() + G.player.armor + G.passives.armor;
     G.aggroT = 0;
     G.bossDue = false;
     G.bossT = t;
@@ -1110,7 +1133,7 @@ function raidPattern(b, kind) {
   }
   const warn = [1.4, 1.2, 1][G.phase];
   // A share of the hero's health, so a robed caster and an armoured warrior fear it alike.
-  const share = [0.3, 0.35, 0.4][G.phase];
+  const share = [0.3, 0.35, 0.4][G.phase] * raidK();
   G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share });
   b.lunge = 0.3;
 }
@@ -1379,7 +1402,7 @@ function moveEnemies(dt) {
       if (by && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > 1 && e.atk <= 0) {
         e.atk = 1.6;
         e.lunge = 0.15;
-        e.face = by.tx >= e.tx ? 1 : -1;
+        faceTo(e, by.tx, by.ty);
         hurtMember(by, e.dmg * 0.8);
       }
     } else if (G.party.length) {
@@ -1395,11 +1418,11 @@ function moveEnemies(dt) {
     }
     if (tgt && tgt !== p) {
       if (Math.abs(e.tx - tgt.tx) + Math.abs(e.ty - tgt.ty) <= 1) {
-        e.face = tgt.tx >= e.tx ? 1 : -1;
+        faceTo(e, tgt.tx, tgt.ty);
         if (e.atk <= 0) {
           e.atk = 1.6;
           e.lunge = 0.15;
-          hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * 0.16 : e.dmg * 0.8);
+          hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * 0.16 * raidK() : e.dmg * 0.8);
         }
         continue;
       }
@@ -1412,7 +1435,7 @@ function moveEnemies(dt) {
     const next = Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1; // beside, or under the hero
     if (next && !hidden) {
       // Beside the hero: strike, as monsters do, from the next tile.
-      e.face = p.tx >= e.tx ? 1 : -1;
+      faceTo(e, p.tx, p.ty);
       if (e.atk <= 0 && !barred(e)) {
         e.atk = 1.6;
         e.lunge = 0.15;
@@ -1561,7 +1584,7 @@ function clearStage() {
     say(`레이드 전용 장비 ${josa(name, '이', '가')} 떨어졌습니다!`, 'sys');
     later(1.2, () => banner(`레이드 전용 · ${name}`));
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
-    G.gold += 500;
+    G.gold += 120 * G.level;
   } else {
     progress.cleared[G.stage.id] = true;
     promote();
@@ -3192,7 +3215,44 @@ const shadowCache = new Map();
  * one-pixel rise on alternate footfalls; the shadow, cast up and to the right as in the
  * game, carries the sense of weight.
  */
-function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1) {
+// Monster pictures all face the viewer (south). Those drawn from above — rats, boars, tigers,
+// bears, pigs, lizards with the head at the bottom, and snakes with the head at the top — turn
+// so the head leads, in all four directions. The upright ones (deer, rabbits, goblins, people)
+// cannot show a back or a side: they lean into the way they walk.
+const TOP_DOWN = new Set(['1005', '1007', '1012', '1013', '1022', '1023', '1025', '1027', '3034', '3035', '3036', '3037',
+  '6008', '8011', '8015', '8023', '8024', '11015', '12020', '12021', '12022', '12023', '12024']);
+const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', '5055', '12013', '12014', '12016', '12017', '8027']);
+
+/** A monster as it moves: turned (top-down kinds), or leaning (upright kinds). */
+function drawMonster(b, x, y, s, alpha = 1) {
+  const img = b.m.img, id = b.m.id, dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
+  const turn = TOP_DOWN.has(id) ? 0 : SNAKES.has(id) ? Math.PI : null;
+  if (turn === null) {
+    drawWalker(img, x, y, b.face, b.phase, b.moving, b.flash, s, alpha, b.moving ? dx : 0);
+    return;
+  }
+  // The head at the bottom (top-down) or the top (snakes): rotate so it points the way it goes.
+  const ang = (dx > 0 ? -Math.PI / 2 : dx < 0 ? Math.PI / 2 : dy < 0 ? Math.PI : 0) + turn;
+  const w = Math.round(img.width * s), h = Math.round(img.height * s);
+  const side = dx !== 0, cy = y - (side ? w / 2 + 2 : h / 2);
+  const lift = b.moving && Math.floor(b.phase / Math.PI) % 2 === 0 ? 1 : 0;
+  ctx.save();
+  ctx.globalAlpha = 0.28 * alpha;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(Math.round(x), Math.round(y - 2), (side ? h : w) * 0.45, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(Math.round(x), Math.round(cy - lift));
+  ctx.rotate(ang);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  if (b.flash > 0) ctx.drawImage(white(img), -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1, lean = 0) {
   const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
   const lift = moving && Math.floor(phase / Math.PI) % 2 === 0 ? 1 : 0;
   x = Math.round(x);
@@ -3207,6 +3267,8 @@ function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1)
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(x, y - lift);
+  // Leaning into the walk: the top a little ahead of the feet.
+  if (lean) ctx.transform(1, 0, -lean * 0.12, 1, 0, 0);
   ctx.scale(face, 1);
   ctx.drawImage(img, -w / 2, -h, w, h);
   if (flash > 0) {
@@ -3265,7 +3327,7 @@ function render(now) {
       continue;
     }
     if (b.ally) {
-      drawWalker(b.m.img, b.x, b.y, b.face, b.phase, b.moving, 0, 1, Math.min(1, (b.life - b.t) * 2) * 0.85);
+      drawMonster(b, b.x, b.y, 1, Math.min(1, (b.life - b.t) * 2) * 0.85);
       continue;
     }
     const s = b.scale;
@@ -3274,7 +3336,7 @@ function render(now) {
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
     if (b.flee) ctx.filter = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
-    drawWalker(b.m.img, b.x + lx, b.y + ly, b.face, b.phase, b.moving, b.flash, s);
+    drawMonster(b, b.x + lx, b.y + ly, s);
     if (b.flee) ctx.filter = 'none';
     if (!b.kind && b.shown && G.t - b.shown < 3) {
       // A struck monster shows its health over its head for a while.

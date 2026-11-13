@@ -28,10 +28,26 @@ export const GEAR = {
 // Raid spoils: one piece a class a raid, beyond anything a hunting ground drops, after the boss
 // it comes from — dragons' gear from 삼두룡, the judging and the cursed from 흑술사, fire from 화령.
 export const RAID_GEAR = {
-  raid_hydra: { warrior: ['weapon', '청룡의검'], rogue: ['weapon', '용마제일검'], mage: ['armor', '용왕의용포'], poet: ['shield', '백룡현갑'] },
-  raid_sorcerer: { warrior: ['weapon', '참마도'], rogue: ['weapon', '저주의단검'], mage: ['weapon', '심판의낫'], poet: ['weapon', '자월초롱'] },
-  raid_fire: { warrior: ['armor', '불의갑주'], rogue: ['armor', '황혼의갑주'], mage: ['weapon', '흑단화염장'], poet: ['armor', '여명의치마'] },
+  // [kind, wardrobe name, power]: power is the tier it counts as (a hunting ground's best is
+  // about 4-5), so a middling raid gives a middling piece and the last raids the best.
+  raid_boar: { warrior: ['weapon', '곤봉', 3], rogue: ['armor', '원주민의옷', 3], mage: ['weapon', '횃불', 3], poet: ['shield', '대나무방패', 3] },
+  raid_tiger: { warrior: ['weapon', '백호의검', 4], rogue: ['weapon', '얼음칼', 4], mage: ['weapon', '건곤권', 4], poet: ['shield', '떡갈나무방패', 4] },
+  raid_goblin: { warrior: ['weapon', '도깨비방망이', 5], rogue: ['weapon', '용겸제일봉', 5], mage: ['weapon', '용랑제일봉', 5], poet: ['shield', '문신방패', 5] },
+  raid_hydra: { warrior: ['weapon', '청룡의검', 7], rogue: ['weapon', '용마제일검', 7], mage: ['armor', '용왕의용포', 7], poet: ['shield', '백룡현갑', 7] },
+  raid_sorcerer: { warrior: ['weapon', '참마도', 8], rogue: ['weapon', '저주의단검', 8], mage: ['weapon', '심판의낫', 8], poet: ['weapon', '자월초롱', 8] },
+  raid_sea: { warrior: ['weapon', '현무의검', 8], rogue: ['weapon', '탁조', 8], mage: ['armor', '선녀의옷', 8], poet: ['shield', '거문고', 8] },
+  raid_fire: { warrior: ['armor', '불의갑주', 9], rogue: ['armor', '황혼의갑주', 9], mage: ['weapon', '흑단화염장', 9], poet: ['armor', '여명의치마', 9] },
 };
+// Every raid piece has a place in its class's line, after the hunting grounds' own.
+for (const r of Object.values(RAID_GEAR))
+  for (const [cls, [kind, name]] of Object.entries(r)) if (!GEAR[cls][kind].includes(name)) GEAR[cls][kind].push(name);
+
+/** The tier a worn piece counts as: its place in the line, or a raid piece's own power. */
+export function gearPower(cls, kind, tier) {
+  const name = GEAR[cls][kind][tier];
+  for (const r of Object.values(RAID_GEAR)) if (r[cls][1] === name) return r[cls][2];
+  return tier;
+}
 
 /** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
 export function plainTiers(cls, kind) {

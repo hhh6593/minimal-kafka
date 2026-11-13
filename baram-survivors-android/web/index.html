@@ -91,7 +91,10 @@
   #bossbar s { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#e8402a, #a01808); }
   #bossbar span { display: block; margin-top: 1px; font: 8px G9, monospace; color: #f0d8b0; }
   /* The raid list: one carved plate per raid, its boss standing on it. */
-  #map.raids { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: #2a1a0c; width: min(56vw, 420px); }
+  #map.raids { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: #2a1a0c; width: min(56vw, 420px);
+      max-height: calc(100vh - 56px); overflow-y: auto; }
+  .raid b small { font: 10px G9, monospace; color: #a05010; }
+  .raid { flex: none; }
   .raid { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; padding: 4px 8px; text-align: left;
       color: #2a1606; background: #e0c088; border: 2px solid; border-color: #f4dca8 #7a4a1e #7a4a1e #f4dca8; }
   .raid img { max-width: 64px; max-height: 64px; justify-self: center; image-rendering: pixelated; }
