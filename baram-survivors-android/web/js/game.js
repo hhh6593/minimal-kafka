@@ -6,7 +6,7 @@ import {
 import { Audio } from './audio.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
-  MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats,
+  MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -632,6 +632,39 @@ function bag(cls) {
   return b;
 }
 
+/** The 용무기's place in a class's weapon line, and whether a bag key is it. */
+function dragonTier(cls) {
+  return GEAR[cls.id].weapon.indexOf(CRAFT_GEAR[cls.id]);
+}
+function isDragonKey(cls, key) {
+  return key === `weapon:${dragonTier(cls)}`;
+}
+/** The top star of a piece: the 용무기 climbs 제일 to 제십, the rest ★1 to ★5. */
+function starMaxOf(cls, key) {
+  return isDragonKey(cls, key) ? DRAGON_MAX : STAR_MAX;
+}
+/** A today's-client item picture by the item's name, or null when the build has none. */
+function picture(name) {
+  const g = name && M && M.gear && M.gear[name];
+  return g ? `assets/gear/${g.id}.png` : null;
+}
+/** A bag piece's name: the 용무기 by its step (용천제삼검), the rest by their line. */
+function pieceName(cls, kind, t) {
+  return kind === 'weapon' && t === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${t}`)) : gearName(cls.id, kind, t);
+}
+/** A piece's icon: today's picture for the 용무기 and legendary pieces (by star), else the wardrobe's. */
+function pieceIcon(cls, kind, t, spId) {
+  if (spId && SPECIAL[spId]) {
+    const sp = SPECIAL[spId];
+    return picture(craftPicture(sp, cls.id, starOf(cls, 'sp:' + spId))) || (hasAvatars() ? gearIcon(cls.id, kind, specialBase(sp, cls.id)) : null);
+  }
+  if (kind === 'weapon' && t === dragonTier(cls)) {
+    const pic = picture(dragonName(cls.id, starOf(cls, `weapon:${t}`)));
+    if (pic) return pic;
+  }
+  return t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
+}
+
 function gearImage(g) {
   // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
   // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
@@ -724,9 +757,9 @@ function buildEquip() {
     for (const t of tiers) {
       const btn = document.createElement('button');
       btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
-      const icon = t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
-      const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`);
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : gearName(cls.id, kind, t)}${star > 1 ? ` ★${star}` : ''}</span>`;
+      const icon = pieceIcon(cls, kind, t);
+      const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
       btn.onclick = () => {
         wear(kind, t);
         buildEquip();
@@ -739,8 +772,8 @@ function buildEquip() {
       if (!sp || sp.kind !== kind) continue;
       const t = specialBase(sp, cls.id), btn = document.createElement('button');
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
-      const icon = hasAvatars() ? gearIcon(cls.id, kind, t) : null;
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}</span><small>${sp.opt.text}</small>`;
+      const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.opt.text}</small>`;
       btn.onclick = () => {
         wear(kind, t, id);
         buildEquip();
@@ -769,7 +802,8 @@ function codexItems(cls) {
     GEAR[cls.id][kind].forEach((name, t) => {
       const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
       const rc = craft && craftRecipe(cls.id);
-      out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name, icon: gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
+      out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name: craft ? `${dragonName(cls.id, 1)} ~ ${dragonName(cls.id, DRAGON_MAX)}` : name,
+        icon: (craft && picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1))) || gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
         owned: b.includes(`${kind}:${t}`),
         from: craft ? `대장장이 조합: ${GEAR[cls.id].weapon[rc.base]} ★${rc.star} + 용의 비늘 ${rc.mats.scale} + 여의주 ${rc.mats.pearl}`
           : raid ? raid.name : tierSources(cls.id, kind, t) });
@@ -777,9 +811,10 @@ function codexItems(cls) {
   }
   for (const sp of SPECIALS) {
     const t = specialBase(sp, cls.id);
-    const from = sp.craft ? `대장장이 조합: ${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${sp.craft.gold}전`
+    const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${sp.craft.gold}전`
       : sp.srcName;
-    out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id), icon: gearIcon(cls.id, sp.kind, t),
+    out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
+      icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || gearIcon(cls.id, sp.kind, t),
       pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from, opt: sp.opt.text });
   }
   return out;
@@ -848,10 +883,13 @@ function openCraft() {
   const mats = progress.mats || {};
   $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전 · `
     + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
+  let icon = null;
   const row = (name, desc, label, can, act) => {
     const r = document.createElement('div');
     r.className = 'trade-row';
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
+    if (icon) r.insertAdjacentHTML('afterbegin', `<img class="trade-pic" src="${icon}" alt="">`);
+    icon = null;
     const btn = document.createElement('button');
     btn.className = 'btn';
     btn.textContent = label;
@@ -873,7 +911,8 @@ function openCraft() {
   const has = b.includes(`weapon:${dt}`);
   const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
     && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
-  row(`${dragon} (${CRAFT_POWER}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
+  icon = picture(dragonName(cls.id, 1));
+  row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) / 2}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${rc.gold}전`,
     has ? '가짐' : '조합', ok, () => {
       progress.gold -= rc.gold;
@@ -892,13 +931,25 @@ function openCraft() {
   const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
   for (const c of CRAFTS) {
     const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
-    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}`,
-      got ? '가짐' : '조합', !got && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
+    if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
+    // An evolution is made out of its base piece at ★5, which goes into the making.
+    const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
+    const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
+    const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
+    icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
+    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}`,
+      got ? '가짐' : '조합', !got && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
         for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
         progress.mats = mats;
+        if (c.from) {
+          b.splice(b.indexOf(baseKey), 1);
+          if (progress.stars && progress.stars[cls.id]) delete progress.stars[cls.id][baseKey];
+          if (savedGear(cls)[c.kind + 'Sp'] === c.from) wear(c.kind, specialBase(sp, cls.id), c.id);
+        }
         b.push(key);
         say(`${josa(specialName(sp, cls.id), '을', '를')} 조합했습니다!`, 'sys');
+        if (c.legend) banner(`조합 성공 · ${specialName(sp, cls.id)}`);
       });
   }
   head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
@@ -906,25 +957,29 @@ function openCraft() {
   let any = false;
   for (const key of owned) {
     const star = starOf(cls, key), copies = copiesOf(cls, key);
-    if (star >= STAR_MAX && !copies && !key.startsWith('sp:cr_')) continue;
+    if (star >= STAR_MAX && !copies && !key.startsWith('sp:cr_') && !isDragonKey(cls, key)) continue;
     const [kind, t] = key.split(':');
     const sp0 = key.startsWith('sp:') ? SPECIAL[key.slice(3)] : null;
-    const name = sp0 ? (sp0.craft ? '◆' : '★') + specialName(sp0, cls.id) : gearName(cls.id, kind, +t);
+    const name = sp0 ? (sp0.craft ? '◆' : '★') + specialName(sp0, cls.id) : pieceName(cls, kind, +t);
+    const top = starMaxOf(cls, key), dragon = isDragonKey(cls, key);
     // Crafted pieces (and the 용무기) never drop twice: their stars are paid in materials.
     const csp = key.startsWith('sp:') && SPECIAL[key.slice(3)] && SPECIAL[key.slice(3)].craft ? SPECIAL[key.slice(3)] : null;
     const crafted = !!csp || key === `weapon:${GEAR[cls.id].weapon.indexOf(CRAFT_GEAR[cls.id])}`;
     if (crafted) {
       any = true;
       const sc = starMats(csp, star);
-      row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: ${matText(sc.mats)} + ${sc.gold}전 · 별마다 반 등급`,
-        star >= STAR_MAX ? '최고' : '강화', star < STAR_MAX && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
+      icon = pieceIcon(cls, kind, +t, csp && csp.id);
+      const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
+      row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전 · 반 등급 오름`,
+        star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
           progress.gold -= sc.gold;
           for (const [id, n] of Object.entries(sc.mats)) mats[id] -= n;
           progress.mats = mats;
           progress.stars = progress.stars || {};
           const st = progress.stars[cls.id] = progress.stars[cls.id] || {};
           st[key] = star + 1;
-          say(`${name} ★${star + 1} 강화!`, 'sys');
+          say(dragon ? `${dragonName(cls.id, star + 1)} 승급!` : `${name} ★${star + 1} 강화!`, 'sys');
+          if (dragon || (csp && csp.craft.legend)) banner(dragon ? `승급 성공 · ${dragonName(cls.id, star + 1)}` : `강화 성공 · ${name} ★${star + 1}`);
         });
       continue;
     }
@@ -1961,10 +2016,7 @@ function rollSpecial(e) {
 function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
     if (!m.from.includes(G.stage.id)) continue;
-    let n = 0;
-    if (id === 'pearl') n = e.kind === 'boss' && Math.random() < (G.stage.raid ? 0.6 : 0.12) ? 1 : 0;
-    else n = e.kind === 'boss' ? 3 + Math.floor(Math.random() * 3) : e.kind === 'mini' ? (Math.random() < 0.5 ? 1 : 0)
-      : e.kind === 'champ' ? (Math.random() < 0.15 ? 1 : 0) : (Math.random() < 0.004 ? 1 : 0);
+    const n = matCount(id, e.kind, !!G.stage.raid);
     for (let i = 0; i < n; i++) G.drops.push({ x: e.x + (i - n / 2) * 14, y: e.y + 6, kind: 'mat', mat: id });
   }
 }
@@ -4314,7 +4366,7 @@ function syncUlt() {
   // trained stats in the others, highest first.
   const g = p.gear || {};
   // The top slot is the helmet's, and no helmet is worn; the armor shows on the figure itself.
-  const worn = [null, ...['weapon', 'shield'].map(k => (p.av ? gearIcon(G.cls.id, k, g[k]) : null))];
+  const worn = [null, ...['weapon', 'shield'].map(k => (p.av && g[k] >= 0 ? pieceIcon(G.cls, k, g[k], g[k + 'Sp']) : null))];
   const trained = Object.entries(G.passives).filter(([, lv]) => lv).sort((a, b) => b[1] - a[1]);
   const slots = SLOT_AT.map(([x, y, dark], i) => {
     let inner = '';

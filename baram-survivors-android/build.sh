@@ -9,6 +9,7 @@
 # from it, with walking and casting frames. Without it the class pictures stand in.
 # SKILL_FX_DIR: the skill-icon download's numbered effect GIFs (사이트번호별/).
 # MODERN_DIR: today's client effects for the last spell of each tree, new_<skill id>.gif.
+# GEAR_DIR: today's client item pictures, <item name>.png (tools/fetch_gear.py downloads them).
 # TOWN_DIR holds town.png (a village map from the 1996 client, 48-pixel tiles) and smithy.png.
 # The art and sound go into the APK only, never into the repository.
 #
@@ -17,12 +18,13 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR] [MODERN_DIR]}"
+IMAGES="${1:?usage: ./build.sh IMAGES_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR] [MODERN_DIR] [GEAR_DIR]}"
 AUDIO="${2:-$HERE/audio}"
 AVATAR="${3:-}"
 TOWN="${4:-}"
 SKILLFX="${5:-}"
 MODERN="${6:-}"
+GEAR="${7:-}"
 SDK="${ANDROID_HOME:-/opt/android-sdk}"
 BT="$SDK/build-tools/35.0.0"
 JAR="$SDK/platforms/android-35/android.jar"
@@ -37,7 +39,7 @@ done
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
 cp -r "$HERE/web" "$OUT/assets/www"
-python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN $SKILLFX $MODERN
+python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN $SKILLFX $MODERN $GEAR
 cp -r "$HERE/res" "$OUT/res"
 
 # Each build gets a higher version code (minutes since 2026-01-01) so Android installs it as an

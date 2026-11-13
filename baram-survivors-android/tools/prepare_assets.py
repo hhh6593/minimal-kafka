@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turns the downloaded old-Baram images (and optional sound files) into the game's assets.
 
-    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR] [MODERN_DIR]
+    prepare_assets.py IMAGES_DIR OUT_DIR [AUDIO_DIR] [AVATAR_DIR] [TOWN_DIR] [SKILL_FX_DIR] [MODERN_DIR] [GEAR_DIR]
 
 MODERN_DIR holds today's client effects for the last spells of each tree, named
 new_<skill id>.gif (for example new_m_fire3.gif), captured on a white background.
@@ -40,6 +40,9 @@ ITEMS = {
     "armor": "203",
     # Crafting materials.
     "m_fur": "230", "m_bone": "33", "m_horn": "229", "m_ember": "63", "m_jade": "36",
+    # Today's client's materials, in old pictures of the like.
+    "m_gold": "1149", "m_steel": "1155", "m_essence": "1161", "m_soul": "1040", "m_scroll": "1163",
+    "m_kalpa": "1016", "m_silver1": "1148", "m_silver2": "1145", "m_silver3": "1146",
 }
 HEROES = ["1001", "1002", "1003", "1004"]
 HERO_HEIGHT = 56
@@ -226,11 +229,12 @@ def main():
     town_src = sys.argv[5] if len(sys.argv) > 5 else None
     skill_fx = sys.argv[6] if len(sys.argv) > 6 else None
     modern = sys.argv[7] if len(sys.argv) > 7 else None
+    gear_src = sys.argv[8] if len(sys.argv) > 8 else None
     pages = json.load(open(os.path.join(src, "_pages.json"), encoding="utf-8"))
     dups = json.load(open(os.path.join(src, "_duplicates.json"), encoding="utf-8"))
-    for d in ("fx", "icon", "mon", "item", "hero", "ui"):
+    for d in ("fx", "icon", "mon", "item", "hero", "ui", "gear"):
         os.makedirs(os.path.join(out, d), exist_ok=True)
-    manifest = {"fx": {}, "monsters": [], "items": {}, "heroes": [], "ui": {}, "audio": {"bgm": [], "sfx": {}}}
+    manifest = {"fx": {}, "monsters": [], "items": {}, "gear": {}, "heroes": [], "ui": {}, "audio": {"bgm": [], "sfx": {}}}
 
     # Effects, with the class page each one was listed on.
     owner = {}
@@ -313,6 +317,14 @@ def main():
             im = trim(Image.open(p).convert("RGBA"))
             im.save(os.path.join(out, "item", iid + ".png"))
             manifest["items"][role] = {"id": iid, "w": im.width, "h": im.height}
+
+    # Today's client item pictures (GEAR_DIR, <item name>.png from the client's item render),
+    # kept under ASCII names: the manifest maps each item name to its file.
+    if gear_src and os.path.isdir(gear_src):
+        for i, n in enumerate(sorted(x for x in os.listdir(gear_src) if x.endswith(".png"))):
+            im = trim(Image.open(os.path.join(gear_src, n)).convert("RGBA"))
+            im.save(os.path.join(out, "gear", f"g{i}.png"), optimize=True)
+            manifest["gear"][n[:-4]] = {"id": f"g{i}", "w": im.width, "h": im.height}
 
     # The wardrobe's backdrop (the island seen from the sea), behind the class figures.
     p = os.path.join(src, "wardrobeB", "wback3.png")
