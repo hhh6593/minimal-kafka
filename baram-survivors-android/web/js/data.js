@@ -338,6 +338,55 @@ export const SKILLS = {
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
+// The spell tree: three 계열 a class, each running from the first spells to the 9차; a spell of
+// 5차 and beyond comes on the cards only once the one before it in its 계열 is at 3단 in this
+// hunt (pre), and each class's 9차 궁극기 is the awakening of its 7차 spell at 8단 (up).
+export const BRANCHES = {
+  warrior: [
+    { name: '검기', note: '일렬·돌진으로 뚫는다', ids: ['w_slash', 'w_fly', 'w_sword', 'w_rush', 'w_flash', 'w_advance', 'w_swords'] },
+    { name: '백호', note: '범위로 베어 쓸어낸다', ids: ['w_tiger', 'w_howl', 'w_roar2', 'w_dragon', 'w_thunder', 'w_blackdragon', 'w_myriad'] },
+    { name: '투혼', note: '기세를 올리고 붙잡는다', ids: ['w_buff', 'w_jin', 'w_lion', 'w_stone', 'w_frenzy', 'w_sentence', 'w_dawn'] },
+  ],
+  rogue: [
+    { name: '검무', note: '날아들어 연달아 벤다', ids: ['r_blink', 'r_dance', 'r_flysword', 'r_hidden', 'r_bloom', 'r_flamesword', 'r_bloodslash', 'r_gale'] },
+    { name: '암기', note: '던지고 꿰뚫는다', ids: ['r_bolt', 'r_formless', 'r_venom', 'r_shuriken', 'r_kill', 'r_shadowstar', 'r_chainstar'] },
+    { name: '그림자', note: '숨고 분신으로 싸운다', ids: ['r_stealth', 'r_clone', 'r_budong', 'r_phantom', 'r_shadowclone'] },
+  ],
+  mage: [
+    { name: '화염', note: '태워 없앤다', ids: ['m_fire', 'm_sammae', 'm_fire3', 'm_desert', 'm_inferno', 'm_kalpa'] },
+    { name: '빙뢰', note: '얼리고 번개로 친다', ids: ['m_ice', 'm_quake', 'm_frost', 'm_twin', 'm_cross', 'm_coldveil', 'm_thunderball', 'm_shards', 'm_gale'] },
+    { name: '주술', note: '저주하고 묶고 빠르게', ids: ['m_curse', 'm_para', 'm_magi', 'm_wisdom', 'm_shift'] },
+  ],
+  poet: [
+    { name: '기원', note: '살리고 채운다', ids: ['c_heal', 'p_baekho', 'p_spirit', 'p_phoenix', 'p_realm', 'p_warmth', 'p_skyspirit'] },
+    { name: '천벌', note: '하늘의 벌로 친다', ids: ['p_orb', 'p_quake', 'p_judge', 'p_burst', 'p_flash', 'p_thunderbomb'] },
+    { name: '진법', note: '진을 펼쳐 지키고 누른다', ids: ['p_barrier', 'p_aegis', 'p_wave', 'p_wargod', 'p_bagua', 'p_dragongod', 'p_bind', 'p_taiji'] },
+  ],
+};
+const PRE = {
+  w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
+  w_dragon: 'w_howl', w_thunder: 'w_dragon', w_blackdragon: 'w_thunder',
+  w_stone: 'w_jin', w_frenzy: 'w_stone', w_sentence: 'w_lion', w_dawn: 'w_frenzy',
+  r_hidden: 'r_flysword', r_bloom: 'r_hidden', r_flamesword: 'r_hidden', r_bloodslash: 'r_flamesword',
+  r_venom: 'r_bolt', r_shuriken: 'r_venom', r_kill: 'r_formless', r_shadowstar: 'r_shuriken', r_chainstar: 'r_shadowstar',
+  r_phantom: 'r_clone', r_shadowclone: 'r_phantom',
+  m_desert: 'm_sammae', m_inferno: 'm_desert',
+  m_frost: 'm_ice', m_twin: 'm_frost', m_cross: 'm_twin', m_coldveil: 'm_frost', m_thunderball: 'm_twin',
+  m_shards: 'm_coldveil', m_gale: 'm_thunderball', m_wisdom: 'm_magi', m_shift: 'm_wisdom',
+  p_realm: 'p_spirit', p_warmth: 'p_realm', p_skyspirit: 'p_warmth',
+  p_judge: 'p_orb', p_burst: 'p_judge', p_flash: 'p_burst', p_thunderbomb: 'p_flash',
+  p_wargod: 'p_aegis', p_bagua: 'p_wave', p_dragongod: 'p_wargod', p_bind: 'p_wave',
+};
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji' };
+for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
+for (const [from, into] of Object.entries(AWAKEN)) {
+  SKILLS[from].up = into;
+  SKILLS[into].evolved = true;
+  SKILLS[into].desc = `${SKILLS[from].name} 8단 + 9차 승급. ` + SKILLS[into].desc;
+}
+// 승급 효과: each 승급 makes the class a little stronger for good (피해 +4%, 체력 +8 a step).
+export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
+
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet'].map(c => [c, PROMO_AT.map(at => ({ at }))]));
 

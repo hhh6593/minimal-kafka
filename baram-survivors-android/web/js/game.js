@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek,
+  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -679,7 +679,7 @@ function combatPower(cls) {
     : g[k] < 0 || g[k] === undefined ? 0 : gearPower(c, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
   const gear = pw('weapon') * 3 + pw('armor') * 2 + pw('shield') + pw('helmet') + pw('cape');
   const set = cardSet(), rec = best[c];
-  return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) + set.hp * 20);
+  return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) * (1 + PROMO_BONUS.dmg * promoOf(c)) + set.hp * 20);
 }
 function raidPower(r) {
   return 1200 * r.level + 3000;
@@ -699,13 +699,13 @@ function applyGear() {
   }
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
-  const cs = cardSet();
-  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0) + cs.hp;
+  const cs = cardSet(), promo = promoOf(c);
+  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0) + cs.hp + PROMO_BONUS.hp * promo;
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
   p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
-  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg);
+  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo);
 }
 
 /** A special option's count on the hero (0 when none is worn). */
@@ -1230,6 +1230,27 @@ function buildTree(cls, hot = new Set()) {
   const box = $('#tree-rows');
   box.innerHTML = '';
   const mine = Object.entries(SKILLS).filter(([, d]) => d.cls === cls.id || d.cls === 'all');
+  // 승급의 길: the nine steps, the ground each needs, done or not, and what they have given.
+  const path = document.createElement('div');
+  path.className = 'promo-path';
+  path.innerHTML = `<b>승급</b> ` + PROMOS[cls.id].map((pr, i) => {
+    const g = STAGES.find(x => x.id === pr.at);
+    return `<span class="${tier > i ? 'done' : tier === i ? 'next' : ''}">${i + 1}차 ${g.name}</span>`;
+  }).join(' › ') + `<small>승급 효과: 피해 +${Math.round(PROMO_BONUS.dmg * tier * 100)}% · 체력 +${PROMO_BONUS.hp * tier}`
+    + ` (한 단계마다 +${PROMO_BONUS.dmg * 100}% · +${PROMO_BONUS.hp})</small>`;
+  box.append(path);
+  // 계열: the three lines of the class, spell by spell, the 승급 each needs.
+  const lines = document.createElement('div');
+  lines.className = 'branches';
+  for (const br of BRANCHES[cls.id]) {
+    const el = document.createElement('div');
+    el.innerHTML = `<b>${br.name}</b> <small>${br.note}</small><span>` + br.ids.map(id => {
+      const d = SKILLS[id];
+      return `<i class="${(d.promo || 0) <= tier ? 'open' : ''}">${d.name}${d.promo ? `<sup>${d.promo}차</sup>` : ''}${d.evolved ? '★' : ''}</i>`;
+    }).join(' → ') + '</span>';
+    lines.append(el);
+  }
+  box.append(lines);
   // One row per 승급: 일반, the old game's 1차 to 4차, and today's 5차 to 9차.
   for (let t = 0; t <= 9; t++) {
     const row = mine.filter(([, d]) => (d.promo || 0) === t);
@@ -1248,6 +1269,7 @@ function buildTree(cls, hot = new Set()) {
         const from = mine.find(([, x]) => x.up === id);
         note = `${from ? from[1].name : ''} 8단에서 각성`;
       } else if (d.up) note = `8단 → ${SKILLS[d.up].name}(${SKILLS[d.up].promo}차)`;
+      if (d.pre) note = (note ? note + ' · ' : '') + `${SKILLS[d.pre[0]].name} ${d.pre[1]}단이면 열림`;
       if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 나옴';
       const el = treeSpell(id, note ? { note } : {});
       if (hot.has(id)) el.style.outline = '2px solid #7a1800';
@@ -3908,6 +3930,8 @@ function drawCards() {
     for (const [id, d] of Object.entries(SKILLS)) {
       if (!mine(id) || d.evolved || d.kind === 'ult' || (d.req || 1) > lvl || have(id)) continue;
       if (d.promo && promoOf(G.cls.id) < d.promo) continue;
+      // 계열: the spell before it in the tree, raised to 3단 in this hunt, opens it.
+      if (d.pre && !G.skills.some(x => x.id === d.pre[0] && x.lv >= d.pre[1])) continue;
       opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
     }
   }
