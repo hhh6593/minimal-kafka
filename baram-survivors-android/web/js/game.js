@@ -2649,7 +2649,9 @@ function cast(skill, st) {
         heroTile();
         p.stepping = false;
       }
-      for (let i = 0; i < st.count; i++) {
+      // Its own blows (def.count) on the one it lands by; the targets the 단 add go to others
+      // beside it, not again on the same (on a lone boss that tripled the blow).
+      for (let i = 0; i < (def.count || 1); i++) {
         later(i * 0.12, () => {
           if (e.hp <= 0) return;
           fxOn(fxid, e);
@@ -2657,6 +2659,8 @@ function cast(skill, st) {
           hurtEnemy(e, st.dmg);
         });
       }
+      const others = around(e.tx, e.ty, 1).filter(o => o !== e && o.hp > 0).slice(0, Math.max(0, st.count - (def.count || 1)));
+      others.forEach((o, i) => later(0.1 + i * 0.1, () => { if (o.hp > 0) { fxOn(fxid, o); hurtEnemy(o, st.dmg); } }));
       break;
     }
     case 'spell': {
