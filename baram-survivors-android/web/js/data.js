@@ -414,7 +414,26 @@ export const RAIDS = [
     name: '브리트라 레이드', lv: '파티', terrain: 'cave', level: 16, open: 'tagye',
     monsters: ['3066', '3067', '3068', '3069', '3078', '3079', '3062'], boss: { id: '10013', name: '브리트라', scale: 1.7 },
     patterns: ['ring', 'meteor', 'breath'], fx: '140', intro: '타계에 봉인되었던 마왕. 혼의 고리와 유성으로 모두를 짓누른다' },
+  // 괴수 raids: the client's 괴수의상 (the dress room's beasts) as bosses, walking their four ways.
+  { id: 'raid_varuna', v2: true, bgm: 'nx_17_Sea_battle', raid: true, title: '심해의 군주',
+    lines: {'enter': '물결이 멈추었다… 바다의 율법을 어긴 자들이로구나.', 'p1': '바다의 아이들아, 저들을 감싸라!', 'p2': '조수가 뒤집힌다. 숨을 아껴 두어라.', 'summon': ['파도야, 저들을 삼켜라!', '심연의 것들이여, 올라오라!'], 'kill': ['물거품이 되어라.', '바다는 약한 것을 품지 않는다.'], 'killHealer': '물을 길어 나르던 자부터 가라앉혔다.', 'low': '썰물이… 오는구나…', 'enrage': '모든 물길이 나를 따른다! 쓸려 가라!', 'death': '바다로… 돌아가겠다…'},
+    name: '바루나 레이드', lv: '파티', terrain: 'sea', level: 15, open: 'deepsea',
+    monsters: ['3019', '3020', '3022', '3023', '3025', '3016'], boss: { id: '3027', name: '바루나', scale: 1.2, beast: 'varuna' },
+    patterns: ['ring', 'breath', 'rain'], fx: '123', intro: '바다를 다스리는 괴수. 물의 고리와 숨결로 파티를 몰아친다' },
+  { id: 'raid_agni', v2: true, bgm: 'nx_27_4beast_born_from_the_lava', raid: true, title: '불의 신',
+    lines: {'enter': '하하하! 제물이 제 발로 걸어 들어왔구나!', 'p1': '불꽃의 자식들아, 춤을 춰라!', 'p2': '이제야 몸이 데워지는군!', 'summon': ['재 속에서 일어나라!', '불길아, 번져라!'], 'kill': ['잿더미가 되었구나!', '불길은 가리지 않는다!'], 'killHealer': '물 뿌리던 놈부터 태웠다!', 'low': '불씨가… 꺼지지 않는다…', 'enrage': '세상을 모두 태워 주마!', 'death': '불은… 다시… 타오른다…'},
+    name: '아그니 레이드', lv: '파티', terrain: 'lava', level: 17, open: 'tagye',
+    pages: [1703, 1704, 1707], boss: { id: '10013', name: '아그니', scale: 1.2, beast: 'agni' },
+    patterns: ['meteor', 'plus', 'cross'], fx: '92', intro: '불을 다스리는 괴수. 유성과 불기둥이 쉬지 않고 떨어진다' },
+  { id: 'raid_airavata', v2: true, bgm: 'nx_08_2_Goguryeo', raid: true, title: '하늘을 받친 코끼리',
+    lines: {'enter': '…하늘을 떠받치는 발 아래, 너희는 먼지와 같다.', 'p1': '구름의 짐승들아, 내려오라!', 'p2': '번개가 상아 끝에 맺힌다.', 'summon': ['하늘의 무리여, 모여라!', '구름을 가르고 내려오라!'], 'kill': ['짓밟혔구나.', '하늘은 무겁다.'], 'killHealer': '빛을 비추던 자를 먼저 밟았다.', 'low': '하늘이… 기우는구나…', 'enrage': '천둥과 함께 모두 짓밟아 주마!', 'death': '하늘이… 너희를… 인정하는구나…'},
+    name: '아이라바타 레이드', lv: '파티', terrain: 'field2', level: 18, open: 'kirin',
+    monsters: ['2019', '2020', '2021', '2032', '2033', '2034'], boss: { id: '2037', name: '아이라바타', scale: 1.2, beast: 'airavata' },
+    patterns: ['cross', 'rain', 'ring', 'meteor'], fx: '140', intro: '인드라를 태운 하늘 코끼리. 가장 강한 레이드' },
 ];
+// The ladder in order of strength, whatever order they were written in.
+RAIDS.sort((a, b) => a.level - b.level);
+
 export const RAID_BOSS_AT = 15, RAID_LIMIT = 8 * 60;
 export const MINI_AT = [135, 285];
 export const CHAMPIONS_AT = [90, 180, 270];

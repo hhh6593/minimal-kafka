@@ -82,17 +82,19 @@
   .pin.on span { color: #000; background: var(--gold); border-color: #fff4c0; }
   .pin.on i { border-top-color: #fff4c0; }
   /* On the 국내성 map the caves carry their own painted labels: a marker only, named when picked. */
-  /* A boss speaking: its face in a sunken frame, its name and line on parchment, over the chat. */
-  #dialog { position: absolute; left: 12px; bottom: 112px; width: min(60%, 420px); z-index: 4; display: grid;
-      grid-template-columns: 52px 1fr; gap: 8px; align-items: center; padding: 5px 8px; pointer-events: none; color: #2a1606;
-      background: #e8d0a0; border: 3px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a; box-shadow: 0 0 0 1px #000; }
-  #dialog.show { animation: dlg-in .25s ease-out; }
-  @keyframes dlg-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* A boss speaking: a slim see-through strip at the foot of the field, just over the chat (face,
+     name, line), so the boss bar, the banners and the fight stay in view. */
+  #dialog { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(66%, 440px); z-index: 4;
+      display: grid; grid-template-columns: 28px 1fr; gap: 6px; align-items: center; padding: 2px 8px 2px 3px;
+      pointer-events: none; color: #f4e2b8; background: rgba(28, 10, 4, 0.62); border: 1px solid rgba(160, 96, 42, 0.8);
+      border-radius: 3px; }
+  #dialog.show { animation: dlg-in .2s ease-out; }
+  @keyframes dlg-in { from { transform: translate(-50%, 6px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
   #dialog[hidden] { display: none; }
-  #dialog canvas { position: static; inset: auto; width: 48px; height: 48px; image-rendering: pixelated; background: #2a1408;
-      border: 2px solid; border-color: #2a1004 #a0602a #a0602a #2a1004; }
-  #dialog b { display: block; font: 700 12px/15px G11, monospace; color: #8a1800; }
-  #dialog span { display: block; font: 11px/15px G9, monospace; }
+  #dialog canvas { position: static; inset: auto; width: 26px; height: 26px; image-rendering: pixelated; background: #2a1408;
+      border: 1px solid #a0602a; }
+  #dialog b { display: inline; font: 700 11px/14px G11, monospace; color: #ff9a6a; margin-right: 6px; }
+  #dialog span { display: inline; font: 11px/14px G9, monospace; text-shadow: 1px 1px 0 #000; }
   /* The boss's bar under the map's name: dark wood, a red fill, the numbers on it. */
   #bossbar { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: min(40%, 300px); z-index: 3;
       padding: 2px 6px 4px; background: #2a1408; border: 2px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;

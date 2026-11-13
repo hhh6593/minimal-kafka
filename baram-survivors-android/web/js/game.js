@@ -115,7 +115,8 @@ function stageMonsters(stage) {
   else list = Object.values(monsterById).filter(m => m.pages.some(p => stage.pages.includes(p)));
   list = list.slice().sort((a, b) => a.area - b.area);
   let boss, mini;
-  if (stage.boss) boss = { m: monsterById[stage.boss.id], name: stage.boss.name, scale: stage.boss.scale || 1.4 };
+  if (stage.boss) boss = { m: monsterById[stage.boss.id], name: stage.boss.name, scale: stage.boss.scale || 1.4,
+    beast: stage.boss.beast && M.beast && M.beast[stage.boss.beast] ? stage.boss.beast : null };
   if (stage.mini) mini = { m: monsterById[stage.mini.id], name: stage.mini.name, scale: stage.mini.scale || 1.2 };
   // Grounds known only by their page: the biggest monsters lead.
   if (!boss) boss = { m: list[list.length - 1], name: stage.name + '의 주인', scale: 1.3 };
@@ -540,7 +541,8 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [],
+    combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
     rerolls: 2 + up('reroll'), skips: 2 + up('skip'), banishes: 2 + up('banish'), banished: new Set(),
@@ -1333,6 +1335,9 @@ function update(dt) {
   runTimers();
   updateAllies(dt);
   updateParty(dt);
+  updateShots(dt);
+  for (const sp of G.sparks) { sp.t += dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; }
+  G.sparks = G.sparks.filter(sp => sp.t < 0.28);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
   G.fxs = G.fxs.filter(f => f.t < f.life);
@@ -1489,8 +1494,14 @@ function bossSay(kind) {
   const c = $('#dlg-face'), g = c.getContext('2d'), im = G.boss.m.img;
   g.imageSmoothingEnabled = false;
   g.clearRect(0, 0, c.width, c.height);
-  const side = Math.min(im.width, im.height);
-  g.drawImage(im, (im.width - side) / 2, 0, side, side, 0, 0, c.width, c.height);
+  if (G.boss.beast) {
+    // A 괴수: the top of its front-facing walk frame.
+    const d = M.beast[G.boss.beast], bi = images[`beast/${G.boss.beast}.png`], side = Math.min(d.cell[0], d.cell[1]);
+    g.drawImage(bi, (d.cell[0] - side) / 2, 0, side, side, 0, 0, c.width, c.height);
+  } else {
+    const side = Math.min(im.width, im.height);
+    g.drawImage(im, (im.width - side) / 2, 0, side, side, 0, 0, c.width, c.height);
+  }
   box.hidden = false;
   box.classList.remove('show');
   void box.offsetWidth;
@@ -1597,6 +1608,42 @@ function raidSpawn(dt) {
     G.aggro = pool[Math.floor(Math.random() * pool.length)];
     if (G.aggro !== prev) b.bubble = { text: `${G.aggro === p ? '너' : G.aggro.name}!`, t: G.t };
     if (G.aggro === p) G.aggro = null;
+  }
+  // Its own blows at range: a dark bolt at someone other than the one it faces, so the whole
+  // party takes hits and the healer has work, and every so often a blast over everyone that a
+  // 마비 from the 주술사 can cut short.
+  G.volleyT = (G.volleyT === undefined ? 3 : G.volleyT) - dt;
+  if (G.volleyT <= 0 && !G.blast) {
+    G.volleyT = [2.8, 2.2, 1.7][G.phase] * (G.enraged ? 0.7 : 1);
+    const face = G.aggro && !G.aggro.down ? G.aggro : p;
+    const pool = partyBodies().filter(x => x !== face);
+    const tgt = pool.length ? pool[Math.floor(Math.random() * pool.length)] : face;
+    b.lunge = 0.2;
+    addShot(b, tgt, { color: '#c02838', glow: '#ff6a5a', size: 5, speed: 300, onHit: () => {
+      const k = 0.12 * raidK() * (G.enraged ? 1.3 : 1);
+      if (tgt === p) hurtPlayer(p.maxHp * k + p.armor, b); else if (!tgt.down) hurtMember(tgt, tgt.maxHp * k);
+      addFx(G.stage.fx, tgt.x, tgt.y - 20, { scale: 0.45 });
+    } });
+  }
+  G.blastT = (G.blastT === undefined ? 12 : G.blastT) - dt;
+  if (G.blastT <= 0 && !G.blast) {
+    G.blastT = [15, 12, 10][G.phase];
+    G.blast = { at: G.t + 1.6 };
+    b.bubble = { text: '모두 쓸어 주마!', t: G.t };
+    say(`${G.boss.name}이(가) 힘을 모읍니다! (광역기)`, 'warn');
+    banner('광역기 준비! 마비로 끊어라');
+  }
+  if (G.blast && G.t >= G.blast.at) {
+    G.blast = null;
+    G.shake = Math.max(G.shake, 0.35);
+    audio.play('boss');
+    for (const x of partyBodies()) {
+      const k = 0.26 * raidK() * (G.enraged ? 1.3 : 1);
+      addFx(G.stage.fx, x.x, x.y - 20, { scale: 0.6 });
+      if (x === p) hurtPlayer(p.maxHp * k + p.armor, b); else hurtMember(x, x.maxHp * k);
+    }
+    G.groupHeal = G.t;
+    say('광역기가 파티를 덮쳤습니다!', 'warn');
   }
   G.raidT -= dt;
   if (G.raidT <= 0) {
@@ -1846,7 +1893,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (kind === 'mini') hp = Math.max(base * 12, (70 + m.area / 10) * tough * 2);
   if (kind === 'boss') hp = (180 + m.area / 5) * tough * 4;
   const e = {
-    m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1,
+    m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
     dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 180 + G.level * 0.5)
@@ -2055,6 +2102,14 @@ function hurtPlayer(dmg, from = null) {
 
 function hurtEnemy(e, dmg, push = null) {
   e.provoked = true;
+  // Sparks off the struck monster (a few, and never too many on screen).
+  if (G.sparks.length < 140) {
+    for (let i = 0; i < 3; i++) {
+      const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 90;
+      G.sparks.push({ x: e.x, y: e.y - (e.m.h * (e.scale || 1)) / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, t: 0,
+        c: Math.random() < 0.5 ? '#fff6c0' : '#ffb040' });
+    }
+  }
   if (e.hp <= 0) return 0;
   if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
   // A heavy blow on a big one stops the world for a blink.
@@ -2101,8 +2156,23 @@ function rollMats(e) {
   }
 }
 
+const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200];
+
 function killEnemy(e) {
   G.kills++;
+  // 연속 처치: kills within three seconds of each other chain; the round numbers are called out.
+  const c = G.combo;
+  c.n = G.t - c.t < 3 ? c.n + 1 : 1;
+  c.t = G.t;
+  c.pop = G.t;
+  c.best = Math.max(c.best, c.n);
+  if (COMBO_AT.includes(c.n)) {
+    banner(`연속 처치 ${c.n}!`);
+    G.flash = G.t;
+    G.shake = Math.max(G.shake, 0.15);
+    audio.play('levelup');
+    if (c.n >= 100) emote(c.n >= 300 ? 'godgame' : 'gains', G.player);
+  }
   rollSpecial(e);
   rollMats(e);
   // For the 의뢰: every kill counts, by ground, and bosses by ground.
@@ -2421,7 +2491,7 @@ function cast(skill, st) {
           const hit = def.shape === 'plus' ? onTiles(plusTiles(tx, ty, Math.max(1, st.radius))) : around(tx, ty, st.radius);
           for (const o of hit) {
             if (def.slow) o.slow = def.slow;
-            if (def.stun) o.stun = def.stun;
+            if (def.stun) { o.stun = def.stun; cutBlast(o); }
             if (def.curse) o.curse = def.curse;
             hurtEnemy(o, st.dmg);
           }
@@ -2448,7 +2518,7 @@ function cast(skill, st) {
       later(0.12, () => {
         G.shake = Math.max(G.shake, 0.1);
         for (const e of hit.slice(0, def.max || 99)) {
-          if (def.stun) e.stun = def.stun;
+          if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
         }
       });
@@ -2498,7 +2568,7 @@ function cast(skill, st) {
           if (e.hp <= 0) continue;
           if (def.slow) e.slow = def.slow;
           if (def.curse) e.curse = def.curse;
-          if (def.stun) e.stun = def.stun;
+          if (def.stun) { e.stun = def.stun; cutBlast(e); }
           // 포효검황: weaker with every tile away.
           const far = def.falloff ? Math.max(0.2, 1 - def.falloff * tdist(e, p)) : 1;
           hurtEnemy(e, st.dmg * far);
@@ -2511,7 +2581,7 @@ function cast(skill, st) {
       addFx(fxid, 0, -26, { follow: true });
       later(0.1, () => {
         for (const e of around(p.tx, p.ty, st.radius)) {
-          if (def.stun) e.stun = def.stun;
+          if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hurtEnemy(e, st.dmg);
         }
       });
@@ -3026,7 +3096,7 @@ function joinParty(cls) {
     cls, name, lv: 1, gear, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
     // Walks in from the edge of the view, as another player would.
     x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
-    cd: { a: 1, b: 3, c: 6, d: 9, r: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,
+    cd: { a: 1, b: 3, c: 6, d: 9, r: 0, e: 5, g: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,
   };
   m.maxHp = memberMaxHp(m);
   m.hp = m.maxHp;
@@ -3182,6 +3252,7 @@ function updateParty(dt) {
     // In a raid everyone casts faster: the skills fly.
     const tick = dt * (G.stage.raid ? 1.4 : 1);
     for (const k of Object.keys(m.cd)) m.cd[k] -= tick;
+    if (G.stage.raid && m.hp < m.maxHp * 0.3 && m.cls.id !== 'poet') partyTalk(m, ['힐 좀요!!', '피 없어요!', '저 죽어요!']);
     partyAct(m);
   }
 }
@@ -3233,6 +3304,73 @@ function stepMember(m, dt) {
   m.moving = !!m.stepping;
 }
 
+/**
+ * Spells in flight between the party and the foe: a glowing ball that follows its target and
+ * does its work on arrival (a heal, a buff, a blow), so the skills are seen crossing the field.
+ */
+function addShot(from, to, o) {
+  G.shots.push({ x: from.x, y: from.y - 26, to, t: 0, trail: [], ...o });
+}
+function updateShots(dt) {
+  for (const sh of G.shots) {
+    const tx = sh.to.x, ty = sh.to.y - 26, dx = tx - sh.x, dy = ty - sh.y, d = Math.hypot(dx, dy);
+    sh.t += dt;
+    sh.trail.unshift([sh.x, sh.y]);
+    if (sh.trail.length > 6) sh.trail.pop();
+    const stepLen = (sh.speed || 360) * dt;
+    if (d <= stepLen + 6 || sh.t > 2.5 || (sh.to.hp !== undefined && sh.to.hp <= 0 && !sh.to.cls)) {
+      sh.done = true;
+      if (sh.onHit && !(sh.to.down)) sh.onHit();
+      continue;
+    }
+    sh.x += (dx / d) * stepLen;
+    sh.y += (dy / d) * stepLen;
+  }
+  G.shots = G.shots.filter(sh => !sh.done);
+}
+function drawShots() {
+  for (const sh of G.shots) {
+    sh.trail.forEach(([x, y], i) => {
+      ctx.globalAlpha = 0.5 * (1 - i / sh.trail.length);
+      ctx.fillStyle = sh.glow || sh.color;
+      ctx.beginPath();
+      ctx.arc(x, y, (sh.size || 4) * (1 - i / 8), 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = sh.glow || sh.color;
+    ctx.beginPath();
+    ctx.arc(sh.x, sh.y, (sh.size || 4) * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = sh.color;
+    ctx.beginPath();
+    ctx.arc(sh.x, sh.y, sh.size || 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sh.x - 1, sh.y - 1, Math.max(1, (sh.size || 4) / 2.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/** The hero's own stun on a raid boss gathering its blast cuts it short, as the 주술사's 마비 does. */
+function cutBlast(e) {
+  if (e.kind !== 'boss' || !G.blast) return;
+  G.blast = null;
+  banner('기술로 광역기를 끊었다!');
+  emote('gains', G.player);
+}
+
+/** A companion's own words in the party chat (not a spell name), now and then. */
+function partyTalk(m, lines) {
+  if (G.t - (m.talked || -99) < 6) return;
+  m.talked = G.t;
+  const text = Array.isArray(lines) ? lines[Math.floor(Math.random() * lines.length)] : lines;
+  m.bubble = { text: text.length > 14 ? text.slice(0, 13) + '…' : text, t: G.t };
+  say(`${m.name}: ${text}`, 'party');
+}
+
 const KIWON = ['누리의기원', '대지의기원', '바다의기원', '동해의기원', '하늘의기원', '천공의기원', '구름의기원', '태양의기원'];
 
 function partyAct(m) {
@@ -3252,30 +3390,59 @@ function partyAct(m) {
       if (downed && m.cd.r <= 0) {
         // 부활: the fallen get up at half health.
         m.cd.r = 12;
-        downed.down = 0;
-        downed.hp = downed.maxHp * 0.5;
-        addFx(FX.revive, downed.x, downed.y - 26);
-        audio.play('revive');
         partySay(m, '부활');
-        downed.bubble = { text: '고마워!', t: G.t + 0.3 };
+        partyTalk(m, ['부활 갑니다!', '일어나요, 아직 안 끝났어요!']);
+        pose('magic');
+        addShot(m, downed, { color: '#ffe680', glow: '#fff2b0', size: 5, speed: 380, onHit: () => {} });
+        later(0.35, () => {
+          if (!downed.down) return;
+          downed.down = 0;
+          downed.hp = downed.maxHp * 0.5;
+          addFx(FX.revive, downed.x, downed.y - 26);
+          audio.play('revive');
+          downed.bubble = { text: '고마워!', t: G.t + 0.3 };
+        });
+      } else if (G.groupHeal && G.t - G.groupHeal < 3 && m.cd.g <= 0) {
+        // After a blast over everyone: the 희원 to the whole party.
+        m.cd.g = 10;
+        for (const x of partyBodies()) addShot(m, x, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => {
+          const n = x.maxHp * 0.25;
+          if (x === p) { heal(n, false); addFx(SKILLS.p_sky.fx, 0, -26, { follow: true, scale: 0.7 }); }
+          else healMember(x, n, SKILLS.p_sky.fx);
+        } });
+        audio.play('skill_p_sky', 'heal');
+        partySay(m, '천공의희원');
+        partyTalk(m, ['다들 피 채워요!', '광역 힐 갑니다~']);
+        pose('magic');
+      } else if (G.stage.raid && m.cd.e <= 0 && p.mp < p.maxMp * 0.5) {
+        // 공력주입: mana for the hero's next great spell.
+        m.cd.e = 16;
+        addShot(m, p, { color: '#9a68ff', glow: '#d6c0ff', size: 4, speed: 380, onHit: () => {
+          p.mp = Math.min(p.maxMp, p.mp + p.maxMp * 0.4);
+          addFx(SKILLS.m_gongryeok.fx, 0, -26, { follow: true, scale: 0.6 });
+        } });
+        audio.play('skill_m_gongryeok', 'heal');
+        partySay(m, '공력주입');
+        partyTalk(m, ['공증 드려요!', '마력 채워 드릴게요']);
         pose('magic');
       } else if (m.cd.a <= 0 && low) {
         m.cd.a = G.stage.raid ? 3.2 : 5;
         const tier = Math.min(7, m.lv + 1), fx = SKILLS.c_heal.fxs[tier];
         const n = low.maxHp * (0.14 + 0.04 * m.lv);
-        if (low === p) {
-          heal(n, false);
-          addFx(fx, 0, -26, { follow: true });
-        } else healMember(low, n, fx);
+        addShot(m, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => {
+          if (low === p) { heal(n, false); addFx(fx, 0, -26, { follow: true }); } else healMember(low, n, fx);
+        } });
         audio.play('skill_c_heal', 'heal', tier + 1);
         partySay(m, KIWON[tier]);
         pose('magic');
       } else if (m.cd.b <= 0) {
         m.cd.b = 14;
         G.buffs.shield = Math.max(G.buffs.shield, G.t + 4 + m.lv);
-        for (const b of partyBodies()) addFx(FX.shield, b === p ? 0 : b.x, -26 + (b === p ? 0 : b.y), { follow: b === p, scale: 0.6 });
+        for (const b of partyBodies()) addShot(m, b, { color: '#5aa8ff', glow: '#c0e0ff', size: 3, speed: 420, onHit: () =>
+          addFx(FX.shield, b === p ? 0 : b.x, -26 + (b === p ? 0 : b.y), { follow: b === p, scale: 0.6 }) });
         audio.play('party_guard');
-        partySay(m, '보호');
+        partySay(m, G.stage.raid ? '보무' : '보호');
+        if (G.stage.raid) partyTalk(m, ['보무 갑니다~', '보호 무장 걸어요!']);
         note('보호의 효과를 받습니다.');
         pose('magic');
       } else if (m.cd.c <= 0) {
@@ -3295,7 +3462,19 @@ function partyAct(m) {
       const t = boss || near(1)[0];
       if (!t) break;
       face(t);
-      if (boss && m.cd.d <= 0) {
+      if (boss && G.blast && m.cd.b <= 0) {
+        // 마비 on the boss gathering its blast: the blast is cut short.
+        m.cd.b = 9;
+        G.blast = null;
+        boss.stun = 1.2;
+        fxOn(SKILLS.m_para.fx, boss);
+        audio.play('skill_m_para', 'strike');
+        partySay(m, '마비');
+        partyTalk(m, ['마비 걸었어요! 광역 끊김!', '마비! 지금 몰아쳐요!']);
+        banner('마비! 광역기를 끊었다');
+        emote('gains', p);
+        pose('magic');
+      } else if (boss && m.cd.d <= 0) {
         // 헬파이어 on the boss: the big one.
         m.cd.d = 16;
         fxOn(SKILLS.m_ult.fx, t);
@@ -3305,8 +3484,10 @@ function partyAct(m) {
         pose('magic');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.3;
-        fxOn(SKILLS.m_fire.fxs[Math.min(7, m.lv)], t);
-        later(0.15, () => hurtEnemy(t, 8 * pw));
+        addShot(m, t, { color: '#ff8a20', glow: '#ffd060', size: 4, speed: 460, onHit: () => {
+          fxOn(SKILLS.m_fire.fxs[Math.min(7, m.lv)], t);
+          hurtEnemy(t, 8 * pw);
+        } });
         audio.play('skill_m_fire', 'spell', Math.min(8, m.lv * 2));
         if (Math.random() < 0.3) partySay(m, ['화염주', '화영열주', '화열참주'][Math.min(2, m.lv - 1)]);
         pose('magic');
@@ -3326,6 +3507,7 @@ function partyAct(m) {
         m.cd.c = 10;
         G.aggro = m;
         partySay(m, '이리 와라');
+        partyTalk(m, ['탱 잡았어요, 뒤로 빠져요!', '어그로 끌게요!']);
         audio.play('skill_w_roar', 'nova');
         pose('attack');
         break;
@@ -3371,9 +3553,18 @@ function partyAct(m) {
       if (boss && m.cd.d <= 0) {
         m.cd.d = 15;
         fxOn(SKILLS.r_ult.fx, t);
-        later(0.25, () => hurtEnemy(t, 55 * pw));
+        for (let i = 0; i < 4; i++) later(0.1 + i * 0.1, () => hurtEnemy(t, 15 * pw * (m.hidden > G.t ? 1.5 : 1)));
         audio.play('skill_r_ult', 'ult');
         partySay(m, '필살검무');
+        partyTalk(m, ['뒤 잡았다!', '필살 들어갑니다']);
+      } else if (boss && m.cd.e <= 0 && m.hp < m.maxHp * 0.6) {
+        // 흡성대법: the foe's strength drawn back as health.
+        m.cd.e = 9;
+        hurtEnemy(t, 10 * pw);
+        addShot(t, m, { color: '#b040d0', glow: '#e8a0ff', size: 4, speed: 360, onHit: () => healMember(m, m.maxHp * 0.25) });
+        audio.play('skill_r_drain', 'spell');
+        partySay(m, '흡성대법');
+        pose('attack');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.6;
@@ -4028,15 +4219,16 @@ const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', 
 
 /** A monster as it moves: turned (top-down kinds), or leaning (upright kinds). */
 /** A summoned 괴수: its own four ways, walking or striking, from the dress-room sheet. */
-function drawBeast(b, alpha) {
+function drawBeast(b, alpha, ox = 0, oy = 0, k = 0.62) {
   const d = M.beast[b.beast], im = images[`beast/${b.beast}.png`];
-  const [cw, ch] = d.cell, k = 0.62;
+  const [cw, ch] = d.cell;
   const row = b.mdy > 0 ? 0 : b.mdx > 0 ? 1 : b.mdy < 0 ? 2 : b.mdx < 0 ? 3 : 0;
-  const col = b.hitT !== undefined && G.t - b.hitT < 0.3 ? 4 + (G.t - b.hitT < 0.15 ? 0 : 1)
+  const struck = b.lunge > 0 ? G.t : b.hitT;
+  const col = struck !== undefined && G.t - struck < 0.3 ? 4 + (b.lunge > 0.15 || G.t - struck < 0.15 ? 0 : 1)
     : b.moving ? Math.floor(b.phase / (Math.PI / 2)) % 4 : Math.floor(G.t * 2.5) % 4;
   ctx.save();
   ctx.globalAlpha = Math.max(0, alpha);
-  ctx.drawImage(im, col * cw, row * ch, cw, ch, Math.round(b.x - d.feet[0] * k), Math.round(b.y - d.feet[1] * k),
+  ctx.drawImage(im, col * cw, row * ch, cw, ch, Math.round(b.x + ox - d.feet[0] * k), Math.round(b.y + oy - d.feet[1] * k),
     Math.round(cw * k), Math.round(ch * k));
   ctx.restore();
 }
@@ -4168,7 +4360,8 @@ function render(now) {
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
     if (b.flee) ctx.filter = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
-    drawMonster(b, b.x + lx, b.y + ly, s);
+    if (b.beast) drawBeast(b, 1, lx, ly, 0.62 * s);
+    else drawMonster(b, b.x + lx, b.y + ly, s);
     if (b.flee) ctx.filter = 'none';
     if (!b.kind && b.shown && G.t - b.shown < 3) {
       // A struck monster shows its health over its head for a while.
@@ -4195,9 +4388,20 @@ function render(now) {
     ctx.translate(Math.round(e.x), Math.round(e.y));
     ctx.rotate((Math.PI / 2) * k * e.face);
     ctx.filter = 'brightness(0.7)';
-    ctx.drawImage(im, -w / 2, -h, w, h);
+    if (e.beast && M.beast[e.beast]) {
+      const d = M.beast[e.beast], k = 0.62 * e.scale;
+      ctx.drawImage(images[`beast/${e.beast}.png`], 0, 0, d.cell[0], d.cell[1], -d.feet[0] * k, -d.feet[1] * k, d.cell[0] * k, d.cell[1] * k);
+    } else ctx.drawImage(im, -w / 2, -h, w, h);
     ctx.restore();
   }
+
+  drawShots();
+  for (const sp of G.sparks) {
+    ctx.globalAlpha = 1 - sp.t / 0.28;
+    ctx.fillStyle = sp.c;
+    ctx.fillRect(Math.round(sp.x), Math.round(sp.y), 2, 2);
+  }
+  ctx.globalAlpha = 1;
 
   // Spell effects over everything, at their own size.
   for (const f of G.fxs) {
@@ -4257,6 +4461,36 @@ function render(now) {
     gr.addColorStop(1, `rgba(0,0,0,${dark})`);
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // A raid blast gathering: the screen's edge throbs red until it falls or is cut.
+  if (G.blast) {
+    const k = 0.25 + 0.2 * Math.sin(G.t * 18);
+    const gr = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+      canvas.width / 2, canvas.height / 2, Math.hypot(canvas.width, canvas.height) / 2);
+    gr.addColorStop(0, 'rgba(160,0,0,0)');
+    gr.addColorStop(1, `rgba(200,20,10,${k})`);
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // A streak's round number: a short white flash.
+  if (G.flash && G.t - G.flash < 0.18) {
+    ctx.fillStyle = `rgba(255,250,220,${0.35 * (1 - (G.t - G.flash) / 0.18)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // 연속 처치: the count at the top right while a streak runs.
+  const c = G.combo;
+  if (c.n >= 10 && G.t - c.t < 3) {
+    const pop = Math.max(0, 1 - (G.t - c.pop) / 0.15), sc = (1 + 0.25 * pop) * (canvas.width / 860);
+    ctx.save();
+    ctx.translate(canvas.width - 70 * (canvas.width / 860), 64 * (canvas.width / 860));
+    ctx.scale(sc, sc);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 18px G11';
+    ctx.globalAlpha = Math.min(1, (3 - (G.t - c.t)) * 2);
+    outline(`${c.n}`, 0, 0, c.n >= 100 ? '#ff7a3a' : '#ffe070');
+    ctx.font = '10px G9';
+    outline('연속 처치', 0, 13, '#f0e0c0');
+    ctx.restore();
   }
   drawJoystick();
 }

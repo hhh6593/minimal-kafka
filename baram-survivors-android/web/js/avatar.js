@@ -53,6 +53,12 @@ export const RAID_GEAR = {
     weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채' } },
   raid_brit: { pow: 12, armor: '황혼의갑주', shield: '천성대방패',
     weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
+  raid_varuna: { pow: 12, armor: '용왕의용포', shield: '거문고',
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비' } },
+  raid_agni: { pow: 13, armor: '불의갑주', shield: '일광방패',
+    weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱' } },
+  raid_airavata: { pow: 14, armor: '선녀의옷', shield: '천성대방패',
+    weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장' } },
 };
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
