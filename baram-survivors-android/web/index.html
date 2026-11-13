@@ -357,7 +357,7 @@
   #mini { position: absolute; left: 50%; top: 36px; transform: translateX(-50%); display: flex; gap: 6px;
       font: 10px G9, monospace; color: #fff; text-shadow: 1px 1px 0 #000; }
   #mini b { font-weight: normal; }
-  #banner { position: fixed; top: max(22%, 86px); left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
+  #banner { position: fixed; top: max(24%, 100px); left: calc((100% - var(--side)) / 2); transform: translateX(-50%); padding: 3px 14px;
       font-weight: 700; color: #ffe070; background: rgba(30, 16, 8, .9); border: 1px solid var(--frame-hi);
       pointer-events: none; white-space: nowrap; z-index: 4; }
   @media (max-height: 420px) {
@@ -422,7 +422,7 @@
   <div id="over-box">
     <div class="caption" id="over-title"></div>
     <div id="over-stats"></div>
-    <div class="row"><button id="again" class="btn">다시 사냥</button><button id="to-select" class="btn">사냥터 선택</button></div>
+    <div class="row"><button id="again" class="btn">다시 사냥</button><button id="keep" class="btn" hidden>계속 사냥</button><button id="to-select" class="btn">사냥터 선택</button></div>
   </div>
 </div>
 

@@ -611,6 +611,7 @@ function pickGear(g) {
       return;
     }
     b.push(id);
+    (G.gained = G.gained || []).push('★' + name);
     saveJson('bs_progress', progress);
     say(`스페셜 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text})`, 'sys');
     banner(`★ 스페셜: ${name}`);
@@ -625,6 +626,7 @@ function pickGear(g) {
     return;
   }
   b.push(id);
+  (G.gained = G.gained || []).push(name);
   saveJson('bs_progress', progress);
   say(`${josa(name, '을', '를')} 주웠습니다. (메뉴 → 장비)`, 'sys');
   note(`${name} 획득`);
@@ -1281,7 +1283,28 @@ function raidMarks() {
   G.marks = G.marks.filter(mk => !mk.done);
 }
 
+/** 계속 사냥: the field keeps growing (40 and half a monster more each second, to 220), a
+ *  champion pack every minute; monsters already grow tougher with time. */
+function endlessSpawn(dt) {
+  const t = G.t, floor = Math.min(FIELD_MAX, 40 + (t - G.clearT) * 0.5);
+  G.spawnT -= dt;
+  if (G.spawnT <= 0) {
+    G.spawnT = 0.5;
+    for (let i = 0; i < 3 && G.enemies.length < floor; i++) addEnemy(pickMonster(Math.random() < 0.3));
+  }
+  if (t >= G.endlessChamp) {
+    G.endlessChamp = t + 60;
+    const m = pickMonster(true), pack = ++G.packs;
+    for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+    say('챔피언 무리가 나타났습니다!', 'warn');
+  }
+}
+
 function spawn(dt) {
+  if (G.endless) {
+    endlessSpawn(dt);
+    return;
+  }
   if (G.stage.raid) {
     raidSpawn(dt);
     raidMarks();
@@ -1429,7 +1452,8 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   const at = spot || ringTile(kind === 'boss' || kind === 'mini');
   if (!at) return null;
   const t = G.t;
-  const tough = (1 + G.level * 0.15) * (1 + t / 150) * (G.cleared ? 1.5 : 1);
+  // Monsters toughen with time: x2.5 by 5:00 (matched to spells growing 15% a 단).
+  const tough = (1 + G.level * 0.15) * (1 + t / 200) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
   let hp = (6 + m.area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
@@ -1649,6 +1673,11 @@ function rollSpecial(e) {
 function killEnemy(e) {
   G.kills++;
   rollSpecial(e);
+  // For the 의뢰: every kill counts, by ground, and bosses by ground.
+  const st = qstats();
+  st.kills++;
+  st.stageKills[G.stage.id] = (st.stageKills[G.stage.id] || 0) + 1;
+  if (e.kind === 'boss') st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
   G.enemies.splice(G.enemies.indexOf(e), 1);
   occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
@@ -1710,6 +1739,9 @@ function clearStage() {
   if (G.cleared) return;
   G.cleared = true;
   audio.play('win');
+  const st = qstats();
+  if (G.stage.raid) st.raids[G.stage.id] = (st.raids[G.stage.id] || 0) + 1;
+  else st.clears[G.stage.id] = (st.clears[G.stage.id] || 0) + 1;
   if (G.stage.raid) {
     progress.raids = progress.raids || {};
     progress.raids[G.stage.id] = (progress.raids[G.stage.id] || 0) + 1;
@@ -1884,10 +1916,11 @@ function cast(skill, st) {
         const f = (e.tx - p.tx) * fx0 + (e.ty - p.ty) * fy0, side = Math.abs((e.tx - p.tx) * fy0 + (e.ty - p.ty) * fx0);
         return e.hp > 0 && f >= 1 && f <= st.range && side <= 1;
       }).sort((a, b) => tdist(a, p) - tdist(b, p));
-      const e = ahead[0];
+      // Nothing ahead: strike one beside the hero where it stands, without moving.
+      const e = ahead[0] || DIRS.map(([dx, dy]) => occ.get(key(p.tx + dx, p.ty + dy))).find(b => b && b.m && !b.ally && b.hp > 0);
       if (!e) return retry(0.25);
       const bx = e.tx + fx0, by = e.ty + fy0;
-      if (!occ.has(key(bx, by))) {
+      if (ahead[0] && !occ.has(key(bx, by))) {
         addFx(fxid, p.x, p.y - 26, { scale: 0.7 });
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
@@ -2251,6 +2284,7 @@ const TOWNSFOLK = [
   { id: 'merchant', name: '상인', img: '5', tx: 11, ty: 4, line: '좋은 물건 있소. 전만 있으면 되오.' },
   { id: 'inn', name: '주모', img: 'hwahwa', tx: 4, ty: 8, line: '몸을 단련하고 가시구려.' },
   { id: 'guide', name: '길잡이', img: '도우미', tx: 8, ty: 8, line: '어느 사냥터로 모실까요?' },
+  { id: 'clerk', name: '관원', img: '계산기1', tx: 12, ty: 8, line: '나라에서 내린 의뢰가 있소. 해내면 칭호를 내리리다.' },
 ];
 
 function enterTown(cls) {
@@ -2328,10 +2362,129 @@ function talk() {
   const n = T && T.near;
   if (!n) return;
   if (n.id === 'guide') showScreen('stages');
+  else if (n.id === 'clerk') openQuests();
   else if (n.id === 'smith') {
     buildEquip();
     $('#equip').hidden = false;
   } else openTrade(n.id);
+}
+
+// ---------------------------------------------------------------- 의뢰 and 칭호
+//
+// The 관원 in town keeps a board of 의뢰: lasting ones that give gold and a 칭호 (shown in the
+// panel's TITLE), and three of the day that send the hunter back to grounds already opened.
+// Progress counts across classes, from progress.stats.
+
+function qstats() {
+  return progress.stats = Object.assign({ kills: 0, stageKills: {}, bosses: {}, clears: {}, raids: {}, endless: 0 }, progress.stats);
+}
+
+function specialsOwned() {
+  return Object.values(progress.inv || {}).reduce((n, b) => n + b.filter(x => x.startsWith('sp:')).length, 0);
+}
+
+function codexShare() {
+  // Pieces found over all pieces there are, for every class.
+  let have = 0, all = 0;
+  for (const c of CLASSES) { const items = codexItems(c); all += items.length; have += items.filter(x => x.owned).length; }
+  return have / Math.max(1, all);
+}
+
+const QUESTS = [
+  { id: 'q_novice', title: '초보 사냥꾼', text: '왕초보사냥터 정복', gold: 50, need: 1, have: s => s.clears.novice || 0 },
+  { id: 'q_rat', title: '쥐잡이', text: '쥐굴의 서생원 3번 쓰러뜨리기', gold: 300, need: 3, have: s => s.bosses.rat || 0 },
+  { id: 'q_snake', title: '땅꾼', text: '뱀굴에서 몬스터 500마리', gold: 400, need: 500, have: s => s.stageKills.snake || 0 },
+  { id: 'q_deer', title: '사슴 사냥꾼', text: '사슴굴 3번 정복', gold: 500, need: 3, have: s => s.clears.deer || 0 },
+  { id: 'q_haunt', title: '퇴마사', text: '흉가 정복', gold: 800, need: 1, have: s => s.clears.haunt || 0 },
+  { id: 'q_goblin', title: '도깨비 잡이', text: '도깨비굴 정복', gold: 1000, need: 1, have: s => s.clears.goblin || 0 },
+  { id: 'q_promo1', title: '승급자', text: '아무 직업이나 1차 승급', gold: 300, need: 1, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_promo4', title: '탈명의 경지', text: '아무 직업이나 4차 승급', gold: 3000, need: 4, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_raid1', title: '레이드 대원', text: '레이드 한 번 이기기', gold: 500, need: 1, have: s => Object.values(s.raids).reduce((a, b) => a + b, 0) },
+  { id: 'q_raid7', title: '전설의 용사', text: '레이드 일곱 곳 모두 이기기', gold: 5000, need: RAIDS.length, have: s => RAIDS.filter(r => s.raids[r.id]).length },
+  { id: 'q_sp1', title: '빛을 본 자', text: '스페셜 아이템 1개 얻기', gold: 500, need: 1, have: () => specialsOwned() },
+  { id: 'q_sp10', title: '수집가', text: '스페셜 아이템 10개 얻기', gold: 3000, need: 10, have: () => specialsOwned() },
+  { id: 'q_kills', title: '백전노장', text: '몬스터 누적 10000마리', gold: 2000, need: 10000, have: s => s.kills },
+  { id: 'q_endless', title: '불굴', text: '정복 뒤 계속 사냥에서 10분 버티기', gold: 1500, need: 10, have: s => Math.floor(s.endless / 60) },
+  { id: 'q_allclass', title: '팔방미인', text: '네 직업 모두 Lv 20 기록', gold: 2000, need: 4, have: () => CLASSES.filter(c => (best[c.id] || {}).lvl >= 20).length },
+  { id: 'q_codex', title: '장비 수집가', text: '도감 장비 절반 모으기', gold: 2000, need: 50, have: () => Math.floor(codexShare() * 100) },
+];
+
+/** Today's three 의뢰: drawn from the grounds already open, the same all day. */
+function dailyQuests() {
+  const day = new Date().toISOString().slice(0, 10);
+  const d = progress.daily;
+  if (d && d.day === day) return d.list;
+  let seed = [...day].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
+  const open = STAGES.filter((s, i) => unlocked(i));
+  const pick = () => open[Math.floor(rnd() * open.length)];
+  const s = qstats();
+  const a = pick(), b = pick();
+  const list = [
+    { id: 'd_kill', text: `${a.name}에서 몬스터 300마리`, gold: 300 + 60 * STAGES.indexOf(a), key: ['stageKills', a.id], need: 300 },
+    { id: 'd_clear', text: `${josa(b.name, '을', '를')} 정복`, gold: 400 + 80 * STAGES.indexOf(b), key: ['clears', b.id], need: 1 },
+    { id: 'd_any', text: '아무 사냥터에서 몬스터 800마리', gold: 500, key: ['kills'], need: 800 },
+  ].map(q => ({ ...q, base: q.key.length > 1 ? (s[q.key[0]][q.key[1]] || 0) : s[q.key[0]] }));
+  progress.daily = { day, list, claimed: [] };
+  saveJson('bs_progress', progress);
+  return list;
+}
+
+function dailyHave(q) {
+  const s = qstats();
+  const now = q.key.length > 1 ? (s[q.key[0]][q.key[1]] || 0) : s[q.key[0]];
+  return now - q.base;
+}
+
+/** The chosen 칭호, or the one the conquests give. */
+function heroTitle(cleared) {
+  return progress.title || TITLES[Math.min(TITLES.length - 1, Math.floor(cleared / 3))];
+}
+
+function openQuests() {
+  const box = $('#trade-rows'), s = qstats();
+  box.innerHTML = '';
+  $('#trade-title').textContent = '관원 · 의뢰';
+  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전`;
+  const done = progress.quests = progress.quests || {};
+  const row = (name, desc, label, can, act) => {
+    const r = document.createElement('div');
+    r.className = 'trade-row';
+    r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = label;
+    b.disabled = !can;
+    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').textContent = `${progress.gold}전`; openQuests(); };
+    r.append(b);
+    box.append(r);
+  };
+  const head = text => { const h = document.createElement('h4'); h.textContent = text; h.style.margin = '6px 0 2px'; box.append(h); };
+  head('오늘의 의뢰');
+  const daily = dailyQuests();
+  for (const q of daily) {
+    const have = Math.min(q.need, dailyHave(q)), got = progress.daily.claimed.includes(q.id);
+    row(q.text, `${have}/${q.need} · ${q.gold}전`, got ? '받음' : '받기', !got && have >= q.need, () => {
+      progress.daily.claimed.push(q.id);
+      progress.gold = (progress.gold || 0) + q.gold;
+    });
+  }
+  head('의뢰 · 칭호');
+  for (const q of QUESTS) {
+    const have = Math.min(q.need, q.have(s)), got = done[q.id];
+    row(`${q.text}`, `${have}/${q.need} · ${q.gold}전 · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
+      done[q.id] = true;
+      progress.gold = (progress.gold || 0) + q.gold;
+    });
+  }
+  head('칭호 고르기');
+  const titles = QUESTS.filter(q => done[q.id]).map(q => q.title);
+  if (!titles.length) row('아직 받은 칭호가 없습니다', '의뢰를 마치고 받기를 누르면 칭호가 생깁니다', '-', false, () => {});
+  for (const t of titles)
+    row(`「${t}」`, progress.title === t ? '지금 쓰는 칭호' : '상태창 TITLE에 보입니다', progress.title === t ? '쓰는 중' : '쓰기', progress.title !== t, () => {
+      progress.title = t;
+    });
+  $('#trade').hidden = false;
 }
 
 // Lasting training sold by the innkeeper, as Charsi's ranks in D2 Survivors.
@@ -3113,11 +3266,20 @@ function showResults(title) {
   G.choosing = false;
   G.pendingLevels = 0;
   bankGold();
+  if (G.endless) {
+    const st = qstats();
+    st.endless = Math.max(st.endless, G.t - G.clearT);
+  }
+  saveJson('bs_progress', progress);
   $('#over-title').textContent = title;
-  $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}<br>`
+  $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}`
+    + (G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : '') + '<br>'
     + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
     + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
+    + (G.gained && G.gained.length ? `<br><b class="promo">얻은 장비: ${G.gained.join(', ')}</b>` : '')
     + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '');
+  // A conquered ground can be hunted on, harder and harder, for its specials.
+  $('#keep').hidden = !(G.cleared && !G.dead && !G.stage.raid);
   showScreen('over');
 }
 
@@ -3773,7 +3935,7 @@ function syncUlt() {
   const cleared = Object.keys(progress.cleared).length;
   put('#sd-clan', G.stage.map === 'world_4' ? '환상의 섬' : '고구려');
   put('#sd-ct', G.stage.name);
-  put('#sd-title', TITLES[Math.min(TITLES.length - 1, Math.floor(cleared / 3))]);
+  put('#sd-title', heroTitle(cleared));
   put('#sd-class', G.cls.name);
   put('#sd-name', '나');
   put('#sd-land', G.stage.map === 'world_4' ? '환상' : '고구려');
@@ -3915,6 +4077,20 @@ $('#quit').onclick = () => {
   leaveHunt();
 };
 $('#again').onclick = () => startRun(G.cls, G.stage);
+// 계속 사냥: back into the conquered ground; the field grows until the hero falls.
+$('#keep').onclick = () => {
+  if (!G || !G.cleared || G.dead) return;
+  G.over = false;
+  G.banked = false;
+  G.gold = 0;
+  G.endless = true;
+  G.clearT = G.t;
+  G.endlessChamp = G.t + 60;
+  showScreen(null);
+  audio.bgm(huntMusic());
+  say('계속 사냥합니다. 갈수록 몬스터가 늘고 강해집니다.', 'sys');
+  banner('계속 사냥');
+};
 $('#to-select').onclick = () => leaveHunt();
 $('#opt-bgm').onclick = () => {
   settings.bgm = !settings.bgm;
@@ -4267,5 +4443,6 @@ window.__appBack = () => {
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r]);
+window.__quests = () => openQuests();
 
 boot();
