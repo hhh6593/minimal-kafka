@@ -38,6 +38,8 @@ ITEMS = {
     "p_life": "1304", "p_area": "1141", "chest": "16",
     # Dropped armor lies on the ground as a folded armor, not as a figure wearing it.
     "armor": "203",
+    # Crafting materials.
+    "m_fur": "230", "m_bone": "33", "m_horn": "229", "m_ember": "63", "m_jade": "36",
 }
 HEROES = ["1001", "1002", "1003", "1004"]
 HERO_HEIGHT = 56

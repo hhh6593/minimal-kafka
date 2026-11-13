@@ -6,7 +6,7 @@ import {
 import { Audio } from './audio.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
-  MATS, craftRecipe, STAR_MAX, starCost,
+  MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -79,7 +79,7 @@ async function boot() {
   audio.setSfx(settings.sfx);
   const paths = [
     ...Object.keys(M.fx).map(id => `fx/${id}.png`),
-    ...Object.keys(M.fx).map(id => `icon/${id}.png`),
+    ...Object.keys(M.fx).filter(id => !id.startsWith('new_')).map(id => `icon/${id}.png`),
     ...M.heroes.map(h => `hero/${h.id}.png`),
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
@@ -740,7 +740,7 @@ function buildEquip() {
       const t = specialBase(sp, cls.id), btn = document.createElement('button');
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
       const icon = hasAvatars() ? gearIcon(cls.id, kind, t) : null;
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>★${specialName(sp, cls.id)}</span><small>${sp.opt.text}</small>`;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}</span><small>${sp.opt.text}</small>`;
       btn.onclick = () => {
         wear(kind, t, id);
         buildEquip();
@@ -777,8 +777,10 @@ function codexItems(cls) {
   }
   for (const sp of SPECIALS) {
     const t = specialBase(sp, cls.id);
-    out.push({ grade: 'special', kind: sp.kind, name: specialName(sp, cls.id), icon: gearIcon(cls.id, sp.kind, t),
-      pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from: sp.srcName, opt: sp.opt.text });
+    const from = sp.craft ? `대장장이 조합: ${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${sp.craft.gold}전`
+      : sp.srcName;
+    out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id), icon: gearIcon(cls.id, sp.kind, t),
+      pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from, opt: sp.opt.text });
   }
   return out;
 }
@@ -821,7 +823,7 @@ function buildCodex() {
     const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
     const grade = { plain: '일반', raid: '레이드', craft: '조합', special: '스페셜' }[it.grade];
     row.innerHTML = (it.icon ? `<img src="${it.icon}" alt="">` : '<span></span>')
-      + `<div><b>${it.grade === 'special' ? '★' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
+      + `<div><b>${it.grade === 'special' ? '★' : it.grade === 'craft' ? '◆' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
       + `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span></div>`;
     box.append(row);
   }
@@ -885,14 +887,47 @@ function openCraft() {
       say(`${josa(dragon, '을', '를')} 조합했습니다!`, 'sys');
       banner(`조합 성공 · ${dragon}`);
     });
-  head('강화 · 사본으로 별을 올린다');
+  head('조합 · 재료 장비');
+  const have = m => Object.entries(m).every(([id, n]) => (mats[id] || 0) >= n);
+  const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
+  for (const c of CRAFTS) {
+    const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
+    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}`,
+      got ? '가짐' : '조합', !got && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
+        progress.gold -= c.gold;
+        for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
+        progress.mats = mats;
+        b.push(key);
+        say(`${josa(specialName(sp, cls.id), '을', '를')} 조합했습니다!`, 'sys');
+      });
+  }
+  head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
   const owned = b.filter(k => !k.startsWith('sp:') || SPECIAL[k.slice(3)]);
   let any = false;
   for (const key of owned) {
     const star = starOf(cls, key), copies = copiesOf(cls, key);
-    if (star >= STAR_MAX && !copies) continue;
+    if (star >= STAR_MAX && !copies && !key.startsWith('sp:cr_')) continue;
     const [kind, t] = key.split(':');
-    const name = key.startsWith('sp:') ? '★' + specialName(SPECIAL[key.slice(3)], cls.id) : gearName(cls.id, kind, +t);
+    const sp0 = key.startsWith('sp:') ? SPECIAL[key.slice(3)] : null;
+    const name = sp0 ? (sp0.craft ? '◆' : '★') + specialName(sp0, cls.id) : gearName(cls.id, kind, +t);
+    // Crafted pieces (and the 용무기) never drop twice: their stars are paid in materials.
+    const csp = key.startsWith('sp:') && SPECIAL[key.slice(3)] && SPECIAL[key.slice(3)].craft ? SPECIAL[key.slice(3)] : null;
+    const crafted = !!csp || key === `weapon:${GEAR[cls.id].weapon.indexOf(CRAFT_GEAR[cls.id])}`;
+    if (crafted) {
+      any = true;
+      const sc = starMats(csp, star);
+      row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: ${matText(sc.mats)} + ${sc.gold}전 · 별마다 반 등급`,
+        star >= STAR_MAX ? '최고' : '강화', star < STAR_MAX && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
+          progress.gold -= sc.gold;
+          for (const [id, n] of Object.entries(sc.mats)) mats[id] -= n;
+          progress.mats = mats;
+          progress.stars = progress.stars || {};
+          const st = progress.stars[cls.id] = progress.stars[cls.id] || {};
+          st[key] = star + 1;
+          say(`${name} ★${star + 1} 강화!`, 'sys');
+        });
+      continue;
+    }
     const cost = starCost(star);
     if (!copies && star === 1) continue;
     any = true;
@@ -2652,7 +2687,7 @@ function qstats() {
 }
 
 function specialsOwned() {
-  return Object.values(progress.inv || {}).reduce((n, b) => n + b.filter(x => x.startsWith('sp:')).length, 0);
+  return Object.values(progress.inv || {}).reduce((n, b) => n + b.filter(x => x.startsWith('sp:') && !x.startsWith('sp:cr_')).length, 0);
 }
 
 function codexShare() {

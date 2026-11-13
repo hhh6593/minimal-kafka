@@ -72,12 +72,26 @@ export function gearPower(cls, kind, tier) {
   return tier;
 }
 
+// Looks added to a class's line only for crafted pieces: never dropped as they are.
+export const EXTRA_LOOKS = new Set();
+
+/** The place of a look in a class's line, adding it (as a crafted-only look) when missing. */
+export function lookTier(cls, kind, name) {
+  let i = GEAR[cls][kind].indexOf(name);
+  if (i < 0) {
+    GEAR[cls][kind].push(name);
+    EXTRA_LOOKS.add(name);
+    i = GEAR[cls][kind].length - 1;
+  }
+  return i;
+}
+
 /** The places in a line that the hunting grounds hand out, weakest first: no raid or crafted
  *  piece among them, wherever those sit in the line. */
 export function plainList(cls, kind) {
   const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
   if (kind === 'weapon') raid.add(CRAFT_GEAR[cls]);
-  return GEAR[cls][kind].map((n, i) => (raid.has(n) ? -1 : i)).filter(i => i >= 0);
+  return GEAR[cls][kind].map((n, i) => (raid.has(n) || EXTRA_LOOKS.has(n) ? -1 : i)).filter(i => i >= 0);
 }
 
 /** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
