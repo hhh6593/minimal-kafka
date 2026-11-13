@@ -156,7 +156,7 @@
   @keyframes tip-out { 0%, 80% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
   #town:not([hidden]) .town-tip { animation-name: tip-out; }
   #talk { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: 40px; min-width: 0; padding: 10px 16px; }
-  #trade { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  #trade { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
   #trade-box { width: min(96vw, 520px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px;
       color: #2a1606; background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
@@ -188,6 +188,8 @@
   .codex-item.missing { opacity: .55; }
   .codex-item.special { background: #f0d890; }
   .codex-item.raid { background: #e8c8a8; }
+  .codex-item.craft { background: #c8e0b8; }
+  .codex-item.craft i { background: #2a6a10; }
   .codex-item img { max-width: 32px; max-height: 32px; justify-self: center; image-rendering: pixelated; }
   .codex-item b { font: 700 11px/14px G11, monospace; }
   .codex-item i { font-style: normal; font: 9px G9, monospace; padding: 0 3px; margin-left: 4px; color: #fff; background: #6a5a42; }
@@ -347,6 +349,7 @@
       border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
   #keys button:active { border-color: #5a3212 #e8c48c #e8c48c #5a3212; }
   #pause-btn { width: 52px; height: 24px; }
+  #speed-btn { width: 64px; height: 22px; font-size: 11px !important; }
   #ult { width: 92px; height: 40px; }
   #ult.ready { color: #7a1800; border-color: #fff0c0 #5a3212 #5a3212 #fff0c0; }
   #ult small { display: block; font: 8px G7, monospace; font-weight: normal; }
@@ -453,7 +456,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="bossbar" hidden><b id="bb-name"></b><i><s id="bb-fill"></s></i><span id="bb-num"></span></div>
@@ -532,7 +535,7 @@
     <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
     <div id="equip-rows"></div>
     <div id="equip-stats"></div>
-    <div class="row"><button id="equip-codex" class="btn">도감</button><button id="close-equip" class="btn">닫기</button></div>
+    <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="close-equip" class="btn">닫기</button></div>
   </div>
 </div>
 <div id="banner" hidden></div>

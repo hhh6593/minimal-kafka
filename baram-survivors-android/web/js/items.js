@@ -7,13 +7,14 @@
 // what makes a conquered ground worth hunting again; the 도감 shows where each piece drops.
 
 import { STAGES, RAIDS } from './data.js';
-import { GEAR, RAID_GEAR, raidSet, plainTiers, gearPower } from './avatar.js';
+import { GEAR, RAID_GEAR, raidSet, plainTiers, plainList, gearPower } from './avatar.js';
 
 // The name each source gives its specials.
 const PREFIX = {
   novice: '다람쥐의', rat: '서생원의', snake: '구렁이의', deer: '광록의', pig: '홍돼지의', bear: '진웅의',
   fox: '구미호의', haunt: '원혼의', goblin: '도깨비의', bandit: '산적왕의', japan: '왜구의', sea: '용궁의',
-  island: '환상의', volcano: '불꽃의',
+  island: '환상의', volcano: '불꽃의', rabbit: '토끼 대왕의', bigsnake: '이무기의', bearman: '곰인의', mantis: '사마귀의',
+  skull: '해골왕의', steppe: '초원의', yogoe: '요괴왕의', palace: '용왕의', royal: '왕궁의',
   raid_boar: '멧돼지왕의', raid_tiger: '산군의', raid_goblin: '대장의', raid_hydra: '삼두룡의',
   raid_sorcerer: '흑술사의', raid_sea: '해왕의', raid_fire: '화령의',
 };
@@ -36,7 +37,7 @@ export const KIND_NAME = { weapon: '무기', armor: '갑옷', shield: '방패' }
 
 /** Every special: id, where it drops, its kind and option. */
 export const SPECIALS = [];
-const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i, raid: false })),
+const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false })),
   ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true }))];
 SOURCES.forEach((src, n) => KINDS.forEach((kind, k) => {
   SPECIALS.push({ id: `${src.id}:${kind}`, src: src.id, srcName: src.raid ? `${src.name} 레이드` : src.name, raid: src.raid,
@@ -51,7 +52,8 @@ export function specialBase(sp, cls) {
     const name = raidSet(sp.src, cls).find(([k]) => k === sp.kind)[1];
     return GEAR[cls][sp.kind].indexOf(name);
   }
-  return Math.min(plainTiers(cls, sp.kind) - 1, Math.floor(sp.rank / 3) + 1);
+  const list = plainList(cls, sp.kind);
+  return list[Math.min(list.length - 1, Math.floor(sp.rank / 3) + 1)];
 }
 
 export function specialName(sp, cls) {
@@ -65,10 +67,12 @@ export function specialPower(sp, cls) {
 
 /** Where an ordinary tier drops: the grounds whose rank (with luck and a boss's +1) reach it. */
 export function tierSources(cls, kind, tier) {
-  const top = plainTiers(cls, kind) - 1;
-  if (tier > top) return [];
+  const list = plainList(cls, kind), top = list.length - 1;
+  tier = list.indexOf(tier);
+  if (tier < 0) return [];
   return STAGES.filter((s, i) => {
-    const lo = Math.min(top, Math.floor(i / 3)), hi = Math.min(top, Math.floor(i / 3) + 2);
+    const lv = s.level !== undefined ? s.level : i;
+    const lo = Math.min(top, Math.floor(lv / 3)), hi = Math.min(top, Math.floor(lv / 3) + 2);
     return tier >= lo && tier <= hi;
   }).map(s => s.name);
 }
@@ -78,4 +82,22 @@ export function raidOf(cls, kind, tier) {
   const name = GEAR[cls][kind][tier];
   const id = Object.keys(RAID_GEAR).find(r => raidSet(r, cls).some(([k, n]) => k === kind && n === name));
   return id ? RAIDS.find(r => r.id === id) : null;
+}
+
+// Materials for the smith's 조합: dropped by the grounds and raids of their kind.
+export const MATS = {
+  scale: { name: '용의 비늘', icon: 'gem2', from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea'] },
+  pearl: { name: '여의주', icon: 'gem4', from: ['raid_hydra', 'palace'] },
+};
+
+/** The 용무기 recipe: the class's best hunting-ground weapon at ★3, scales, a pearl and gold. */
+export function craftRecipe(cls) {
+  const list = plainList(cls, 'weapon');
+  return { base: list[list.length - 1], star: 3, mats: { scale: 15, pearl: 1 }, gold: 3000 };
+}
+
+/** Copies needed to raise a piece from a star to the next (★1→★2 two, … ★4→★5 five). */
+export const STAR_MAX = 5;
+export function starCost(star) {
+  return { copies: star + 1, gold: 150 * star * star };
 }

@@ -36,16 +36,21 @@ export const RAID_GEAR = {
   raid_tiger: { pow: 4, armor: '여자무사옷', shield: '떡갈나무방패',
     weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱' } },
   raid_goblin: { pow: 5, armor: '여자갑옷', shield: '문신방패',
-    weapon: { warrior: '도깨비방망이', rogue: '용겸제일봉', mage: '용랑제일봉', poet: '검정깃발' } },
+    weapon: { warrior: '도깨비방망이', rogue: '현랑부', mage: '도깨비방망이', poet: '검정깃발' } },
   raid_hydra: { pow: 7, armor: '용왕의용포', shield: '백룡현갑',
-    weapon: { warrior: '청룡의검', rogue: '용마제일검', mage: '용겸제일봉', poet: '탁조' } },
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '일월대도', poet: '탁조' } },
   raid_sorcerer: { pow: 8, armor: '무녀복', shield: '팔세지도',
     weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
   raid_sea: { pow: 8, armor: '선녀의옷', shield: '거문고',
-    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '용랑제일봉' } },
+    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검' } },
   raid_fire: { pow: 9, armor: '불의갑주', shield: '일광방패',
     weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권' } },
 };
+
+// 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
+export const CRAFT_GEAR = { warrior: '용천제일검', rogue: '용마제일검', mage: '용겸제일봉', poet: '용랑제일봉' };
+export const CRAFT_POWER = 10;
+for (const [cls, name] of Object.entries(CRAFT_GEAR)) if (!GEAR[cls].weapon.includes(name)) GEAR[cls].weapon.push(name);
 
 /** A raid's three pieces for a class: [kind, name]. */
 export function raidSet(id, cls) {
@@ -61,14 +66,24 @@ for (const id of Object.keys(RAID_GEAR))
 /** The tier a worn piece counts as: its place in the line, or its raid set's power. */
 export function gearPower(cls, kind, tier) {
   const name = GEAR[cls][kind][tier];
+  if (kind === 'weapon' && name === CRAFT_GEAR[cls]) return CRAFT_POWER;
   for (const id of Object.keys(RAID_GEAR))
     if (raidSet(id, cls).some(([k, n]) => k === kind && n === name)) return RAID_GEAR[id].pow;
   return tier;
 }
 
+/** The places in a line that the hunting grounds hand out, weakest first: no raid or crafted
+ *  piece among them, wherever those sit in the line. */
+export function plainList(cls, kind) {
+  const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
+  if (kind === 'weapon') raid.add(CRAFT_GEAR[cls]);
+  return GEAR[cls][kind].map((n, i) => (raid.has(n) ? -1 : i)).filter(i => i >= 0);
+}
+
 /** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
 export function plainTiers(cls, kind) {
   const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
+  if (kind === 'weapon') raid.add(CRAFT_GEAR[cls]);
   return GEAR[cls][kind].filter(n => !raid.has(n)).length;
 }
 

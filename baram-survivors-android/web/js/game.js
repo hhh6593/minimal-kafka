@@ -6,10 +6,11 @@ import {
 import { Audio } from './audio.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
+  MATS, craftRecipe, STAR_MAX, starCost,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
-  RAID_GEAR, plainTiers, gearPower, raidSet,
+  RAID_GEAR, plainTiers, plainList, gearPower, raidSet, CRAFT_GEAR, CRAFT_POWER,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -326,6 +327,9 @@ function buildSelect() {
 }
 
 function unlocked(i) {
+  // The first fourteen open one after another; an added ground when its own is conquered.
+  const s = STAGES[i];
+  if (s.open) return QUERY.has('all') || !!progress.cleared[s.open];
   return QUERY.has('all') || i === 0 || !!progress.cleared[STAGES[i - 1].id];
 }
 
@@ -336,7 +340,7 @@ function buildStages() {
   if (!pickedStage) {
     // The furthest open ground.
     let i = 0;
-    while (i + 1 < STAGES.length && unlocked(i + 1)) i++;
+    while (i + 1 < 14 && unlocked(i + 1)) i++;
     pickedStage = STAGES[i];
     mapTab = pickedStage.map;
   }
@@ -516,7 +520,7 @@ function startRun(cls, stage) {
   const mons = stageMonsters(stage);
   occ.clear();
   G = {
-    cls, stage, ...mons, level: stage.raid ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
+    cls, stage, ...mons, level: stage.level !== undefined ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
     player: {
       hp: Math.round(cls.hp * (1 + 0.1 * up('life'))), maxHp: Math.round(cls.hp * (1 + 0.1 * up('life'))), mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
@@ -546,8 +550,22 @@ function startRun(cls, stage) {
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
   if (stage.raid) raidSetup();
+  G.wasCleared = stage.raid ? !!(progress.raids || {})[stage.id] : !!progress.cleared[stage.id];
+  syncSpeed();
   nextChoice();
 }
+
+/** The 속도 key: shown only on a ground (or raid) conquered before. */
+function syncSpeed() {
+  const b = $('#speed-btn');
+  b.hidden = !(G && G.wasCleared);
+  b.textContent = `속도 ×${settings.speed || 1}`;
+}
+$('#speed-btn').onclick = () => {
+  settings.speed = (settings.speed || 1) % 3 + 1;
+  saveJson('bs_settings', settings);
+  syncSpeed();
+};
 
 // ---------------------------------------------------------------- gear
 //
@@ -563,8 +581,9 @@ function savedGear(cls) {
 function applyGear() {
   const p = G.player, g = p.gear, c = G.cls.id;
   // A special worn counts a rank above its look, and adds its option.
-  const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c)
-    : g[k] < 0 ? -1 : gearPower(c, k, g[k]));
+  // Each star above ★1 adds half a rank.
+  const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(G.cls, 'sp:' + g[k + 'Sp']) - 1)
+    : g[k] < 0 ? -1 : gearPower(c, k, g[k]) + 0.5 * (starOf(G.cls, `${k}:${g[k]}`) - 1));
   const bonus = p.bonus = {};
   for (const k of ['weapon', 'armor', 'shield']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
@@ -586,6 +605,19 @@ function opt(id) {
 // The bag: every piece found is kept for the class (as in D2 Survivors, gear stays even after
 // death), and the player chooses what to wear from the menu's 장비 window.
 
+/** A piece's star (★1 to ★5) and spare copies, kept per class; key 'kind:tier' or 'sp:id'. */
+function starOf(cls, key) {
+  return ((progress.stars || {})[cls.id] || {})[key] || 1;
+}
+function copiesOf(cls, key) {
+  return ((progress.copies || {})[cls.id] || {})[key] || 0;
+}
+function addCopy(cls, key) {
+  progress.copies = progress.copies || {};
+  const c = progress.copies[cls.id] = progress.copies[cls.id] || {};
+  c[key] = (c[key] || 0) + 1;
+}
+
 function bag(cls) {
   progress.inv = progress.inv || {};
   const b = progress.inv[cls.id] = progress.inv[cls.id] || ['armor:0', 'weapon:0'];
@@ -606,8 +638,9 @@ function pickGear(g) {
     const b = bag(G.cls), id = 'sp:' + g.sp, sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id);
     audio.play('chest');
     if (b.includes(id)) {
-      G.gold += 1000;
-      note(`${name}: 이미 가진 스페셜이라 1000전에 팔았습니다.`);
+      addCopy(G.cls, id);
+      saveJson('bs_progress', progress);
+      note(`${name}: 강화 재료(사본) +1`);
       return;
     }
     b.push(id);
@@ -621,8 +654,10 @@ function pickGear(g) {
   const name = gearName(G.cls.id, g.kind, g.tier) || '장비';
   audio.play('pickup');
   if (b.includes(id)) {
-    G.gold += 50 * (g.tier + 1);
-    note(`${name}: 이미 가진 장비라 팔았습니다.`);
+    // A second one is no longer sold: it is a copy for raising the piece's star at the smith.
+    addCopy(G.cls, id);
+    saveJson('bs_progress', progress);
+    note(`${name}: 강화 재료(사본) +1`);
     return;
   }
   b.push(id);
@@ -682,7 +717,8 @@ function buildEquip() {
       const btn = document.createElement('button');
       btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
       const icon = t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : gearName(cls.id, kind, t)}</span>`;
+      const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`);
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : gearName(cls.id, kind, t)}${star > 1 ? ` ★${star}` : ''}</span>`;
       btn.onclick = () => {
         wear(kind, t);
         buildEquip();
@@ -705,8 +741,8 @@ function buildEquip() {
     }
     box.append(row);
   }
-  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id)
-    : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]));
+  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
+    : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
   const opts = ['weapon', 'armor', 'shield'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20} · 방어 +${Math.max(0, pw('shield') + 1)}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '');
@@ -723,9 +759,12 @@ function codexItems(cls) {
   const b = bag(cls), out = [];
   for (const kind of ['weapon', 'armor', 'shield']) {
     GEAR[cls.id][kind].forEach((name, t) => {
-      const raid = raidOf(cls.id, kind, t);
-      out.push({ grade: raid ? 'raid' : 'plain', kind, name, icon: gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
-        owned: b.includes(`${kind}:${t}`), from: raid ? raid.name : tierSources(cls.id, kind, t) });
+      const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
+      const rc = craft && craftRecipe(cls.id);
+      out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name, icon: gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
+        owned: b.includes(`${kind}:${t}`),
+        from: craft ? `대장장이 조합: ${GEAR[cls.id].weapon[rc.base]} ★${rc.star} + 용의 비늘 ${rc.mats.scale} + 여의주 ${rc.mats.pearl}`
+          : raid ? raid.name : tierSources(cls.id, kind, t) });
     });
   }
   for (const sp of SPECIALS) {
@@ -749,7 +788,7 @@ function buildCodex() {
   }
   const grades = $('#codex-grades');
   grades.innerHTML = '';
-  for (const [g, label] of [['all', '전체'], ['plain', '일반'], ['raid', '레이드'], ['special', '★ 스페셜']]) {
+  for (const [g, label] of [['all', '전체'], ['plain', '일반'], ['raid', '레이드'], ['craft', '조합'], ['special', '★ 스페셜']]) {
     const btn = document.createElement('button');
     btn.textContent = label;
     btn.className = codexGrade === g ? 'on' : '';
@@ -772,7 +811,7 @@ function buildCodex() {
     const row = document.createElement('div');
     row.className = 'codex-item ' + it.grade + (it.owned ? '' : ' missing');
     const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
-    const grade = { plain: '일반', raid: '레이드', special: '스페셜' }[it.grade];
+    const grade = { plain: '일반', raid: '레이드', craft: '조합', special: '스페셜' }[it.grade];
     row.innerHTML = (it.icon ? `<img src="${it.icon}" alt="">` : '<span></span>')
       + `<div><b>${it.grade === 'special' ? '★' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
       + `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span></div>`;
@@ -785,6 +824,86 @@ $('#codex-search').oninput = () => buildCodex();
 $('#open-codex').onclick = () => { codexCls = null; buildCodex(); $('#codex').hidden = false; };
 $('#equip-codex').onclick = () => { codexCls = null; buildCodex(); $('#codex').hidden = false; };
 $('#close-codex').onclick = () => { $('#codex').hidden = true; };
+
+// ---------------------------------------------------------------- 강화 · 조합 (the smith)
+//
+// 강화: a piece's spare copies (a second drop of it) and gold raise its star, ★1 to ★5, half a
+// rank each. 조합: the 용무기, made only here, from the best hunting-ground weapon at ★3, dragon
+// scales, a pearl and gold.
+
+function openCraft() {
+  const cls = G ? G.cls : chosenClass, b = bag(cls), box = $('#trade-rows');
+  box.innerHTML = '';
+  $('#trade-title').textContent = '대장장이 · 강화·조합';
+  const mats = progress.mats || {};
+  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전 · `
+    + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
+  const row = (name, desc, label, can, act) => {
+    const r = document.createElement('div');
+    r.className = 'trade-row';
+    r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = label;
+    btn.disabled = !can;
+    btn.onclick = () => {
+      act();
+      saveJson('bs_progress', progress);
+      if ($('#town-gold')) $('#town-gold').textContent = `${progress.gold || 0}전`;
+      if (G) applyGear();
+      openCraft();
+    };
+    r.append(btn);
+    box.append(r);
+  };
+  const head = text => { const h = document.createElement('h4'); h.textContent = text; h.style.margin = '6px 0 2px'; box.append(h); };
+  head(`조합 · ${cls.name}의 용무기`);
+  const rc = craftRecipe(cls.id), dragon = CRAFT_GEAR[cls.id], dt = GEAR[cls.id].weapon.indexOf(dragon);
+  const baseKey = `weapon:${rc.base}`, baseName = GEAR[cls.id].weapon[rc.base];
+  const has = b.includes(`weapon:${dt}`);
+  const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
+    && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
+  row(`${dragon} (${CRAFT_POWER}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
+    + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${rc.gold}전`,
+    has ? '가짐' : '조합', ok, () => {
+      progress.gold -= rc.gold;
+      for (const [id, n] of Object.entries(rc.mats)) mats[id] -= n;
+      progress.mats = mats;
+      // The base weapon goes into the making.
+      b.splice(b.indexOf(baseKey), 1);
+      b.push(`weapon:${dt}`);
+      if (progress.stars && progress.stars[cls.id]) delete progress.stars[cls.id][baseKey];
+      if (savedGear(cls).weapon === rc.base) wear('weapon', dt);
+      say(`${josa(dragon, '을', '를')} 조합했습니다!`, 'sys');
+      banner(`조합 성공 · ${dragon}`);
+    });
+  head('강화 · 사본으로 별을 올린다');
+  const owned = b.filter(k => !k.startsWith('sp:') || SPECIAL[k.slice(3)]);
+  let any = false;
+  for (const key of owned) {
+    const star = starOf(cls, key), copies = copiesOf(cls, key);
+    if (star >= STAR_MAX && !copies) continue;
+    const [kind, t] = key.split(':');
+    const name = key.startsWith('sp:') ? '★' + specialName(SPECIAL[key.slice(3)], cls.id) : gearName(cls.id, kind, +t);
+    const cost = starCost(star);
+    if (!copies && star === 1) continue;
+    any = true;
+    const can = star < STAR_MAX && copies >= cost.copies && (progress.gold || 0) >= cost.gold;
+    row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: 사본 ${copies}/${cost.copies} + ${cost.gold}전 · 별마다 반 등급`,
+      star >= STAR_MAX ? '최고' : '강화', can, () => {
+        progress.gold -= cost.gold;
+        progress.copies[cls.id][key] -= cost.copies;
+        progress.stars = progress.stars || {};
+        const st = progress.stars[cls.id] = progress.stars[cls.id] || {};
+        st[key] = star + 1;
+        say(`${name} ★${star + 1} 강화!`, 'sys');
+      });
+  }
+  if (!any) row('강화할 장비가 없습니다', '같은 장비를 한 번 더 주우면 사본이 되어 강화 재료가 됩니다', '-', false, () => {});
+  $('#trade').hidden = false;
+}
+
+$('#equip-craft').onclick = () => openCraft();
 
 $('#open-equip').onclick = () => {
   buildEquip();
@@ -948,7 +1067,9 @@ function might() {
 function frame(now) {
   const dt = Math.min(0.05, (now - (frame.last || now)) / 1000);
   frame.last = now;
-  for (let i = 0; i < TEST_SPEED; i++) {
+  // A ground already conquered may be hunted at x2 or x3 (the 속도 key): farming goes quicker.
+  const fast = G && G.wasCleared ? settings.speed || 1 : 1;
+  for (let i = 0; i < TEST_SPEED * fast; i++) {
     if (!G || G.paused || G.choosing || G.over) continue;
     if (G.hitstop > 0) G.hitstop -= dt;
     else update(dt);
@@ -1123,7 +1244,8 @@ const FLOOR_OPEN = [6, 40, 55, 65, 75], FLOOR_FIVE = [60, 85, 105, 110, 120];
 const FIELD_MAX = 220;
 
 function floorCount(t) {
-  const a = Math.min(4, Math.round((G.level / (STAGES.length - 1)) * 4));
+  // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
+  const a = Math.min(4, Math.round((G.level / 13) * 4));
   return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 300));
 }
 
@@ -1670,9 +1792,22 @@ function rollSpecial(e) {
   say('어디선가 빛나는 물건이 떨어졌습니다!', 'warn');
 }
 
+/** Materials of the ground's kind: a few from bosses, sometimes from the strong ones. */
+function rollMats(e) {
+  for (const [id, m] of Object.entries(MATS)) {
+    if (!m.from.includes(G.stage.id)) continue;
+    let n = 0;
+    if (id === 'pearl') n = e.kind === 'boss' && Math.random() < (G.stage.raid ? 0.6 : 0.12) ? 1 : 0;
+    else n = e.kind === 'boss' ? 3 + Math.floor(Math.random() * 3) : e.kind === 'mini' ? (Math.random() < 0.5 ? 1 : 0)
+      : e.kind === 'champ' ? (Math.random() < 0.15 ? 1 : 0) : (Math.random() < 0.004 ? 1 : 0);
+    for (let i = 0; i < n; i++) G.drops.push({ x: e.x + (i - n / 2) * 14, y: e.y + 6, kind: 'mat', mat: id });
+  }
+}
+
 function killEnemy(e) {
   G.kills++;
   rollSpecial(e);
+  rollMats(e);
   // For the 의뢰: every kill counts, by ground, and bosses by ground.
   const st = qstats();
   st.kills++;
@@ -1727,10 +1862,10 @@ function fieldFalls() {
 function dropGear(e, dx = 0) {
   const line = GEAR[G.cls.id], kinds = ['weapon', 'armor', 'shield'];
   const kind = kinds[Math.floor(Math.random() * 3)];
-  // Hunting grounds never drop a raid's piece.
-  const top = plainTiers(G.cls.id, kind) - 1;
-  const tier = Math.max(0, Math.min(top, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0)
-    + (e.kind === 'boss' ? 1 : 0)));
+  // Hunting grounds never drop a raid's or a crafted piece.
+  const list = plainList(G.cls.id, kind), top = list.length - 1;
+  const tier = list[Math.max(0, Math.min(top, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0)
+    + (e.kind === 'boss' ? 1 : 0)))];
   G.drops.push({ x: e.x + dx, y: e.y, kind: 'gear', gear: { kind, tier } });
 }
 
@@ -1765,9 +1900,13 @@ function clearStage() {
   }
   saveJson('bs_progress', progress);
   record();
-  const next = G.stage.raid ? null : STAGES[STAGES.indexOf(G.stage) + 1];
+  // What the conquest opens: the next of the first fourteen, and the grounds and raids that
+  // wait on this one.
+  const idx = STAGES.indexOf(G.stage);
+  const opened = G.stage.raid ? [] : [...(idx >= 0 && idx < 13 && !STAGES[idx + 1].open ? [STAGES[idx + 1]] : []),
+    ...STAGES.filter(x => x.open === G.stage.id), ...RAIDS.filter(r => r.open === G.stage.id)];
   say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, 'sys');
-  if (next) say(`이제 ${next.name}에 들어갈 수 있습니다.`);
+  if (opened.length) say(`이제 ${opened.map(x => x.name).join(', ')}에 들어갈 수 있습니다.`);
   banner(`${G.stage.name} 정복!`);
   // A moment to pick up what the boss left, then the results.
   const run = G;
@@ -2421,8 +2560,8 @@ function dailyQuests() {
   const s = qstats();
   const a = pick(), b = pick();
   const list = [
-    { id: 'd_kill', text: `${a.name}에서 몬스터 300마리`, gold: 300 + 60 * STAGES.indexOf(a), key: ['stageKills', a.id], need: 300 },
-    { id: 'd_clear', text: `${josa(b.name, '을', '를')} 정복`, gold: 400 + 80 * STAGES.indexOf(b), key: ['clears', b.id], need: 1 },
+    { id: 'd_kill', text: `${a.name}에서 몬스터 300마리`, gold: 300 + 60 * (a.level !== undefined ? a.level : STAGES.indexOf(a)), key: ['stageKills', a.id], need: 300 },
+    { id: 'd_clear', text: `${josa(b.name, '을', '를')} 정복`, gold: 400 + 80 * (b.level !== undefined ? b.level : STAGES.indexOf(b)), key: ['clears', b.id], need: 1 },
     { id: 'd_any', text: '아무 사냥터에서 몬스터 800마리', gold: 500, key: ['kills'], need: 800 },
   ].map(q => ({ ...q, base: q.key.length > 1 ? (s[q.key[0]][q.key[1]] || 0) : s[q.key[0]] }));
   progress.daily = { day, list, claimed: [] };
@@ -2944,6 +3083,13 @@ function updatePickups(dt) {
     if (Math.hypot(d.x - p.x, d.y - p.y) < reach) {
       d.taken = true;
       if (d.kind === 'gear') pickGear(d.gear);
+      else if (d.kind === 'mat') {
+        progress.mats = progress.mats || {};
+        progress.mats[d.mat] = (progress.mats[d.mat] || 0) + 1;
+        (G.gained = G.gained || []).push(MATS[d.mat].name);
+        note(`${MATS[d.mat].name} +1`);
+        audio.play('pickup');
+      }
       else if (d.kind === 'heal') heal(30, true);
       else if (d.kind === 'coin') {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
@@ -3251,9 +3397,13 @@ function die() {
 /** Gear still lying on the ground when a hunt ends goes to the bag: no spoils are lost. */
 function gatherGear() {
   for (const d of G.drops) {
-    if (d.kind !== 'gear' || d.taken) continue;
+    if (d.taken || (d.kind !== 'gear' && d.kind !== 'mat')) continue;
     d.taken = true;
-    pickGear(d.gear);
+    if (d.kind === 'gear') pickGear(d.gear);
+    else {
+      progress.mats = progress.mats || {};
+      progress.mats[d.mat] = (progress.mats[d.mat] || 0) + 1;
+    }
   }
 }
 
@@ -3615,7 +3765,8 @@ function render(now) {
 
   // On the ground: experience, money, boxes.
   for (const d of G.drops) {
-    const im = d.kind === 'gear' ? gearImage(d.gear) : images[`item/${M.items[d.kind].id}.png`];
+    const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? images[`item/${M.items[MATS[d.mat].icon].id}.png`]
+      : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
     if (d.gear && d.gear.sp) {
       // A special shimmers gold where it lies.
