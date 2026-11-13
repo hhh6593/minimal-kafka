@@ -249,6 +249,7 @@
   #equip-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
   /* One line per kind: its name at the left, the pieces found side by side (scrolling when many). */
   #equip-rows { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 34px 1fr; gap: 4px 6px;
+    grid-auto-rows: max-content; align-content: start;
       align-items: center; }
   #equip-rows h4 { margin: 0; font-size: 12px; color: #7a1800; }
   .equip-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }

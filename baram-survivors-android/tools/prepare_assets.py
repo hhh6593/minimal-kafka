@@ -333,10 +333,10 @@ def main():
         for n in sorted(x for x in os.listdir(edir) if x.endswith(".gif")):
             frames, durs = frames_of(os.path.join(edir, n))
             frames = [f.resize((64, 64), Image.LANCZOS) for f in frames]
-            strip = Image.new("RGBA", (64 * len(frames), 64))
+            row = Image.new("RGBA", (64 * len(frames), 64))
             for i, f in enumerate(frames):
-                strip.paste(f, (64 * i, 0))
-            strip.save(os.path.join(out, "emote", n[:-4] + ".png"), optimize=True)
+                row.paste(f, (64 * i, 0))
+            row.save(os.path.join(out, "emote", n[:-4] + ".png"), optimize=True)
             manifest["emote"][n[:-4]] = {"n": len(frames), "dur": durs[0] or 150}
 
     # 괴수의상 from the dress room (GEAR_DIR/beast/<key>.png: 4 rows front, right, back, left by

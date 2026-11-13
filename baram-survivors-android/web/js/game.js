@@ -1885,11 +1885,15 @@ const TEMPERS = {
   normal: { step: 1, atk: 1.6, sight: 99 },
   fierce: { step: 0.8, atk: 1.1, sight: 99 },   // 사나운: quicker steps and blows
 };
-/** A kind's temper, fixed by its picture: small, low monsters on the early grounds are often timid. */
+/**
+ * A monster's temper. The original table gives it by kind, but a ground here has few kinds, so
+ * each monster rolls its own: the first grounds have many timid ones, the deep ones more fierce.
+ */
 function temperOf(m) {
-  const h = [...String(m.id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7) % 10;
-  if (!G.stage.raid && G.level <= 9 && h < (m.rank < 0.5 ? 4 : 2)) return 'timid';
-  return h >= 8 ? 'fierce' : 'normal';
+  const lv = G.stage.raid ? 12 : G.level, r = Math.random();
+  const timid = Math.max(0, 0.35 - lv * 0.035) * (m.rank < 0.5 ? 1.2 : 0.8);
+  const fierce = Math.min(0.3, 0.05 + lv * 0.02);
+  return r < timid ? 'timid' : r > 1 - fierce ? 'fierce' : 'normal';
 }
 /** The original wander: turn to a random side (and step only if already facing it), or walk on. */
 function wander(e, st) {
