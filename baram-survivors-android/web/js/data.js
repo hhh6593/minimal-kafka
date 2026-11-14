@@ -227,7 +227,7 @@ export const SKILLS = {
     desc: '하늘빛이 터지며 가까운 몬스터 넷을 친다' },
   p_realm: { promo: 6, cls: 'poet', req: 24, name: '선인의영역', kind: 'heal', fx: '135', heal: 30, cd: 13, guard: 1.5,
     desc: '선인의 영역을 펼쳐 크게 회복하고 잠시 공격을 받지 않는다' },
-  p_bagua: { promo: 7, cls: 'poet', req: 27, name: '천신팔괘진', kind: 'screen', fx: '134', modern: 'new_p_break', dmg: 30, cd: 6,
+  p_bagua: { promo: 7, cls: 'poet', req: 27, name: '천신팔괘진', kind: 'screen', fx: '134', dmg: 30, cd: 6,
     falloff: 0.04, desc: '팔괘진을 펼쳐 화면의 모든 몬스터를 친다' },
   p_dragongod: { promo: 7, cls: 'poet', req: 27, name: '용신의가호', kind: 'buff', buff: 'shield', fx: '150', modern: 'new_p_phoenix',
     cd: 15, duration: 6, desc: '용신의 가호로 오래 받는 피해가 절반이 된다' },
@@ -404,7 +404,7 @@ const LOOKS = {
   m_thunderball: ['118', c(205), 1], m_shift: ['98', c(210), 1], m_coldveil: ['96', c(220), 1.2],
   m_gale: ['148', c(150), 1.1], m_shards: ['129', c(185), 1.2],
   p_judge: ['89', c(50), 1.2], p_wargod: ['132', c(0), 1], p_burst: ['131', c(45), 1.1],
-  p_realm: ['13', c(120), 1.3], p_bagua: ['134', c(50), 1], p_dragongod: ['150', c(200), 1],
+  p_realm: ['13', c(120), 1.3], p_bagua: ['134', c(50), 1.4], p_dragongod: ['150', c(200), 1],
   p_flash: ['68', c(190), 1.2], p_bind: ['115', c(50), 1.2], p_warmth: ['125', c(205), 1],
   p_thunderbomb: ['129', c(30), 1.3], p_skyspirit: ['135', c(185), 1.1],
 };
