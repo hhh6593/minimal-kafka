@@ -1390,6 +1390,7 @@ function frame(now) {
  */
 function stepHero(dx, dy, dt) {
   const p = G.player;
+  let rest = dt;
   if (p.stepping) {
     p.st += dt;
     const k = Math.min(1, p.st / p.sdur);
@@ -1399,20 +1400,27 @@ function stepHero(dx, dy, dt) {
     p.phase += (dt / p.sdur) * Math.PI;
     if (k < 1) return;
     p.stepping = false;
+    // The time past the tile goes on into the next step: a held direction walks on without a
+    // stop at every tile.
+    rest = p.st - p.sdur;
   }
-  p.moving = false;
   if (!dx && !dy) {
+    p.moving = false;
     p.pushT = 0;
     p.turnT = 0;
     return;
   }
+  const walking = p.moving;
   if (p.fdx !== dx || p.fdy !== dy) {
     p.fdx = dx;
     p.fdy = dy;
     if (dx) p.face = dx;
-    p.turnT = 0.1;
     p.pushT = 0;
-    return;
+    // Standing, a new direction first turns the hero (to aim a spell); walking, it turns as it goes.
+    if (!walking) {
+      p.turnT = 0.1;
+      return;
+    }
   }
   if (p.turnT > 0) {
     p.turnT -= dt;
@@ -1420,6 +1428,7 @@ function stepHero(dx, dy, dt) {
   }
   const nx = p.tx + dx, ny = p.ty + dy, there = occ.get(key(nx, ny));
   if (there && there.hp > 0) {
+    p.moving = false;
     p.pushT = (p.pushT || 0) + dt;
     if (p.pushT < 0.5 || there.moving || there.kind === 'boss') return;
     // Pushed long enough, the hero and the monster trade places: never two on one tile.
@@ -1440,6 +1449,7 @@ function stepHero(dx, dy, dt) {
   p.st = 0;
   p.sdur = TILE / heroSpeed();
   p.stepping = p.moving = true;
+  if (rest > 0 && rest < p.sdur) stepHero(dx, dy, rest);
 }
 
 /** Pixels a second the hero walks. */
@@ -5077,7 +5087,8 @@ function drawHero(now, hidden) {
   }
   // The wardrobe figure: four directions, four walking frames, attack and casting poses.
   const dir = facing(p.fdx, p.fdy);
-  const pose = p.poseT > 0 ? p.pose : p.moving ? 'walk' : 'idle';
+  // Walking, the legs keep going while the spells fly (as in 연): the strike pose shows standing.
+  const pose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
   drawAvatar(ctx, p.av, p.x, p.y, dir, pose, Math.floor(p.walkT / WALK_MS), hidden ? 0.35 : 1);
 }
 
