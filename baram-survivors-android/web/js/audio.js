@@ -59,12 +59,14 @@ export class Audio {
   /** Plays one numbered sound now, for trying a choice out. */
   preview(n) {
     this.unlock();
-    if (this.buffers[n]) this.start(this.buffers[n]);
+    const [num, r] = String(n).split('@');
+    if (this.buffers[num]) this.start(this.buffers[num], 1, +r || 1);
   }
 
-  start(buffer, gain = 1) {
+  start(buffer, gain = 1, rate = 1) {
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
+    if (rate !== 1) src.playbackRate.value = rate;
     if (gain === 1) src.connect(this.master);
     else {
       const g = this.ctx.createGain();
@@ -109,9 +111,11 @@ export class Audio {
       let n = this.map[k];
       if (Array.isArray(n)) n = n[Math.min(level, n.length) - 1];
       if (n === '-') return; // chosen: no sound
-      const b = (n && this.buffers[n]) || this.buffers[k];
+      // 'NNN@r': the sound at r times its speed (a spell sharing another's sound, pitched apart).
+      const [num, r] = n ? String(n).split('@') : [];
+      const b = (num && this.buffers[num]) || this.buffers[k];
       if (b) {
-        this.start(b, GAIN[key] ?? 1);
+        this.start(b, GAIN[key] ?? 1, +r || 1);
         return;
       }
     }

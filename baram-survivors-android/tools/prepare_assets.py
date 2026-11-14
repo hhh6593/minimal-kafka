@@ -449,7 +449,10 @@ def main():
                     # Small in an APK: sounds as OGG at their own rate; music as mono 22 kHz OGG.
                     name = key + ".ogg"
                     import subprocess
-                    extra = ["-ac", "1", "-ar", "22050", "-q:a", "1"] if kind == "bgm" else ["-q:a", "3"]
+                    # Music to one loudness (the OST and the MIDI renders differ by 7 dB and more), so a
+                    # change of ground does not jump in volume; sounds keep their own levels.
+                    extra = (["-af", "loudnorm=I=-18:TP=-1.5:LRA=11", "-ac", "1", "-ar", "22050", "-q:a", "1"]
+                             if kind == "bgm" else ["-q:a", "3"])
                     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src_file, *extra, "-c:a", "libvorbis",
                                     os.path.join(out, "audio", kind, name)], check=True)
                 else:

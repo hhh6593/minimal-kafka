@@ -5215,6 +5215,21 @@ const GAME_SOUNDS = {
   // 116 and 353 were only guessed (from an English server's scripts) and are a long hiss:
   // played on every hit they drowned the hunt. The hero being struck and monsters falling are
   // silent until a real sound for them is known; plain hits use the weapon sound, softly.
+  // 5차~9차: the sound list has none of these by name, so each takes the named sound closest to
+  // what it is (a teleport 비영사천문, a wind 어두운바람소리, a death sentence 비명소리와 종소리),
+  // and spells sharing a sound play it at their own pitch ('NNN@speed').
+  skill_w_rush: '100@1.15', skill_w_stone: '084@0.85', skill_w_dragon: '101@0.9', skill_w_frenzy: '705',
+  skill_w_thunder: '059@0.85', skill_w_flash: '354@1.1', skill_w_blackdragon: '060@0.8', skill_w_sentence: '020',
+  skill_w_dawn: '065@1.1', skill_w_swords: '091@0.95', skill_w_advance: '104@0.9', skill_w_myriad: '035@0.85',
+  skill_r_venom: '716@1.1', skill_r_phantom: '039@1.1', skill_r_shuriken: '709@0.9', skill_r_hidden: '096@1.1',
+  skill_r_bloom: '090@1.1', skill_r_kill: '349', skill_r_flamesword: '357@0.9', skill_r_shadowstar: '716@0.85',
+  skill_r_shadowclone: '039@0.85', skill_r_bloodslash: '064@0.9', skill_r_chainstar: '709@1.2', skill_r_gale: '035@1.15',
+  skill_m_frost: '054', skill_m_wisdom: '105@1.1', skill_m_desert: '044@0.9', skill_m_twin: '059',
+  skill_m_cross: '073@1.1', skill_m_inferno: '093@0.9', skill_m_thunderball: '058@1.1', skill_m_shift: '001',
+  skill_m_coldveil: '053@0.85', skill_m_gale: '002', skill_m_shards: '052@1.2', skill_m_kalpa: '073@0.8',
+  skill_p_judge: '057@1.1', skill_p_wargod: '084@1.1', skill_p_burst: '104@1.15', skill_p_realm: '097@0.9',
+  skill_p_bagua: '109@0.9', skill_p_dragongod: '702', skill_p_flash: '701@1.2', skill_p_bind: '070',
+  skill_p_warmth: '098@1.1', skill_p_thunderbomb: '700@1.1', skill_p_skyspirit: '066@0.9', skill_p_taiji: '109@0.75',
   hit: '331', kill: '-', hurt: '-', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
   win: '401', lose: '402', revive: '112', click: '408', party_guard: '008',
 };
@@ -5233,7 +5248,7 @@ function soundDefaults() {
   }
   for (const [use, n] of Object.entries(GAME_SOUNDS)) {
     // '-' is a choice too: no sound at all.
-    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x))) d[use] = n;
+    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x.split('@')[0]))) d[use] = n;
   }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
@@ -5338,13 +5353,13 @@ function buildSounds() {
     const show = () => {
       const v = audio.map[key];
       val.textContent = Array.isArray(v) ? `${v[0]}~${v[v.length - 1]}` : v || '-';
-      const nm = !Array.isArray(v) && (M.audio.names || {})[v];
+      const nm = !Array.isArray(v) && v && (M.audio.names || {})[String(v).split('@')[0]];
       val.title = nm || '';
       name.textContent = nm ? `${label} · ${nm}` : label;
     };
     const move = d => {
       const cur = audio.map[key];
-      const i = Math.max(0, options.indexOf(Array.isArray(cur) ? cur[0] : cur || '-'));
+      const i = Math.max(0, options.indexOf(String(Array.isArray(cur) ? cur[0] : cur || '-').split('@')[0]));
       const v = options[(i + d + options.length) % options.length];
       settings.sounds = Object.assign(settings.sounds || {}, { [key]: v });
       saveJson('bs_settings', settings);
