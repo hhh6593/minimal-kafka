@@ -4475,8 +4475,12 @@ const shadowCache = new Map();
 // so the head leads, in all four directions. The upright ones (deer, rabbits, goblins, people)
 // cannot show a back or a side: they lean into the way they walk.
 const TOP_DOWN = new Set(['1005', '1007', '1012', '1013', '1022', '1023', '1025', '1027', '3034', '3035', '3036', '3037',
-  '6008', '8011', '8015', '8023', '8024', '11015', '12020', '12021', '12022', '12023', '12024']);
-const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', '5055', '12013', '12014', '12016', '12017', '8027']);
+  '6008', '8011', '8015', '8023', '8024', '11015', '12020', '12021', '12022', '12023', '12024',
+  // Drawn from above as well, the head at the bottom: the green rats, the rats of the bear cave, the scorpion.
+  '1008', '1009', '1014', '1036', '1037', '3016']);
+// The head at the top: snakes, and the squid (its mantle leads).
+const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', '5055', '12013', '12014', '12016', '12017', '8027',
+  '3027', '12108']);
 
 /** A monster as it moves: turned (top-down kinds), or leaning (upright kinds). */
 /** A summoned 괴수: its own four ways, walking or striking, from the dress-room sheet. */
