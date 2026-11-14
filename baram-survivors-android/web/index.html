@@ -403,6 +403,25 @@
     .choice canvas, .choice .item { width: 34px; height: 34px; }
   }
   @media (max-width: 560px) { #classes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* ---- 바람의나라 연 layout in a hunt: the whole screen for the field; health and mana at the
+     top left (drawn on the canvas), spells and the 필살기 at the bottom right, the chat a dim
+     strip at the bottom left. The carved panel comes back with 상태창. ---- */
+  body.yeon #play-frame { border: 0; box-shadow: none; }
+  body.yeon #mini { display: none !important; }
+  body.yeon #chat { left: 8px; right: auto; bottom: 8px; width: min(44%, 380px); height: 54px; padding: 3px 7px;
+      color: #f0ece0; background: rgba(10,8,6,0.45); border: 0; border-radius: 4px; font: 10px/12.5px G9, monospace; }
+  body.yeon #chat::after { display: none; }
+  body.yeon #chat p.sys { color: #9ac8ff; }
+  body.yeon #chat p.party { color: #9aff8a; }
+  body.yeon #chat p.warn { color: #ff8a6a; }
+  body.yeon #map-tab { top: 6px; background: rgba(10,8,6,0.55); border: 0; border-radius: 4px; }
+  body.yeon #keys { right: 10px; bottom: 10px; flex-direction: row; align-items: flex-end; }
+  body.yeon #ult { width: 74px; height: 74px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4d08a, #a8641e 70%, #5a2a08);
+      border: 3px solid #2a1004; color: #fff6dc; text-shadow: 1px 1px 0 #2a1004; font-size: 11px; }
+  body.yeon #ult.ready { box-shadow: 0 0 12px 4px #ffd040; color: #fff; }
+  body.yeon #pause-btn, body.yeon #speed-btn { background: rgba(20,14,8,0.7); color: #f4e6c4; border: 1px solid #a07040; border-radius: 4px; }
+  body.yeon #unfold { top: 46%; }
 </style>
 </head>
 <body>

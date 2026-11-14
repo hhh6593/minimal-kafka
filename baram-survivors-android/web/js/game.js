@@ -286,7 +286,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
-  Z = Math.max(1, Math.round(canvas.height / 470));
+  // In 연's full-screen hunt the field is framed closer (a hero about a sixth of the height).
+  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 330 : 470) * 2) / 2);
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -305,6 +306,7 @@ function showScreen(name) {
   document.body.classList.toggle('hunting', hunting);
   $('#side').hidden = $('#play-frame').hidden = !hunting;
   document.body.classList.toggle('panel-off', hunting && settings.panel === false);
+  document.body.classList.toggle('yeon', hunting && settings.panel === false);
   $('#unfold').hidden = $('#mini').hidden = !(hunting && settings.panel === false);
   resize();
   if (name === 'title') audio.bgm('title');
@@ -613,7 +615,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], arcs: [], puffs: [], pfx: [], ghosts: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], puffs: [], ghosts: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
@@ -2690,7 +2692,6 @@ function cast(skill, st) {
           for (const [dx, dy] of dirs) {
             const b = occ.get(key(p.tx + dx, p.ty + dy));
             if (!b || !b.m || b.ally) continue;
-            swingArc(p, dx, dy, (CLASS_GLOW[G.cls.id] || ['#e8d4a0'])[0]);
             if (fxid) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
             hurtEnemy(b, dmg, [dx, dy]);
           }
@@ -2737,19 +2738,13 @@ function cast(skill, st) {
       if (def.weakest) targets.sort((a, b) => a.hp - b.hp);
       targets = targets.slice(0, st.count);
       if (!targets.length) return retry(0.25);
-      // A survivors spell is seen to fly: a glowing orb from the hero to each target, the
-      // spell's own picture bursting where it lands.
-      const col = CLASS_GLOW[G.cls.id] || ['#fff', '#ffd'];
       targets.forEach((e, i) => later(i * 0.08, () => {
         if (e.hp <= 0) return;
-        addShot(p, e, { color: col[1], glow: col[0], size: 3 + Math.min(3, skill.lv / 3), speed: 620, onHit: () => {
-          if (e.hp <= 0) return;
-          const life = fxOn(fxid, e);
-          later(life * 0.3, () => {
-            const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
-            if (def.drain && dealt) heal(dealt * def.drain, false, true);
-          });
-        } });
+        const life = fxOn(fxid, e);
+        later(life * 0.3, () => {
+          const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
+          if (def.drain && dealt) heal(dealt * def.drain, false, true);
+        });
       }));
       break;
     }
@@ -2976,7 +2971,6 @@ function plainAttack(dt) {
     if (p.fdx) p.face = p.fdx;
   }
   hurtEnemy(t, 7 * (1 + 0.1 * G.passives.power));
-  swingArc(p, dx, dy, '#e8d4a0');
   audio.play('hit');
   strikePose('attack');
 }
@@ -3708,11 +3702,7 @@ function updateStyle(dt) {
   G.lastPos = [p.x, p.y];
   for (const g of G.ghosts) g.t += dt;
   G.ghosts = G.ghosts.filter(g => g.t < 0.35);
-  for (const f of G.pfx) f.t += dt;
-  G.pfx = G.pfx.filter(f => f.t < f.life);
   if (G.mark && G.t - G.mark.t > 0.7) G.mark = null;
-  for (const a of G.arcs) a.t += dt;
-  G.arcs = G.arcs.filter(a => a.t < 0.18);
   for (const f of G.puffs) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; }
   G.puffs = G.puffs.filter(f => f.t < 0.45);
   const mt = MOTES[G.stage.terrain];
@@ -3773,14 +3763,8 @@ function scatterFx(id, n, scale) {
   for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
 }
 
-/** A swing's crescent: the weapon's path, the way the blow went. */
-function swingArc(from, dx, dy, color) {
-  if (G.arcs.length < 20) G.arcs.push({ x: from.x, y: from.y - 24, ang: Math.atan2(dy || 0, dx || (dy ? 0 : from.face || 1)), t: 0, color });
-}
-
 function drawSouls() {
   drawGhosts();
-  drawPfx();
   drawMark();
   for (const f of G.puffs) {
     const k = f.t / 0.45;
@@ -3789,22 +3773,6 @@ function drawSouls() {
     ctx.beginPath();
     ctx.arc(f.x, f.y, f.r * (1 + k), 0, Math.PI * 2);
     ctx.fill();
-  }
-  for (const a of G.arcs) {
-    const k = a.t / 0.18, r = 26;
-    ctx.save();
-    ctx.translate(a.x, a.y);
-    ctx.rotate(a.ang);
-    ctx.globalAlpha = 0.9 * (1 - k);
-    ctx.fillStyle = a.color;
-    // A crescent: the outer arc swept a little further than the inner, thick in the middle.
-    const sw = 1.6 * Math.min(1, k * 3 + 0.3);
-    ctx.beginPath();
-    ctx.arc(0, 0, r, -sw / 2, sw / 2);
-    ctx.arc(r * 0.35, 0, r * 0.72, sw / 2, -sw / 2, true);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
   }
   ctx.globalAlpha = 1;
   const p = G.player, tx = p.x, ty = p.y - 26;
@@ -3848,9 +3816,12 @@ function drawSkillBar() {
   const W = canvas.width, u = W / 860;
   const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
   const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
-  const sz = Math.round(30 * u), gap = Math.round(5 * u), x0 = Math.round(12 * u), y0 = Math.round(H - sz - 10 * u);
+  const yeon = document.body.classList.contains('yeon'), dpr = canvas.width / cr.width;
+  const sz = Math.round((yeon ? 38 : 30) * u), gap = Math.round(5 * u);
+  // 연: two rows of four at the bottom right, left of the 필살기 button; else a row at the bottom left.
+  const x0 = yeon ? W - (100 * dpr) - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
   G.skills.slice(0, 8).forEach((s, i) => {
-    const def = SKILLS[s.id], x = x0 + i * (sz + gap), y = y0;
+    const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap), y = y0 + (yeon && i >= 4 ? sz + gap : 0);
     const tier = def.promo >= 8 ? '#e8a020' : def.promo >= 5 ? '#9a5cff' : def.promo ? '#3aa0ff' : '#5ac83a';
     ctx.fillStyle = 'rgba(10,8,6,0.75)';
     ctx.fillRect(x - 2, y - 2, sz + 4, sz + 4);
@@ -3891,9 +3862,8 @@ function drawSkillBar() {
 
 
 // ---------------------------------------------------------------- class flourishes (바람의나라 연)
-// From 연's hunts: the 전사 and 도적 close in — a dash to the foe with afterimages, a great
-// crescent sweeping round — and the 주술사 and 도사 fill the field from afar: lightning from
-// the sky, pillars of light, volleys of darts. Drawn by hand over the spell's own picture.
+// From 연's hunts: the 전사 and 도적 close in (a dash to the foe, afterimages behind), and the
+// 주술사 and 도사 fill the field from afar with the game's own spell pictures on many foes.
 
 const THUNDER = /뢰|뇌|천둥|번개|섬광/;
 function classFlourish(def, skill, st) {
@@ -3916,26 +3886,16 @@ function classFlourish(def, skill, st) {
         if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
       }
     }
-    // A great crescent round the hero for the sweeping blows.
-    if (['cleave', 'nova', 'screen', 'slash', 'strike', 'line'].includes(def.kind) && G.pfx.length < 40) {
-      G.pfx.push({ type: 'whirl', t: 0, life: 0.32, r: TILE * (1.2 + Math.min(1.5, (st.radius || 1) * 0.5)),
-        color: cls === 'warrior' ? '#f4f8ff' : '#d8c8ff', rim: cls === 'warrior' ? '#7ab8ff' : '#9a6aff', a0: Math.random() * 6 });
-    }
     return;
   }
-  // Casters: the sky answers.
-  const targets = nearestEnemies(def.kind === 'screen' ? 8 : 3, 8);
+  // Casters: the sky answers, with the game's own pictures — 뇌진주's lightning for the thunder
+  // spells, 천벌's light for the 도사, 화염주's fire for the 주술사 — dropped on several foes.
+  const targets = nearestEnemies(def.kind === 'screen' ? 6 : 2, 8);
   if (!targets.length) return;
-  const thunder = THUNDER.test(def.name) || /뢰진|뇌진/.test(def.name);
-  if (thunder) {
-    targets.slice(0, def.kind === 'screen' ? 6 : 2).forEach((e, i) => later(i * 0.06, () => G.pfx.push({ type: 'bolt', t: 0, life: 0.28, x: e.x, y: e.y - 16, seed: Math.random() * 99 })));
-  } else if (cls === 'poet') {
-    targets.slice(0, def.kind === 'screen' ? 6 : 2).forEach((e, i) => later(i * 0.07, () => G.pfx.push({ type: 'pillar', t: 0, life: 0.55, x: e.x, y: e.y, color: '#ffd84a' })));
-  } else {
-    targets.slice(0, def.kind === 'screen' ? 5 : 2).forEach((e, i) => later(i * 0.07, () => G.pfx.push({ type: 'pillar', t: 0, life: 0.5, x: e.x, y: e.y, color: '#ff7a2a' })));
-  }
-  // A volley of darts across the field for the great spells (도사's 파군표창, as in the captures).
-  if (def.kind === 'screen' && G.pfx.length < 60) G.pfx.push({ type: 'volley', t: 0, life: 0.6, x: p.x, y: p.y, color: cls === 'poet' ? '#d8d0ff' : '#ffd0a0', seed: Math.random() * 99 });
+  const thunder = THUNDER.test(def.name);
+  const pic = thunder ? '89' : cls === 'poet' ? '149' : '148';
+  if (!M.fx[pic]) return;
+  targets.forEach((e, i) => later(0.05 + i * 0.07, () => { if (e.hp > 0) fxOn(grownFx(pic, skill.lv), e, { scale: 0.9 }); }));
 }
 
 function drawGhosts() {
@@ -3952,84 +3912,6 @@ function drawGhosts() {
   }
 }
 
-function drawPfx() {
-  const p = G.player;
-  for (const f of G.pfx) {
-    const k = f.t / f.life;
-    ctx.save();
-    if (f.type === 'whirl') {
-      // A broad crescent sweeping once round the hero, bright edge leading.
-      const cx = p.x, cy = p.y - 22, sweep = Math.PI * 1.6, a1 = f.a0 + sweep * Math.min(1, k * 1.6);
-      ctx.globalAlpha = 0.85 * (1 - k);
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, f.r - i * 4, (f.r - i * 4) * 0.55, 0, a1 - 1.6 + i * 0.15, a1);
-        ctx.strokeStyle = i === 0 ? f.rim : f.color;
-        ctx.lineWidth = i === 0 ? 7 : 4 - i;
-        ctx.stroke();
-      }
-    } else if (f.type === 'bolt') {
-      // A jagged stroke from the top of the view to the struck, white in a blue glow.
-      ctx.globalCompositeOperation = 'lighter';
-      const top = p.y - VH / 2 - 20;
-      let x = f.x, y = top, r = f.seed;
-      const pts = [[x, y]];
-      while (y < f.y) { r = (r * 9301 + 49297) % 233280; y = Math.min(f.y, y + 14); x = f.x + ((r / 233280) - 0.5) * 22; pts.push([x, y]); }
-      for (const [w, c, a] of [[9, '#3a6aff', 0.35], [4, '#9ad0ff', 0.7], [1.5, '#ffffff', 1]]) {
-        ctx.globalAlpha = a * (1 - k);
-        ctx.strokeStyle = c;
-        ctx.lineWidth = w;
-        ctx.beginPath();
-        pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 0.6 * (1 - k);
-      ctx.fillStyle = '#cfe6ff';
-      ctx.beginPath();
-      ctx.ellipse(f.x, f.y + 12, 18 * (1 + k), 7 * (1 + k), 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (f.type === 'pillar') {
-      // A column of light dropping onto the target and widening, a ring where it lands.
-      ctx.globalCompositeOperation = 'lighter';
-      const h = 120, w = 10 + 10 * Math.sin(Math.PI * k), drop = Math.min(1, k * 4);
-      const gr = ctx.createLinearGradient(0, f.y - h, 0, f.y);
-      gr.addColorStop(0, 'rgba(0,0,0,0)');
-      gr.addColorStop(1, f.color);
-      ctx.globalAlpha = 0.75 * (1 - k * 0.8);
-      ctx.fillStyle = gr;
-      ctx.fillRect(f.x - w / 2, f.y - h * drop, w, h * drop);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(f.x - w / 6, f.y - h * drop, w / 3, h * drop);
-      ctx.strokeStyle = f.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(f.x, f.y - 2, 10 + 22 * k, 4 + 8 * k, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (f.type === 'volley') {
-      // Darts streaking down across the view in a slant.
-      ctx.globalCompositeOperation = 'lighter';
-      let r = f.seed;
-      for (let i = 0; i < 40; i++) {
-        r = (r * 9301 + 49297) % 233280;
-        const ox = (r / 233280 - 0.5) * VW;
-        r = (r * 9301 + 49297) % 233280;
-        const lag = (r / 233280) * 0.5, q = Math.max(0, Math.min(1, (k - lag) * 3));
-        if (q <= 0 || q >= 1) continue;
-        const x = f.x + ox - 60 + q * 120, y = f.y - VH / 2 + q * VH;
-        ctx.globalAlpha = 0.9 * (1 - q * 0.5);
-        ctx.strokeStyle = f.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - 10, y - 20);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
-  ctx.globalAlpha = 1;
-}
-
 /** The target, framed as 연 frames it: a pale square round its feet. */
 function drawMark() {
   const m = G.mark;
@@ -4044,6 +3926,40 @@ function drawMark() {
   ctx.restore();
 }
 
+/** 연's status at the top left: level, then health (red) and mana (blue) bars with their numbers. */
+function drawYeonStatus() {
+  if (!document.body.classList.contains('yeon')) return;
+  const p = G.player, cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const x = 10 * d, y = 10 * d, w = 170 * d, h = 13 * d;
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,6,0.55)';
+  ctx.fillRect(x - 4 * d, y - 4 * d, w + 44 * d, h * 2 + 12 * d);
+  ctx.font = `bold ${Math.round(16 * d)}px G11`;
+  ctx.textAlign = 'center';
+  outline(String(p.lvl), x + 14 * d, y + h + 6 * d, '#fff');
+  const bx = x + 32 * d;
+  const barRow = (yy, k, c1, c2, text) => {
+    ctx.fillStyle = '#1a0a04';
+    ctx.fillRect(bx, yy, w, h);
+    const g = ctx.createLinearGradient(0, yy, 0, yy + h);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    ctx.fillRect(bx + d, yy + d, Math.max(0, (w - 2 * d) * k), h - 2 * d);
+    ctx.font = `${Math.round(9 * d)}px G9`;
+    ctx.textAlign = 'right';
+    outline(text, bx + w - 4 * d, yy + h - 3 * d, '#fff');
+  };
+  barRow(y, Math.max(0, p.hp / p.maxHp), '#ff5a3a', '#a01808', `${Math.ceil(Math.max(0, p.hp))}`);
+  barRow(y + h + 3 * d, Math.min(1, p.mp / p.maxMp), '#5aa0ff', '#1840b0', `${Math.floor(p.mp)}`);
+  // Experience: a thin line along the screen's foot.
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, canvas.height - 3 * d, canvas.width, 3 * d);
+  ctx.fillStyle = '#7aff6a';
+  ctx.fillRect(0, canvas.height - 3 * d, canvas.width * Math.min(1, p.xp / p.next), 3 * d);
+  ctx.restore();
+}
+
 /** A boss's entrance: letterbox bars slide in, its name on a plate, then away. */
 function drawCine() {
   if (!G.cine) return;
@@ -4051,7 +3967,7 @@ function drawCine() {
   if (t > 2.8) { G.cine = null; return; }
   // The lower bar sits on the chat strip, which covers the canvas's foot.
   const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
-  const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
+  const H = !document.body.classList.contains('yeon') && dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
   const k = t < 0.3 ? t / 0.3 : t > 2.4 ? Math.max(0, (2.8 - t) / 0.4) : 1;
   const bar = H * 0.13 * (1 - Math.pow(1 - k, 3));
   ctx.fillStyle = '#000';
@@ -5317,6 +5233,7 @@ function render(now) {
     ctx.restore();
   }
   drawSkillBar();
+  drawYeonStatus();
   drawCine();
   drawJoystick();
 }
@@ -5593,6 +5510,7 @@ function setPanel(on) {
   settings.panel = on;
   saveJson('bs_settings', settings);
   document.body.classList.toggle('panel-off', !on);
+  document.body.classList.toggle('yeon', !on && document.body.classList.contains('hunting'));
   $('#unfold').hidden = on;
   $('#mini').hidden = on;
   for (const k of Object.keys(shown)) delete shown[k];
@@ -5860,6 +5778,12 @@ function soundDefaults() {
 }
 
 function migrateSettings() {
+  if (settings.layoutVer !== 1) {
+    // 바람의나라 연's full-screen hunt by default; the carved panel is a tap away (상태창).
+    settings.panel = false;
+    settings.layoutVer = 1;
+    saveJson('bs_settings', settings);
+  }
   if (settings.numbersVer !== 2) {
     // 바람의나라 연 shows every blow's number: on by default (it can still be turned off).
     settings.numbers = true;
