@@ -470,7 +470,7 @@ function raidInfo(r) {
     const rec = best[c.id];
     return `${c.name} ${rec ? `Lv ${rec.lvl}` : '기록 없음'}`;
   });
-  const rec = best[chosenClass.id], start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
+  const rec = best[chosenClass.id], start = raidStart(rec);
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · 8분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
@@ -1601,9 +1601,17 @@ function raidStars(r) {
 }
 
 /** A raid: the hero starts grown (cards for each level), and every other class joins at once. */
+/**
+ * The level a hero starts a raid at: three quarters of its best, up to 33 (the 9차's spells), so
+ * the 승급 spells it has earned are in its build from the start.
+ */
+function raidStart(rec) {
+  return Math.max(1, Math.min(33, Math.floor((rec ? rec.lvl : 1) * 0.75)));
+}
+
 function raidSetup() {
   const p = G.player, rec = best[G.cls.id];
-  const start = Math.max(1, Math.min(20, Math.floor((rec ? rec.lvl : 1) * 0.6)));
+  const start = raidStart(rec);
   p.lvl = start;
   p.next = xpFor(start);
   // The hero's own route: the build of its best hunt (or one made from its open spells),
@@ -1700,7 +1708,8 @@ function raidSpawn(dt) {
     const e = addEnemy(G.boss.m, 'boss', G.boss);
     if (!e) return;
     // Built for a whole party: about four minutes for a party of grown heroes.
-    e.hp = e.maxHp = 11000 * G.level;
+    // Tougher for a party that comes in stronger (a start above Lv 20: +6% a level).
+    e.hp = e.maxHp = 11000 * G.level * (1 + 0.06 * Math.max(0, G.player.lvl - 20));
     // Its bite takes a sixth of the hero's health.
     e.dmg = G.player.maxHp * 0.16 * raidK() + G.player.armor + G.passives.armor;
     G.aggroT = 0;
@@ -2672,7 +2681,10 @@ function cast(skill, st) {
     }
     case 'strike': {
       // On a monster near the hero, and the tiles around it as the spell grows.
-      const targets = nearestEnemies(st.count * 3, st.range).sort(() => Math.random() - 0.5).slice(0, st.count);
+      // 탈명 and its kind take the strongest in reach (a boss before its followers); the rest fall
+      // where they will.
+      const targets = nearestEnemies(st.count * 3, st.range)
+        .sort(def.strongest ? (a, b) => b.maxHp - a.maxHp : () => Math.random() - 0.5).slice(0, st.count);
       if (!targets.length) return retry(0.3);
       targets.forEach((e, i) => {
         const tx = e.tx, ty = e.ty;

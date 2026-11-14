@@ -73,8 +73,8 @@ export const SKILLS = {
     scaleHp: 0.08, desc: '백호참 8단 + 4차 승급. 앞쪽 역삼각형(아홉 칸)의 몬스터 아홉을 한꺼번에 벤다' },
   w_blood: { promo: 4, cls: 'warrior', req: 18, name: '혈겁만파', kind: 'screen', fx: '141', dmg: 20, cd: 5, curse: 3,
     desc: '피의 물결이 화면을 덮어 모든 몬스터를 치고 저주한다' },
-  w_talm: { promo: 4, cls: 'warrior', req: 18, name: '탈명사식\'염', kind: 'strike', fx: '139', dmg: 30, cd: 3.5, range: 7, radius: 1,
-    count: 1, hitAt: 0.3, shape: 'plus', desc: '불의 탈명사식. 먼 몬스터와 그 상하좌우를 불사른다' },
+  w_talm: { promo: 4, cls: 'warrior', req: 18, name: '탈명사식\'염', kind: 'strike', fx: '139', dmg: 44, cd: 3.5, range: 7, radius: 1,
+    count: 1, hitAt: 0.3, shape: 'plus', strongest: true, desc: '불의 탈명사식. 가장 강한 몬스터(보스를 먼저)와 그 상하좌우를 불사른다' },
   w_ult: { cls: 'warrior', name: '건곤대나이', kind: 'ult', fx: '14', hpCost: 0.3,
     desc: '체력 30%와 마력을 모두 바쳐, 앞쪽 네 칸(폭 세 칸)의 적을 최대 체력에 비례한 일격으로 벤다' },
 
