@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
+  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -94,6 +94,10 @@ async function boot() {
   await Promise.all(paths.map(p => loadImage(p).then(() => {
     bar.style.width = (100 * ++done / paths.length) + '%';
   })));
+  // 연's own effects where the build has them: the spell's picture as it is, no tint.
+  for (const [id, fx] of Object.entries(YEON_FX)) {
+    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, tint: null, fxk: 1 });
+  }
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
     if (def.tint && M.fx[def.fx]) M.fx['s_' + id] = { ...M.fx[def.fx], src: def.fx, tint: def.tint, k: def.fxk };
@@ -287,7 +291,7 @@ function resize() {
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
   // In 연's full-screen hunt the field is framed closer (a hero about a sixth of the height).
-  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 330 : 470) * 2) / 2);
+  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 420 : 470) * 2) / 2);
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -615,7 +619,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], puffs: [], ghosts: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], puffs: [], ghosts: [], feed: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
@@ -3759,6 +3763,7 @@ function scatterFx(id, n, scale) {
   // Light (drawn added) copies well; a solid picture repeated large reads as blocks: fewer, smaller.
   const f = M.fx[id];
   if (f && f.cls === 'modern') return; // today's pictures are already large, and dark-backed
+  if (f && f.cls === 'yeon') { n = Math.min(n, 6); scale = Math.min(scale, 0.75); } // 연's are large already
   if (f && !f.add) { n = Math.ceil(n / 3); scale = Math.min(scale, 1); }
   for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
 }
@@ -3852,6 +3857,11 @@ function drawSkillBar() {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+      if (s.timer >= 1) {
+        ctx.font = `bold ${Math.round(10 * u)}px G9`;
+        ctx.textAlign = 'center';
+        outline(`${Math.ceil(s.timer)}초`, x + sz / 2, y + sz / 2 + 4 * u, '#ffffff');
+      }
     } else if (G.t - (s.readyFlash || 0) > 0.3 && s.timer > -0.05 && s.timer <= 0.05) s.readyFlash = G.t;
     ctx.font = `bold ${Math.round(9 * u)}px G9`;
     ctx.textAlign = 'right';
@@ -3957,6 +3967,29 @@ function drawYeonStatus() {
   ctx.fillRect(0, canvas.height - 3 * d, canvas.width, 3 * d);
   ctx.fillStyle = '#7aff6a';
   ctx.fillRect(0, canvas.height - 3 * d, canvas.width * Math.min(1, p.xp / p.next), 3 * d);
+  ctx.restore();
+}
+
+/** 연's pickup list at the right: each find a line, the newest at the bottom, fading out. */
+function lootFeed(text) {
+  G.feed.push({ text, t: G.t });
+  if (G.feed.length > 6) G.feed.shift();
+}
+function drawLootFeed() {
+  G.feed = G.feed.filter(f => G.t - f.t < 4);
+  if (!G.feed.length) return;
+  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const x = canvas.width - 12 * d, y0 = 150 * d;
+  ctx.save();
+  ctx.textAlign = 'right';
+  ctx.font = `${Math.round(10 * d)}px G9`;
+  G.feed.forEach((f, i) => {
+    ctx.globalAlpha = Math.min(1, (4 - (G.t - f.t)) * 1.5);
+    const y = y0 + i * 15 * d, w = ctx.measureText(f.text).width + 12 * d;
+    ctx.fillStyle = 'rgba(10,8,6,0.5)';
+    ctx.fillRect(x - w, y - 11 * d, w + 4 * d, 14 * d);
+    outline(f.text, x, y, '#f4e6c4');
+  });
   ctx.restore();
 }
 
@@ -4259,6 +4292,7 @@ function updatePickups(dt) {
         progress.mats[d.mat] = (progress.mats[d.mat] || 0) + 1;
         (G.gained = G.gained || []).push(MATS[d.mat].name);
         note(`${MATS[d.mat].name} +1`);
+        lootFeed(`${MATS[d.mat].name} 획득`);
         audio.play('pickup');
       }
       else if (d.kind === 'heal') heal(30, true);
@@ -4266,6 +4300,7 @@ function updatePickups(dt) {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         G.gold += n;
         note(`${n}전을 주웠습니다.`);
+        lootFeed(`${n}전 획득`);
         audio.play('pickup');
       } else if (d.kind === 'chest') {
         G.gold += 100 * (1 + G.level);
@@ -5087,6 +5122,17 @@ function render(now) {
     ctx.translate(Math.round(e.x), Math.round(e.y));
     ctx.rotate((Math.PI / 2) * k * e.face);
     ctx.filter = 'brightness(0.7)';
+    if (d.t > 0.12 && d.t < 0.9) {
+      // 연 marks the fallen: a small red DEAD over the body.
+      ctx.save();
+      ctx.rotate(-(Math.PI / 2) * k * e.face);
+      ctx.filter = 'none';
+      ctx.font = 'bold 8px G7';
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = Math.min(1, (0.9 - d.t) * 3);
+      thick('DEAD', 0, -6, '#ff4a3a');
+      ctx.restore();
+    }
     if (e.beast && M.beast[e.beast]) {
       const d = M.beast[e.beast], k = 0.62 * e.scale;
       ctx.drawImage(images[`beast/${e.beast}.png`], 0, 0, d.cell[0], d.cell[1], -d.feet[0] * k, -d.feet[1] * k, d.cell[0] * k, d.cell[1] * k);
@@ -5234,6 +5280,7 @@ function render(now) {
   }
   drawSkillBar();
   drawYeonStatus();
+  drawLootFeed();
   drawCine();
   drawJoystick();
 }
@@ -5443,6 +5490,11 @@ function syncUlt() {
   }
   if (document.body.classList.contains('panel-off')) {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
+    // The 필살기 button is outside the panel: it is kept up to date without it too.
+    const ready = p.mp >= p.maxMp && !G.dead;
+    put('#ult span', SKILLS[G.cls.ult].name);
+    put('#ult small', ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
+    ultBtn.classList.toggle('ready', ready);
     return;
   }
   const cleared = Object.keys(progress.cleared).length;

@@ -275,6 +275,33 @@ def main():
             manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),
                                    "durs": [90] * len(frames), "add": False, "cls": "modern"}
 
+    # 바람의나라 연's own skill effects, from the official patch notes' skill previews
+    # (GEAR_DIR/yeonfx/<name>.gif, drawn on black): cropped to what is drawn over all frames,
+    # shrunk to the old effects' scale and thinned to 24 frames at most. Drawn added, so the
+    # black is nothing.
+    ydir = os.path.join(gear_src, "yeonfx") if gear_src else None
+    if ydir and os.path.isdir(ydir):
+        for n in sorted(x for x in os.listdir(ydir) if x.endswith(".gif")):
+            fid = "y_" + n[:-4]
+            frames, durs = frames_of(os.path.join(ydir, n))
+            rgb = [f.convert("RGB") for f in frames]
+            box = None
+            for f in rgb:
+                b = f.point(lambda v: 255 if v > 24 else 0).getbbox()
+                if b:
+                    box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+            if not box:
+                continue
+            step = max(1, -(-len(rgb) // 24))
+            keep = list(range(0, len(rgb), step))
+            d2 = [sum(durs[i:i + step]) for i in keep]
+            w, h = box[2] - box[0], box[3] - box[1]
+            k = min(1.0, 150 / max(w, h))
+            pics = [rgb[i].crop(box).resize((max(1, round(w * k)), max(1, round(h * k))), Image.LANCZOS).convert("RGBA") for i in keep]
+            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+            icon(pics, True).save(os.path.join(out, "icon", fid + ".png"))
+            manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": len(pics), "durs": d2, "add": True, "cls": "yeon"}
+
     for fid in HEROES:
         im = Image.open(os.path.join(src, "magics", fid + ".gif"))
         im = dehalo(im) if fid == "1001" else trim(im.convert("RGBA"))
