@@ -57,21 +57,40 @@ m["version"] = v
 json.dump(m, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
 PY
 
-# Launcher icon: the four classes' faces on a wooden tile.
-python3 -I - "$OUT/assets/www/assets/hero" "$OUT/res" <<'PY'
+# Launcher icon: the old client's own icon, the light-blue cloud of WinBaram.exe (baram.png in
+# the image download, from the old site's front page). Its black backdrop is made see-through;
+# without it, the four classes' faces on a wooden tile as before.
+python3 -I - "$OUT/assets/www/assets/hero" "$OUT/res" "$IMAGES/baram.png" <<'PY'
 import sys, os
 from PIL import Image, ImageDraw
-heroes, res = sys.argv[1], sys.argv[2]
-base = Image.new("RGBA", (192, 192), (43, 29, 18, 255))
-d = ImageDraw.Draw(base)
-d.rectangle([0, 0, 191, 191], outline=(160, 122, 70, 255), width=6)
-hero = Image.open(os.path.join(heroes, "1003.png")).convert("RGBA")
-s = min(150 / hero.width, 150 / hero.height)
-hero = hero.resize((int(hero.width * s), int(hero.height * s)), Image.NEAREST)
-base.alpha_composite(hero, ((192 - hero.width) // 2, 180 - hero.height))
-for name, px in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
+heroes, res, cloud = sys.argv[1], sys.argv[2], sys.argv[3]
+if os.path.exists(cloud):
+    im = Image.open(cloud).convert("RGBA")
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, _ = px[x, y]
+            v = max(r, g, b)
+            # Pure black is the backdrop; the dark fringe around the cloud fades out with it.
+            px[x, y] = (r, g, b, 0 if v < 24 else min(255, (v - 24) * 4))
+    im = im.crop(im.getbbox())
+    s = 176 / max(im.size)
+    im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    base = Image.new("RGBA", (192, 192), (0, 0, 0, 0))
+    base.alpha_composite(im, ((192 - im.width) // 2, (192 - im.height) // 2))
+    smooth = Image.LANCZOS
+else:
+    base = Image.new("RGBA", (192, 192), (43, 29, 18, 255))
+    d = ImageDraw.Draw(base)
+    d.rectangle([0, 0, 191, 191], outline=(160, 122, 70, 255), width=6)
+    hero = Image.open(os.path.join(heroes, "1003.png")).convert("RGBA")
+    s = min(150 / hero.width, 150 / hero.height)
+    hero = hero.resize((int(hero.width * s), int(hero.height * s)), Image.NEAREST)
+    base.alpha_composite(hero, ((192 - hero.width) // 2, 180 - hero.height))
+    smooth = Image.NEAREST
+for name, size in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
     os.makedirs(f"{res}/mipmap-{name}", exist_ok=True)
-    base.resize((px, px), Image.NEAREST).save(f"{res}/mipmap-{name}/ic_launcher.png")
+    base.resize((size, size), smooth).save(f"{res}/mipmap-{name}/ic_launcher.png")
 PY
 
 "$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/compiled/res.zip"
