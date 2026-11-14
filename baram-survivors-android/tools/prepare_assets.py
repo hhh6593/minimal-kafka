@@ -151,6 +151,39 @@ def icon(frames, add):
     return out
 
 
+
+def unblot(frames):
+    """Drops solid white blobs from an effect's frames: some old effects carry their shadows
+    (or a whole flash frame) in pure white, which the client never showed. Thin white strokes
+    (lightning, sword glints) stay: only a white patch of 150 pixels or more that fills most of
+    its box goes."""
+    import numpy as np
+    from collections import deque
+    out = []
+    for f in frames:
+        a = np.array(f.convert("RGBA"))
+        white = (a[:, :, 0] >= 248) & (a[:, :, 1] >= 248) & (a[:, :, 2] >= 248) & (a[:, :, 3] > 200)
+        seen = np.zeros(white.shape, bool)
+        H, W = white.shape
+        for y0, x0 in zip(*np.nonzero(white)):
+            if seen[y0, x0]:
+                continue
+            q = deque([(y0, x0)]); seen[y0, x0] = True; pts = []
+            while q:
+                y, x = q.popleft(); pts.append((y, x))
+                for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                    if 0 <= ny < H and 0 <= nx < W and white[ny, nx] and not seen[ny, nx]:
+                        seen[ny, nx] = True; q.append((ny, nx))
+            if len(pts) < 150:
+                continue
+            ys = [p[0] for p in pts]; xs = [p[1] for p in pts]
+            box = (max(ys) - min(ys) + 1) * (max(xs) - min(xs) + 1)
+            if len(pts) / box > 0.6:
+                for y, x in pts:
+                    a[y, x, 3] = 0
+        out.append(Image.fromarray(a, "RGBA"))
+    return out
+
 def strip(frames):
     w, h = frames[0].size
     out = Image.new("RGBA", (w * len(frames), h))
@@ -257,7 +290,7 @@ def main():
         frames, durs = frames_of(fx_files[fid])
         add = is_additive(frames)
         if not add:
-            frames = unframe(frames)
+            frames = unblot(unframe(frames))
         strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
         icon(frames, add).save(os.path.join(out, "icon", fid + ".png"))
         manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),

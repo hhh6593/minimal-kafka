@@ -96,7 +96,7 @@ async function boot() {
   })));
   // 연's own effects where the build has them: the spell's picture as it is, no tint.
   for (const [id, fx] of Object.entries(YEON_FX)) {
-    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, tint: null, fxk: 1 });
+    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, tint: null, fxk: 1, modern: null });
   }
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
@@ -291,7 +291,7 @@ function resize() {
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
   // In 연's full-screen hunt the field is framed closer (a hero about a sixth of the height).
-  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 420 : 470) * 2) / 2);
+  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 600 : 470) * 2) / 2);
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -1517,8 +1517,6 @@ function update(dt) {
   updateParty(dt);
   updateShots(dt);
   updateStyle(dt);
-  for (const sp of G.sparks) { sp.t += dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; }
-  G.sparks = G.sparks.filter(sp => sp.t < 0.28);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
   G.fxs = G.fxs.filter(f => f.t < f.life);
@@ -1571,14 +1569,17 @@ function ringTile(must = false) {
 // A survivors game is a horde: the field opens full (24 even on the first ground) and swells to
 // 130~190 by 5:00, the monsters in it weaker one by one (see HORDE) so they fall in a blow or two.
 const FLOOR_OPEN = [24, 40, 50, 60, 70], FLOOR_FIVE = [130, 150, 170, 180, 190];
-const FIELD_MAX = 320;
+const FIELD_MAX = 420;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
 const HORDE = { hp: 1, dmg: 1 };
 
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
   const a = Math.min(4, Math.round((G.level / 13) * 4));
-  return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 200));
+  // The counts were set for a view of 860 x 400; a wider view (the 연 layout, a big phone)
+  // holds as many monsters a screen, not fewer.
+  const view = Math.min(2, Math.max(1, (VW * VH) / (860 * 400)));
+  return Math.round((FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 200)) * view);
 }
 
 // ---------------------------------------------------------------- raids
@@ -2346,14 +2347,6 @@ function hurtPlayer(dmg, from = null, pierce = false) {
 
 function hurtEnemy(e, dmg, push = null) {
   e.provoked = true;
-  // Sparks off the struck monster (a few, and never too many on screen).
-  if (G.sparks.length < 140) {
-    for (let i = 0; i < 3; i++) {
-      const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 90;
-      G.sparks.push({ x: e.x, y: e.y - (e.m.h * (e.scale || 1)) / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, t: 0,
-        c: Math.random() < 0.5 ? '#fff6c0' : '#ffb040' });
-    }
-  }
   if (e.hp <= 0) return 0;
   if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
   // A heavy blow on a big one stops the world for a blink.
@@ -3638,29 +3631,13 @@ function updateShots(dt) {
   }
   G.shots = G.shots.filter(sh => !sh.done);
 }
+/** What flies between bodies is the game's own spell picture, small, by the colour it was given. */
+const SHOT_FX = { '#c02838': '148', '#ffe680': '131', '#58e868': '3', '#9a68ff': '98', '#5aa8ff': '96', '#ff8a20': '40', '#b040d0': '98' };
 function drawShots() {
   for (const sh of G.shots) {
-    sh.trail.forEach(([x, y], i) => {
-      ctx.globalAlpha = 0.5 * (1 - i / sh.trail.length);
-      ctx.fillStyle = sh.glow || sh.color;
-      ctx.beginPath();
-      ctx.arc(x, y, (sh.size || 4) * (1 - i / 8), 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = sh.glow || sh.color;
-    ctx.beginPath();
-    ctx.arc(sh.x, sh.y, (sh.size || 4) * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = sh.color;
-    ctx.beginPath();
-    ctx.arc(sh.x, sh.y, sh.size || 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(sh.x - 1, sh.y - 1, Math.max(1, (sh.size || 4) / 2.5), 0, Math.PI * 2);
-    ctx.fill();
+    const id = sh.fx || SHOT_FX[sh.color] || '131';
+    if (!M.fx[id]) continue;
+    drawFx(id, sh.x, sh.y, sh.t, 0.45, 0, 'center', true);
   }
 }
 
@@ -4858,16 +4835,7 @@ function render(now) {
     const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? images[`item/${M.items[MATS[d.mat].icon].id}.png`]
       : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
-    if (d.gear && d.gear.sp) {
-      // A special shimmers gold where it lies.
-      ctx.save();
-      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now * 6);
-      ctx.fillStyle = '#ffd040';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(d.x), Math.round(d.y - im.height / 2), im.width * 0.9, im.height * 0.7, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
+
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
@@ -4953,11 +4921,7 @@ function render(now) {
   }
 
   drawShots();
-  for (const sp of G.sparks) {
-    ctx.globalAlpha = 1 - sp.t / 0.28;
-    ctx.fillStyle = sp.c;
-    ctx.fillRect(Math.round(sp.x), Math.round(sp.y), 2, 2);
-  }
+
   ctx.globalAlpha = 1;
 
   // Spell effects over everything, at their own size.
