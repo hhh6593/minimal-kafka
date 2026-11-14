@@ -619,7 +619,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], puffs: [], ghosts: [], feed: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], feed: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
@@ -1998,9 +1998,7 @@ function spawn(dt) {
     audio.bgm('boss');
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, 'warn');
-    // 현대식 보스 등장: letterbox bars and a name plate, the world slowed for a breath.
-    G.cine = { at: performance.now() / 1000, name: G.boss.name };
-    G.slowmo = Math.max(G.slowmo || 0, 0.7);
+
     emote(Math.random() < 0.5 ? 'ready' : 'popcorn');
   }
   if (boss) {
@@ -2445,11 +2443,6 @@ function killEnemy(e) {
   G.enemies.splice(at, 1);
   occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
-  // The slain's soul streams into the hero (the experience it gives, seen).
-  if (!G.stage.raid && G.souls.length < 90) G.souls.push({ x: e.x, y: e.y - e.m.h * e.scale / 2, t: 0, kind: e.kind });
-  // A puff of dust where it falls.
-  if (G.puffs.length < 120) for (let i = 0; i < 4; i++)
-    G.puffs.push({ x: e.x + rand(-10, 10), y: e.y - rand(2, 14), r: rand(4, 8), vx: rand(-20, 20), vy: rand(-26, -6), t: 0 });
   audio.play('kill');
   const p = G.player;
   p.mp = Math.min(p.maxMp, p.mp + 0.6);
@@ -2629,7 +2622,6 @@ function fxOn(id, b, o = {}) {
 
 function cast(skill, st) {
   const def = SKILLS[skill.id];
-  G.lightAt = G.t;
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
   // 5차+ spells draw their effect in their own colour (s_<id>, made at boot from def.tint).
@@ -3669,18 +3661,6 @@ function drawShots() {
 
 /** The glow of a class's flying spells: [halo, core]. */
 const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'] };
-/** Edge shade of the open grounds. */
-const VIGNETTE = { field: 'rgba(5,20,10,0.6)', field2: 'rgba(25,8,20,0.55)', island: 'rgba(0,20,30,0.55)' };
-/** What floats in the air of each ground. */
-const MOTES = {
-  field: { color: ['#f4ff9a', '#c8ff70'], vy: -6, drift: 10, size: 1.5, glow: true, n: 22 },   // 반딧불
-  field2: { color: ['#ffc8dc', '#ffe4ee'], vy: 18, drift: 22, size: 2, glow: false, n: 26, petal: true }, // 벚꽃
-  cave: { color: ['#d8c8a0', '#a89878'], vy: 3, drift: 4, size: 1, glow: false, n: 30 },         // 먼지
-  house: { color: ['#7ad8ff', '#b0f0ff'], vy: -4, drift: 14, size: 2.5, glow: true, n: 8 },       // 도깨비불
-  sea: { color: ['#bfefff', '#ffffff'], vy: -22, drift: 6, size: 2, glow: false, n: 26, ring: true }, // 물방울
-  island: { color: ['#fff6c0', '#ffffff'], vy: -3, drift: 8, size: 1.2, glow: true, n: 20 },      // 반짝임
-  lava: { color: ['#ffb040', '#ff6a20'], vy: -26, drift: 12, size: 1.5, glow: true, n: 34 },      // 불티
-};
 
 /** The effect picture of a spell at its 단: a second name for the same frames, 6% larger a step. */
 function grownFx(id, lv) {
@@ -3695,67 +3675,8 @@ function grownFx(id, lv) {
   return key;
 }
 
-function updateStyle(dt) {
-  const p = G.player;
-  for (const s of G.souls) s.t += dt;
-  G.souls = G.souls.filter(s => s.t < 0.55);
-  // 잔상: a hero who jumps more than a tile in a frame (blink, dash) leaves ghosts along the way.
-  if (G.lastPos && Math.hypot(p.x - G.lastPos[0], p.y - G.lastPos[1]) > TILE * 1.4 && G.ghosts.length < 30) {
-    for (let k = 1; k <= 5; k++) G.ghosts.push({ x: G.lastPos[0] + (p.x - G.lastPos[0]) * k / 6, y: G.lastPos[1] + (p.y - G.lastPos[1]) * k / 6, t: -k * 0.02 });
-  }
-  G.lastPos = [p.x, p.y];
-  for (const g of G.ghosts) g.t += dt;
-  G.ghosts = G.ghosts.filter(g => g.t < 0.35);
-  if (G.mark && G.t - G.mark.t > 0.7) G.mark = null;
-  for (const f of G.puffs) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; }
-  G.puffs = G.puffs.filter(f => f.t < 0.45);
-  const mt = MOTES[G.stage.terrain];
-  if (!mt) return;
-  const w = VW / 2 + 40, h = VH / 2 + 40;
-  for (const a of G.amb) {
-    a.t += dt;
-    a.x += (a.vx + Math.sin(a.t * 1.3 + a.ph) * mt.drift * 0.6) * dt;
-    a.y += a.vy * dt;
-  }
-  G.amb = G.amb.filter(a => a.t < a.life && Math.abs(a.x - p.x) < w && Math.abs(a.y - p.y) < h);
-  while (G.amb.length < mt.n) {
-    G.amb.push({ x: p.x + rand(-w, w), y: p.y + rand(-h, h), vx: rand(-mt.drift, mt.drift), vy: mt.vy * rand(0.6, 1.4),
-      t: 0, life: rand(3, 7), ph: rand(0, 6), c: mt.color[Math.random() < 0.5 ? 0 : 1] });
-  }
-}
+function updateStyle(dt) {}
 
-function drawAmbient() {
-  const mt = MOTES[G.stage.terrain];
-  if (!mt) return;
-  for (const a of G.amb) {
-    const fade = Math.min(1, a.t / 0.6, (a.life - a.t) / 0.8);
-    const tw = mt.glow ? 0.6 + 0.4 * Math.sin(a.t * 5 + a.ph) : 1;
-    ctx.globalAlpha = Math.max(0, fade * tw);
-    if (mt.glow) {
-      ctx.globalAlpha *= 0.35;
-      ctx.fillStyle = a.c;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, mt.size * 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = Math.max(0, fade * tw);
-    }
-    ctx.fillStyle = a.c;
-    if (mt.ring) {
-      ctx.strokeStyle = a.c;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(a.x, a.y, mt.size, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (mt.petal) {
-      ctx.save();
-      ctx.translate(a.x, a.y);
-      ctx.rotate(a.t * 2 + a.ph);
-      ctx.fillRect(-mt.size, -mt.size / 2, mt.size * 2, mt.size);
-      ctx.restore();
-    } else ctx.fillRect(Math.round(a.x), Math.round(a.y), Math.ceil(mt.size), Math.ceil(mt.size));
-  }
-  ctx.globalAlpha = 1;
-}
 
 /** A spell's picture rained over the visible field: n copies in waves, large. */
 function scatterFx(id, n, scale) {
@@ -3768,39 +3689,6 @@ function scatterFx(id, n, scale) {
   for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
 }
 
-function drawSouls() {
-  drawGhosts();
-  drawMark();
-  for (const f of G.puffs) {
-    const k = f.t / 0.45;
-    ctx.globalAlpha = 0.45 * (1 - k);
-    ctx.fillStyle = '#c8c0b0';
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, f.r * (1 + k), 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  const p = G.player, tx = p.x, ty = p.y - 26;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const s of G.souls) {
-    // Up a little first, then in to the hero.
-    const k = s.t / 0.55, e = k * k;
-    const x = s.x + (tx - s.x) * e, y = s.y - 18 * Math.sin(k * Math.PI) + (ty - s.y) * e;
-    const big = s.kind ? 2 : 1;
-    ctx.globalAlpha = 0.5 * (1 - k * 0.5);
-    ctx.fillStyle = s.kind ? '#ffd86a' : '#8ad8ff';
-    ctx.beginPath();
-    ctx.arc(x, y, 4 * big, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(x, y, 1.5 * big, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
 
 /** The spells in hand, as 연's skill row: each icon in a frame of its 승급 tier, the time
  * to its next cast sweeping round it, its 단 in the corner. Bottom left, above the chat. */
@@ -3880,7 +3768,6 @@ function classFlourish(def, skill, st) {
   const p = G.player, cls = G.cls.id;
   if (!def || def.kind === 'ult' || def.kind === 'buff' || def.kind === 'aura') return;
   const near = nearestEnemies(1, 6)[0];
-  if (near) G.mark = { e: near, t: G.t };
   if (cls === 'warrior' || cls === 'rogue') {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
     const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
@@ -3908,33 +3795,7 @@ function classFlourish(def, skill, st) {
   targets.forEach((e, i) => later(0.05 + i * 0.07, () => { if (e.hp > 0) fxOn(grownFx(pic, skill.lv), e, { scale: 0.9 }); }));
 }
 
-function drawGhosts() {
-  const p = G.player;
-  if (!p.av && !p.img) return;
-  for (const g of G.ghosts) {
-    if (g.t < 0) continue;
-    ctx.save();
-    ctx.globalAlpha = 0.45 * (1 - g.t / 0.35);
-    ctx.filter = `brightness(1.6) saturate(0.4) drop-shadow(0 0 3px ${(CLASS_GLOW[G.cls.id] || ['#fff'])[0]})`;
-    if (p.av) drawAvatar(ctx, p.av, g.x, g.y, facing(p.fdx, p.fdy), 'walk', 1, 1);
-    else ctx.drawImage(p.img, g.x - p.img.width / 2, g.y - p.img.height);
-    ctx.restore();
-  }
-}
 
-/** The target, framed as 연 frames it: a pale square round its feet. */
-function drawMark() {
-  const m = G.mark;
-  if (!m || !m.e || m.e.hp <= 0) return;
-  const e = m.e, w = Math.max(26, e.m.w * e.scale * 0.8), h = Math.max(26, e.m.h * e.scale * 0.8);
-  const pulse = 1 + 0.08 * Math.sin(G.t * 14);
-  ctx.save();
-  ctx.globalAlpha = 0.8 * (1 - (G.t - m.t) / 0.7);
-  ctx.strokeStyle = '#f4f0e0';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(Math.round(e.x - w * pulse / 2), Math.round(e.y - h * pulse), Math.round(w * pulse), Math.round(h * pulse));
-  ctx.restore();
-}
 
 /** 연's status at the top left: level, then health (red) and mana (blue) bars with their numbers. */
 function drawYeonStatus() {
@@ -3991,44 +3852,6 @@ function drawLootFeed() {
     outline(f.text, x, y, '#f4e6c4');
   });
   ctx.restore();
-}
-
-/** A boss's entrance: letterbox bars slide in, its name on a plate, then away. */
-function drawCine() {
-  if (!G.cine) return;
-  const t = performance.now() / 1000 - G.cine.at, W = canvas.width, u = W / 860;
-  if (t > 2.8) { G.cine = null; return; }
-  // The lower bar sits on the chat strip, which covers the canvas's foot.
-  const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
-  const H = !document.body.classList.contains('yeon') && dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
-  const k = t < 0.3 ? t / 0.3 : t > 2.4 ? Math.max(0, (2.8 - t) / 0.4) : 1;
-  const bar = H * 0.13 * (1 - Math.pow(1 - k, 3));
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, W, bar);
-  ctx.fillRect(0, H - bar, W, bar);
-  if (t > 0.25) {
-    const a = Math.min(1, (t - 0.25) / 0.25) * k;
-    ctx.save();
-    ctx.globalAlpha = a;
-    ctx.textAlign = 'center';
-    const y = H - bar / 2 + 8 * u;
-    ctx.font = `bold ${Math.round(20 * u)}px G11`;
-    const w = ctx.measureText(G.cine.name).width;
-    // A red seal, the name large, and the call in small red beside it.
-    ctx.fillStyle = '#b8231a';
-    ctx.fillRect(W / 2 - w / 2 - 32 * u, y - 18 * u, 22 * u, 22 * u);
-    ctx.fillStyle = '#fff3d8';
-    ctx.font = `bold ${Math.round(13 * u)}px G11`;
-    ctx.fillText('王', W / 2 - w / 2 - 21 * u, y - 2 * u);
-    ctx.font = `bold ${Math.round(20 * u)}px G11`;
-    ctx.fillStyle = '#ffe2b0';
-    ctx.fillText(G.cine.name, W / 2, y);
-    ctx.font = `${Math.round(10 * u)}px G9`;
-    ctx.fillStyle = '#e0574a';
-    ctx.textAlign = 'left';
-    ctx.fillText('보 스 출 현', W / 2 + w / 2 + 12 * u, y - 4 * u);
-    ctx.restore();
-  }
 }
 
 /** The hero's own stun on a raid boss gathering its blast cuts it short, as the 주술사's 마비 does. */
@@ -5025,27 +4848,6 @@ function render(now) {
     const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? images[`item/${M.items[MATS[d.mat].icon].id}.png`]
       : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
-    // 연's loot: a pillar of light and a ring on the ground, by worth.
-    const beam = d.gear && d.gear.sp ? '#c070ff' : d.kind === 'gear' ? '#ff5a3a' : d.kind === 'chest' ? '#ffd040' : null;
-    if (beam) {
-      ctx.save();
-      const pulse = 0.75 + 0.25 * Math.sin(now * 5 + d.x);
-      const gr = ctx.createLinearGradient(0, d.y - 90, 0, d.y);
-      gr.addColorStop(0, 'rgba(0,0,0,0)');
-      gr.addColorStop(1, beam);
-      ctx.globalAlpha = 0.55 * pulse;
-      ctx.fillStyle = gr;
-      ctx.fillRect(Math.round(d.x - 3), Math.round(d.y - 90), 6, 90);
-      ctx.globalAlpha = 0.25 * pulse;
-      ctx.fillRect(Math.round(d.x - 7), Math.round(d.y - 70), 14, 70);
-      ctx.globalAlpha = 0.7 * pulse;
-      ctx.strokeStyle = beam;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(Math.round(d.x), Math.round(d.y - 2), 16, 6, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
     if (d.gear && d.gear.sp) {
       // A special shimmers gold where it lies.
       ctx.save();
@@ -5140,9 +4942,7 @@ function render(now) {
     ctx.restore();
   }
 
-  drawAmbient();
   drawShots();
-  drawSouls();
   for (const sp of G.sparks) {
     ctx.globalAlpha = 1 - sp.t / 0.28;
     ctx.fillStyle = sp.c;
@@ -5151,24 +4951,6 @@ function render(now) {
   ctx.globalAlpha = 1;
 
   // Spell effects over everything, at their own size.
-  // 연's spells glow: a soft light of the class's colour under each effect while it plays.
-  const glow = (CLASS_GLOW[G.cls.id] || ['#fff'])[0];
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const f of G.fxs) {
-    if (f.t < 0 || f.loop || f.life < 0.15) continue;
-    const fm = M.fx[f.id];
-    if (!fm) continue;
-    const x = f.follow ? p.x + f.x : f.x, y = (f.follow ? p.y + f.y : f.y) - (f.anchor === 'bottom' ? fm.h * f.scale * (fm.k || 1) / 2 : 0);
-    const r = Math.max(fm.w, fm.h) * f.scale * (fm.k || 1) * 0.55, k = Math.sin(Math.PI * Math.min(1, f.t / f.life));
-    const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, glow);
-    gr.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.35 * k;
-    ctx.fillStyle = gr;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  ctx.restore();
   for (const f of G.fxs) {
     if (f.t < 0) continue;
     const x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
@@ -5228,17 +5010,7 @@ function render(now) {
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const lit = Math.max(0, 1 - (G.t - (G.lightAt || -9)) / 0.3);
-  const dark = DARK[G.stage.terrain] ? DARK[G.stage.terrain] * (1 - 0.45 * lit) : 0;
-  if (!dark) {
-    // Open grounds: a soft shade at the edges, tinted to the ground.
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.3, cx, cy, Math.hypot(cx, cy));
-    gr.addColorStop(0, 'rgba(0,0,0,0)');
-    gr.addColorStop(1, VIGNETTE[G.stage.terrain] || 'rgba(10,10,30,0.3)');
-    ctx.fillStyle = gr;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
+  const dark = DARK[G.stage.terrain];
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
     const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -5281,7 +5053,6 @@ function render(now) {
   drawSkillBar();
   drawYeonStatus();
   drawLootFeed();
-  drawCine();
   drawJoystick();
 }
 
@@ -5494,6 +5265,8 @@ function syncUlt() {
     const ready = p.mp >= p.maxMp && !G.dead;
     put('#ult span', SKILLS[G.cls.ult].name);
     put('#ult small', ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
+    const ic = `url(assets/icon/${SKILLS[G.cls.ult].fx}.png)`;
+    if (shown.ultIcon !== ic) { shown.ultIcon = ic; ultBtn.style.backgroundImage = ic; }
     ultBtn.classList.toggle('ready', ready);
     return;
   }
