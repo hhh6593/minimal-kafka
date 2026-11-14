@@ -1550,9 +1550,12 @@ function ringTile(must = false) {
 // champions every 90 seconds and a named leader with followers twice a ground. At 6:00 the
 // boss comes and the field calms to 25; the boss weakens after 1:30 and is surely down by
 // 2:50. The grounds map onto the five acts in order.
-// A hero hunting alone: the first act opens lighter (6 rising to 60) than D2 Survivors' party-sized one.
-const FLOOR_OPEN = [6, 40, 55, 65, 75], FLOOR_FIVE = [60, 85, 105, 110, 120];
-const FIELD_MAX = 220;
+// A survivors game is a horde: the field opens full (24 even on the first ground) and swells to
+// 130~190 by 5:00, the monsters in it weaker one by one (see HORDE) so they fall in a blow or two.
+const FLOOR_OPEN = [24, 50, 65, 75, 85], FLOOR_FIVE = [130, 150, 170, 180, 190];
+const FIELD_MAX = 320;
+// The crowd of a hunt, each one: life and bite against the old one-by-one counts.
+const HORDE = { hp: 0.65, dmg: 0.7 };
 
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
@@ -1919,13 +1922,13 @@ function spawn(dt) {
   // Up to the floor at once, a few a frame.
   for (let i = 0; i < 4 && G.enemies.length < floor; i++) addEnemy(pickMonster());
   if (!boss) {
-    // And on top of the floor, one a second from 1:00, two from 3:00.
+    // And on top of the floor, one a second from 0:20, two from 1:30, three from 3:00, four from 4:30.
     G.spawnT -= dt;
     if (G.spawnT <= 0) {
       G.spawnT = 1;
-      const extra = t >= 180 ? 2 : t >= 60 ? 1 : 0;
+      const extra = t >= 270 ? 4 : t >= 180 ? 3 : t >= 90 ? 2 : t >= 20 ? 1 : 0;
       // Never far past the floor: a field that is not being thinned does not keep swelling.
-      const cap = Math.min(FIELD_MAX, floor + 70);
+      const cap = Math.min(FIELD_MAX, floor + 120);
       for (let i = 0; i < extra && G.enemies.length < cap; i++) addEnemy(pickMonster());
     }
     if (G.champs.length && t >= G.champs[0]) {
@@ -2083,6 +2086,10 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   };
   const tp = TEMPERS[e.temper];
   e.stepTime *= tp.step * (pactOn('swift') ? 0.83 : 1);
+  if (!kind && !G.stage.raid && !G.endless) {
+    e.hp = e.maxHp = e.hp * HORDE.hp;
+    e.dmg *= HORDE.dmg;
+  }
   if (pactOn('hp')) { e.hp *= 1.4; e.maxHp *= 1.4; }
   if (pactOn('fang')) e.dmg *= 1.35;
   place(e, at[0], at[1]);
