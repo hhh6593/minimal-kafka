@@ -613,7 +613,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], arcs: [], puffs: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
@@ -1477,6 +1477,7 @@ function update(dt) {
       s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste'));
       if (s.timer <= 0) {
         const st = stats(s);
+        s.cdMax = st.cd;
         s.timer += st.cd;
         if (s.timer < 0) s.timer = st.cd;
         // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
@@ -1499,6 +1500,7 @@ function update(dt) {
   updateAllies(dt);
   updateParty(dt);
   updateShots(dt);
+  updateStyle(dt);
   for (const sp of G.sparks) { sp.t += dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; }
   G.sparks = G.sparks.filter(sp => sp.t < 0.28);
   if (!G.dead) updatePickups(dt);
@@ -1555,7 +1557,7 @@ function ringTile(must = false) {
 const FLOOR_OPEN = [24, 40, 50, 60, 70], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 320;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
-const HORDE = { hp: 0.85, dmg: 0.9 };
+const HORDE = { hp: 1, dmg: 1 };
 
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
@@ -1931,7 +1933,7 @@ function spawn(dt) {
       // eases it again. The strong are kept busy; the struggling are not piled on.
       const p = G.player, well = p.hp / p.maxHp > 0.75;
       G.calm = well ? (G.calm || 0) + 1 : Math.max(0, (G.calm || 0) - 3);
-      const press = Math.min(3, Math.floor(G.calm / 25));
+      const press = Math.min(3, Math.floor(G.calm / 20));
       if (press > (G.press || 0)) {
         say(press === 3 ? '몬스터들이 사방에서 몰려듭니다!' : '몬스터들이 더 몰려듭니다!', 'warn');
         if (press >= 2) banner(press === 3 ? '압박 최고조!' : '몬스터가 몰려든다!');
@@ -1990,7 +1992,9 @@ function spawn(dt) {
     audio.bgm('boss');
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다!`, 'warn');
-    banner(`보스 ${G.boss.name} 등장!`);
+    // 현대식 보스 등장: letterbox bars and a name plate, the world slowed for a breath.
+    G.cine = { at: performance.now() / 1000, name: G.boss.name };
+    G.slowmo = Math.max(G.slowmo || 0, 0.7);
     emote(Math.random() < 0.5 ? 'ready' : 'popcorn');
   }
   if (boss) {
@@ -2352,6 +2356,9 @@ function hurtEnemy(e, dmg, push = null) {
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
+  // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
+  const crit = Math.random() < 0.1;
+  if (crit) dmg *= 1.8;
   if (e.capPerSec) {
     // A hunt's boss: no more than its share of life a second, whatever lands on it.
     const sec = Math.floor(G.t);
@@ -2363,7 +2370,16 @@ function hurtEnemy(e, dmg, push = null) {
   e.hp -= dmg;
   e.flash = 0.12;
   e.shown = G.t;
-  if (settings.numbers) floatText(e.x, e.y - e.m.h * e.scale - 8, Math.round(dmg), '#ffffff');
+  // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
+  // orange for a heavy blow, grey for a light one.
+  if (crit || settings.numbers) {
+    e.numN = G.t - (e.numT || -9) < 0.6 ? Math.min(4, (e.numN || 0) + 1) : 0;
+    e.numT = G.t;
+    if (G.texts.length > 70) G.texts.shift();
+    const heavy = dmg >= e.maxHp * 0.35;
+    G.texts.push({ x: e.x + rand(-5, 5), y: e.y - e.m.h * e.scale - 10 - e.numN * 10, text: String(Math.round(dmg)), t: 0, num: true,
+      crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
+  }
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
@@ -2423,6 +2439,11 @@ function killEnemy(e) {
   G.enemies.splice(at, 1);
   occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
+  // The slain's soul streams into the hero (the experience it gives, seen).
+  if (!G.stage.raid && G.souls.length < 90) G.souls.push({ x: e.x, y: e.y - e.m.h * e.scale / 2, t: 0, kind: e.kind });
+  // A puff of dust where it falls.
+  if (G.puffs.length < 120) for (let i = 0; i < 4; i++)
+    G.puffs.push({ x: e.x + rand(-10, 10), y: e.y - rand(2, 14), r: rand(4, 8), vx: rand(-20, 20), vy: rand(-26, -6), t: 0 });
   audio.play('kill');
   const p = G.player;
   p.mp = Math.min(p.maxMp, p.mp + 0.6);
@@ -2602,11 +2623,14 @@ function fxOn(id, b, o = {}) {
 
 function cast(skill, st) {
   const def = SKILLS[skill.id];
+  G.lightAt = G.t;
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
   // 5차+ spells draw their effect in their own colour (s_<id>, made at boot from def.tint).
-  const fxid = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
+  const fxBase = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : M.fx['s_' + skill.id] ? 's_' + skill.id : def.fx;
+  // A spell grows with its 단, as a survivors weapon does: its picture 6% larger a step.
+  const fxid = grownFx(fxBase, skill.lv);
   const p = G.player;
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
   // (in a raid the boss is the fight; a warrior's 백호참 or 동귀어진 should not cut the air).
@@ -2665,6 +2689,7 @@ function cast(skill, st) {
           for (const [dx, dy] of dirs) {
             const b = occ.get(key(p.tx + dx, p.ty + dy));
             if (!b || !b.m || b.ally) continue;
+            swingArc(p, dx, dy, (CLASS_GLOW[G.cls.id] || ['#e8d4a0'])[0]);
             if (fxid) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
             hurtEnemy(b, dmg, [dx, dy]);
           }
@@ -2711,13 +2736,19 @@ function cast(skill, st) {
       if (def.weakest) targets.sort((a, b) => a.hp - b.hp);
       targets = targets.slice(0, st.count);
       if (!targets.length) return retry(0.25);
-      targets.forEach((e, i) => later(i * 0.1, () => {
+      // A survivors spell is seen to fly: a glowing orb from the hero to each target, the
+      // spell's own picture bursting where it lands.
+      const col = CLASS_GLOW[G.cls.id] || ['#fff', '#ffd'];
+      targets.forEach((e, i) => later(i * 0.08, () => {
         if (e.hp <= 0) return;
-        const life = fxOn(fxid, e);
-        later(life * 0.3, () => {
-          const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
-          if (def.drain && dealt) heal(dealt * def.drain, false, true);
-        });
+        addShot(p, e, { color: col[1], glow: col[0], size: 3 + Math.min(3, skill.lv / 3), speed: 620, onHit: () => {
+          if (e.hp <= 0) return;
+          const life = fxOn(fxid, e);
+          later(life * 0.3, () => {
+            const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
+            if (def.drain && dealt) heal(dealt * def.drain, false, true);
+          });
+        } });
       }));
       break;
     }
@@ -2937,6 +2968,7 @@ function plainAttack(dt) {
     if (p.fdx) p.face = p.fdx;
   }
   hurtEnemy(t, 7 * (1 + 0.1 * G.passives.power));
+  swingArc(p, dx, dy, '#e8d4a0');
   audio.play('hit');
   strikePose('attack');
 }
@@ -3617,6 +3649,246 @@ function drawShots() {
     ctx.beginPath();
     ctx.arc(sh.x - 1, sh.y - 1, Math.max(1, (sh.size || 4) / 2.5), 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+// ---------------------------------------------------------------- style: today's 바람 over the old art
+// The old pictures stay as they were; on them, the staging of today's game: a cut-in for the
+// boss: letterbox bars and a name plate, souls streaming to the hero, motes in the air of each
+// ground, light when a spell is cast.
+
+/** The glow of a class's flying spells: [halo, core]. */
+const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'] };
+/** Edge shade of the open grounds. */
+const VIGNETTE = { field: 'rgba(20,30,10,0.32)', field2: 'rgba(40,10,30,0.3)', island: 'rgba(0,30,40,0.3)' };
+/** What floats in the air of each ground. */
+const MOTES = {
+  field: { color: ['#f4ff9a', '#c8ff70'], vy: -6, drift: 10, size: 1.5, glow: true, n: 22 },   // 반딧불
+  field2: { color: ['#ffc8dc', '#ffe4ee'], vy: 18, drift: 22, size: 2, glow: false, n: 26, petal: true }, // 벚꽃
+  cave: { color: ['#d8c8a0', '#a89878'], vy: 3, drift: 4, size: 1, glow: false, n: 30 },         // 먼지
+  house: { color: ['#7ad8ff', '#b0f0ff'], vy: -4, drift: 14, size: 2.5, glow: true, n: 8 },       // 도깨비불
+  sea: { color: ['#bfefff', '#ffffff'], vy: -22, drift: 6, size: 2, glow: false, n: 26, ring: true }, // 물방울
+  island: { color: ['#fff6c0', '#ffffff'], vy: -3, drift: 8, size: 1.2, glow: true, n: 20 },      // 반짝임
+  lava: { color: ['#ffb040', '#ff6a20'], vy: -26, drift: 12, size: 1.5, glow: true, n: 34 },      // 불티
+};
+
+/** The effect picture of a spell at its 단: a second name for the same frames, 6% larger a step. */
+function grownFx(id, lv) {
+  if (!id || !M.fx[id]) return id;
+  lv = Math.max(1, lv || 1);
+  const key = id + '@' + lv;
+  if (!M.fx[key]) {
+    // 연's spells are drawn large over the field: a quarter larger to begin, 6% more a 단.
+    const f = M.fx[id];
+    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * 1.25 * (1 + 0.06 * (lv - 1)) };
+  }
+  return key;
+}
+
+function updateStyle(dt) {
+  const p = G.player;
+  for (const s of G.souls) s.t += dt;
+  G.souls = G.souls.filter(s => s.t < 0.55);
+  for (const a of G.arcs) a.t += dt;
+  G.arcs = G.arcs.filter(a => a.t < 0.18);
+  for (const f of G.puffs) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; }
+  G.puffs = G.puffs.filter(f => f.t < 0.45);
+  const mt = MOTES[G.stage.terrain];
+  if (!mt) return;
+  const w = VW / 2 + 40, h = VH / 2 + 40;
+  for (const a of G.amb) {
+    a.t += dt;
+    a.x += (a.vx + Math.sin(a.t * 1.3 + a.ph) * mt.drift * 0.6) * dt;
+    a.y += a.vy * dt;
+  }
+  G.amb = G.amb.filter(a => a.t < a.life && Math.abs(a.x - p.x) < w && Math.abs(a.y - p.y) < h);
+  while (G.amb.length < mt.n) {
+    G.amb.push({ x: p.x + rand(-w, w), y: p.y + rand(-h, h), vx: rand(-mt.drift, mt.drift), vy: mt.vy * rand(0.6, 1.4),
+      t: 0, life: rand(3, 7), ph: rand(0, 6), c: mt.color[Math.random() < 0.5 ? 0 : 1] });
+  }
+}
+
+function drawAmbient() {
+  const mt = MOTES[G.stage.terrain];
+  if (!mt) return;
+  for (const a of G.amb) {
+    const fade = Math.min(1, a.t / 0.6, (a.life - a.t) / 0.8);
+    const tw = mt.glow ? 0.6 + 0.4 * Math.sin(a.t * 5 + a.ph) : 1;
+    ctx.globalAlpha = Math.max(0, fade * tw);
+    if (mt.glow) {
+      ctx.globalAlpha *= 0.35;
+      ctx.fillStyle = a.c;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, mt.size * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = Math.max(0, fade * tw);
+    }
+    ctx.fillStyle = a.c;
+    if (mt.ring) {
+      ctx.strokeStyle = a.c;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, mt.size, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (mt.petal) {
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.t * 2 + a.ph);
+      ctx.fillRect(-mt.size, -mt.size / 2, mt.size * 2, mt.size);
+      ctx.restore();
+    } else ctx.fillRect(Math.round(a.x), Math.round(a.y), Math.ceil(mt.size), Math.ceil(mt.size));
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** A swing's crescent: the weapon's path, the way the blow went. */
+function swingArc(from, dx, dy, color) {
+  if (G.arcs.length < 20) G.arcs.push({ x: from.x, y: from.y - 24, ang: Math.atan2(dy || 0, dx || (dy ? 0 : from.face || 1)), t: 0, color });
+}
+
+function drawSouls() {
+  for (const f of G.puffs) {
+    const k = f.t / 0.45;
+    ctx.globalAlpha = 0.45 * (1 - k);
+    ctx.fillStyle = '#c8c0b0';
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * (1 + k), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const a of G.arcs) {
+    const k = a.t / 0.18, r = 26;
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.ang);
+    ctx.globalAlpha = 0.9 * (1 - k);
+    ctx.fillStyle = a.color;
+    // A crescent: the outer arc swept a little further than the inner, thick in the middle.
+    const sw = 1.6 * Math.min(1, k * 3 + 0.3);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -sw / 2, sw / 2);
+    ctx.arc(r * 0.35, 0, r * 0.72, sw / 2, -sw / 2, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  const p = G.player, tx = p.x, ty = p.y - 26;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const s of G.souls) {
+    // Up a little first, then in to the hero.
+    const k = s.t / 0.55, e = k * k;
+    const x = s.x + (tx - s.x) * e, y = s.y - 18 * Math.sin(k * Math.PI) + (ty - s.y) * e;
+    const big = s.kind ? 2 : 1;
+    ctx.globalAlpha = 0.5 * (1 - k * 0.5);
+    ctx.fillStyle = s.kind ? '#ffd86a' : '#8ad8ff';
+    ctx.beginPath();
+    ctx.arc(x, y, 4 * big, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5 * big, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The spells in hand, as 연's skill row: each icon in a frame of its 승급 tier, the time
+ * to its next cast sweeping round it, its 단 in the corner. Bottom left, above the chat. */
+const iconCache = {};
+function skillIconImage(id) {
+  if (iconCache[id] !== undefined) return iconCache[id];
+  const def = SKILLS[id];
+  if (M.skillicon && M.skillicon.includes(id)) {
+    const im = new Image();
+    im.src = `assets/skillicon/${id}.png`;
+    return (iconCache[id] = im);
+  }
+  const fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
+  return (iconCache[id] = fx ? images[`icon/${fx}.png`] || null : null);
+}
+function drawSkillBar() {
+  if (!G.skills.length || G.dead) return;
+  const W = canvas.width, u = W / 860;
+  const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
+  const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
+  const sz = Math.round(30 * u), gap = Math.round(5 * u), x0 = Math.round(12 * u), y0 = Math.round(H - sz - 10 * u);
+  G.skills.slice(0, 8).forEach((s, i) => {
+    const def = SKILLS[s.id], x = x0 + i * (sz + gap), y = y0;
+    const tier = def.promo >= 8 ? '#e8a020' : def.promo >= 5 ? '#9a5cff' : def.promo ? '#3aa0ff' : '#5ac83a';
+    ctx.fillStyle = 'rgba(10,8,6,0.75)';
+    ctx.fillRect(x - 2, y - 2, sz + 4, sz + 4);
+    ctx.fillStyle = tier;
+    ctx.fillRect(x - 2, y - 2, sz + 4, 2);
+    ctx.fillRect(x - 2, y + sz, sz + 4, 2);
+    ctx.fillRect(x - 2, y - 2, 2, sz + 4);
+    ctx.fillRect(x + sz, y - 2, 2, sz + 4);
+    const im = skillIconImage(s.id);
+    if (im && im.width) {
+      ctx.save();
+      if (def.tint && !(M.skillicon && M.skillicon.includes(s.id))) ctx.filter = def.tint;
+      const k = Math.min(sz / im.width, sz / im.height);
+      ctx.drawImage(im, x + (sz - im.width * k) / 2, y + (sz - im.height * k) / 2, im.width * k, im.height * k);
+      ctx.restore();
+    }
+    // The wait: a dark sector that shrinks clockwise as the spell comes ready.
+    const left = s.cdMax ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0;
+    if (left > 0.02) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, sz, sz);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(x + sz / 2, y + sz / 2);
+      ctx.arc(x + sz / 2, y + sz / 2, sz, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    } else if (G.t - (s.readyFlash || 0) > 0.3 && s.timer > -0.05 && s.timer <= 0.05) s.readyFlash = G.t;
+    ctx.font = `bold ${Math.round(9 * u)}px G9`;
+    ctx.textAlign = 'right';
+    outline(String(s.lv), x + sz - 1, y + sz - 2, '#fff');
+  });
+  ctx.textAlign = 'left';
+}
+
+/** A boss's entrance: letterbox bars slide in, its name on a plate, then away. */
+function drawCine() {
+  if (!G.cine) return;
+  const t = performance.now() / 1000 - G.cine.at, W = canvas.width, u = W / 860;
+  if (t > 2.8) { G.cine = null; return; }
+  // The lower bar sits on the chat strip, which covers the canvas's foot.
+  const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
+  const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
+  const k = t < 0.3 ? t / 0.3 : t > 2.4 ? Math.max(0, (2.8 - t) / 0.4) : 1;
+  const bar = H * 0.13 * (1 - Math.pow(1 - k, 3));
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, bar);
+  ctx.fillRect(0, H - bar, W, bar);
+  if (t > 0.25) {
+    const a = Math.min(1, (t - 0.25) / 0.25) * k;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    const y = H - bar / 2 + 8 * u;
+    ctx.font = `bold ${Math.round(20 * u)}px G11`;
+    const w = ctx.measureText(G.cine.name).width;
+    // A red seal, the name large, and the call in small red beside it.
+    ctx.fillStyle = '#b8231a';
+    ctx.fillRect(W / 2 - w / 2 - 32 * u, y - 18 * u, 22 * u, 22 * u);
+    ctx.fillStyle = '#fff3d8';
+    ctx.font = `bold ${Math.round(13 * u)}px G11`;
+    ctx.fillText('王', W / 2 - w / 2 - 21 * u, y - 2 * u);
+    ctx.font = `bold ${Math.round(20 * u)}px G11`;
+    ctx.fillStyle = '#ffe2b0';
+    ctx.fillText(G.cine.name, W / 2, y);
+    ctx.font = `${Math.round(10 * u)}px G9`;
+    ctx.fillStyle = '#e0574a';
+    ctx.textAlign = 'left';
+    ctx.fillText('보 스 출 현', W / 2 + w / 2 + 12 * u, y - 4 * u);
+    ctx.restore();
   }
 }
 
@@ -4600,6 +4872,27 @@ function render(now) {
     const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? images[`item/${M.items[MATS[d.mat].icon].id}.png`]
       : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
+    // 연's loot: a pillar of light and a ring on the ground, by worth.
+    const beam = d.gear && d.gear.sp ? '#c070ff' : d.kind === 'gear' ? '#ff5a3a' : d.kind === 'chest' ? '#ffd040' : null;
+    if (beam) {
+      ctx.save();
+      const pulse = 0.75 + 0.25 * Math.sin(now * 5 + d.x);
+      const gr = ctx.createLinearGradient(0, d.y - 90, 0, d.y);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, beam);
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.fillStyle = gr;
+      ctx.fillRect(Math.round(d.x - 3), Math.round(d.y - 90), 6, 90);
+      ctx.globalAlpha = 0.25 * pulse;
+      ctx.fillRect(Math.round(d.x - 7), Math.round(d.y - 70), 14, 70);
+      ctx.globalAlpha = 0.7 * pulse;
+      ctx.strokeStyle = beam;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(Math.round(d.x), Math.round(d.y - 2), 16, 6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (d.gear && d.gear.sp) {
       // A special shimmers gold where it lies.
       ctx.save();
@@ -4683,7 +4976,9 @@ function render(now) {
     ctx.restore();
   }
 
+  drawAmbient();
   drawShots();
+  drawSouls();
   for (const sp of G.sparks) {
     ctx.globalAlpha = 1 - sp.t / 0.28;
     ctx.fillStyle = sp.c;
@@ -4715,6 +5010,17 @@ function render(now) {
       ctx.fillRect(x + w - 1, y, 1, 12);
       ctx.fillStyle = '#fff';
       ctx.fillText(t.text, Math.round(t.x), y + 9);
+    } else if (t.num) {
+      // A number pops in and settles; a crit larger.
+      const base = t.crit ? 1.45 : t.color === '#ffb43a' ? 1.1 : 0.9;
+      const k = base * (t.t < 0.1 ? 1.6 - t.t * 6 : 1);
+      ctx.save();
+      ctx.translate(Math.round(t.x), Math.round(t.y));
+      ctx.scale(k, k);
+      ctx.font = 'bold 12px G11';
+      thick(t.text, 0, 0, t.color);
+      ctx.restore();
+      ctx.font = '10px G9';
     } else thick(t.text, t.x, t.y, t.color);
   }
   ctx.globalAlpha = 1;
@@ -4740,7 +5046,17 @@ function render(now) {
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const dark = DARK[G.stage.terrain];
+  const lit = Math.max(0, 1 - (G.t - (G.lightAt || -9)) / 0.3);
+  const dark = DARK[G.stage.terrain] ? DARK[G.stage.terrain] * (1 - 0.45 * lit) : 0;
+  if (!dark) {
+    // Open grounds: a soft shade at the edges, tinted to the ground.
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.45, cx, cy, Math.hypot(cx, cy));
+    gr.addColorStop(0, 'rgba(0,0,0,0)');
+    gr.addColorStop(1, VIGNETTE[G.stage.terrain] || 'rgba(10,10,30,0.3)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
     const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -4780,6 +5096,8 @@ function render(now) {
     outline('연속 처치', 0, 13, '#f0e0c0');
     ctx.restore();
   }
+  drawSkillBar();
+  drawCine();
   drawJoystick();
 }
 
@@ -5322,9 +5640,10 @@ function soundDefaults() {
 }
 
 function migrateSettings() {
-  if (settings.numbersVer !== 1) {
-    settings.numbers = false;
-    settings.numbersVer = 1;
+  if (settings.numbersVer !== 2) {
+    // 바람의나라 연 shows every blow's number: on by default (it can still be turned off).
+    settings.numbers = true;
+    settings.numbersVer = 2;
     saveJson('bs_settings', settings);
   }
 }
