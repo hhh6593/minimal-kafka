@@ -286,8 +286,7 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
-  // Closer than the old client's view, as 바람의나라 연 frames a hunt: half steps keep the pixels even.
-  Z = Math.max(1, Math.round(canvas.height / 270 * 2) / 2);
+  Z = Math.max(1, Math.round(canvas.height / 470));
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -2855,7 +2854,9 @@ function cast(skill, st) {
       const all = onScreen();
       if (!all.length) return retry(0.5);
       addFx(fxid, 0, -26, { follow: true, scale: 1.4 });
-      all.slice(0, 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: 0.6 }));
+      // As 바람의나라 연 draws its great spells: the picture rains all over the screen in waves.
+      scatterFx(fxid, 14, 1.3);
+      all.slice(0, 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: 0.9 }));
       later(0.35, () => {
         G.shake = Math.max(G.shake, 0.25);
         for (const e of all) {
@@ -2872,7 +2873,12 @@ function cast(skill, st) {
     }
     case 'nova': {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-      addFx(fxid, 0, -26, { follow: true });
+      addFx(fxid, 0, -26, { follow: true, scale: M.fx[fxid] && M.fx[fxid].add ? 2.2 : 1.4 });
+      // A ring of the picture round the hero, out to the spell's reach (light pictures only).
+      for (let k = 0; k < (M.fx[fxid] && M.fx[fxid].add ? 8 : 0); k++) {
+        const a = (k / 8) * Math.PI * 2, r = (st.radius || 2) * TILE;
+        addFx(fxid, p.x + Math.cos(a) * r, p.y - 20 + Math.sin(a) * r * 0.7, { delay: 0.04 * k, scale: 1.3 });
+      }
       later(0.1, () => {
         for (const e of around(p.tx, p.ty, st.radius)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
@@ -2987,6 +2993,10 @@ function castUlt() {
   say(`${def.name}!`);
   audio.play('skill_' + G.cls.ult, 'ult');
   G.shake = 0.5;
+  // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
+  addFx(grownFx(def.fx, 8), 0, -26, { follow: true, scale: 2.4 });
+  scatterFx(grownFx(def.fx, 8), 10, 1.5);
+  G.flash = G.t;
   const lvl = p.lvl, pw = 1 + 0.1 * G.passives.power;
   const v = viewTiles();
   const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
@@ -3661,7 +3671,7 @@ function drawShots() {
 /** The glow of a class's flying spells: [halo, core]. */
 const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'] };
 /** Edge shade of the open grounds. */
-const VIGNETTE = { field: 'rgba(20,30,10,0.32)', field2: 'rgba(40,10,30,0.3)', island: 'rgba(0,30,40,0.3)' };
+const VIGNETTE = { field: 'rgba(5,20,10,0.6)', field2: 'rgba(25,8,20,0.55)', island: 'rgba(0,20,30,0.55)' };
 /** What floats in the air of each ground. */
 const MOTES = {
   field: { color: ['#f4ff9a', '#c8ff70'], vy: -6, drift: 10, size: 1.5, glow: true, n: 22 },   // 반딧불
@@ -3740,6 +3750,16 @@ function drawAmbient() {
     } else ctx.fillRect(Math.round(a.x), Math.round(a.y), Math.ceil(mt.size), Math.ceil(mt.size));
   }
   ctx.globalAlpha = 1;
+}
+
+/** A spell's picture rained over the visible field: n copies in waves, large. */
+function scatterFx(id, n, scale) {
+  const p = G.player, w = VW / 2 - 20, h = VH / 2 - 20;
+  // Light (drawn added) copies well; a solid picture repeated large reads as blocks: fewer, smaller.
+  const f = M.fx[id];
+  if (f && f.cls === 'modern') return; // today's pictures are already large, and dark-backed
+  if (f && !f.add) { n = Math.ceil(n / 3); scale = Math.min(scale, 1); }
+  for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
 }
 
 /** A swing's crescent: the weapon's path, the way the blow went. */
@@ -4644,6 +4664,7 @@ function durs(id) {
 function addFx(id, x, y, o = {}) {
   if (!M.fx[id]) return 0;
   const life = durs(id).reduce((a, b) => a + b, 0);
+  if (G.fxs.length > 260) return life; // a phone draws only so many at once
   G.fxs.push({ id, x, y, t: -(o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
     follow: o.follow, anchor: o.anchor || 'center' });
   return life;
@@ -4666,6 +4687,8 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   ctx.save();
   if (f.add) ctx.globalCompositeOperation = 'lighter';
   if (f.tint) ctx.filter = f.tint;
+  // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks.
+  if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
   ctx.drawImage(im, i * f.w, 0, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
@@ -5079,7 +5102,7 @@ function render(now) {
   if (!dark) {
     // Open grounds: a soft shade at the edges, tinted to the ground.
     const cx = canvas.width / 2, cy = canvas.height / 2;
-    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.45, cx, cy, Math.hypot(cx, cy));
+    const gr = ctx.createRadialGradient(cx, cy, canvas.height * 0.3, cx, cy, Math.hypot(cx, cy));
     gr.addColorStop(0, 'rgba(0,0,0,0)');
     gr.addColorStop(1, VIGNETTE[G.stage.terrain] || 'rgba(10,10,30,0.3)');
     ctx.fillStyle = gr;
@@ -5151,13 +5174,6 @@ function drawHero(now, hidden) {
   // The wardrobe figure: four directions, four walking frames, attack and casting poses.
   const dir = facing(p.fdx, p.fdy);
   const pose = p.poseT > 0 ? p.pose : p.moving ? 'walk' : 'idle';
-  // The hero's dark outline, as 연 draws its sprites: the figure in black a pixel out on four sides.
-  if (!hidden) {
-    ctx.save();
-    ctx.filter = 'brightness(0)';
-    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawAvatar(ctx, p.av, p.x + ox, p.y + oy, dir, pose, Math.floor(p.walkT / WALK_MS), 0.85);
-    ctx.restore();
-  }
   drawAvatar(ctx, p.av, p.x, p.y, dir, pose, Math.floor(p.walkT / WALK_MS), hidden ? 0.35 : 1);
 }
 
