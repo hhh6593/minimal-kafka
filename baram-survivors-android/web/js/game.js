@@ -1555,7 +1555,7 @@ function ringTile(must = false) {
 const FLOOR_OPEN = [24, 40, 50, 60, 70], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 320;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
-const HORDE = { hp: 0.65, dmg: 0.7 };
+const HORDE = { hp: 0.85, dmg: 0.9 };
 
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
@@ -1926,7 +1926,18 @@ function spawn(dt) {
     G.spawnT -= dt;
     if (G.spawnT <= 0) {
       G.spawnT = 1;
-      const extra = t >= 270 ? 4 : t >= 180 ? 3 : t >= 90 ? 2 : t >= 20 ? 1 : 0;
+      // 압박: a hero who stays well (over 3/4 of its life) for 25 seconds is pressed harder, a step
+      // at a time up to three (one more monster a second and 12% harder blows each); being hurt
+      // eases it again. The strong are kept busy; the struggling are not piled on.
+      const p = G.player, well = p.hp / p.maxHp > 0.75;
+      G.calm = well ? (G.calm || 0) + 1 : Math.max(0, (G.calm || 0) - 3);
+      const press = Math.min(3, Math.floor(G.calm / 25));
+      if (press > (G.press || 0)) {
+        say(press === 3 ? '몬스터들이 사방에서 몰려듭니다!' : '몬스터들이 더 몰려듭니다!', 'warn');
+        if (press >= 2) banner(press === 3 ? '압박 최고조!' : '몬스터가 몰려든다!');
+      }
+      G.press = press;
+      const extra = (t >= 270 ? 4 : t >= 180 ? 3 : t >= 90 ? 2 : t >= 20 ? 1 : 0) + press;
       // Never far past the floor: a field that is not being thinned does not keep swelling.
       const cap = Math.min(FIELD_MAX, floor + 120);
       for (let i = 0; i < extra && G.enemies.length < cap; i++) addEnemy(pickMonster());
@@ -2097,7 +2108,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   e.stepTime *= tp.step * (pactOn('swift') ? 0.83 : 1);
   if (!kind && !G.stage.raid && !G.endless) {
     e.hp = e.maxHp = e.hp * HORDE.hp;
-    e.dmg *= HORDE.dmg;
+    e.dmg *= HORDE.dmg * (1 + 0.12 * (G.press || 0));
   }
   if (pactOn('hp')) { e.hp *= 1.4; e.maxHp *= 1.4; }
   if (pactOn('fang')) e.dmg *= 1.35;
