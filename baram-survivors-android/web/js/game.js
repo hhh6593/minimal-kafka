@@ -613,7 +613,7 @@ function startRun(cls, stage) {
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
-    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], arcs: [], puffs: [],
+    enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], souls: [], amb: [], arcs: [], puffs: [], pfx: [], ghosts: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
@@ -2631,6 +2631,7 @@ function cast(skill, st) {
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : M.fx['s_' + skill.id] ? 's_' + skill.id : def.fx;
   // A spell grows with its 단, as a survivors weapon does: its picture 6% larger a step.
   const fxid = grownFx(fxBase, skill.lv);
+  classFlourish(def, skill, st);
   const p = G.player;
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
   // (in a raid the boss is the fight; a warrior's 백호참 or 동귀어진 should not cut the air).
@@ -3700,6 +3701,16 @@ function updateStyle(dt) {
   const p = G.player;
   for (const s of G.souls) s.t += dt;
   G.souls = G.souls.filter(s => s.t < 0.55);
+  // 잔상: a hero who jumps more than a tile in a frame (blink, dash) leaves ghosts along the way.
+  if (G.lastPos && Math.hypot(p.x - G.lastPos[0], p.y - G.lastPos[1]) > TILE * 1.4 && G.ghosts.length < 30) {
+    for (let k = 1; k <= 5; k++) G.ghosts.push({ x: G.lastPos[0] + (p.x - G.lastPos[0]) * k / 6, y: G.lastPos[1] + (p.y - G.lastPos[1]) * k / 6, t: -k * 0.02 });
+  }
+  G.lastPos = [p.x, p.y];
+  for (const g of G.ghosts) g.t += dt;
+  G.ghosts = G.ghosts.filter(g => g.t < 0.35);
+  for (const f of G.pfx) f.t += dt;
+  G.pfx = G.pfx.filter(f => f.t < f.life);
+  if (G.mark && G.t - G.mark.t > 0.7) G.mark = null;
   for (const a of G.arcs) a.t += dt;
   G.arcs = G.arcs.filter(a => a.t < 0.18);
   for (const f of G.puffs) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; }
@@ -3768,6 +3779,9 @@ function swingArc(from, dx, dy, color) {
 }
 
 function drawSouls() {
+  drawGhosts();
+  drawPfx();
+  drawMark();
   for (const f of G.puffs) {
     const k = f.t / 0.45;
     ctx.globalAlpha = 0.45 * (1 - k);
@@ -3873,6 +3887,161 @@ function drawSkillBar() {
     outline(String(s.lv), x + sz - 1, y + sz - 2, '#fff');
   });
   ctx.textAlign = 'left';
+}
+
+
+// ---------------------------------------------------------------- class flourishes (바람의나라 연)
+// From 연's hunts: the 전사 and 도적 close in — a dash to the foe with afterimages, a great
+// crescent sweeping round — and the 주술사 and 도사 fill the field from afar: lightning from
+// the sky, pillars of light, volleys of darts. Drawn by hand over the spell's own picture.
+
+const THUNDER = /뢰|뇌|천둥|번개|섬광/;
+function classFlourish(def, skill, st) {
+  const p = G.player, cls = G.cls.id;
+  if (!def || def.kind === 'ult' || def.kind === 'buff' || def.kind === 'aura') return;
+  const near = nearestEnemies(1, 6)[0];
+  if (near) G.mark = { e: near, t: G.t };
+  if (cls === 'warrior' || cls === 'rogue') {
+    // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
+    const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally; });
+    if (near && !beside && !p.stepping && G.t - (G.dashAt || -9) > 1.5 && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
+      const spot = DIRS.map(([dx, dy]) => [near.tx + dx, near.ty + dy]).filter(([x, y]) => free(x, y))
+        .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
+      if (spot) {
+        G.dashAt = G.t;
+        p.x = spot[0] * TILE + TILE / 2;
+        p.y = spot[1] * TILE + TILE - 6;
+        heroTile();
+        const dx = near.tx - p.tx, dy = near.ty - p.ty;
+        if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
+      }
+    }
+    // A great crescent round the hero for the sweeping blows.
+    if (['cleave', 'nova', 'screen', 'slash', 'strike', 'line'].includes(def.kind) && G.pfx.length < 40) {
+      G.pfx.push({ type: 'whirl', t: 0, life: 0.32, r: TILE * (1.2 + Math.min(1.5, (st.radius || 1) * 0.5)),
+        color: cls === 'warrior' ? '#f4f8ff' : '#d8c8ff', rim: cls === 'warrior' ? '#7ab8ff' : '#9a6aff', a0: Math.random() * 6 });
+    }
+    return;
+  }
+  // Casters: the sky answers.
+  const targets = nearestEnemies(def.kind === 'screen' ? 8 : 3, 8);
+  if (!targets.length) return;
+  const thunder = THUNDER.test(def.name) || /뢰진|뇌진/.test(def.name);
+  if (thunder) {
+    targets.slice(0, def.kind === 'screen' ? 6 : 2).forEach((e, i) => later(i * 0.06, () => G.pfx.push({ type: 'bolt', t: 0, life: 0.28, x: e.x, y: e.y - 16, seed: Math.random() * 99 })));
+  } else if (cls === 'poet') {
+    targets.slice(0, def.kind === 'screen' ? 6 : 2).forEach((e, i) => later(i * 0.07, () => G.pfx.push({ type: 'pillar', t: 0, life: 0.55, x: e.x, y: e.y, color: '#ffd84a' })));
+  } else {
+    targets.slice(0, def.kind === 'screen' ? 5 : 2).forEach((e, i) => later(i * 0.07, () => G.pfx.push({ type: 'pillar', t: 0, life: 0.5, x: e.x, y: e.y, color: '#ff7a2a' })));
+  }
+  // A volley of darts across the field for the great spells (도사's 파군표창, as in the captures).
+  if (def.kind === 'screen' && G.pfx.length < 60) G.pfx.push({ type: 'volley', t: 0, life: 0.6, x: p.x, y: p.y, color: cls === 'poet' ? '#d8d0ff' : '#ffd0a0', seed: Math.random() * 99 });
+}
+
+function drawGhosts() {
+  const p = G.player;
+  if (!p.av && !p.img) return;
+  for (const g of G.ghosts) {
+    if (g.t < 0) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.45 * (1 - g.t / 0.35);
+    ctx.filter = `brightness(1.6) saturate(0.4) drop-shadow(0 0 3px ${(CLASS_GLOW[G.cls.id] || ['#fff'])[0]})`;
+    if (p.av) drawAvatar(ctx, p.av, g.x, g.y, facing(p.fdx, p.fdy), 'walk', 1, 1);
+    else ctx.drawImage(p.img, g.x - p.img.width / 2, g.y - p.img.height);
+    ctx.restore();
+  }
+}
+
+function drawPfx() {
+  const p = G.player;
+  for (const f of G.pfx) {
+    const k = f.t / f.life;
+    ctx.save();
+    if (f.type === 'whirl') {
+      // A broad crescent sweeping once round the hero, bright edge leading.
+      const cx = p.x, cy = p.y - 22, sweep = Math.PI * 1.6, a1 = f.a0 + sweep * Math.min(1, k * 1.6);
+      ctx.globalAlpha = 0.85 * (1 - k);
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, f.r - i * 4, (f.r - i * 4) * 0.55, 0, a1 - 1.6 + i * 0.15, a1);
+        ctx.strokeStyle = i === 0 ? f.rim : f.color;
+        ctx.lineWidth = i === 0 ? 7 : 4 - i;
+        ctx.stroke();
+      }
+    } else if (f.type === 'bolt') {
+      // A jagged stroke from the top of the view to the struck, white in a blue glow.
+      ctx.globalCompositeOperation = 'lighter';
+      const top = p.y - VH / 2 - 20;
+      let x = f.x, y = top, r = f.seed;
+      const pts = [[x, y]];
+      while (y < f.y) { r = (r * 9301 + 49297) % 233280; y = Math.min(f.y, y + 14); x = f.x + ((r / 233280) - 0.5) * 22; pts.push([x, y]); }
+      for (const [w, c, a] of [[9, '#3a6aff', 0.35], [4, '#9ad0ff', 0.7], [1.5, '#ffffff', 1]]) {
+        ctx.globalAlpha = a * (1 - k);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 0.6 * (1 - k);
+      ctx.fillStyle = '#cfe6ff';
+      ctx.beginPath();
+      ctx.ellipse(f.x, f.y + 12, 18 * (1 + k), 7 * (1 + k), 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (f.type === 'pillar') {
+      // A column of light dropping onto the target and widening, a ring where it lands.
+      ctx.globalCompositeOperation = 'lighter';
+      const h = 120, w = 10 + 10 * Math.sin(Math.PI * k), drop = Math.min(1, k * 4);
+      const gr = ctx.createLinearGradient(0, f.y - h, 0, f.y);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, f.color);
+      ctx.globalAlpha = 0.75 * (1 - k * 0.8);
+      ctx.fillStyle = gr;
+      ctx.fillRect(f.x - w / 2, f.y - h * drop, w, h * drop);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(f.x - w / 6, f.y - h * drop, w / 3, h * drop);
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(f.x, f.y - 2, 10 + 22 * k, 4 + 8 * k, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (f.type === 'volley') {
+      // Darts streaking down across the view in a slant.
+      ctx.globalCompositeOperation = 'lighter';
+      let r = f.seed;
+      for (let i = 0; i < 40; i++) {
+        r = (r * 9301 + 49297) % 233280;
+        const ox = (r / 233280 - 0.5) * VW;
+        r = (r * 9301 + 49297) % 233280;
+        const lag = (r / 233280) * 0.5, q = Math.max(0, Math.min(1, (k - lag) * 3));
+        if (q <= 0 || q >= 1) continue;
+        const x = f.x + ox - 60 + q * 120, y = f.y - VH / 2 + q * VH;
+        ctx.globalAlpha = 0.9 * (1 - q * 0.5);
+        ctx.strokeStyle = f.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 10, y - 20);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** The target, framed as 연 frames it: a pale square round its feet. */
+function drawMark() {
+  const m = G.mark;
+  if (!m || !m.e || m.e.hp <= 0) return;
+  const e = m.e, w = Math.max(26, e.m.w * e.scale * 0.8), h = Math.max(26, e.m.h * e.scale * 0.8);
+  const pulse = 1 + 0.08 * Math.sin(G.t * 14);
+  ctx.save();
+  ctx.globalAlpha = 0.8 * (1 - (G.t - m.t) / 0.7);
+  ctx.strokeStyle = '#f4f0e0';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(Math.round(e.x - w * pulse / 2), Math.round(e.y - h * pulse), Math.round(w * pulse), Math.round(h * pulse));
+  ctx.restore();
 }
 
 /** A boss's entrance: letterbox bars slide in, its name on a plate, then away. */
