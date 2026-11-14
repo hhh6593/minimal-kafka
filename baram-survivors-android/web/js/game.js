@@ -1560,7 +1560,7 @@ const HORDE = { hp: 0.85, dmg: 0.9 };
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
   const a = Math.min(4, Math.round((G.level / 13) * 4));
-  return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 300));
+  return Math.round(FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 200));
 }
 
 // ---------------------------------------------------------------- raids
@@ -1922,7 +1922,7 @@ function spawn(dt) {
   // Up to the floor at once, a few a frame.
   for (let i = 0; i < 4 && G.enemies.length < floor; i++) addEnemy(pickMonster());
   if (!boss) {
-    // And on top of the floor, one a second from 0:20, two from 1:30, three from 3:00, four from 4:30.
+    // And on top of the floor, one a second from 0:15, two from 1:00, three from 2:00, four from 3:00.
     G.spawnT -= dt;
     if (G.spawnT <= 0) {
       G.spawnT = 1;
@@ -1937,7 +1937,7 @@ function spawn(dt) {
         if (press >= 2) banner(press === 3 ? '압박 최고조!' : '몬스터가 몰려든다!');
       }
       G.press = press;
-      const extra = (t >= 270 ? 4 : t >= 180 ? 3 : t >= 90 ? 2 : t >= 20 ? 1 : 0) + press;
+      const extra = (t >= 180 ? 4 : t >= 120 ? 3 : t >= 60 ? 2 : t >= 15 ? 1 : 0) + press;
       // Never far past the floor: a field that is not being thinned does not keep swelling.
       const cap = Math.min(FIELD_MAX, floor + 120);
       for (let i = 0; i < extra && G.enemies.length < cap; i++) addEnemy(pickMonster());
@@ -2003,14 +2003,14 @@ function spawn(dt) {
       return;
     }
     // Never a ground without end: five minutes after it came, the boss falls.
-    if (b && (since > 300 || !(b.hp > -Infinity))) {
+    if (b && (since > 200 || !(b.hp > -Infinity))) {
       b.hp = 0;
       killEnemy(b);
       return;
     }
-    if (b && since > 90) {
+    if (b && since > 60) {
       b.hp -= b.maxHp * 0.004 * dt * 60 / 60;
-      b.weak = since > 170 ? Math.pow(2, (since - 170) / 10) : 1;
+      b.weak = since > 115 ? Math.pow(2, (since - 115) / 10) : 1;
       if (b.hp <= 0) killEnemy(b);
     }
   }
@@ -2024,7 +2024,7 @@ function spawn(dt) {
 function eventPlan() {
   const kinds = ['march', 'ring', 'treasure'].sort(() => Math.random() - 0.5);
   kinds.push(['march', 'ring'][Math.floor(Math.random() * 2)]);
-  return [60, 160, 230, 320].map((at, i) => ({ at: at + Math.floor(Math.random() * 10), kind: kinds[i] }));
+  return [40, 105, 155, 210].map((at, i) => ({ at: at + Math.floor(Math.random() * 10), kind: kinds[i] }));
 }
 
 function huntEvent(kind) {
@@ -2082,7 +2082,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (!at) return null;
   const t = G.t;
   // Monsters toughen with time: x2.5 by 5:00 (matched to spells growing 15% a 단).
-  const tough = (1 + G.level * 0.15) * (1 + t / 200) * (G.cleared ? 1.5 : 1);
+  const tough = (1 + G.level * 0.15) * (1 + t / 133) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
   let hp = (6 + m.area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
@@ -2095,13 +2095,13 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   const e = {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
-    stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
+    stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 2000),
     // Deeper grounds bite harder: +15% a step (흉가, the 7th, twice the first).
-    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 180 + G.level * 0.5) * (1 + 0.15 * G.level)
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.15 * G.level)
       * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
-    xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 300)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
+    xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 200)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
     face: 1, phase: Math.random() * 6, flash: 0, slow: 0, stun: 0, curse: 0, cd: Math.random() * 0.5, atk: 0.6,
     lunge: 0, hits: new Map(), temper: kind && kind !== 'minion' ? (kind === 'champ' ? 'fierce' : 'normal') : temperOf(m),
   };
@@ -2295,7 +2295,9 @@ function moveEnemies(dt) {
     }
   }
   for (const e of gone) {
-    G.enemies.splice(G.enemies.indexOf(e), 1);
+    const at = G.enemies.indexOf(e);
+    if (at < 0) continue;
+    G.enemies.splice(at, 1);
     occ.delete(key(e.tx, e.ty));
     if (e.flee) say('보물을 지닌 몬스터가 달아났습니다.');
   }
@@ -2392,6 +2394,11 @@ function rollMats(e) {
 const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200];
 
 function killEnemy(e) {
+  // Each monster dies once: a second call (two blows landing in the same instant) must not
+  // count it again, nor — through indexOf -1 — take the last monster in the list (often the
+  // boss, the newest) off the field with it.
+  const at = G.enemies.indexOf(e);
+  if (at < 0) return;
   G.kills++;
   // 연속 처치: kills within three seconds of each other chain; the round numbers are called out.
   const c = G.combo;
@@ -2413,7 +2420,7 @@ function killEnemy(e) {
   st.kills++;
   st.stageKills[G.stage.id] = (st.stageKills[G.stage.id] || 0) + 1;
   if (e.kind === 'boss') st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
-  G.enemies.splice(G.enemies.indexOf(e), 1);
+  G.enemies.splice(at, 1);
   occ.delete(key(e.tx, e.ty));
   G.dying.push({ e, t: 0 });
   audio.play('kill');
@@ -3911,7 +3918,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
-  v *= 1.2;
+  v *= 1.7;
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {

@@ -536,9 +536,9 @@ export const STAGES = [
     intro: '이 세상 밖, 안개 너머의 굴. 거마족의 혼과 고대의 마령이 깨어 있다' },
 ];
 
-// The clock of a hunting ground, as D2 Survivors' acts: the boss comes at 6:00; a named
-// leader (with followers) at 2:15 and 4:45; a pack of champions every 90 seconds.
-export const BOSS_AT = 6 * 60;
+// The clock of a hunting ground, as D2 Survivors' acts: the boss comes at 4:00 (shortened from D2 Survivors' 6:00 for tempo); a named
+// leader (with followers) at 1:30 and 3:10; a pack of champions every minute.
+export const BOSS_AT = 4 * 60;
 
 // 레이드: 키운 직업이 모두 모여 거대한 보스 하나를 친다. 고른 직업으로 들어가고, 나머지 직업은 각자의
 // 최고 기록과 장비만큼 강한 동료로 처음부터 함께한다. 보스는 1:30에 나오며, 바닥에 붉게 예고한 칸을
@@ -631,8 +631,8 @@ RAIDS.push({ id: 'raid_gwoe', v2: true, gwoe: true, bgm: 'bs_suhwa', raid: true,
 RAIDS.sort((a, b) => a.level - b.level);
 
 export const RAID_BOSS_AT = 15, RAID_LIMIT = 8 * 60;
-export const MINI_AT = [135, 285];
-export const CHAMPIONS_AT = [90, 180, 270];
+export const MINI_AT = [90, 190];
+export const CHAMPIONS_AT = [60, 120, 180];
 
 // Shared effects: hit spark, death puff, level-up, heal, shield and the ghost a dead hero becomes.
 // Shared effects, by the site's numbers: level-up (봉황의기원), potion heal (바다의기원), 보호, 소환, and the
