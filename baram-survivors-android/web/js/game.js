@@ -1956,7 +1956,8 @@ function spawn(dt) {
     }
     // Near a wall the ring can be full of rock: try again next frame rather than lose the boss,
     // but not for ever: after half a minute the ground is simply conquered.
-    if (!addEnemy(G.boss.m, 'boss', G.boss)) {
+    const bo = addEnemy(G.boss.m, 'boss', G.boss);
+    if (!bo) {
       if (t > BOSS_AT + 30) {
         G.bossDue = false;
         G.bossT = t;
@@ -1966,6 +1967,14 @@ function spawn(dt) {
     }
     G.bossDue = false;
     G.bossT = t;
+    // A ground's boss is a fight, however strong the hero has grown (승급, cards, gear): its life
+    // grows with the hero's level and 승급, it is untouchable for its two-second entrance, and it
+    // loses at most 8% of its life a second (see hurtEnemy), so it is seen and fought, never
+    // gone the moment it comes.
+    const grow = 1 + 0.04 * Math.max(0, G.player.lvl - 15) + 0.1 * promoOf(G.cls.id);
+    bo.hp = bo.maxHp = bo.maxHp * grow;
+    bo.guardT = t + 2;
+    bo.capPerSec = 0.08;
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
@@ -2325,6 +2334,14 @@ function hurtEnemy(e, dmg, push = null) {
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
+  if (e.capPerSec) {
+    // A hunt's boss: no more than its share of life a second, whatever lands on it.
+    const sec = Math.floor(G.t);
+    if (e.capSec !== sec) { e.capSec = sec; e.capUsed = 0; }
+    dmg = Math.min(dmg, e.maxHp * e.capPerSec - e.capUsed);
+    if (!(dmg > 0)) return 0;
+    e.capUsed += dmg;
+  }
   e.hp -= dmg;
   e.flash = 0.12;
   e.shown = G.t;
