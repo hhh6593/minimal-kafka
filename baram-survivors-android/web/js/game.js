@@ -388,7 +388,7 @@ function buildStages() {
   const s = pickedStage, i = STAGES.indexOf(s), open = unlocked(i);
   const { pool, boss } = stageMonsters(s);
   const show = [pool[0], pool[Math.floor(pool.length / 2)], pool[pool.length - 1]].filter((m, k, a) => m && a.indexOf(m) === k);
-  $('#stage-info').innerHTML = `<h3>${s.name}</h3><div class="lv">적정 레벨 ${s.lv}</div>
+  $('#stage-info').innerHTML = `<h3>${s.name}</h3><div class="lv">난이도 ${'★'.repeat(Math.min(5, 1 + Math.floor(i / 3)))} · 원작 적정 Lv ${s.lv}</div>
     <p>${s.intro}</p>
     <div class="mons">${show.map(m => `<img src="assets/mon/${m.id}.png" alt="">`).join('')}</div>
     <div class="boss">보스: <b>${boss.name}</b></div>
@@ -1725,7 +1725,7 @@ function raidSpawn(dt) {
     // Tougher for a party that comes in stronger (a start above Lv 20: +6% a level).
     e.hp = e.maxHp = 11000 * G.level * (1 + 0.06 * Math.max(0, G.player.lvl - 20));
     // Its bite takes a sixth of the hero's health.
-    e.dmg = G.player.maxHp * 0.16 * raidK() + G.player.armor + G.passives.armor;
+    e.dmg = G.player.maxHp * 0.16 * raidK();
     G.aggroT = 0;
     G.bossDue = false;
     G.bossT = t;
@@ -1801,7 +1801,7 @@ function raidSpawn(dt) {
     b.lunge = 0.2;
     addShot(b, tgt, { color: '#c02838', glow: '#ff6a5a', size: 5, speed: 300, onHit: () => {
       const k = 0.12 * raidK() * (G.enraged ? 1.3 : 1);
-      if (tgt === p) hurtPlayer(p.maxHp * k + p.armor, b); else if (!tgt.down) hurtMember(tgt, tgt.maxHp * k);
+      if (tgt === p) hurtPlayer(p.maxHp * k, b, true); else if (!tgt.down) hurtMember(tgt, tgt.maxHp * k);
       addFx(G.stage.fx, tgt.x, tgt.y - 20, { scale: 0.45 });
     } });
   }
@@ -1820,7 +1820,7 @@ function raidSpawn(dt) {
     for (const x of partyBodies()) {
       const k = 0.26 * raidK() * (G.enraged ? 1.3 : 1);
       addFx(G.stage.fx, x.x, x.y - 20, { scale: 0.6 });
-      if (x === p) hurtPlayer(p.maxHp * k + p.armor, b); else hurtMember(x, x.maxHp * k);
+      if (x === p) hurtPlayer(p.maxHp * k, b, true); else hurtMember(x, x.maxHp * k);
     }
     G.groupHeal = G.t;
     say('광역기가 파티를 덮쳤습니다!', 'warn');
@@ -1883,7 +1883,7 @@ function raidMarks() {
     for (const m of G.party) if (mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) hurtMember(m, m.maxHp * mk.share);
     if (!G.dead && mk.tiles.some(([x, y]) => x === p.tx && y === p.ty)) {
       p.inv = 0;
-      hurtPlayer(mk.dmg + p.armor + G.passives.armor);
+      hurtPlayer(mk.dmg, null, true);
       say('붉은 칸에 맞았습니다!', 'warn');
     }
   }
@@ -2096,7 +2096,8 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 3000),
-    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 180 + G.level * 0.5)
+    // Deeper grounds bite harder: +15% a step (흉가, the 7th, twice the first).
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 180 + G.level * 0.5) * (1 + 0.15 * G.level)
       * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
@@ -2305,10 +2306,14 @@ function barred(e) {
   return G.skills.some(s => SKILLS[s.id].kind === 'aura');
 }
 
-function hurtPlayer(dmg, from = null) {
+function hurtPlayer(dmg, from = null, pierce = false) {
   const p = G.player;
   if (G.buffs.guard > G.t || p.inv > 0) return;
-  let taken = Math.max(1, dmg - p.armor - G.passives.armor);
+  // 방어: a share of each blow, not a flat amount (taken off flat, a good shield turned every
+  // monster's bite into 1): 10 cuts a third, 20 half, never more than 70%.
+  // A raid boss's blows are measured on the hero's life and go through armor.
+  const ac = pierce || (from && from.kind === 'boss' && G.stage.raid) ? 0 : Math.max(0, p.armor + 2 * G.passives.armor);
+  let taken = Math.max(1, dmg * Math.max(0.3, 20 / (20 + ac)));
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
   // 반탄공: the blow comes back threefold.
   if (from && from.m && G.buffs.reflect > G.t) later(0.05, () => hurtEnemy(from, taken * 3));

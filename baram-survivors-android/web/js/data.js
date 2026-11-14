@@ -424,7 +424,7 @@ export const PASSIVES = {
   speed: { name: '민첩', item: 'p_speed', max: 5, desc: '이동 속도 +8%' },
   area: { name: '공력', item: 'p_area', max: 5, desc: '마법이 닿는 거리와 범위가 늘어난다' },
   magnet: { name: '노획', item: 'magnet', max: 5, desc: '떨어진 돈과 물건을 더 멀리서 줍는다' },
-  armor: { name: '무장', item: 'p_armor', max: 5, desc: '받는 피해 -1' },
+  armor: { name: '무장', item: 'p_armor', max: 5, desc: '방어 +2 (받는 피해가 줄어듭니다)' },
   mana: { name: '공력증강', item: 'potion', max: 5, desc: '마력 회복 +25%' },
 };
 
