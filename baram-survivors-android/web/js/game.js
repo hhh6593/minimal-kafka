@@ -1552,7 +1552,7 @@ function ringTile(must = false) {
 // 2:50. The grounds map onto the five acts in order.
 // A survivors game is a horde: the field opens full (24 even on the first ground) and swells to
 // 130~190 by 5:00, the monsters in it weaker one by one (see HORDE) so they fall in a blow or two.
-const FLOOR_OPEN = [24, 50, 65, 75, 85], FLOOR_FIVE = [130, 150, 170, 180, 190];
+const FLOOR_OPEN = [24, 40, 50, 60, 70], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 320;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
 const HORDE = { hp: 0.65, dmg: 0.7 };
@@ -3878,7 +3878,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
-  v *= 1.4;
+  v *= 1.2;
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
