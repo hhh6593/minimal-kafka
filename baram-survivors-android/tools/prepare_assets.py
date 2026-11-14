@@ -15,6 +15,7 @@ What it writes:
   item/<id>.png    the item icons the game uses
   hero/<id>.png    the four class portraits
   icon/<id>.png    each effect's fullest frame, cropped, for spell slots
+  skillicon/<id>.png  the 8·9차 spells' own icons (GEAR_DIR/skillicon/)
   ui/...           the world maps for the hunting-ground picker
   audio/...        whatever sound files AUDIO_DIR holds (see README)
   manifest.json    sizes, frame timings and blending of all of the above
@@ -325,6 +326,16 @@ def main():
             im = trim(Image.open(os.path.join(gear_src, n)).convert("RGBA"))
             im.save(os.path.join(out, "gear", f"g{i}.png"), optimize=True)
             manifest["gear"][n[:-4]] = {"id": f"g{i}", "w": im.width, "h": im.height}
+
+    # The 8·9차 spells' own icons, cut from the game's skill window (GEAR_DIR/skillicon/<id>.png,
+    # tools/skill_icons.py).
+    sdir = os.path.join(gear_src, "skillicon") if gear_src else None
+    manifest["skillicon"] = []
+    if sdir and os.path.isdir(sdir):
+        os.makedirs(os.path.join(out, "skillicon"), exist_ok=True)
+        for n in sorted(x for x in os.listdir(sdir) if x.endswith(".png")):
+            Image.open(os.path.join(sdir, n)).convert("RGB").save(os.path.join(out, "skillicon", n), optimize=True)
+            manifest["skillicon"].append(n[:-4])
 
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.

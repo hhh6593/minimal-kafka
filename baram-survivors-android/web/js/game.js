@@ -94,6 +94,10 @@ async function boot() {
   await Promise.all(paths.map(p => loadImage(p).then(() => {
     bar.style.width = (100 * ++done / paths.length) + '%';
   })));
+  // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
+  for (const [id, def] of Object.entries(SKILLS)) {
+    if (def.tint && M.fx[def.fx]) M.fx['s_' + id] = { ...M.fx[def.fx], src: def.fx, tint: def.tint, k: def.fxk };
+  }
   for (const m of M.monsters) {
     const img = images[`mon/${m.id}.png`];
     if (img && img.width) monsterById[m.id] = { ...m, area: m.w * m.h, img };
@@ -1192,7 +1196,7 @@ function treeSpell(id, opts = {}) {
   const mine = G && G.skills.find(x => x.id === id);
   el.className = 'spell' + (def.evolved ? ' final' : '') + (mine ? ' have' : '')
     + (G && !mine && (def.req || 1) > G.player.lvl ? ' lock' : '');
-  el.append(fx ? fxIcon(fx) : itemIcon('p_power'));
+  el.append(skillIcon(id, fx));
   const t = document.createElement('div');
   const grown = !mine && G && G.skills.some(x => x.from === id || x.from2 === id);
   // A 승급 spell not yet opened: which conquest opens it.
@@ -1477,8 +1481,9 @@ function update(dt) {
         if (s.timer < 0) s.timer = st.cd;
         // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
         if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
-        // In a raid the 전사 is the party's main blade: its strikes cut the boss half again as deep.
-        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.5;
+        // In a raid the 전사 is the party's main blade: its strikes cut the boss more than twice as deep
+        // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
+        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 2.2;
         cast(s, st);
       }
     }
@@ -2546,8 +2551,9 @@ function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
+  // 5차+ spells draw their effect in their own colour (s_<id>, made at boot from def.tint).
   const fxid = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
-    : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : def.fx;
+    : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : M.fx['s_' + skill.id] ? 's_' + skill.id : def.fx;
   const p = G.player;
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
   // (in a raid the boss is the fight; a warrior's 백호참 or 동귀어진 should not cut the air).
@@ -3989,7 +3995,7 @@ function nextChoice() {
     if (o.type === 'skill') {
       const def = SKILLS[o.id];
       const lvFx = def.fxs ? def.fxs[Math.min(o.lv, def.fxs.length) - 1] : def.fx;
-      icon = !lvFx ? itemIcon('p_power') : fxIcon(lvFx);
+      icon = skillIcon(o.id, lvFx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
       tag = (o.mastered ? '숙련' : o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
@@ -4082,6 +4088,20 @@ function fxIcon(id) {
   const im = document.createElement('img');
   im.src = `assets/icon/${id}.png`;
   im.className = 'item';
+  return im;
+}
+
+/** A spell's icon: the game's own for the 8·9차 spells, else its effect's, in its colour. */
+function skillIcon(id, fx) {
+  if (M.skillicon && M.skillicon.includes(id)) {
+    const im = document.createElement('img');
+    im.src = `assets/skillicon/${id}.png`;
+    im.className = 'item skillicon';
+    return im;
+  }
+  if (!fx) return itemIcon('p_power');
+  const im = fxIcon(fx);
+  if (SKILLS[id].tint) im.style.filter = SKILLS[id].tint;
   return im;
 }
 
@@ -4314,11 +4334,12 @@ function fxFrame(d, t, loop) {
 
 function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   const f = M.fx[id];
-  const im = images[`fx/${id}.png`];
+  const im = images[`fx/${f.src || id}.png`];
   const i = fxFrame(durs(id), t, loop);
-  const w = f.w * scale, h = f.h * scale;
+  const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
   ctx.save();
   if (f.add) ctx.globalCompositeOperation = 'lighter';
+  if (f.tint) ctx.filter = f.tint;
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
   ctx.drawImage(im, i * f.w, 0, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);

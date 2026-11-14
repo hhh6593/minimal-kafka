@@ -384,6 +384,32 @@ for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[into].evolved = true;
   SKILLS[into].desc = `${SKILLS[from].name} 8단 + 9차 승급. ` + SKILLS[into].desc;
 }
+// The 5차+ spells' own looks. The old site has an effect for every spell up to 4차; past that
+// the game borrows them, so each spell here picks its own (some from effects no spell used)
+// and its own colour, drawn as a canvas/CSS filter over the effect and its icon: no two read
+// alike. [effect, colour, size]. c(h): recolour to hue h; h(d): turn the hues by d degrees.
+// 8·9차 spells also carry the real icon from the game's own skill window (assets/skillicon/).
+const c = h => `sepia(1) saturate(5) hue-rotate(${h - 40}deg)`;
+const LOOKS = {
+  w_rush: ['22', c(205), 1.3], w_stone: ['9', c(35), 1.2], w_dragon: ['140', c(55), 1.3],
+  w_frenzy: ['25', c(0), 1], w_thunder: ['141', c(55), 1], w_flash: ['139', c(200), 1],
+  w_blackdragon: ['141', c(350), 1.25], w_sentence: ['20', c(170), 1.2], w_dawn: ['21', c(15), 1.3],
+  w_swords: ['22', c(185), 1.4], w_advance: ['121', c(45), 1.2],
+  r_venom: ['37', c(110), 1.2], r_phantom: ['51', c(275), 1], r_shuriken: ['145', c(0), 0.9],
+  r_hidden: ['144', c(260), 1], r_bloom: ['145', c(330), 1], r_kill: ['144', c(0), 1],
+  r_flamesword: ['144', c(290), 1.2], r_shadowstar: ['37', c(270), 1.4], r_shadowclone: ['51', c(215), 1.2],
+  r_bloodslash: ['145', c(350), 1.2], r_chainstar: ['145', c(240), 1.1],
+  m_frost: ['68', c(195), 1.3], m_wisdom: ['115', c(280), 1], m_desert: ['148', c(40), 1],
+  m_twin: ['89', c(275), 1.2], m_cross: ['147', c(200), 1], m_inferno: ['148', c(10), 1],
+  m_thunderball: ['118', c(205), 1], m_shift: ['98', c(210), 1], m_coldveil: ['96', c(220), 1.2],
+  m_gale: ['148', c(150), 1.1], m_shards: ['129', c(185), 1.2],
+  p_judge: ['89', c(50), 1.2], p_wargod: ['132', c(0), 1], p_burst: ['131', c(45), 1.1],
+  p_realm: ['13', c(120), 1.3], p_bagua: ['134', c(50), 1], p_dragongod: ['150', c(200), 1],
+  p_flash: ['68', c(190), 1.2], p_bind: ['115', c(50), 1.2], p_warmth: ['125', c(205), 1],
+  p_thunderbomb: ['129', c(30), 1.3], p_skyspirit: ['135', c(185), 1.1],
+};
+for (const [id, [fx, tint, k]] of Object.entries(LOOKS)) Object.assign(SKILLS[id], { fx, tint, fxk: k });
+
 // 승급 효과: each 승급 makes the class a little stronger for good (피해 +4%, 체력 +8 a step).
 export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 
