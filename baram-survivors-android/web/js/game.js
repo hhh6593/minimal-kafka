@@ -96,7 +96,7 @@ async function boot() {
   })));
   // 연's own effects where the build has them: the spell's picture as it is, no tint.
   for (const [id, fx] of Object.entries(YEON_FX)) {
-    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, tint: null, fxk: 1, modern: null });
+    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
@@ -2628,7 +2628,7 @@ function cast(skill, st) {
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
   // 5차+ spells draw their effect in their own colour (s_<id>, made at boot from def.tint).
-  const fxBase = def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
+  const fxBase = def.yeon ? def.fx : def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : M.fx['s_' + skill.id] ? 's_' + skill.id : def.fx;
   // A spell grows with its 단, as a survivors weapon does: its picture 6% larger a step.
   const fxid = grownFx(fxBase, skill.lv);
@@ -2851,7 +2851,7 @@ function cast(skill, st) {
       addFx(fxid, 0, -26, { follow: true, scale: 1.4 });
       // As 바람의나라 연 draws its great spells: the picture rains all over the screen in waves.
       scatterFx(fxid, 14, 1.3);
-      all.slice(0, 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: 0.9 }));
+      all.slice(0, M.fx[fxid] && M.fx[fxid].cls === 'yeon' ? 3 : 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: M.fx[fxid] && M.fx[fxid].cls === 'yeon' ? 0.6 : 0.9 }));
       later(0.35, () => {
         G.shake = Math.max(G.shake, 0.25);
         for (const e of all) {
@@ -3671,7 +3671,7 @@ function scatterFx(id, n, scale) {
   // Light (drawn added) copies well; a solid picture repeated large reads as blocks: fewer, smaller.
   const f = M.fx[id];
   if (f && f.cls === 'modern') return; // today's pictures are already large, and dark-backed
-  if (f && f.cls === 'yeon') { n = Math.min(n, 6); scale = Math.min(scale, 0.75); } // 연's are large already
+  if (f && f.cls === 'yeon') { n = Math.min(n, 3); scale = Math.min(scale, 0.6); } // 연's are large already
   if (f && !f.add) { n = Math.ceil(n / 3); scale = Math.min(scale, 1); }
   for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
 }

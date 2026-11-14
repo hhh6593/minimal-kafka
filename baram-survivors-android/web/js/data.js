@@ -416,12 +416,17 @@ for (const [id, [fx, tint, k]] of Object.entries(LOOKS)) Object.assign(SKILLS[id
 export const YEON_FX = {
   w_rush: 'y_gwangya', w_stone: 'y_baram', w_frenzy: 'y_frenzy', w_sentence: 'y_pilsal', w_advance: 'y_geukmyeol',
   w_swords: 'y_muhyeong', w_dragon: 'y_gwonmu',
-  r_venom: 'y_hyeoldok', r_hidden: 'y_suhyo', r_chainstar: 'y_chains', r_bloodslash: 'y_hyeolgi',
+  r_venom: 'y_hyeoldok', r_phantom: 'y_suhyo', r_chainstar: 'y_chains', r_bloodslash: 'y_hyeolgi',
   r_flamesword: 'y_jujak',
   m_cross: 'y_sipja', m_shift: 'y_magisun', m_coldveil: 'y_honma', m_desert: 'y_yeomhwa', m_thunderball: 'y_gwangpok',
   m_frost: 'y_hyeonmu',
   p_realm: 'y_seongi', p_bind: 'y_roots', p_thunderbomb: 'y_bonghwang', p_wargod: 'y_gwonsin',
   p_skyspirit: 'y_jeongi',
+  // 4차 승급 previews (the official 4차 승급 notice) and 6차 승급 (its patch notes).
+  w_ungong: 'y_ungong', w_roar2: 'y_geukbaekho', r_gaehyeol: 'y_gaehyeol', p_phoenix: 'y_phoenix', p_guard: 'y_geumgang',
+  m_twin: 'y_saseul', w_chohon: 'y_chohon', r_hidden: 'y_chimyeong', m_inferno: 'y_jiok', p_bagua: 'y_bagua',
+  w_blood: 'y_geukjin', r_shuriken: 'y_hwasal', w_dragon: 'y_hwaryong', r_kill: 'y_jaa',
+  m_shards: 'y_seori',
 };
 
 // 승급 효과: each 승급 makes the class a little stronger for good (피해 +4%, 체력 +8 a step).
