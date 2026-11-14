@@ -409,17 +409,18 @@ const LOOKS = {
   p_thunderbomb: ['129', c(30), 1.3], p_skyspirit: ['135', c(185), 1.1],
 };
 for (const [id, [fx, tint, k]] of Object.entries(LOOKS)) Object.assign(SKILLS[id], { fx, tint, fxk: k });
-// 바람의나라 연's own effects (the official 5차 승급 skill previews, the 마도사's, 주작 and 현무):
+// 바람의나라 연's own effects (the official 5차 승급 skill previews, the 마도사's, 주작 and 현무; previews
+// with the test character standing in them are left out):
 // where one matches a spell, it is that spell's picture, untinted. A build without them keeps
 // the looks above (game.js checks M.fx).
 export const YEON_FX = {
   w_rush: 'y_gwangya', w_stone: 'y_baram', w_frenzy: 'y_frenzy', w_sentence: 'y_pilsal', w_advance: 'y_geukmyeol',
-  w_swords: 'y_muhyeong', w_blackdragon: 'y_hyeolma', w_dragon: 'y_gwonmu',
-  r_venom: 'y_hyeoldok', r_hidden: 'y_suhyo', r_shuriken: 'y_gigong', r_chainstar: 'y_chains', r_bloodslash: 'y_hyeolgi',
+  w_swords: 'y_muhyeong', w_dragon: 'y_gwonmu',
+  r_venom: 'y_hyeoldok', r_hidden: 'y_suhyo', r_chainstar: 'y_chains', r_bloodslash: 'y_hyeolgi',
   r_flamesword: 'y_jujak',
   m_cross: 'y_sipja', m_shift: 'y_magisun', m_coldveil: 'y_honma', m_desert: 'y_yeomhwa', m_thunderball: 'y_gwangpok',
   m_frost: 'y_hyeonmu',
-  p_realm: 'y_seongi', p_bind: 'y_roots', p_thunderbomb: 'y_bonghwang', p_wargod: 'y_gwonsin', p_judge: 'y_jeukchuk',
+  p_realm: 'y_seongi', p_bind: 'y_roots', p_thunderbomb: 'y_bonghwang', p_wargod: 'y_gwonsin',
   p_skyspirit: 'y_jeongi',
 };
 
