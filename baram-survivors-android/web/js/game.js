@@ -286,7 +286,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
-  Z = Math.max(1, Math.round(canvas.height / 470));
+  // Closer than the old client's view, as 바람의나라 연 frames a hunt: half steps keep the pixels even.
+  Z = Math.max(1, Math.round(canvas.height / 270 * 2) / 2);
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -3680,7 +3681,7 @@ function grownFx(id, lv) {
   if (!M.fx[key]) {
     // 연's spells are drawn large over the field: a quarter larger to begin, 6% more a 단.
     const f = M.fx[id];
-    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * 1.25 * (1 + 0.06 * (lv - 1)) };
+    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * 1.4 * (1 + 0.06 * (lv - 1)) };
   }
   return key;
 }
@@ -4816,6 +4817,10 @@ function drawMonster(b, x, y, s, alpha = 1) {
   ctx.globalAlpha = alpha;
   ctx.translate(Math.round(x), Math.round(cy - lift));
   ctx.rotate(ang);
+  const sil = silhouette(img), o = Math.max(1, s);
+  ctx.globalAlpha = alpha * 0.85;
+  for (const [ox, oy] of [[-o, 0], [o, 0], [0, -o], [0, o]]) ctx.drawImage(sil, -w / 2 + ox, -h / 2 + oy, w, h);
+  ctx.globalAlpha = alpha;
   ctx.drawImage(img, -w / 2, -h / 2, w, h);
   if (b.flash > 0) ctx.drawImage(white(img), -w / 2, -h / 2, w, h);
   ctx.restore();
@@ -4839,6 +4844,11 @@ function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1,
   // Leaning into the walk: the top a little ahead of the feet.
   if (lean) ctx.transform(1, 0, -lean * 0.12, 1, 0, 0);
   ctx.scale(face, 1);
+  // 연's sprites wear a dark outline: the silhouette a pixel out on four sides, under the picture.
+  const sil = silhouette(img), o = Math.max(1, scale);
+  ctx.globalAlpha = alpha * 0.85;
+  for (const [ox, oy] of [[-o, 0], [o, 0], [0, -o], [0, o]]) ctx.drawImage(sil, -w / 2 + ox, -h + oy, w, h);
+  ctx.globalAlpha = alpha;
   ctx.drawImage(img, -w / 2, -h, w, h);
   if (flash > 0) {
     ctx.globalAlpha = alpha;
@@ -4987,6 +4997,24 @@ function render(now) {
   ctx.globalAlpha = 1;
 
   // Spell effects over everything, at their own size.
+  // 연's spells glow: a soft light of the class's colour under each effect while it plays.
+  const glow = (CLASS_GLOW[G.cls.id] || ['#fff'])[0];
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const f of G.fxs) {
+    if (f.t < 0 || f.loop || f.life < 0.15) continue;
+    const fm = M.fx[f.id];
+    if (!fm) continue;
+    const x = f.follow ? p.x + f.x : f.x, y = (f.follow ? p.y + f.y : f.y) - (f.anchor === 'bottom' ? fm.h * f.scale * (fm.k || 1) / 2 : 0);
+    const r = Math.max(fm.w, fm.h) * f.scale * (fm.k || 1) * 0.55, k = Math.sin(Math.PI * Math.min(1, f.t / f.life));
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, glow);
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.35 * k;
+    ctx.fillStyle = gr;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.restore();
   for (const f of G.fxs) {
     if (f.t < 0) continue;
     const x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
@@ -5123,6 +5151,13 @@ function drawHero(now, hidden) {
   // The wardrobe figure: four directions, four walking frames, attack and casting poses.
   const dir = facing(p.fdx, p.fdy);
   const pose = p.poseT > 0 ? p.pose : p.moving ? 'walk' : 'idle';
+  // The hero's dark outline, as 연 draws its sprites: the figure in black a pixel out on four sides.
+  if (!hidden) {
+    ctx.save();
+    ctx.filter = 'brightness(0)';
+    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) drawAvatar(ctx, p.av, p.x + ox, p.y + oy, dir, pose, Math.floor(p.walkT / WALK_MS), 0.85);
+    ctx.restore();
+  }
   drawAvatar(ctx, p.av, p.x, p.y, dir, pose, Math.floor(p.walkT / WALK_MS), hidden ? 0.35 : 1);
 }
 
@@ -5157,10 +5192,10 @@ function drawEmote(who, x, y) {
 }
 
 function drawBubble(text, x, y, age = 0) {
-  // A shout over a character's head, drawn as the old client drew them (see the 노획 capture):
-  // a pill of near-black maroon with a violet rim and violet letters, a small tail below.
+  // A shout over a character's head, as 바람의나라 연 draws them: a dark see-through pill with a
+  // thin light rim and white letters, a small tail below.
   if (!settings.bubbles) return;
-  const RIM = '#5c58d7', EDGE = '#1c0d3a', FILL = '#251117';
+  const RIM = 'rgba(230,230,235,0.9)', EDGE = 'rgba(0,0,0,0.5)', FILL = 'rgba(22,22,28,0.82)';
   ctx.save();
   ctx.globalAlpha = age < 1 ? 1 : Math.max(0, 1 - (age - 1) / 0.3);
   ctx.font = 'bold 12px G11';
@@ -5192,7 +5227,7 @@ function drawBubble(text, x, y, age = 0) {
   ctx.fillRect(x - 1, t + h, 3, 1);
   ctx.fillStyle = EDGE;
   ctx.fillRect(x, t + h + 1, 1, 1);
-  ctx.fillStyle = RIM;
+  ctx.fillStyle = '#ffffff';
   ctx.fillText(text, x, t + 14);
   ctx.restore();
 }
