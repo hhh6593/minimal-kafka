@@ -1485,6 +1485,12 @@ function update(dt) {
         // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
         if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 2.2;
         cast(s, st);
+        // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
+        // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
+        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) {
+          const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0 && tdist(e, p) <= 5);
+          if (bo) later(0.2, () => { if (bo.hp > 0) hurtEnemy(bo, st.dmg * 0.8); });
+        }
       }
     }
     plainAttack(dt);
