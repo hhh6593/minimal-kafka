@@ -1483,7 +1483,7 @@ function update(dt) {
         if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
         // In a raid the 전사 is the party's main blade: its strikes cut the boss more than twice as deep
         // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
-        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 2.2;
+        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.8;
         cast(s, st);
         // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
         // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
