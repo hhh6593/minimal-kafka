@@ -42,7 +42,11 @@ LAYERS = {
     'back': ['Hair_b'], 'body': ['Sprite'], 'armor': ['Skin'], 'head': ['Head', 'Hair'],
     'helmet': ['Hat', 'Hat_color'], 'shield': ['Sheild', 'Sheild_color'],
     'weapon': ['Weapon', 'Weapon_color', 'Weapon_back'],
+    # The template keys the cape's place and sorting but leaves its sprite empty: the game
+    # picks the cape frame from the body's (cape_E_<body frame - 21>).
+    'cape': ['Cape'],
 }
+CAPE_OFFSET = 21
 # Slots drawn from the template as they are (the beard of the template's face is left off).
 DROP = {'Face', 'Cape', 'Cape_color', 'Emotion'}
 
@@ -63,8 +67,10 @@ POOL = {
     'shield': [7201, 7202, 7203, 7204, 7006, 7008, 507001, 507023],
     'helmet': {'warrior': [2006, 202037], 'rogue': [2006, 202043], 'mage': [2006, 202055], 'poet': [2006, 202049]},
 }
-DRAGON = {'mage': [(1, 1409), (4, 1412)], 'poet': [(1, 1307), (4, 1310), (10, 1316)],
-          'warrior': [(1, 1170), (7, 1172)], 'rogue': [(1, 1256), (7, 1272)]}
+# The 용무기 lines (Items_Weapon tags C(itd1..4) = Job_1..4: 전사, 도적, 주술사, 도사):
+# step n is item base + n - 1; a step without a worn sheet wears the nearest lower one.
+DRAGON = {'warrior': 1207, 'rogue': 1110, 'mage': 1409, 'poet': 1307}
+POOL['cape'] = {c: [4055, 504001, 504021] for c in ('warrior', 'rogue', 'mage', 'poet')}
 
 
 def tex_for(catalog, iid, kind):
@@ -77,7 +83,7 @@ def tex_for(catalog, iid, kind):
         if c['tex'].lower() in want or c['stem'].lower() == f'item_{iid}_e' \
                 or (kind == 'shield' and c['id'] == str(iid) and c['stem'] == 'Shield_0001'):
             # A worn sheet, not the item's icon: as many frames as the slot uses.
-            if c['n'] < {'armor': 77, 'weapon': 4, 'shield': 3, 'helmet': 9}.get(kind, 1) or (kind == 'armor' and c['n'] != 77):
+            if c['n'] < {'armor': 77, 'weapon': 4, 'shield': 3, 'helmet': 9, 'cape': 50}.get(kind, 1) or (kind == 'armor' and c['n'] != 77):
                 continue
             if best is None or c['n'] > best['n']:
                 best = c
@@ -158,12 +164,14 @@ def main():
                     m[kind][f"t{x['t']}"] = v
                     review.append((cls, kind, f"t{x['t']} {x['name']}", v, variants[cls][(kind, v)][2]))
         # 용무기 by step
+        last = None
         for step in range(1, 11):
-            iid = [i for s, i in DRAGON[cls] if s <= step][-1]
-            v = wadd(iid)
+            v = wadd(DRAGON[cls] + step - 1) or last
+            last = v
             if v:
                 m['weapon'][f'dragon{step}'] = v
                 review.append((cls, 'weapon', g['dragon']['names'][step - 1], v, variants[cls][('weapon', v)][2]))
+        m['weapon'][f"t{g['dragon']['tier']}"] = m['weapon'].get('dragon1')
         # crafted specials
         for c in g['crafts']:
             kind = c['kind']
@@ -187,6 +195,8 @@ def main():
                     v = pl[-1] if c['legend'] else pl[len(pl) // 2]
             elif kind == 'helmet':
                 v = wadd(POOL['helmet'][cls][-1], 'helmet')
+            elif kind == 'cape':
+                v = wadd(POOL['cape'][cls][-1 if 'steel' in c['id'] else 1], 'cape')
             if v:
                 m[kind][c['id']] = v
             review.append((cls, kind, f"{c['id']} {c['name']}", v or '(none)',
@@ -259,6 +269,15 @@ def main():
             for slot in LAYERS[kind]:
                 k = crc.get(slot)
                 s = st.get(k) if k is not None else None
+                if kind == 'cape':
+                    body = st[0]['sprite']
+                    if not s or not s['active'] or body is None or not body.path_id:
+                        continue
+                    bi = int(body.read().m_Name.rsplit('_', 1)[1]) - CAPE_OFFSET
+                    alt = bytex.get((variants[cls][(kind, variant)][0], str(bi)))
+                    if alt is not None:
+                        out_l.append(place(s, alt, alt, root))
+                    continue
                 if not s or not s['active'] or s['sprite'] is None or not s['sprite'].path_id:
                     continue
                 try:
@@ -294,8 +313,8 @@ def main():
             for fi, (t, st) in enumerate(fr):
                 orders = {}
                 for kind, slots in LAYERS.items():
-                    os_ = [st[crc[s]]['order'] for s in slots if s in crc and crc[s] in st
-                           and st[crc[s]]['sprite'] is not None and st[crc[s]]['sprite'].path_id and st[crc[s]]['active']]
+                    os_ = [st[crc[s]]['order'] for s in slots if s in crc and crc[s] in st and st[crc[s]]['active']
+                           and (kind == 'cape' or (st[crc[s]]['sprite'] is not None and st[crc[s]]['sprite'].path_id))]
                     if os_:
                         orders[kind] = min(os_)
                 z[key].append([k for k, _ in sorted(orders.items(), key=lambda kv: (kv[1], list(LAYERS).index(kv[0])))])
