@@ -3425,6 +3425,8 @@ function drawTown(now) {
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
     if (b.hero) {
+      // In town too, the hero in 연's own figure, in the gear it has on.
+      if (drawYhero2(T.cls, savedGear(T.cls), T, T.x, T.y, T.moving ? 'walk' : 'idle', 1)) continue;
       if (T.av) drawAvatar(ctx, T.av, T.x, T.y, facing(T.fdx, T.fdy), T.moving ? 'walk' : 'idle', Math.floor(T.walkT / WALK_MS));
       continue;
     }
@@ -6374,6 +6376,7 @@ window.__gearTest = () => {
   for (const [k, v] of Object.entries(keep)) if (!k.endsWith('Sp')) wear(k, v, keep[k + 'Sp'] || null);
   return { cls: c, tried: ['weapon', 'armor', 'shield'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
 };
+window.__dragonTier = () => dragonTier(G.cls);
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
