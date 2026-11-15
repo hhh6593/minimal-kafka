@@ -15,13 +15,14 @@ Writes OUT_DIR/ytown/:
   <area>.png        each area rendered from its own 32-pixel tiles (market, smithy, armor, jumak;
                     named apart from the folk's pictures)
   <role>.png        the townsfolk: 연's 국내성 NPCs (털보, 떼보, 왈숙 이모, the palace lady, the board)
-  warp.png, warp_light.png, illusion.png   연's warp floor, its glow, the phantom portal (4 frames)
+  sign.png, statue.png    a 장승 for the ways out, 연's guardian statue for the raids
+  mm_<area>.png     each area's minimap (연's own for the market)
   index.json        {"areas": {area: {"w", "h", "tile", "cols", "rows", "walk": [rows, "." walkable],
                      "spawn": [x, y]}}, "folk": {role: {"cell", "foot", "row", "n", "ms"}},
                      "spots": {role: {"area", "x", "y"}},
                      "doors": [{"area", "x", "y", "to", "label"}],      warp floors between areas
                      "exits": {area: {"x", "y"}},                       each house's way out
-                     "portals": [{"x", "y", "tab", "label", "art"}]}    the market's gates
+                     "portals": [{"x", "y", "r", "tab", "label", "art", "sign"}]}   the ways out
 """
 import json
 import os
@@ -56,10 +57,18 @@ SPOTS = {'smith': ('smithy', 400, 300), 'merchant': ('armor', 384, 262), 'inn': 
 # own @WARP object.
 DOORS = [('market', 640, 640, 'smithy', '대장간'), ('market', 1376, 640, 'armor', '갑옷점'),
          ('market', 736, 1088, 'jumak', '주막')]
-# The market's gates as portals: its lower gate and its upper warp (연's own), and the two
-# sides. tab: the hunting-ground map they open.
-PORTALS = [(992, 1600, 'gungnae', '남문 · 국내성 사냥터', 'warp'), (560, 352, 'world_1', '북문 · 대륙', 'warp'),
-           (1728, 992, 'world_4', '포구 · 환상의 섬', 'warp'), (288, 992, 'raid', '환영의 문 · 레이드', 'illusion')]
+# The ways out of town, in the market's own pixels: walking into the 남문's opening, up through
+# the hall to the north road, out along the hall's east end towards the 포구 — each with a 장승
+# (연's wooden totem post) and its name beside it — and the stone guardian statue on the square,
+# 연's own, whose base opens the raids. tab: the hunting-ground map each opens.
+PORTALS = [
+    {'x': 1008, 'y': 1592, 'r': 40, 'tab': 'gungnae', 'label': '남문 · 국내성 사냥터', 'art': 'gate', 'sign': (912, 1568)},
+    {'x': 1024, 'y': 280, 'r': 40, 'tab': 'world_1', 'label': '북쪽 길 · 대륙', 'art': 'gate', 'sign': (944, 576)},
+    {'x': 1760, 'y': 384, 'r': 40, 'tab': 'world_4', 'label': '포구 가는 길 · 환상의 섬', 'art': 'gate', 'sign': (1712, 470)},
+    {'x': 352, 'y': 1188, 'r': 26, 'tab': 'raid', 'label': '영웅의 석상 · 레이드', 'art': 'statue', 'sign': None},
+]
+# The minimap of each area: 연's own (Minimaps bundle, the whole map at a quarter) for the market.
+MINIMAP = {'market': ('chip_kow_guknesung_marget_m', 0.25)}
 SPAWN = (992, 1500)
 
 
@@ -126,21 +135,47 @@ def main():
             im.save(os.path.join(d, want[n] + '.png'))
             folk[want[n]] = {'cell': list(im.size), 'foot': [im.width // 2, im.height - 2], 'row': 0, 'n': 1, 'ms': 1000}
 
-    # 연's warp floor and its glow, and the phantom portal (a 2x2 sheet of frames, halved).
-    art = {'Warp_Floor': 'warp', 'Warp_Floor_light': 'warp_light', 'Phantom_Guknesung_Illusion_Portal_A': 'illusion'}
+    # 연's minimap of each area (its own where 연 has one, else the area drawn small), cropped to
+    # the area, at most 180 pixels across.
+    mmaps = os.path.join(os.path.dirname(maps), 'Minimaps_1001.unity3d')
+    own = {}
+    if os.path.isfile(mmaps):
+        names = {v[0]: k for k, v in MINIMAP.items()}
+        for o in UnityPy.load(mmaps).objects:
+            if o.type.name == 'Texture2D' and o.peek_name() in names:
+                own[names[o.peek_name()]] = o.read().image.convert('RGB')
+    for key in areas:
+        if key in own:
+            k = MINIMAP[key][1]
+            ox, oy = shift[key]
+            mm = own[key].crop((round(ox * k), round(oy * k), round((ox + areas[key]['w']) * k), round((oy + areas[key]['h']) * k)))
+        else:
+            mm = Image.open(os.path.join(d, key + '.png'))
+        z = 180 / max(mm.size)
+        mm = mm.resize((round(mm.width * z), round(mm.height * z)), Image.LANCZOS)
+        mm.save(os.path.join(d, 'mm_' + key + '.png'))
+        areas[key]['mm'] = [mm.width, mm.height]
+
+    # The 장승 by each way out (one post of 연's totem row) and the guardian statue.
     for o in UnityPy.load(objects).objects:
-        if o.type.name == 'Texture2D' and o.peek_name() in art:
+        if o.type.name != 'Texture2D':
+            continue
+        n = o.peek_name()
+        if n == 'Totem':
             im = o.read().image.convert('RGBA')
-            if art[o.peek_name()] == 'illusion':
-                im = im.resize((im.width // 2, im.height // 2), Image.LANCZOS)
-            im.save(os.path.join(d, art[o.peek_name()] + '.png'))
+            post = im.crop((0, 0, im.width // 6, im.height))
+            post.crop(post.getbbox()).save(os.path.join(d, 'sign.png'))
+        elif n == 'Object_1066':
+            im = o.read().image.convert('RGBA')
+            im.crop(im.getbbox()).save(os.path.join(d, 'statue.png'))
 
     index = {'areas': areas, 'folk': folk,
              'spots': {k: dict(zip(('area', 'x', 'y'), [a] + at(a, x, y))) for k, (a, x, y) in SPOTS.items()},
              'doors': [dict(zip(('area', 'x', 'y', 'to', 'label'), [a] + at(a, x, y) + [to, label])) for a, x, y, to, label in DOORS],
              'exits': exits,
-             'portals': [dict(zip(('x', 'y', 'tab', 'label', 'art'), at('market', x, y) + [tab, label, art]))
-                         for x, y, tab, label, art in PORTALS]}
+             'portals': [{**{k: v for k, v in pt.items() if k not in ('x', 'y', 'sign')},
+                          'x': at('market', pt['x'], pt['y'])[0], 'y': at('market', pt['x'], pt['y'])[1],
+                          'sign': at('market', *pt['sign']) if pt['sign'] else None} for pt in PORTALS]}
     with open(os.path.join(d, 'index.json'), 'w', encoding='utf-8') as f:
         json.dump(index, f, ensure_ascii=False)
     print('town', {k: (v['w'], v['h']) for k, v in areas.items()}, sorted(folk), exits)

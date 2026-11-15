@@ -89,7 +89,7 @@ async function boot() {
     ...(M.npc || []).map(n => `npc/${n}.png`),
     ...(M.ui.town ? ['ui/town.png'] : []),
     ...(M.ui.ytown ? [...Object.keys(M.ui.ytown.areas).map(k => `ytown/${k}.png`), ...Object.keys(M.ui.ytown.folk).map(k => `ytown/${k}.png`),
-      'ytown/warp.png', 'ytown/warp_light.png', 'ytown/illusion.png'] : []),
+      ...Object.keys(M.ui.ytown.areas).map(k => `ytown/mm_${k}.png`), 'ytown/sign.png', 'ytown/statue.png'] : []),
     ...(M.ui.ytitle ? ['ui/title_bg.jpg'] : []),
     ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
     ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
@@ -3555,6 +3555,8 @@ function townBlocked(x, y) {
   if (m) {
     const tx = Math.floor(x / m.tile), ty = Math.floor((y - 2) / m.tile);
     if (tx < 0 || ty < 0 || tx >= m.cols || ty >= m.rows || m.walk[ty][tx] !== '.') return true;
+    // The guardian statue stands on its base: the hero walks up to it, not through it.
+    if (T.area === 'market' && M.ui.ytown.portals.some(pt => pt.art === 'statue' && Math.abs(pt.x - x) < 16 && y < pt.y - 12 && y > pt.y - 40)) return true;
     return T.folk.some(n => Math.abs(n.x - x) < 14 && y > n.y - 14 && y < n.y + 6);
   }
   const tx = Math.floor(x / TOWN_TILE), ty = Math.floor((y - 4) / TOWN_TILE);
@@ -3576,7 +3578,7 @@ function townWarps() {
   const on = (x, y) => Math.hypot(x - T.x, y - T.y) < WARP_R;
   let hit = null;
   if (T.area === 'market') {
-    for (const pt of yt.portals) if (on(pt.x, pt.y)) hit = () => openPortal(pt.tab);
+    for (const pt of yt.portals) if (Math.hypot(pt.x - T.x, pt.y - T.y) < (pt.r || WARP_R)) hit = () => openPortal(pt.tab);
     for (const d of yt.doors) {
       if (d.area === T.area && on(d.x, d.y)) {
         const ex = yt.exits[d.to] || { x: yt.areas[d.to].spawn[0], y: yt.areas[d.to].spawn[1] + 40 };
@@ -3626,27 +3628,81 @@ function updateTown(dt) {
   }
 }
 
-/** 연's warp floor (or the phantom portal) with its label, glowing. */
-function drawWarp(x, y, label, art, now) {
-  const floor = images['ytown/warp.png'], light = images['ytown/warp_light.png'], ill = images['ytown/illusion.png'];
-  ctx.save();
-  if (art === 'illusion' && ill && ill.width) {
-    // The phantom gate: its four frames (a 2 x 2 sheet) in turn.
-    const fw = ill.width / 2, fh = ill.height / 2, i = Math.floor(now * 8) % 4;
-    ctx.drawImage(ill, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh, Math.round(x - fw / 2), Math.round(y - fh * 0.62), fw, fh);
-  } else if (floor && floor.width) {
-    const w = floor.width * 0.6, h = floor.height * 0.6 * 0.55;
-    ctx.drawImage(floor, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
-    if (light && light.width) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(now * 3);
-      ctx.drawImage(light, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
-    }
-  }
-  ctx.restore();
+/** A way out of town as 연 marks one: a 장승 by the road with the place's name, or the guardian
+ * statue on its base; a door or a house's way out shows only its name. */
+function drawWayOut(pt, now) {
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
-  outline(label, x, y - (art === 'illusion' ? 52 : 16), '#9fe8ff');
+  if (pt.art === 'statue') {
+    const im = images['ytown/statue.png'];
+    const fy = pt.y - 12;
+    if (im && im.width) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, fy - 1, im.width * 0.45, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.drawImage(im, Math.round(pt.x - im.width / 2), Math.round(fy - im.height));
+    }
+    outline(pt.label, pt.x, fy + 10, '#ffd27a');
+    return;
+  }
+  const sign = images['ytown/sign.png'];
+  if (pt.sign && sign && sign.width) {
+    const [sx, sy] = pt.sign;
+    ctx.drawImage(sign, Math.round(sx - sign.width / 2), Math.round(sy - sign.height));
+    outline(pt.label, sx, sy + 10, '#ffd27a');
+  } else outline(pt.label, pt.x, pt.y - 14, '#ffd27a');
+}
+
+// 연's minimap at the top right: the area small, the hero, its people and the ways out on it.
+// A tap on it makes it larger or smaller.
+let townMapBig = false;
+function townMinimapRect() {
+  const a = townArea();
+  if (!a || !a.mm) return null;
+  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const k = (townMapBig ? 1.6 : 0.82) * d;
+  const w = a.mm[0] * k, h = a.mm[1] * k;
+  return { x: canvas.width - w - 10 * d, y: 34 * d, w, h, d };
+}
+function drawTownMinimap() {
+  const a = townArea(), r = townMinimapRect(), im = a && images[`ytown/mm_${T.area}.png`];
+  if (!r || !im || !im.width) return;
+  const yt = M.ui.ytown, { x, y, w, h, d } = r, sx = w / a.w, sy = h / a.h;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x - 3 * d, y - 3 * d, w + 6 * d, h + 6 * d);
+  ctx.strokeStyle = 'rgb(201,162,74)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(x - 2.5 * d, y - 2.5 * d, w + 5 * d, h + 5 * d);
+  ctx.globalAlpha = 0.85;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(im, x, y, w, h);
+  ctx.globalAlpha = 1;
+  const dot = (px, py, color, size, label) => {
+    const X = x + px * sx, Y = y + py * sy;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(X - size / 2 - d, Y - size / 2 - d, size + 2 * d, size + 2 * d);
+    ctx.fillStyle = color;
+    ctx.fillRect(X - size / 2, Y - size / 2, size, size);
+    if (label && townMapBig) {
+      ctx.font = `${Math.round(8 * d)}px G7`;
+      ctx.textAlign = 'center';
+      outline(label, X, Y - size, '#fff');
+    }
+  };
+  if (T.area === 'market') {
+    for (const pt of yt.portals) dot(pt.x, pt.y, '#ffb43a', 4 * d, pt.label.split(' · ')[0]);
+    for (const dr of yt.doors) dot(dr.x, dr.y, '#7ad0ff', 3 * d, dr.label);
+  } else if (yt.exits[T.area]) dot(yt.exits[T.area].x, yt.exits[T.area].y, '#7ad0ff', 3 * d, '장터');
+  for (const n of T.folk) dot(n.x, n.y, '#ffe070', 3 * d, n.label);
+  if (Math.floor(performance.now() / 400) % 2 === 0 || townMapBig) dot(T.x, T.y, '#ff3a2a', 4 * d, null);
+  ctx.font = `${Math.round(9 * d)}px G9`;
+  ctx.textAlign = 'center';
+  const names = { market: '국내성 장터', smithy: '대장간', armor: '갑옷점', jumak: '주막' };
+  outline(names[T.area] || '국내성', x + w / 2, y + h + 11 * d, '#f4e2b0');
+  ctx.restore();
 }
 
 function drawTown(now) {
@@ -3665,13 +3721,18 @@ function drawTown(now) {
   if (map && map.width) ctx.drawImage(map, 0, 0);
   if (yt) {
     if (T.area === 'market') {
-      for (const pt of yt.portals) drawWarp(pt.x, pt.y, pt.label, pt.art, now);
-      for (const d of yt.doors) drawWarp(d.x, d.y, d.label, 'warp', now);
-    } else if (yt.exits[T.area]) drawWarp(yt.exits[T.area].x, yt.exits[T.area].y, '장터로', 'warp', now);
+      for (const pt of yt.portals) if (pt.art !== 'statue') drawWayOut(pt, now);
+      for (const d of yt.doors) drawWayOut({ x: d.x, y: d.y + 4, label: d.label }, now);
+    } else if (yt.exits[T.area]) drawWayOut({ x: yt.exits[T.area].x, y: yt.exits[T.area].y + 4, label: '장터로' }, now);
   }
   const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }]);
+  if (yt && T.area === 'market') for (const pt of yt.portals) if (pt.art === 'statue') bodies.push({ statue: pt, y: pt.y - 12 });
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
+    if (b.statue) {
+      drawWayOut(b.statue, now);
+      continue;
+    }
     if (b.hero) {
       // In town too, the hero in 연's own figure, in the gear it has on.
       if (drawYhero2(T.cls, savedGear(T.cls), T, T.x, T.y, T.moving ? 'walk' : 'idle', 1)) continue;
@@ -3700,6 +3761,7 @@ function drawTown(now) {
     const top = yt && yt.folk[T.near.look] ? yt.folk[T.near.look].foot[1] + 6 : 28;
     drawBubble(T.near.line, T.near.x, T.near.y - top, 0);
   }
+  if (yt) drawTownMinimap();
 }
 
 // Test: the town as it stands (the hero, the folk, who is near), and whether a spot is walkable.
@@ -5208,6 +5270,16 @@ for (const t of ['pointerup', 'pointercancel']) {
 function tapTown(e) {
   if (T.camX === undefined) return;
   const r = canvas.getBoundingClientRect();
+  // A tap on the minimap makes it larger or smaller.
+  const mr = M.ui.ytown && townMinimapRect();
+  if (mr) {
+    const cx = (e.clientX - r.left) * (canvas.width / r.width), cy = (e.clientY - r.top) * (canvas.height / r.height);
+    if (cx > mr.x - 6 * mr.d && cx < mr.x + mr.w + 6 * mr.d && cy > mr.y - 6 * mr.d && cy < mr.y + mr.h + 16 * mr.d) {
+      townMapBig = !townMapBig;
+      audio && audio.play('click');
+      return;
+    }
+  }
   const wx = T.camX + (e.clientX - r.left) * (canvas.width / r.width) / Z;
   const wy = T.camY + (e.clientY - r.top) * (canvas.height / r.height) / Z;
   const hit = T.folk.map(n => [n, Math.abs(n.x - wx) + Math.abs(n.y - 22 - wy) * 0.7])
