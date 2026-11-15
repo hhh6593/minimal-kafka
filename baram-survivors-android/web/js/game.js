@@ -1571,11 +1571,11 @@ function ringTile(must = false) {
 const FLOOR_OPEN = [24, 30, 36, 44, 52], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 420;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
-const HORDE = { hp: 1, dmg: 1 };
+const HORDE = { hp: 1, dmg: 0.85 };
 
 /** How many times the 860 x 400 view the field shows (1 to 2): more monsters, each worth less. */
 function viewCrowd() {
-  return Math.min(2, Math.max(1, (VW * VH) / (860 * 400)));
+  return Math.min(1.5, Math.max(1, (VW * VH) / (860 * 400)));
 }
 
 function floorCount(t) {
