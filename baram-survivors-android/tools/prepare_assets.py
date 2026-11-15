@@ -371,7 +371,8 @@ def main():
 
     # 연's own spell effects (GEAR_DIR/yskill/<skill id>.png strips + index.json, from
     # tools/yeon_skills.py): fx "k_<skill id>", drawn with their own pivot on the target's feet.
-    # The screen-wide ones are stored at most 360 pixels and drawn back at their size.
+    # The screen-wide ones are stored at most 360 pixels ("scale" in the index says by how much)
+    # and drawn back at their size.
     kdir = os.path.join(gear_src, "yskill") if gear_src else None
     if kdir and os.path.isfile(os.path.join(kdir, "index.json")):
         with open(os.path.join(kdir, "index.json"), encoding="utf-8") as f:
@@ -390,7 +391,7 @@ def main():
             strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
             icon(pics, k.get("add", False)).save(os.path.join(out, "icon", fid + ".png"))
             manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
-                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / z, 3),
+                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
                                    "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
 
     for fid in HEROES:
