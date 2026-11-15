@@ -70,12 +70,12 @@ POOL = {
 # The 용무기 lines (Items_Weapon tags C(itd1..4) = Job_1..4: 전사, 도적, 주술사, 도사):
 # step n is item base + n - 1; a step without a worn sheet wears the nearest lower one.
 DRAGON = {'warrior': 1207, 'rogue': 1110, 'mage': 1409, 'poet': 1307}
-POOL['cape'] = {c: [4055, 504001, 504021] for c in ('warrior', 'rogue', 'mage', 'poet')}
+POOL['cape'] = {c: [85002, 4055, 504001, 504007, 504021, 803626] for c in ('warrior', 'rogue', 'mage', 'poet')}
 
 
 def tex_for(catalog, iid, kind):
     """The texture of item iid's worn sheet, by texture name (the sprite names repeat)."""
-    want = {f'item_{iid}_e', f'item_{iid}'}
+    want = {f'item_{iid}_e', f'item_{iid}', f'item_{iid}_b_e'}
     best = None
     for c in catalog:
         # Some sheets sit in textures named after their batch (_new_item_03_E): their sprites'
@@ -149,7 +149,7 @@ def main():
             v = 'a' if p <= 3 else 'c' if p <= 7 else 'b' if p <= 10 else 'd'
             m['armor'][f"t{x['t']}"] = v
             review.append((cls, 'armor', f"t{x['t']} {x['name']}", v, variants[cls].get(('armor', v), (0, 0, '-'))[2]))
-        for kind in ('weapon', 'shield', 'helmet'):
+        for kind in ('weapon', 'shield', 'helmet', 'cape'):
             lst = g.get(kind, [])
             pl = [wadd(i, kind) for i in (POOL[kind][cls] if isinstance(POOL[kind], dict) else POOL[kind])]
             pl = [v for v in pl if v]
@@ -196,9 +196,13 @@ def main():
             elif kind == 'helmet':
                 v = wadd(POOL['helmet'][cls][-1], 'helmet')
             elif kind == 'cape':
-                v = wadd(POOL['cape'][cls][-1 if 'steel' in c['id'] else 1], 'cape')
+                v = wadd(POOL['cape'][cls][-1 if 'steel' in c['id'] else -2], 'cape')
             if v:
                 m[kind][c['id']] = v
+                # The crafted piece's own place in the line (its look) wears the same.
+                for x in g.get(kind, []):
+                    if x['name'] == c['look'] and not x['plain']:
+                        m[kind][f"t{x['t']}"] = v
             review.append((cls, kind, f"{c['id']} {c['name']}", v or '(none)',
                            variants[cls][(kind, v)][2] if v and (kind, v) in variants[cls] else '-'))
 

@@ -24,8 +24,16 @@ export const GEAR = {
     weapon: ['흑단부채', '대붓', '백운장', '하늘개비', '자월초롱'],
     shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
 };
-// 투구 and 망토: only today's crafted pieces (items.js), worn from the dress room's looks.
-for (const g of Object.values(GEAR)) { g.helmet = []; g.cape = []; }
+// 투구 and 망토: 바람의나라 연's own lines, weakest first (their worn sheets and icons come from
+// 연's resources, tools/yeon_gear.py). Helmets end in the class's 제사 dragon helmet; the capes
+// are shared. Today's crafted pieces (items.js) are added after these as crafted-only looks.
+const HELMETS = ['연두색남자투구', '가죽남자투구', '구리남자투구', '청동남자투구', '금장남자투구', '북방의남자투구'];
+const CAPES = ['남옥망토', '얼음망토', '숲의권속망토', '추방자망토', '몰락자망토', '밤의 인도자 날개(남)'];
+const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용겸제사투구', poet: '용랑제사투구' };
+for (const [cls, g] of Object.entries(GEAR)) {
+  g.helmet = [...HELMETS, DRAGON_HELMET[cls]];
+  g.cape = [...CAPES];
+}
 
 // Raid spoils: one piece a class a raid, beyond anything a hunting ground drops, after the boss
 // it comes from — dragons' gear from 삼두룡, the judging and the cursed from 흑술사, fire from 화령.
@@ -110,11 +118,9 @@ export function plainList(cls, kind) {
   return GEAR[cls][kind].map((n, i) => (raid.has(n) || EXTRA_LOOKS.has(n) ? -1 : i)).filter(i => i >= 0);
 }
 
-/** How many tiers of a kind the hunting grounds hand out: the raid pieces are not among them. */
+/** How many tiers of a kind the hunting grounds hand out: no raid or crafted-only piece. */
 export function plainTiers(cls, kind) {
-  const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
-  if (kind === 'weapon') raid.add(CRAFT_GEAR[cls]);
-  return GEAR[cls][kind].filter(n => !raid.has(n)).length;
+  return plainList(cls, kind).length;
 }
 
 let M, images;
