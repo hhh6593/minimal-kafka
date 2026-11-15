@@ -634,6 +634,7 @@ function startRun(cls, stage) {
   G.pendingLevels = 1;
   G.firstCard = true;
   showScreen(null);
+  if (audio) audio.play('enter'); // 연's own 'into the world' sting
   audio.bgm(huntMusic());
   $('#chat').innerHTML = '';
   $('#vert').innerHTML = '';
@@ -5558,7 +5559,7 @@ const GAME_SOUNDS = {
   skill_p_warmth: '098@1.1', skill_p_thunderbomb: '700@1.1', skill_p_skyspirit: '066@0.9', skill_p_taiji: '109@0.75',
   // A kill thuds with the strong blade's hit (337), a crit rings with the client's own crit (349).
   hit: '331', kill: '337', crit: '349', hurt: '-', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
-  win: '401', lose: '402', revive: '112', click: '408', party_guard: '008',
+  win: '401', lose: '402', revive: '112', party_guard: '008',
 };
 
 /** Each game sound: the game's own where known, else one from the player's sorting. */
@@ -5589,6 +5590,8 @@ function soundDefaults() {
   const all = M.audio.bgm.map(b => b.key), has = k => all.includes(k);
   if (has('nx_04_Winds_take2')) d.bgm_title = 'nx_04_Winds_take2';
   if (has('bs_login')) d.bgm_title = 'bs_login';
+  // 바람의나라 연's own login theme (from its app) where the build has it.
+  if (has('yeon_login')) d.bgm_title = 'yeon_login';
   if (has('bs_charcreate')) d.bgm_select = 'bs_charcreate';
   if (has('nx_08_2_Goguryeo')) d.bgm_town = 'nx_08_2_Goguryeo';
   if (has('nx_10_4way_battle')) d.bgm_boss = 'nx_10_4way_battle';
