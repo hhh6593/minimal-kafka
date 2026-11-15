@@ -848,7 +848,18 @@ function pieceName(cls, kind, t) {
   return kind === 'weapon' && t === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${t}`)) : gearName(cls.id, kind, t);
 }
 /** A piece's icon: today's picture for the 용무기 and legendary pieces (by star), else the wardrobe's. */
+/** 연's own icon of a piece, keyed as its 연 look is (a special by id, the 용무기 by step, else tier). */
+function yItemIcon(cls, kind, t, spId) {
+  const idx = M.yitemicon && M.yitemicon[cls.id] && M.yitemicon[cls.id][kind];
+  if (!idx) return null;
+  const key = spId ? (idx[spId] ? spId : SPECIAL[spId] ? 't' + specialBase(SPECIAL[spId], cls.id) : null)
+    : kind === 'weapon' && t === dragonTier(cls) ? 'dragon' + starOf(cls, `weapon:${t}`) : 't' + t;
+  const f = key && idx[key];
+  return f ? 'assets/yitemicon/' + f : null;
+}
 function pieceIcon(cls, kind, t, spId) {
+  const y = yItemIcon(cls, kind, t, spId);
+  if (y) return y;
   if (spId && SPECIAL[spId]) {
     const sp = SPECIAL[spId];
     return picture(craftPicture(sp, cls.id, starOf(cls, 'sp:' + spId))) || (hasAvatars() ? gearIcon(cls.id, kind, specialBase(sp, cls.id)) : null);
@@ -896,6 +907,13 @@ function refreshAvatars() {
 function gearImage(g) {
   // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
   // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
+  // 연's own icon for the piece where the build has it.
+  const y = G && yItemIcon(G.cls, g.kind, g.tier, g.sp);
+  if (y) {
+    const k = y.slice('assets/'.length);
+    if (!(k in images)) loadImage(k);
+    if (images[k] && images[k].complete && images[k].width) return images[k];
+  }
   if (g.kind === 'armor' && M.items.armor) return images[`item/${M.items.armor.id}.png`];
   const path = hasAvatars() && gearIcon(G.cls.id, g.kind, g.tier);
   return path ? images[path.slice('assets/'.length)] : images[`item/${M.items.chest.id}.png`];
@@ -954,7 +972,8 @@ function buildEquip() {
   const cls = G ? G.cls : chosenClass, g = savedGear(cls), b = bag(cls);
   const box = $('#equip-rows');
   box.innerHTML = '';
-  if (hasAvatars()) {
+  // The old wardrobe's hair picks do not reach a hero drawn in 연's own figure: no row for them.
+  if (hasAvatars() && !(M.yhero2 && M.yhero2[cls.id])) {
     // 머리 모양: any of the wardrobe's hair, kept per class, as the 미용실 did.
     const h = document.createElement('h4');
     h.textContent = '머리';
@@ -3417,6 +3436,9 @@ function drawTown(now) {
   let camX = Math.round(T.x - VW / 2), camY = Math.round(T.y - 30 - VH / 2);
   camX = VW >= mw ? Math.round((mw - VW) / 2) : Math.max(0, Math.min(mw - VW, camX));
   camY = VH >= mh ? Math.round((mh - VH) / 2) : Math.max(0, Math.min(mh - VH, camY));
+  // Kept for a tap on someone (tapTown).
+  T.camX = camX;
+  T.camY = camY;
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
   ctx.fillStyle = yt ? '#000' : '#2a1a0e';
   ctx.fillRect(camX, camY, VW, VH);
@@ -4943,8 +4965,27 @@ canvas.addEventListener('pointermove', e => {
 });
 for (const t of ['pointerup', 'pointercancel']) {
   canvas.addEventListener(t, e => {
-    if (e.pointerId === joy.id) joy.id = null;
+    if (e.pointerId !== joy.id) return;
+    // In town, a short tap on someone is talking to them, wherever the hero stands.
+    if (t === 'pointerup' && T && !G && !$('#town').hidden && Math.hypot(joy.x - joy.ox, joy.y - joy.oy) < 12) tapTown(e);
+    joy.id = null;
   });
+}
+
+/** The person under a tap in town, if any: spoken to at once. */
+function tapTown(e) {
+  if (T.camX === undefined) return;
+  const r = canvas.getBoundingClientRect();
+  const wx = T.camX + (e.clientX - r.left) * (canvas.width / r.width) / Z;
+  const wy = T.camY + (e.clientY - r.top) * (canvas.height / r.height) / Z;
+  const hit = T.folk.map(n => [n, Math.abs(n.x - wx) + Math.abs(n.y - 22 - wy) * 0.7])
+    .filter(([n, d]) => Math.abs(n.x - wx) < 26 && wy > n.y - 64 && wy < n.y + 10).sort((a, b) => a[1] - b[1])[0];
+  if (!hit) return;
+  T.near = hit[0];
+  T.fdx = Math.sign(hit[0].x - T.x);
+  T.fdy = 0;
+  audio && audio.play('click');
+  talk();
 }
 addEventListener('contextmenu', e => e.preventDefault());
 

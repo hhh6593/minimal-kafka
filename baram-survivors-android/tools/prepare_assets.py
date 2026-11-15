@@ -653,6 +653,20 @@ def main():
                     shutil.copyfile(os.path.join(h2, meta["file"]), os.path.join(out, "yhero2", meta["file"]))
             manifest["yhero2"][cls_id] = c
 
+    # 바람의나라 연's own item icons for the pieces (GEAR_DIR/yitemicon/<class>/<kind>_<key>.png +
+    # index.json, from tools/yeon_itemicons.py), keyed as the 연 looks are.
+    ii = os.path.join(gear_src, "yitemicon") if gear_src else None
+    manifest["yitemicon"] = {}
+    if ii and os.path.isfile(os.path.join(ii, "index.json")):
+        with open(os.path.join(ii, "index.json"), encoding="utf-8") as f:
+            iidx = json.load(f)
+        for cls_id, kinds in iidx.items():
+            os.makedirs(os.path.join(out, "yitemicon", cls_id), exist_ok=True)
+            for kind, keys in kinds.items():
+                for key, rel in keys.items():
+                    shutil.copyfile(os.path.join(ii, rel), os.path.join(out, "yitemicon", rel))
+        manifest["yitemicon"] = iidx
+
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
     edir = os.path.join(gear_src, "emote") if gear_src else None
