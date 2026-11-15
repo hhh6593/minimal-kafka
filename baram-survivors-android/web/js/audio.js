@@ -56,6 +56,11 @@ export class Audio {
     return Object.keys(this.files).filter(k => /^\d+$/.test(k)).sort((a, b) => a - b);
   }
 
+  /** Whether the build carries a sound by this name (numbered or 연's own named clips). */
+  has(name) {
+    return Object.prototype.hasOwnProperty.call(this.files, name);
+  }
+
   /** Plays one numbered sound now, for trying a choice out. */
   preview(n) {
     this.unlock();

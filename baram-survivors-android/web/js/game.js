@@ -662,6 +662,12 @@ for (const b of document.querySelectorAll('#map-tabs button')) {
       buildStages();
       return;
     }
+    // The list of every ground: on the hardest one open (no map of its own to pick from).
+    if (mapTab === 'list') {
+      pickedStage = bestOpenStage();
+      buildStages();
+      return;
+    }
     pickedStage = STAGES.find((s, i) => s.map === mapTab && unlocked(i) && !progress.cleared[s.id])
       || STAGES.find(s => s.map === mapTab);
     buildStages();
@@ -2953,10 +2959,14 @@ function cast(skill, st) {
     }
   }
   let used = true;
+  // No target yet: try again shortly. The spell is ready, only waiting, so its slot is not
+  // darkened (it flickered dark and light while the field was empty).
   const retry = t => {
     used = false;
     skill.timer = t;
+    skill.waiting = true;
   };
+  skill.waiting = false;
   switch (def.kind) {
     case 'slash': {
       // 기본 공격: the tile ahead; 후면/측면 공격 add the tiles behind and beside; n중공격 hits again.
@@ -3343,6 +3353,16 @@ function ultWait() {
   return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
 }
 
+/** What the 필살기 button shows: the 보스 technique in 보스 mode, the hunting 필살기 else. */
+function ultShown(cls) {
+  if (ultMode(cls) === 'boss' && SKILLS[BOSS_ULT[cls]]) {
+    const id = BOSS_ULT[cls];
+    const icon = M.skillicon && M.skillicon.includes(id) ? `assets/skillicon/${id}.png` : ultIcon(cls);
+    return { name: SKILLS[id].name, icon };
+  }
+  return { name: ultLook(cls).name, icon: ultIcon(cls) };
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
@@ -3351,9 +3371,10 @@ function castUlt() {
   const def = ultLook(G.cls.id);
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-  G.bubble = { text: `${def.name}!`, t: G.t };
+  const shownName = ultShown(G.cls.id).name;
+  G.bubble = { text: `${shownName}!`, t: G.t };
   strikePose(G.cls.id === 'warrior' || G.cls.id === 'rogue' ? 'attack' : 'magic');
-  say(`${def.name}!`);
+  say(`${shownName}!`);
   audio.play('skill_' + def.id, 'ult');
   G.shake = 0.5;
   // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
@@ -4315,7 +4336,7 @@ function drawSkillBar() {
       ctx.restore();
     }
     // The wait, as 연 shows it: the icon darkened, the seconds over it.
-    const left = s.cdMax ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0;
+    const left = s.cdMax && !s.waiting ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0;
     if (left > 0.02) {
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(x, y, sz, sz);
@@ -6150,9 +6171,9 @@ function syncUlt() {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
     // The 필살기 button is outside the panel: it is kept up to date without it too.
     const ready = p.mp >= p.maxMp && !G.dead && ultWait() <= 0;
-    put('#ult span', ultLook(G.cls.id).name);
+    put('#ult span', ultShown(G.cls.id).name);
     put('#ult small', ultWait() > 0 ? `${Math.ceil(ultWait())}초` : ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
-    const ic = `url(${ultIcon(G.cls.id)})`;
+    const ic = `url(${ultShown(G.cls.id).icon})`;
     if (shown.ultIcon !== ic) { shown.ultIcon = ic; ultBtn.style.backgroundImage = ic; }
     ultBtn.classList.toggle('ready', ready);
     return;
@@ -6212,7 +6233,7 @@ function syncUlt() {
     $('#side-slots').innerHTML = slots;
   }
   const ready = p.mp >= p.maxMp && !G.dead && ultWait() <= 0;
-  put('#ult span', ultLook(G.cls.id).name);
+  put('#ult span', ultShown(G.cls.id).name);
   put('#ult small', ultWait() > 0 ? `${Math.ceil(ultWait())}초` : ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
   ultBtn.classList.toggle('ready', ready);
 }
@@ -6471,9 +6492,10 @@ function soundDefaults() {
     // '-' is a choice too: no sound at all.
     if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x.split('@')[0]))) d[use] = n;
   }
-  // 바람의나라 연's own clips win wherever the build carries them.
+  // 바람의나라 연's own clips win wherever the build carries them (they go by name, not number:
+  // checked against every file, not the numbered bank, or none of them was ever used).
   for (const [use, n] of Object.entries(YEON_SOUNDS)) {
-    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x.split('@')[0]))) d[use] = n;
+    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || audio.has(x.split('@')[0]))) d[use] = n;
   }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
@@ -6526,10 +6548,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 7) {
+  if (settings.soundsVer !== 8) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 7;
+    settings.soundsVer = 8;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
@@ -6746,6 +6768,12 @@ window.__dragonTier = () => dragonTier(G.cls);
 window.__Z = () => Z;
 window.__hurtPlayer = d => hurtPlayer(d, null);
 window.__event = k => huntEvent(k);
+window.__openPortal = t => openPortal(t);
+window.__silentSkills = () => {
+  const has = n => (Array.isArray(n) ? n : [n]).some(x => x && x !== '-' && audio.has(String(x).split('@')[0]));
+  return Object.entries(SKILLS).filter(([id, d]) => d.kind !== 'passive' && !has(audio.map['skill_' + id]))
+    .map(([id, d]) => [id, d.name, d.kind, audio.map['skill_' + id] || null]);
+};
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
