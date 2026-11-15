@@ -527,7 +527,7 @@ export const STAGES = [
   { id: 'fox', bgm: 'nx_21_Pray_for_family', name: '여우굴', lv: '30~45', terrain: 'cave', map: 'gungnae', at: [0.065, 0.79],
     monsters: ['3012', '3013', '12009', '12003'], mini: { id: '3013', name: '불구미호', scale: 1.6 },
     boss: { id: '12008', name: '구미호', scale: 1.6 }, intro: '꼬리 아홉 달린 여우가 숨어 사는 굴' },
-  { id: 'haunt', bgm: 'bs_haunt', name: '흉가', lv: '99', terrain: 'house', map: 'gungnae', at: [0.125, 0.305],
+  { id: 'haunt', bgm: 'bs_haunt', name: '흉가', lv: '99', terrain: 'house', map: 'gungnae', at: [0.125, 0.305], ease: 0.7,
     pages: [312, 1001], intro: '원혼이 떠도는 버려진 집. 일반성의 마지막 사냥터' },
   { id: 'goblin', bgm: 'nx_22_Burning_the_angry', name: '도깨비굴', lv: '80~99', terrain: 'cave', map: 'gungnae', at: [0.18, 0.085],
     pages: [801, 802, 804], intro: '도깨비들이 방망이를 휘두르는 굴' },

@@ -33,7 +33,7 @@ export const YEON_SOUNDS = {
  "boss": "sfx_ui_tower_boss",
  "win": "sfx_ui_muhan_win",
  "lose": "sfx_ui_muhan_defeat",
- "revive": "sfx_ui_resurrection_normal",
+ "revive": "fx_skill_420501",
  "click": "sfx_ui_roulette_click",
  "promote": "sfx_fx_promotion",
  "enter": "sfx_fx_warp",

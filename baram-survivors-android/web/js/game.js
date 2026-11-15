@@ -105,6 +105,8 @@ async function boot() {
   for (const [id, fx] of Object.entries(YEON_FX)) {
     if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
+  // Every getting-up (성황령, the class's own 부활, a companion raised) shows 연's revive.
+  if (M.fx.k_revive) FX.revive = 'k_revive';
   // Better still, the spell's own effect out of 연's client, where it has one by that name.
   for (const id of Object.keys(SKILLS)) {
     const fx = 'k_' + id;
@@ -2200,7 +2202,9 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (!at) return null;
   const t = G.t;
   // Monsters toughen with time: x2.5 by 5:00 (matched to spells growing 15% a 단).
-  const tough = (1 + G.level * 0.1) * (1 + t / 133) * (G.cleared ? 1.5 : 1);
+  // A ground may be eased a little (stage.ease, e.g. 흉가: its 99-level monsters were a wall).
+  const ease = G.stage.ease || 1;
+  const tough = (1 + G.level * 0.1) * (1 + t / 133) * (G.cleared ? 1.5 : 1) * ease;
   const rank = kind ? 1 : m.rank;
   let hp = (6 + m.area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
@@ -2215,7 +2219,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 2000),
     // Deeper grounds bite harder: +15% a step (흉가, the 7th, twice the first).
-    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.1 * G.level)
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.1 * G.level) * ease
       * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
@@ -4360,7 +4364,7 @@ function partyAct(m) {
 function drawParty(m) {
   const dir = facing(m.fdx, m.fdy);
   const alpha = m.down ? 0.4 : m.hidden > G.t ? 0.35 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
-  const mPose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
+  const mPose = m.down ? 'dead' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
   if ((m.cls.id && drawYhero2(m.cls, m.gear, m, m.x, y, mPose, alpha)) || drawYhero(m.cls.id || m.cls, m.gear ? m.gear.armor : 0, m, m.x, y, mPose, alpha)) {
     // drawn in 연's own figure
   } else if (m.av) {
@@ -5175,12 +5179,14 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
-  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle' }[pose] || 'idle';
-  const a = H.anims[`${name}_${dir}`] || H.anims[`idle_${dir}`] || H.anims.walk_down;
+  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle', dead: 'dead' }[pose] || 'idle';
+  // A fallen hero is 연's own ghost: the dead frame, the same from every side.
+  const a = name === 'dead' && H.anims.dead ? H.anims.dead
+    : H.anims[`${name}_${dir}`] || H.anims[`idle_${dir}`] || H.anims.walk_down;
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
   else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
-  const [cw, ch] = H.cell, [fx, fy] = H.foot, mirror = dir === 'side' && fdx > 0;
+  const [cw, ch] = H.cell, [fx, fy] = H.foot, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
   ctx.save();
   ctx.globalAlpha = 0.3 * alpha;
   ctx.fillStyle = '#000';
@@ -5599,7 +5605,7 @@ function drawHero(now, hidden) {
   if (G.dead) {
     // The ghost the dead become: the hero, pale and see-through, floating.
     const y = p.y - 4 - Math.sin(now * 2) * 3;
-    if (drawYhero2(G.cls, p.gear, p, p.x, y, 'idle', 0.45)) return;
+    if (drawYhero2(G.cls, p.gear, p, p.x, y, 'dead', 0.9)) return;
     if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, y, 'idle', 0.45)) return;
     if (p.av) drawAvatar(ctx, p.av, p.x, y, facing(p.fdx, p.fdy), 'idle', 0, 0.45);
     else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
@@ -6413,6 +6419,7 @@ window.__gearTest = () => {
 };
 window.__dragonTier = () => dragonTier(G.cls);
 window.__Z = () => Z;
+window.__hurtPlayer = d => hurtPlayer(d, null);
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
