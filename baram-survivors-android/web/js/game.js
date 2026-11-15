@@ -3763,6 +3763,8 @@ function classFlourish(def, skill, st) {
         .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
       if (spot) {
         G.dashAt = G.t;
+        // Landing in the crowd, the hero is untouchable for a moment (it chose the fight, not the blows).
+        p.inv = Math.max(p.inv, 0.5);
         p.x = spot[0] * TILE + TILE / 2;
         p.y = spot[1] * TILE + TILE - 6;
         heroTile();
