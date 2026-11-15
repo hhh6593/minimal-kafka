@@ -4045,14 +4045,8 @@ function classFlourish(def, skill, st) {
     }
     return;
   }
-  // Casters: the sky answers, with the game's own pictures — 뇌진주's lightning for the thunder
-  // spells, 천벌's light for the 도사, 화염주's fire for the 주술사 — dropped on several foes.
-  const targets = nearestEnemies(def.kind === 'screen' ? 6 : 2, 8);
-  if (!targets.length) return;
-  const thunder = THUNDER.test(def.name);
-  const pic = thunder ? '89' : cls === 'poet' ? '149' : '148';
-  if (!M.fx[pic]) return;
-  targets.forEach((e, i) => later(0.05 + i * 0.07, () => { if (e.hp > 0) fxOn(grownFx(pic, skill.lv), e, { scale: 0.9 }); }));
+  // Casters show only their own spell's effect: an extra meteor or bolt dropped on every cast
+  // (the earlier flourish) made 백열주 look like a fire spell.
 }
 
 
