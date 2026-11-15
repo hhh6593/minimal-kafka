@@ -107,6 +107,41 @@ def build(env):
     return parts, clips
 
 
+def family(ref):
+    """What kind of part a mapped sprite is, to tell where one binding's keys end."""
+    if ref is None or not ref.path_id:
+        return 'none'
+    try:
+        n = ref.read().m_Name
+    except Exception:
+        return 'none'
+    return re.sub(r'_\d+$', '', n)
+
+
+def pptr_groups(mapping, nbind):
+    """Splits pptrCurveMapping into one run of keys per sprite binding (in binding order):
+    runs of the same part family; a run shared by two bindings (a part and its _color twin,
+    or two empty parts) is split evenly."""
+    fams = [family(r) for r in mapping]
+    runs = []
+    for i, f in enumerate(fams):
+        if runs and runs[-1][0] == f:
+            runs[-1][1].append(i)
+        else:
+            runs.append([f, [i]])
+    # Split runs until there is one per binding: a run whose length is a multiple of a
+    # neighbour-sized group is cut in halves first.
+    while len(runs) < nbind:
+        cand = [r for r in runs if len(r[1]) > 1]
+        if not cand:
+            break
+        best = max(cand, key=lambda r: (len(r[1]) % 2 == 0, len(r[1])))
+        i = runs.index(best)
+        h = len(best[1]) // 2
+        runs[i:i + 1] = [[best[0], best[1][:h]], [best[0], best[1][h:]]]
+    return [[mapping[j] for j in r[1]] for r in runs]
+
+
 def frames(clip, parts):
     """[(time, {crc: {'sprite', 'pos', 'order', 'active'}})] for each key time of the clip."""
     cb = clip.m_ClipBindingConstant
@@ -114,18 +149,23 @@ def frames(clip, parts):
     keys = streamed_keys(clip)
     curve = 0
     plan = []
+    pbind = []
+    # Float curves are numbered over the non-sprite bindings only; sprite keys live in
+    # pptrCurveMapping, one run per sprite binding, spread evenly over the clip.
     for b in cb.genericBindings:
         if b.isPPtrCurve:
-            n = 1
-        elif b.typeID == 4:
-            n = TRANSFORM_CURVES.get(b.attribute, 1)
-        else:
-            n = 1
+            pbind.append(b)
+            continue
+        n = TRANSFORM_CURVES.get(b.attribute, 1) if b.typeID == 4 else 1
         plan.append((b, list(range(curve, curve + n))))
         curve += n
-    times = sorted({round(t, 4) for ks in keys.values() for t, _ in ks})
+    groups = pptr_groups(mapping, len(pbind))
     stop = clip.m_MuscleClip.m_StopTime
-    times = [t for t in times if t < stop - 1e-4] or [0.0]
+    times = sorted({round(t, 4) for ks in keys.values() for t, _ in ks})
+    for g in groups:
+        if len(g) > 1:
+            times += [round(i * stop / (len(g) - 1), 4) for i in range(len(g))]
+    times = sorted({t for t in times if t < stop - 1e-4}) or [0.0]
     out = []
     for t in times:
         # Only the parts this clip gives a sprite are drawn: the prefab's own renderers hold
@@ -136,15 +176,18 @@ def frames(clip, parts):
             if s is None or any(c not in keys for c in cs):
                 continue
             vals = [value_at(keys[c], t) for c in cs]
-            if b.isPPtrCurve and b.typeID == 212:
-                idx = int(round(vals[0]))
-                s['sprite'] = mapping[idx] if 0 <= idx < len(mapping) else None
-            elif b.typeID == 4 and b.attribute == 1:
+            if b.typeID == 4 and b.attribute == 1:
                 s['pos'] = [vals[0], vals[1]]
             elif b.typeID == 1:
                 s['active'] = vals[0] > 0.5
             elif b.typeID == 114:
                 s['order'] = vals[0]
+        for b, g in zip(pbind, groups):
+            s = st.get(b.path)
+            if s is None or not g:
+                continue
+            i = 0 if len(g) == 1 else min(len(g) - 1, int(t / (stop / (len(g) - 1)) + 1e-4))
+            s['sprite'] = g[i]
         out.append((t, st))
     # One loop: the walk clips repeat their cycle; keep the frames where the body changes,
     # up to its first return to the opening frame.

@@ -91,6 +91,7 @@ async function boot() {
     ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
     ...(M.floor || []).map(k => `floor/${k}.png`),
     ...Object.keys(M.prop || {}).map(k => `prop/${k}.png`),
+    ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -2458,6 +2459,14 @@ function hurtEnemy(e, dmg, push = null) {
     G.texts.push({ x: e.x + rand(-5, 5), y: e.y - e.m.h * e.scale - 10 - e.numN * 10, text: String(Math.round(dmg)), t: 0, num: true,
       crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
+  // 연's hit spark on the struck body (its crit flash for a crit), not on every one of a crowd.
+  if (G.t - (e.sparkT || -9) > 0.25 && G.fxs.length < 60) {
+    const spark = crit ? 'h_hit_light' : 'h_hit_6';
+    if (M.fx[spark]) {
+      e.sparkT = G.t;
+      fxOn(spark, e, { scale: crit ? 0.8 : 0.6 });
+    }
+  }
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
@@ -4362,6 +4371,8 @@ function gainXp(v) {
     p.next = xpFor(p.lvl);
     G.pendingLevels++;
     say(`레벨이 올랐습니다. (Lv ${p.lvl})`, 'sys');
+    // 연's level-up burst, its LEVEL UP lettering over the hero.
+    if (M.fx.h_levelup) addFx('h_levelup', 0, 2, { anchor: 'bottom', follow: true });
     if (p.lvl % 10 === 0) emote('grind', p);
     // Party members join at levels 3, 9 and 15, as D2 Survivors' mercenaries do.
     const joinAt = [3, 9, 15].indexOf(p.lvl);
@@ -4963,6 +4974,46 @@ function drawBeast(b, alpha, ox = 0, oy = 0, k = 0.62) {
   ctx.restore();
 }
 
+// ---------------------------------------------------------------- 연's damage digits
+// The bitmap font 연 draws hits with (tools/yeon_hud.py): white digits in a black edge. Each
+// kind of hit gets its colour by tinting the white (the edge stays black): white for a plain
+// blow, 연's yellow for a heavy one, its red for a crit, grey for a light one.
+const DIGIT_TINT = { '#d8d8d8': '#ffffff', '#ffb43a': 'rgb(255,220,60)', '#ff3a2a': 'rgb(255,60,40)' };
+const tintedDigits = new Map();
+function dmgFont() {
+  const im = images['hud/font_damage.png'];
+  return M.hud && M.hud.font_damage && im && im.width ? im : null;
+}
+function digitSheet(color) {
+  const c0 = DIGIT_TINT[color] || color;
+  let c = tintedDigits.get(c0);
+  if (!c) {
+    const im = dmgFont();
+    c = document.createElement('canvas');
+    c.width = im.width;
+    c.height = im.height;
+    const g = c.getContext('2d');
+    g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = c0;
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'destination-in';
+    g.drawImage(im, 0, 0);
+    tintedDigits.set(c0, c);
+  }
+  return c;
+}
+function drawDigits(text, x, y, color, k) {
+  const f = M.hud.font_damage, sheet = digitSheet(color);
+  const glyphs = [...text].map(ch => f.glyphs[ch]).filter(Boolean);
+  const w = glyphs.reduce((a, g) => a + g[4], 0) * k;
+  let cx = x - w / 2;
+  for (const [gx, gy, gw, gh, adv] of glyphs) {
+    ctx.drawImage(sheet, gx, gy, gw, gh, Math.round(cx), Math.round(y - f.height * k), gw * k, gh * k);
+    cx += adv * k;
+  }
+}
+
 // ---------------------------------------------------------------- 연's own monsters
 // The monsters as 바람의나라 연 draws them (tools/yeon_units.py): a sheet per monster with walk,
 // idle, attack and death in three directions (the side one faces left; mirrored for right),
@@ -5233,6 +5284,11 @@ function render(now) {
       ctx.fillRect(x + w - 1, y, 1, 12);
       ctx.fillStyle = '#fff';
       ctx.fillText(t.text, Math.round(t.x), y + 9);
+    } else if (t.num && dmgFont()) {
+      // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
+      // to a third larger and settle in a tenth of a second, a crit bigger still.
+      const base = t.crit ? 0.8 : t.color === '#ffb43a' ? 0.66 : 0.56;
+      drawDigits(t.text, Math.round(t.x), Math.round(t.y), t.color, base * (t.t < 0.1 ? 1.3 - t.t * 3 : 1));
     } else if (t.num) {
       // A number pops in and settles; a crit larger.
       const base = t.crit ? 1.45 : t.color === '#ffb43a' ? 1.1 : 0.9;

@@ -394,6 +394,42 @@ def main():
                                    "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
                                    "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
 
+    # 연's hunt presentation (GEAR_DIR/yhud/, tools/yeon_hud.py): hit sparks and the level-up
+    # burst as fx "h_<name>" (sparks drawn on the body's middle, the level-up on the feet), the
+    # damage-number bitmap font (white digits in black, tinted per kind of hit) and the
+    # kill-streak art.
+    hdir = os.path.join(gear_src, "yhud") if gear_src else None
+    manifest["hud"] = {}
+    if hdir and os.path.isfile(os.path.join(hdir, "index.json")):
+        with open(os.path.join(hdir, "index.json"), encoding="utf-8") as f:
+            hindex = json.load(f)
+        for name, k in hindex.items():
+            hsrc = os.path.join(hdir, name + ".png")
+            if not os.path.isfile(hsrc):
+                continue
+            (cw, ch), n = k["cell"], k["n"]
+            sheet = Image.open(hsrc).convert("RGBA")
+            pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+            # 연's kill burst opens on two plain discs: start after them.
+            if name == "kill":
+                pics = pics[2:]
+            fid = "h_" + name
+            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+            entry = {"w": cw, "h": ch, "n": len(pics), "durs": [k["ms"]] * len(pics), "add": bool(k.get("add")), "cls": "yeon"}
+            if name.startswith("levelup") or name == "kill":
+                entry.update({"ax": k["anchor"][0], "ay": k["anchor"][1]})
+            manifest["fx"][fid] = entry
+        os.makedirs(os.path.join(out, "hud"), exist_ok=True)
+        for font in ("font_damage", "font_gold"):
+            if os.path.isfile(os.path.join(hdir, font + ".png")):
+                shutil.copyfile(os.path.join(hdir, font + ".png"), os.path.join(out, "hud", font + ".png"))
+                with open(os.path.join(hdir, font + ".json"), encoding="utf-8") as f:
+                    manifest["hud"][font] = json.load(f)
+        manifest["hud"]["ui"] = []
+        for n in sorted(x for x in os.listdir(hdir) if x.startswith("ui_") and x.endswith(".png")):
+            shutil.copyfile(os.path.join(hdir, n), os.path.join(out, "hud", n))
+            manifest["hud"]["ui"].append(n[:-4])
+
     for fid in HEROES:
         im = Image.open(os.path.join(src, "magics", fid + ".gif"))
         im = dehalo(im) if fid == "1001" else trim(im.convert("RGBA"))
