@@ -1,7 +1,7 @@
 // 바람의나라 연's own sounds (tools/yeon_sounds.py): for each game sound and spell, the clip the
-// game itself plays, matched by the spell's Korean name in its skill table (or, for the
-// 5차 and later spells, by the effect each draws). Used where the build has the clip; the old
-// client's numbered sounds stay the fallback.
+// game itself plays, out of the same 연 skill record as the spell's icon and effect (its sound
+// field, or its effect's PlaySound event). Used where the build has the clip; the old client's
+// numbered sounds stay the fallback.
 export const YEON_SOUNDS = {
  "hit": "sfx_bat_hit_normal",
  "crit": "sfx_bat_critical",
@@ -71,7 +71,7 @@ export const YEON_SOUNDS = {
  "skill_w_ungong": "fx_skill_heal_01",
  "skill_m_sage": "SFX_Magician_4th_01",
  "skill_p_life": "fx_skill_heal_09",
- "skill_p_baekho2": "fx_skill_41801",
+ "skill_p_baekho2": "SFX_Shaman_3rd_03",
  "skill_w_frenzy": "SFX_Warrior_5th_3",
  "skill_w_chohon": "SFX_Warrior_3rd_01",
  "skill_w_sword": "SFX_Warrior_3rd_02",
@@ -83,7 +83,7 @@ export const YEON_SOUNDS = {
  "skill_m_quake": "SFX_Magician_3rd_03",
  "skill_p_aegis": "SFX_Shaman_3rd_01_1",
  "skill_p_wave": "SFX_Shaman_3rd_02_1",
- "skill_p_break": "SFX_Shaman_3rd_03",
+ "skill_p_break": "fx_skill_420501",
  "skill_m_fire": [
   "fx_skill_10101_1",
   "fx_skill_10101_1",
@@ -142,7 +142,7 @@ export const YEON_SOUNDS = {
  "skill_r_budong": "fx_skill_230201",
  "skill_r_storm": "fx_skill_10105_3",
  "skill_m_curse": "fx_skill_320101",
- "skill_m_hoche": "fx_skill_320301",
+ "skill_m_hoche": "fx_skill_42811",
  "skill_m_talm": "SFX_Common_Explosion_2",
  "skill_p_summon": "fx_skill_420601",
  "skill_p_barrier": "fx_skill_130301",
@@ -154,14 +154,14 @@ export const YEON_SOUNDS = {
  "skill_c_kick": "sfx_bat_hit_normal_2",
  "skill_w_bless": "fx_skill_420201",
  "skill_w_lion": "SFX_Warrior_ChargeOrder",
- "skill_r_muyoung": "fx_skill_210101",
+ "skill_r_muyoung": "fx_skill_220201",
  "skill_r_nuri": "fx_skill_230201",
  "skill_r_forget": "fx_skill_320401",
  "skill_r_gaehyeol": "fx_skill_heal_01",
  "skill_m_gongryeok": "fx_skill_430401",
  "skill_m_arm": "fx_skill_130301",
  "skill_m_toema": "fx_skill_420101",
- "skill_m_poison": "fx_skill_21801",
+ "skill_m_poison": "fx_skill_320301",
  "skill_m_manpa": "fx_skill_21801",
  "skill_m_despair": "fx_skill_320101",
  "skill_m_chaos": "fx_skill_320401",
@@ -170,12 +170,12 @@ export const YEON_SOUNDS = {
  "skill_p_pahon": "fx_skill_420101",
  "skill_p_sky": "fx_skill_heal_06",
  "skill_p_weaken": "fx_skill_320101",
- "skill_w_rush": "SFX_Warrior_5th_1",
+ "skill_w_rush": "fx_skill_110201",
  "skill_w_stone": "SFX_Warrior_Impregnability",
  "skill_w_sentence": "SFX_Thief_5th_1",
- "skill_w_advance": "SFX_Warrior_ChargeOrder",
+ "skill_w_advance": "SFX_Lancer_5th_1",
  "skill_w_swords": "fx_skill_0088",
- "skill_w_dragon": "SFX_Warrior_5th_2_1",
+ "skill_w_dragon": "SFX_Lancer_4th_02",
  "skill_w_thunder": "SFX_Shaman_ThunderCloud",
  "skill_w_flash": "fx_skill_110302",
  "skill_w_blackdragon": "SFX_Warrior_4th_03",
@@ -188,7 +188,7 @@ export const YEON_SOUNDS = {
  "skill_r_flamesword": "SFX_Common_Fire_Whoosh_1",
  "skill_r_hidden": "SFX_Thief_6th_1",
  "skill_r_shuriken": "fx_skill_210401",
- "skill_r_kill": "fx_skill_deadlystrike",
+ "skill_r_kill": "SFX_Celestial_6th_1",
  "skill_r_shadowstar": "fx_skill_210402",
  "skill_r_shadowclone": "fx_skill_210601",
  "skill_r_gale": "fx_skill_210302",
@@ -207,9 +207,9 @@ export const YEON_SOUNDS = {
  "skill_p_realm": "SFX_Shaman_5th_3",
  "skill_p_bind": "SFX_Shaman_5th_1",
  "skill_p_thunderbomb": "SFX_Shaman_5th_2_1",
- "skill_p_wargod": "SFX_Shaman_5th_2_2",
+ "skill_p_wargod": "SFX_Fighter_5th_3",
  "skill_p_skyspirit": "fx_skill_heal_11",
- "skill_p_bagua": "SFX_Shaman_6th_1",
+ "skill_p_bagua": "SFX_Celestial_5th_Bagua",
  "skill_p_judge": "SFX_Shaman_ThunderCloud",
  "skill_p_burst": "SFX_Common_Explosion_1",
  "skill_p_dragongod": "SFX_Shaman_4th_03",
@@ -232,4 +232,32 @@ export const YEON_BGM = {
  "japan": "BGM_Raid_NewJapan_1stField",
  "china": "BGM_China_DryLand_48",
  "tower": "BGM_YeonTower_Field"
+};
+
+// Each hunting ground's music in 연 (its map of the same name), and two raids' by place.
+export const YEON_STAGE_BGM = {
+ "novice": "bgm_00000001_48",
+ "rat": "bgm_00000005_48",
+ "snake": "bgm_00000003_48",
+ "deer": "bgm_00000005_48",
+ "pig": "bgm_00000003_48",
+ "bear": "bgm_00000005_48",
+ "fox": "bgm_00000005_48",
+ "haunt": "bgm_00000007_48",
+ "goblin": "bgm_boss05_48",
+ "bandit": "bgm_00000114_64",
+ "japan": "bgm_00000006_48",
+ "island": "bgm_00000148_48",
+ "rabbit": "bgm_00000003_48",
+ "mantis": "bgm_00000003_48",
+ "skull": "bgm_00000004_48",
+ "steppe": "bgm_00000135_64",
+ "palace": "bgm_00000121_48",
+ "royal": "bgm_00000174_48",
+ "deepsea": "BGM_Raid_YongGung_1stField_48"
+};
+
+export const YEON_RAID_BGM = {
+ "raid_goblin": "bgm_boss05_48",
+ "raid_sea": "BGM_Raid_YongGung_1stBoss_48"
 };

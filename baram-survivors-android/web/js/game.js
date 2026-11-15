@@ -4,7 +4,7 @@ import {
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
-import { YEON_SOUNDS, YEON_BGM } from './yeon_sounds.js';
+import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -5869,6 +5869,10 @@ function soundDefaults() {
     const k = raidBgm[r.terrain] || YEON_BGM.raid;
     if (has(k)) d['bgm_raid_' + r.id] = k;
   }
+  // Each ground's own music in 연, read off its map of the same name (and a raid's, where 연
+  // has one for it).
+  for (const [id, k] of Object.entries(YEON_STAGE_BGM)) if (has(k)) d['bgm_stage_' + id] = k;
+  for (const [id, k] of Object.entries(YEON_RAID_BGM)) if (has(k)) d['bgm_raid_' + id] = k;
   return d;
 }
 
@@ -5890,10 +5894,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 6) {
+  if (settings.soundsVer !== 7) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 6;
+    settings.soundsVer = 7;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
