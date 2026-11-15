@@ -100,6 +100,12 @@
   .pin.next i { border-top-color: #ffd84a; animation: pinpulse 0.9s ease-in-out infinite; }
   .pin.cleared i { border-top-color: #6ad04a; }
   .pin.town { z-index: 3; }
+  .stagecard { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
+  .stagecard img { max-height: 44px; max-width: 48px; object-fit: contain; }
+  .stagecard .st { display: inline-block; margin: 1px 0; padding: 0 4px; font: 700 10px/13px G9, monospace; border: 1px solid #000; }
+  .stagecard .st.done { color: #0c2a06; background: #8ce070; }
+  .stagecard .st.open { color: #2a1606; background: #ffd84a; }
+  .stagecard .st.shut { color: #c8b8a0; background: #3a3028; }
   .pin.town b { color: #fff; background: #3a68c8; }
   .pin.town i { border-top-color: #5a8af0; }
   #map.gungnae .pin.town span { display: inline; }
@@ -452,6 +458,8 @@
   /* 연's notices: words in the field with a black edge, no box (as its '대상이 너무 멀리 있습니다'). */
   body.yeon #banner { background: none; border: 0; top: 22%; font-size: 15px; color: #ff4a3a;
       text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000; }
+  /* The 필살기's way (사냥 / 보스), switched with a tap beside the button. */
+  #ult-mode { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #2a1606; border: 2px solid rgb(148,48,219); }
 </style>
 </head>
 <body>
@@ -478,7 +486,7 @@
 <div id="stages" class="screen" hidden>
   <div class="stage-wrap">
     <div class="map-col">
-      <div id="map-tabs"><button data-map="gungnae">국내성</button><button data-map="world_1">대륙</button><button data-map="world_4">환상의 섬</button><button data-map="raid">레이드</button></div>
+      <div id="map-tabs"><button data-map="list">목록</button><button data-map="gungnae">국내성</button><button data-map="world_1">대륙</button><button data-map="world_4">환상의 섬</button><button data-map="raid">레이드</button></div>
       <div id="map"></div>
     </div>
     <div class="info-col">
@@ -538,7 +546,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>

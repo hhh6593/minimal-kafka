@@ -457,6 +457,31 @@ function buildStages() {
   const map = $('#map');
   map.classList.toggle('gungnae', mapTab === 'gungnae');
   map.classList.toggle('raids', mapTab === 'raid');
+  if (mapTab === 'list') {
+    // Every ground as a card, in the order they are hunted: its boss, its level, and plainly
+    // whether it is conquered, open to try, or closed (and what opens it).
+    if (pickedStage.raid) pickedStage = bestOpenStage();
+    map.classList.add('raids');
+    map.innerHTML = '';
+    const order = STAGES.map((s, i) => [s, i, s.level !== undefined ? s.level : i]).sort((a, b) => a[2] - b[2]);
+    for (const [s, i] of order) {
+      const open = unlocked(i), done = !!progress.cleared[s.id];
+      const b = document.createElement('button');
+      b.className = 'raid stagecard' + (open ? '' : ' locked') + (s === pickedStage ? ' on' : '');
+      const { pool, boss } = stageMonsters(s);
+      // The boss's picture where the build has one, else the ground's strongest monster.
+      const face = monsterById[boss.id] ? boss.id : (pool[pool.length - 1] || {}).id;
+      b.innerHTML = `<img src="assets/mon/${face}.png" alt=""><div><b>${s.name} <small>Lv ${s.lv}</small></b>`
+        + `<span class="st ${done ? 'done' : open ? 'open' : 'shut'}">${done ? '정복' : open ? '도전 가능' : '잠김'}</span>`
+        + `<span>${open ? s.intro : lockReason(i)}</span></div>`;
+      b.onclick = () => { pickedStage = s; buildStages(); };
+      map.append(b);
+    }
+    const on = map.querySelector('.on');
+    if (on) on.scrollIntoView({ block: 'center' });
+    stageInfo();
+    return;
+  }
   if (mapTab === 'raid') {
     if (!pickedStage.raid) pickedStage = RAIDS[0];
     map.innerHTML = '';
@@ -509,6 +534,11 @@ function buildStages() {
     };
     map.append(b);
   });
+  stageInfo();
+}
+
+/** The picked ground's card beside the map or list, and the way in. */
+function stageInfo() {
   const s = pickedStage, i = STAGES.indexOf(s), open = unlocked(i);
   const { pool, boss } = stageMonsters(s);
   const show = [pool[0], pool[Math.floor(pool.length / 2)], pool[pool.length - 1]].filter((m, k, a) => m && a.indexOf(m) === k);
@@ -2887,6 +2917,14 @@ function drawChain() {
   ctx.restore();
 }
 
+/** How far, in tiles, a picture reaches from its centre as drawn (most of its half-width): a
+ *  spell strikes as far as it is seen to (연's great effects are far wider than the old reach). */
+function seenReach(fxid, scale = 1) {
+  const f = M.fx[fxid];
+  if (!f) return 0;
+  return (Math.min(f.w, f.h * 1.6) * (f.k || 1) * scale) / 2 / TILE * 0.85;
+}
+
 function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
@@ -3067,6 +3105,12 @@ function cast(skill, st) {
       // The picture stands in the middle of the triangle.
       const mid = (depth + 1) / 2;
       addFx(fxid, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25) });
+      // As far as the picture is seen to reach round its middle, too.
+      const reach = seenReach(fxid, Math.min(1.6, 0.7 + depth * 0.25));
+      if (reach > depth) {
+        const cx = p.tx + Math.round(dx * mid), cy = p.ty + Math.round(dy * mid);
+        for (const e of around(cx, cy, reach)) if (!hit.includes(e)) hit.push(e);
+      }
       later(0.12, () => {
         G.shake = Math.max(G.shake, 0.1);
         for (const e of hit.slice(0, def.max || 99)) {
@@ -3139,8 +3183,11 @@ function cast(skill, st) {
         const a = (k / 8) * Math.PI * 2, r = (st.radius || 2) * TILE;
         addFx(fxid, p.x + Math.cos(a) * r, p.y - 20 + Math.sin(a) * r * 0.7, { delay: 0.04 * k, scale: 1.3 });
       }
+      // It strikes as far as its picture is seen to spread, if that is past its own reach.
+      const novaScale = nf && nf.cls === 'yeon' ? 1 : nf && nf.add ? 2.2 : 1.4;
+      const reach = Math.max(st.radius || 0, nf && nf.cls === 'yeon' ? seenReach(fxid, novaScale) : 0);
       later(0.1, () => {
-        for (const e of around(p.tx, p.ty, st.radius)) {
+        for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hurtEnemy(e, st.dmg);
         }
@@ -3264,6 +3311,23 @@ function ultIcon(cls) {
   return `assets/icon/${fx}.png`;
 }
 
+/** The way the class's 필살기 strikes: 'hunt' (the whole screen) or 'boss' (one, eight times as hard). */
+function ultMode(cls) {
+  return (settings.ultMode && settings.ultMode[cls]) || 'hunt';
+}
+function toggleUltMode() {
+  if (!G) return;
+  settings.ultMode = settings.ultMode || {};
+  settings.ultMode[G.cls.id] = ultMode(G.cls.id) === 'hunt' ? 'boss' : 'hunt';
+  saveJson('bs_settings', settings);
+  syncUltMode();
+  say(`필살기: ${ultMode(G.cls.id) === 'hunt' ? '사냥용 (화면 전체)' : '보스용 (가장 강한 적 하나에 8배)'}`, 'sys');
+}
+function syncUltMode() {
+  const b = $('#ult-mode');
+  if (b && G) b.textContent = ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스';
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
@@ -3282,34 +3346,28 @@ function castUlt() {
   const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
   const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
+  // The 필살기's two ways, switched by the player at the button: 사냥 strikes everything on the
+  // screen, 보스 puts eight times the blow into the strongest foe in sight (and a little around it).
+  const mode = ultMode(G.cls.id);
+  const base = (G.cls.id === 'warrior' ? p.maxHp * 0.9 : 60 + lvl * 12) * pw;
+  const seen = onScreen();
+  if (mode === 'boss') {
+    const rank = e => (e.kind === 'boss' ? 4 : e.kind === 'mini' ? 3 : e.kind === 'champ' ? 2 : 1) * 1e9 + e.hp;
+    const target = seen.slice().sort((a, b) => rank(b) - rank(a))[0];
+    if (target) {
+      fxOn(def.fx, target, { scale: 1.6 });
+      later(0.3, () => {
+        if (target.hp > 0) hurtEnemy(target, base * 8);
+        around(target.tx, target.ty, 1.5).forEach(e => { if (e !== target && e.hp > 0) hurtEnemy(e, base); });
+      });
+    }
+  } else {
+    seen.slice(0, 14).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.04 }));
+    later(0.4, () => seen.forEach(e => { if (e.hp > 0) hurtEnemy(e, base); }));
+  }
+  // What each class's 필살기 brings besides the blow.
   switch (G.cls.ult) {
-    case 'w_ult': {
-      // 건곤대나이: "spends health to strike the enemies in front" — four tiles ahead, three wide,
-      // with strength from the warrior's health.
-      const fdx = p.fdx || p.face, fdy = p.fdx ? 0 : p.fdy;
-      addFx(def.fx, fdx * TILE * 2, fdy * TILE * 2 - 26, { follow: true, scale: 1.3 });
-      later(0.15, () => G.enemies.slice().forEach(e => {
-        const ahead = (e.tx - p.tx) * fdx + (e.ty - p.ty) * fdy;
-        const side = Math.abs((e.tx - p.tx) * fdy - (e.ty - p.ty) * fdx);
-        if (ahead >= 0 && ahead <= 4 && side <= 1) hurtEnemy(e, p.maxHp * 2.6 * pw);
-      }));
-      break;
-    }
-    case 'r_ult': {
-      const list = around(p.tx, p.ty, 4);
-      for (let k = 0; k < 3; k++) {
-        later(k * 0.2, () => list.forEach((e, i) => {
-          if (e.hp <= 0) return;
-          if (i < 30) fxOn(def.fx, e, { rot: k });
-          hurtEnemy(e, (40 + lvl * 9) * pw);
-        }));
-      }
-      break;
-    }
     case 'm_ult': {
-      const list = onScreen();
-      list.slice(0, 12).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.05 }));
-      later(0.5, () => list.forEach(e => hurtEnemy(e, (70 + lvl * 14) * pw)));
       G.buffs.shield = G.t + def.shield;
       addFx(FX.shield, 0, -26, { follow: true, scale: 0.6 });
       break;
@@ -3523,8 +3581,9 @@ function talk() {
   const n = T && T.near;
   if (!n) return;
   if (n.id === 'guide') {
-    // Through the guide the map opens on the hardest ground the hero can enter.
-    pickedStage = null;
+    // Through the guide: the list of grounds as cards, on the hardest one the hero can enter.
+    pickedStage = bestOpenStage();
+    mapTab = 'list';
     showScreen('stages');
   }
   else if (n.id === 'clerk') openQuests();
@@ -5874,6 +5933,7 @@ const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사'
 function syncUlt() {
   if (!G) return;
   const p = G.player;
+  put('#ult-mode', ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스');
   put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
   put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock((G.stage.raid ? RAID_BOSS_AT : BOSS_AT) - G.t)}`
     : G.stage.raid && !G.cleared ? `남은 시간 ${clock(Math.max(0, RAID_LIMIT - G.t))}` : '');
@@ -6057,6 +6117,7 @@ $('#keep').onclick = () => {
   banner('계속 사냥');
 };
 $('#to-select').onclick = () => leaveHunt();
+$('#ult-mode').onclick = e => { e.stopPropagation(); toggleUltMode(); };
 $('#opt-bgm').onclick = () => {
   settings.bgm = !settings.bgm;
   audio.setBgm(settings.bgm);
