@@ -2627,7 +2627,9 @@ function killEnemy(e) {
   G.dying.push({ e, t: 0 });
   audio.play('kill');
   const p = G.player;
-  p.mp = Math.min(p.maxMp, p.mp + 0.6);
+  // A kill gives a little mana, but not the kills of a 필살기 itself (a screen of them refilled it
+  // at once, and it could be thrown again and again).
+  if (G.t - (G.ultAt === undefined ? -99 : G.ultAt) > 3) p.mp = Math.min(p.maxMp, p.mp + 0.6);
   // Experience comes at the kill, as in the game: nothing to pick up.
   gainXp(e.xp);
   const roll = Math.random();
@@ -3333,10 +3335,19 @@ function syncUltMode() {
   if (b && G) b.textContent = ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스';
 }
 
+/** Seconds until the 필살기 may be thrown again (at least 25 between two, whatever the mana). */
+const ULT_REST = 25;
+// Each class's 필살기 against a boss: a single-target technique of its own (from 연's skills).
+const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe' };
+function ultWait() {
+  return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
-  if (p.mp < p.maxMp) return;
+  if (p.mp < p.maxMp || ultWait() > 0) return;
+  G.ultAt = G.t;
   const def = ultLook(G.cls.id);
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
@@ -3346,8 +3357,10 @@ function castUlt() {
   audio.play('skill_' + def.id, 'ult');
   G.shake = 0.5;
   // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
-  addFx(grownFx(def.fx, 8), 0, -26, { follow: true, scale: 2.4 });
-  scatterFx(grownFx(def.fx, 8), 10, 1.5);
+  if (ultMode(G.cls.id) === 'hunt') {
+    addFx(grownFx(def.fx, 8), 0, -26, { follow: true, scale: 2.4 });
+    scatterFx(grownFx(def.fx, 8), 10, 1.5);
+  }
   const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
   const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
@@ -3357,14 +3370,32 @@ function castUlt() {
   const base = (G.cls.id === 'warrior' ? p.maxHp * 0.9 : 60 + lvl * 12) * pw;
   const seen = onScreen();
   if (mode === 'boss') {
+    // A technique of its own against the strongest foe: 진섬격, 암살, 성려멸주 or 지뢰진 — five
+    // quick blows on it, each with that spell's 연 effect, the 전사 and 도적 leaping to it first.
     const rank = e => (e.kind === 'boss' ? 4 : e.kind === 'mini' ? 3 : e.kind === 'champ' ? 2 : 1) * 1e9 + e.hp;
     const target = seen.slice().sort((a, b) => rank(b) - rank(a))[0];
+    const tech = BOSS_ULT[G.cls.id], tfx = M.fx['k_' + tech] ? 'k_' + tech : def.fx;
+    G.bubble = { text: `${SKILLS[tech] ? SKILLS[tech].name : def.name}!`, t: G.t };
     if (target) {
-      fxOn(def.fx, target, { scale: 1.6 });
-      later(0.3, () => {
-        if (target.hp > 0) hurtEnemy(target, base * 8);
-        around(target.tx, target.ty, 1.5).forEach(e => { if (e !== target && e.hp > 0) hurtEnemy(e, base); });
-      });
+      if (G.cls.id === 'warrior' || G.cls.id === 'rogue') {
+        const spot = DIRS.map(([dx, dy]) => [target.tx + dx, target.ty + dy]).filter(([x, y]) => free(x, y))
+          .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
+        if (spot) {
+          p.x = spot[0] * TILE + TILE / 2;
+          p.y = spot[1] * TILE + TILE - 6;
+          heroTile();
+          p.inv = Math.max(p.inv, 1.2);
+        }
+      }
+      for (let k = 0; k < 5; k++) {
+        later(0.15 + k * 0.22, () => {
+          if (target.hp <= 0) return;
+          fxOn(tfx, target, { scale: 1.2 });
+          hurtEnemy(target, base * 1.6);
+          G.shake = Math.max(G.shake, 0.12);
+          if (k === 4) around(target.tx, target.ty, 1.5).forEach(e => { if (e !== target && e.hp > 0) hurtEnemy(e, base); });
+        });
+      }
     }
   } else {
     seen.slice(0, 14).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.04 }));
@@ -6046,9 +6077,9 @@ function syncUlt() {
   if (document.body.classList.contains('panel-off')) {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
     // The 필살기 button is outside the panel: it is kept up to date without it too.
-    const ready = p.mp >= p.maxMp && !G.dead;
+    const ready = p.mp >= p.maxMp && !G.dead && ultWait() <= 0;
     put('#ult span', ultLook(G.cls.id).name);
-    put('#ult small', ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
+    put('#ult small', ultWait() > 0 ? `${Math.ceil(ultWait())}초` : ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
     const ic = `url(${ultIcon(G.cls.id)})`;
     if (shown.ultIcon !== ic) { shown.ultIcon = ic; ultBtn.style.backgroundImage = ic; }
     ultBtn.classList.toggle('ready', ready);
@@ -6108,9 +6139,9 @@ function syncUlt() {
     shown.slots = slots;
     $('#side-slots').innerHTML = slots;
   }
-  const ready = p.mp >= p.maxMp && !G.dead;
+  const ready = p.mp >= p.maxMp && !G.dead && ultWait() <= 0;
   put('#ult span', ultLook(G.cls.id).name);
-  put('#ult small', ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
+  put('#ult small', ultWait() > 0 ? `${Math.ceil(ultWait())}초` : ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
   ultBtn.classList.toggle('ready', ready);
 }
 
