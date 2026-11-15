@@ -99,6 +99,9 @@
   .pin.locked { opacity: .5; filter: grayscale(1); }
   .pin.next i { border-top-color: #ffd84a; animation: pinpulse 0.9s ease-in-out infinite; }
   .pin.cleared i { border-top-color: #6ad04a; }
+  .pin.town b { color: #fff; background: #3a68c8; }
+  .pin.town i { border-top-color: #5a8af0; }
+  #map.gungnae .pin.town span { display: inline; }
   @keyframes pinpulse { 50% { transform: translateY(-3px) scale(1.25); } }
   #map-goal { position: absolute; left: 4px; top: 4px; z-index: 2; padding: 1px 5px; font: 10px/14px G9, monospace;
       color: #ffd84a; background: rgba(13, 7, 3, .85); border: 1px solid var(--mid); pointer-events: none; }

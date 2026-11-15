@@ -427,6 +427,16 @@ function lockReason(i) {
   return need ? `${need.name}의 보스를 쓰러뜨리면 열립니다` : '앞 사냥터를 정복하면 열립니다';
 }
 
+/** The hardest ground open to the hero: by its level (the order it is hunted in). */
+function bestOpenStage() {
+  let best = STAGES[0], bl = -1;
+  STAGES.forEach((s, i) => {
+    const lvl = s.level !== undefined ? s.level : i;
+    if (unlocked(i) && lvl > bl) { best = s; bl = lvl; }
+  });
+  return best;
+}
+
 function unlocked(i) {
   // The first fourteen open one after another; an added ground when its own is conquered.
   const s = STAGES[i];
@@ -439,10 +449,8 @@ let pickedStage = null;
 
 function buildStages() {
   if (!pickedStage) {
-    // The furthest open ground.
-    let i = 0;
-    while (i + 1 < 14 && unlocked(i + 1)) i++;
-    pickedStage = STAGES[i];
+    // The hardest ground the hero may enter now, picked and shown on its own map.
+    pickedStage = bestOpenStage();
     mapTab = pickedStage.map;
   }
   for (const b of document.querySelectorAll('#map-tabs button')) b.classList.toggle('on', b.dataset.map === mapTab);
@@ -471,6 +479,17 @@ function buildStages() {
   goal.id = 'map-goal';
   goal.textContent = nextI >= 0 ? `다음 목표: ${STAGES[nextI].name}` : '모든 사냥터를 정복했습니다';
   map.append(goal);
+  // The town on its own map: straight back to it from here, as through the guide.
+  const townAt = (M.ymap && M.ymap[mapTab] && M.ymap[mapTab].town) || (mapTab === 'gungnae' ? [0.5, 0.52] : null);
+  if (townAt) {
+    const t = document.createElement('button');
+    t.className = 'pin town';
+    t.style.left = townAt[0] * 100 + '%';
+    t.style.top = townAt[1] * 100 + '%';
+    t.innerHTML = '<b>마을</b><i></i><span>국내성</span>';
+    t.onclick = () => enterTown(chosenClass);
+    map.append(t);
+  }
   STAGES.forEach((s, i) => {
     if (s.map !== mapTab) return;
     const b = document.createElement('button');
@@ -3499,7 +3518,11 @@ window.__town = () => T;
 function talk() {
   const n = T && T.near;
   if (!n) return;
-  if (n.id === 'guide') showScreen('stages');
+  if (n.id === 'guide') {
+    // Through the guide the map opens on the hardest ground the hero can enter.
+    pickedStage = null;
+    showScreen('stages');
+  }
   else if (n.id === 'clerk') openQuests();
   else if (n.id === 'smith') {
     buildEquip();
