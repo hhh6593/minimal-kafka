@@ -1568,7 +1568,7 @@ function ringTile(must = false) {
 // 2:50. The grounds map onto the five acts in order.
 // A survivors game is a horde: the field opens full (24 even on the first ground) and swells to
 // 130~190 by 5:00, the monsters in it weaker one by one (see HORDE) so they fall in a blow or two.
-const FLOOR_OPEN = [24, 40, 50, 60, 70], FLOOR_FIVE = [130, 150, 170, 180, 190];
+const FLOOR_OPEN = [24, 30, 36, 44, 52], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 420;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
 const HORDE = { hp: 1, dmg: 1 };
@@ -2371,7 +2371,7 @@ function hurtEnemy(e, dmg, push = null) {
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
   const crit = Math.random() < 0.1;
-  if (crit) dmg *= 1.8;
+  if (crit) { dmg *= 1.8; audio.play('crit'); }
   if (e.capPerSec) {
     // A hunt's boss: no more than its share of life a second, whatever lands on it.
     const sec = Math.floor(G.t);
@@ -5476,7 +5476,7 @@ document.addEventListener('click', e => {
 // 92, so 092.wav), the rest start silent or on a made-up sound, and the player listens and
 // picks. Choices are saved with the other settings.
 
-const EVENTS = [['hit', '타격'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
+const EVENTS = [['hit', '타격'], ['crit', '치명타'], ['kill', '몬스터 쓰러짐'], ['hurt', '맞음'], ['levelup', '레벨업'], ['pickup', '줍기'],
   ['heal', '회복'], ['chest', '보물 상자'], ['boss', '보스 등장'], ['win', '정복'], ['lose', '유령이 됨'], ['revive', '부활'], ['click', '버튼 누름']];
 const MUSIC = [['title', '처음 화면'], ['select', '직업·사냥터 선택'], ['town', '국내성'], ['boss', '보스'], ...STAGES.map(s => ['stage_' + s.id, s.name]),
   ...RAIDS.map(r => ['raid_' + r.id, r.name])];
@@ -5556,7 +5556,8 @@ const GAME_SOUNDS = {
   skill_p_judge: '057@1.1', skill_p_wargod: '084@1.1', skill_p_burst: '104@1.15', skill_p_realm: '097@0.9',
   skill_p_bagua: '109@0.9', skill_p_dragongod: '702', skill_p_flash: '701@1.2', skill_p_bind: '070',
   skill_p_warmth: '098@1.1', skill_p_thunderbomb: '700@1.1', skill_p_skyspirit: '066@0.9', skill_p_taiji: '109@0.75',
-  hit: '331', kill: '-', hurt: '-', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
+  // A kill thuds with the strong blade's hit (337), a crit rings with the client's own crit (349).
+  hit: '331', kill: '337', crit: '349', hurt: '-', levelup: '123', pickup: '406', heal: '074', chest: '503', boss: '509',
   win: '401', lose: '402', revive: '112', click: '408', party_guard: '008',
 };
 
@@ -5614,10 +5615,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 4) {
+  if (settings.soundsVer !== 5) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 4;
+    settings.soundsVer = 5;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});
