@@ -568,6 +568,20 @@ def main():
             shutil.copyfile(usrc, os.path.join(out, "yunit", mid + ".png"))
             manifest["yunit"][mid] = {"cell": u["cell"], "foot": u["foot"], "anims": u["anims"]}
 
+    # 바람의나라 연's own heroes (GEAR_DIR/yhero/<class>[_<a|b|c>].png + index.json, from
+    # tools/yeon_avatar.py): each class in 연's parts, an outfit per armour tier.
+    hydir = os.path.join(gear_src, "yhero") if gear_src else None
+    manifest["yhero"] = {}
+    if hydir and os.path.isfile(os.path.join(hydir, "index.json")):
+        os.makedirs(os.path.join(out, "yhero"), exist_ok=True)
+        with open(os.path.join(hydir, "index.json"), encoding="utf-8") as f:
+            yindex = json.load(f)
+        for key, u in yindex.items():
+            ysrc = os.path.join(hydir, key + ".png")
+            if os.path.isfile(ysrc) and "anims" in u:
+                shutil.copyfile(ysrc, os.path.join(out, "yhero", key + ".png"))
+                manifest["yhero"][key] = {"cell": u["cell"], "foot": u["foot"], "anims": u["anims"]}
+
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
     edir = os.path.join(gear_src, "emote") if gear_src else None

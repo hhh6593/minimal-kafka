@@ -4290,7 +4290,10 @@ function partyAct(m) {
 function drawParty(m) {
   const dir = facing(m.fdx, m.fdy);
   const alpha = m.down ? 0.4 : m.hidden > G.t ? 0.35 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
-  if (m.av) {
+  const mPose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
+  if (drawYhero(m.cls.id || m.cls, m.gear ? m.gear.armor : 0, m, m.x, y, mPose, alpha)) {
+    // drawn in 연's own figure
+  } else if (m.av) {
     const pose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
     drawAvatar(ctx, m.av, m.x, y, dir, pose, Math.floor(m.walkT / WALK_MS), alpha);
   } else drawWalker(m.img, m.x, y, m.fdx < 0 ? -1 : 1, m.walkT / 100, m.moving, m.flash, 1, alpha);
@@ -5014,6 +5017,39 @@ function drawDigits(text, x, y, color, k) {
   }
 }
 
+// ---------------------------------------------------------------- 연's own heroes
+// The heroes as 바람의나라 연 draws them (tools/yeon_avatar.py): each class in 연's own parts,
+// in three outfits by the armour worn (a starter, a middle one, the dragon set), walking,
+// standing, striking and casting in three directions (the side one faces left).
+
+function yheroKey(clsId, armor) {
+  const tier = armor >= 6 ? 'c' : armor >= 3 ? 'b' : 'a';
+  for (const k of [`${clsId}_${tier}`, clsId]) {
+    if (M.yhero && M.yhero[k]) {
+      const path = `yhero/${k}.png`;
+      if (!(path in images)) loadImage(path);
+      const im = images[path];
+      if (im && im.complete && im.width) return { u: M.yhero[k], im };
+    }
+  }
+  return null;
+}
+
+/** Draws a hero from 연's sheet; false when there is none for the class. */
+function drawYhero(clsId, armor, b, x, y, pose, alpha) {
+  const yh = yheroKey(clsId, armor);
+  if (!yh) return false;
+  const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
+  const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
+  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle' }[pose] || 'idle';
+  const a = yh.u.anims[`${name}_${dir}`] || yh.u.anims[`idle_${dir}`] || yh.u.anims.walk_down;
+  let f = 0;
+  if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
+  else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
+  drawYunit(yh, b, x, y, 1, alpha, a.row, f, dir === 'side' && fdx > 0);
+  return true;
+}
+
 // ---------------------------------------------------------------- 연's own monsters
 // The monsters as 바람의나라 연 draws them (tools/yeon_units.py): a sheet per monster with walk,
 // idle, attack and death in three directions (the side one faces left; mirrored for right),
@@ -5369,6 +5405,7 @@ function render(now) {
 
 function heroHeight() {
   const p = G.player;
+  if (M.yhero && M.yhero[G.cls.id]) return 44;
   return p.av ? p.av.top : p.img.height;
 }
 
@@ -5377,10 +5414,14 @@ function drawHero(now, hidden) {
   if (G.dead) {
     // The ghost the dead become: the hero, pale and see-through, floating.
     const y = p.y - 4 - Math.sin(now * 2) * 3;
+    if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, y, 'idle', 0.45)) return;
     if (p.av) drawAvatar(ctx, p.av, p.x, y, facing(p.fdx, p.fdy), 'idle', 0, 0.45);
     else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
     return;
   }
+  // 연's own figure for the class, in the outfit of the armour worn.
+  const yPose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
+  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, p.y, yPose, hidden ? 0.35 : 1)) return;
   // Struck, the hero does not flicker: the client showed a blow only in the health bar.
   if (!p.av) {
     drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);

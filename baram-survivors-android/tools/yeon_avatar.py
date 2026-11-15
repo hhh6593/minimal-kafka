@@ -41,7 +41,7 @@ ANIMS = {
 TRANSFORM_CURVES = {1: 3, 2: 4, 3: 3, 4: 3}
 
 
-def streamed_keys(clip):
+def streamed_keys(clip, total=None):
     """{curve: [(time, value), ...]} from the streamed, dense and constant parts of a clip."""
     data = clip.m_MuscleClip.m_Clip.data
     keys = {}
@@ -55,15 +55,18 @@ def streamed_keys(clip):
             ci = struct.unpack_from('<i', buf, i)[0]
             co = struct.unpack_from('<4f', buf, i + 4)
             i += 20
-            if t > -1e30 and t < 1e30:
-                keys.setdefault(ci, []).append((t, co[3]))
+            if t < 1e30:
+                # A key at -infinity is the curve's opening value.
+                keys.setdefault(ci, []).append((max(t, 0.0), co[3]))
     n_stream = sc.curveCount
     dc = data.m_DenseClip
     for f in range(dc.m_FrameCount):
         t = dc.m_BeginTime + f / dc.m_SampleRate
         for c in range(dc.m_CurveCount):
             keys.setdefault(n_stream + c, []).append((t, dc.m_SampleArray[f * dc.m_CurveCount + c]))
-    base = n_stream + dc.m_CurveCount
+    # Sprite (pptr) curves are stored in the streamed data but not counted in its curveCount:
+    # the constant curves are the last ones of all.
+    base = (total - len(data.m_ConstantClip.data)) if total is not None else n_stream + dc.m_CurveCount
     for c, v in enumerate(data.m_ConstantClip.data):
         keys.setdefault(base + c, []).append((0.0, v))
     return keys
@@ -107,65 +110,22 @@ def build(env):
     return parts, clips
 
 
-def family(ref):
-    """What kind of part a mapped sprite is, to tell where one binding's keys end."""
-    if ref is None or not ref.path_id:
-        return 'none'
-    try:
-        n = ref.read().m_Name
-    except Exception:
-        return 'none'
-    return re.sub(r'_\d+$', '', n)
-
-
-def pptr_groups(mapping, nbind):
-    """Splits pptrCurveMapping into one run of keys per sprite binding (in binding order):
-    runs of the same part family; a run shared by two bindings (a part and its _color twin,
-    or two empty parts) is split evenly."""
-    fams = [family(r) for r in mapping]
-    runs = []
-    for i, f in enumerate(fams):
-        if runs and runs[-1][0] == f:
-            runs[-1][1].append(i)
-        else:
-            runs.append([f, [i]])
-    # Split runs until there is one per binding: a run whose length is a multiple of a
-    # neighbour-sized group is cut in halves first.
-    while len(runs) < nbind:
-        cand = [r for r in runs if len(r[1]) > 1]
-        if not cand:
-            break
-        best = max(cand, key=lambda r: (len(r[1]) % 2 == 0, len(r[1])))
-        i = runs.index(best)
-        h = len(best[1]) // 2
-        runs[i:i + 1] = [[best[0], best[1][:h]], [best[0], best[1][h:]]]
-    return [[mapping[j] for j in r[1]] for r in runs]
-
-
 def frames(clip, parts):
-    """[(time, {crc: {'sprite', 'pos', 'order', 'active'}})] for each key time of the clip."""
+    """[(time, {crc: {'sprite', 'pos', 'order', 'active'}})] for each key time of the clip.
+
+    Curves are numbered over the bindings in order (a Transform position, rotation or scale
+    takes 3 or 4, anything else 1); a sprite curve's value is an index into pptrCurveMapping."""
     cb = clip.m_ClipBindingConstant
     mapping = cb.pptrCurveMapping
-    keys = streamed_keys(clip)
     curve = 0
     plan = []
-    pbind = []
-    # Float curves are numbered over the non-sprite bindings only; sprite keys live in
-    # pptrCurveMapping, one run per sprite binding, spread evenly over the clip.
     for b in cb.genericBindings:
-        if b.isPPtrCurve:
-            pbind.append(b)
-            continue
-        n = TRANSFORM_CURVES.get(b.attribute, 1) if b.typeID == 4 else 1
+        n = TRANSFORM_CURVES.get(b.attribute, 1) if (b.typeID == 4 and not b.isPPtrCurve) else 1
         plan.append((b, list(range(curve, curve + n))))
         curve += n
-    groups = pptr_groups(mapping, len(pbind))
+    keys = streamed_keys(clip, curve)
     stop = clip.m_MuscleClip.m_StopTime
-    times = sorted({round(t, 4) for ks in keys.values() for t, _ in ks})
-    for g in groups:
-        if len(g) > 1:
-            times += [round(i * stop / (len(g) - 1), 4) for i in range(len(g))]
-    times = sorted({t for t in times if t < stop - 1e-4}) or [0.0]
+    times = sorted({round(t, 4) for ks in keys.values() for t, _ in ks if t < stop - 1e-4}) or [0.0]
     out = []
     for t in times:
         # Only the parts this clip gives a sprite are drawn: the prefab's own renderers hold
@@ -176,18 +136,16 @@ def frames(clip, parts):
             if s is None or any(c not in keys for c in cs):
                 continue
             vals = [value_at(keys[c], t) for c in cs]
-            if b.typeID == 4 and b.attribute == 1:
+            if b.isPPtrCurve:
+                if b.typeID == 212:
+                    i = int(round(vals[0]))
+                    s['sprite'] = mapping[i] if 0 <= i < len(mapping) else None
+            elif b.typeID == 4 and b.attribute == 1:
                 s['pos'] = [vals[0], vals[1]]
             elif b.typeID == 1:
                 s['active'] = vals[0] > 0.5
             elif b.typeID == 114:
                 s['order'] = vals[0]
-        for b, g in zip(pbind, groups):
-            s = st.get(b.path)
-            if s is None or not g:
-                continue
-            i = 0 if len(g) == 1 else min(len(g) - 1, int(t / (stop / (len(g) - 1)) + 1e-4))
-            s['sprite'] = g[i]
         out.append((t, st))
     # One loop: the walk clips repeat their cycle; keep the frames where the body changes,
     # up to its first return to the opening frame.
@@ -219,18 +177,35 @@ def render(state, swap, cache):
         except Exception:
             continue
         name = sp.m_Name
+        geo = None
+        drop = False
         for a, b in swap.items():
             if name.startswith(a):
+                if not b:
+                    drop = True  # an empty swap takes the part off (the template's helmet, beard...)
+                    break
                 alt = cache['byname'].get(b + name[len(a):])
                 if alt is not None:
+                    # The slot keeps its geometry: a worn piece is drawn where the template
+                    # piece was (armor sheets carry a corner pivot of their own).
+                    if (int(alt.m_Rect.width), int(alt.m_Rect.height)) == (int(sp.m_Rect.width), int(sp.m_Rect.height)):
+                        geo = sp
                     sp = alt
                     name = sp.m_Name
                 break
-        if name not in cache['img']:
-            cache['img'][name] = sp.image
-        im = cache['img'][name]
-        r = sp.m_Rect
-        px, py = sp.m_Pivot.x * r.width, (1 - sp.m_Pivot.y) * r.height
+        if drop:
+            continue
+        key = (name, sp.object_reader.path_id)
+        if key not in cache['img']:
+            cache['img'][key] = sp.image
+        im = cache['img'][key]
+        g = geo or sp
+        r = g.m_Rect
+        px, py = g.m_Pivot.x * r.width, (1 - g.m_Pivot.y) * r.height
+        # Tightly packed sprites come back trimmed: put the picture where it sits in its rect.
+        off = sp.m_RD.textureRectOffset
+        px -= off.x
+        py -= sp.m_Rect.height - off.y - im.height
         x, y = s['pos']
         # Parts sit under "Sprite", whose own position is the root of the drawing.
         if k != 0:
@@ -248,12 +223,21 @@ def main():
     env = UnityPy.load(units, items)
     parts, clips = build(env)
     byname = {}
-    prefixes = {b for sw in classes.values() for b in sw.values()}
+    prefixes = {b for sw in classes.values() for b in sw.values() if b}
     for o in env.objects:
         if o.type.name == 'Sprite':
             n = o.peek_name()
-            if any(n.startswith(p) for p in prefixes):
-                byname[n] = o.read()
+            for p in prefixes:
+                if n.startswith(p):
+                    sp = o.read()
+                    # Names repeat across sheets: keep the one cut from the item's own texture.
+                    # The texture is the item's own sheet: "item_1000" for Item_1000_E_*, or "Item_3226_E".
+                    stem = p.rstrip('_').lower()
+                    tname = sp.m_RD.texture.read().m_Name.lower()
+                    own = tname == stem or tname == re.sub(r'_[es]$', '', stem)
+                    if n not in byname or own:
+                        byname[n] = sp
+                    break
     cache = {'img': {}, 'byname': byname}
     index = {}
     for cls, swap in classes.items():
