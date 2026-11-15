@@ -61,7 +61,10 @@ export function specialBase(sp, cls) {
     const name = raidSet(sp.src, cls).find(([k]) => k === sp.kind)[1];
     return GEAR[cls][sp.kind].indexOf(name);
   }
-  const list = plainList(cls, sp.kind);
+  // A class whose plain line of this kind is all crafted looks (the 주술사's shields) takes the
+  // line as it stands, so the special still has a base, a name and a picture.
+  let list = plainList(cls, sp.kind);
+  if (!list.length) list = GEAR[cls][sp.kind].map((n, i) => i);
   return list[Math.min(list.length - 1, Math.floor(sp.rank / 3) + 1)];
 }
 

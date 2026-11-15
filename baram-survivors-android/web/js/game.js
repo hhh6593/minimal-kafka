@@ -5036,7 +5036,10 @@ function drawDigits(text, x, y, color, k) {
 // standing, striking and casting in three directions (the side one faces left).
 
 function yheroKey(clsId, armor) {
-  const tier = armor >= 6 ? 'c' : armor >= 3 ? 'b' : 'a';
+  // The class's armour line in thirds: the first third the starter outfit, then the middle one,
+  // the best third the dragon set.
+  const n = (GEAR[clsId] && GEAR[clsId].armor.length) || 6, f = Math.max(0, armor) / Math.max(1, n - 1);
+  const tier = f > 2 / 3 ? 'c' : f > 1 / 3 ? 'b' : 'a';
   for (const k of [`${clsId}_${tier}`, clsId]) {
     if (M.yhero && M.yhero[k]) {
       const path = `yhero/${k}.png`;
@@ -6212,6 +6215,35 @@ window.__appBack = () => {
   return false;
 };
 // For testing in a browser console.
+
+// Test: every piece of gear of the class in play, worn in turn — its icon, its stats, the
+// hero drawn in it and the equipment window — returning what failed.
+window.__gearTest = () => {
+  const bad = [], cls = G.cls, c = cls.id, keep = { ...G.player.gear };
+  const check = (label, kind, t, sp) => {
+    try {
+      wear(kind, t, sp);
+      const icon = pieceIcon(cls, kind, t, sp);
+      if (!icon && !(kind === 'armor')) bad.push(label + ': no icon');
+      if (!(G.player.gearPower > 0) || !(G.player.maxHp > 0)) bad.push(label + ': bad stats');
+      render(performance.now() / 1000);
+    } catch (e) {
+      bad.push(label + ': ' + e.message);
+    }
+  };
+  for (const kind of ['weapon', 'armor', 'shield']) {
+    (GEAR[c][kind] || []).forEach((name, t) => check(`${kind} ${t} ${name}`, kind, t, null));
+  }
+  let n = 0;
+  for (const sp of Object.values(SPECIAL)) {
+    if (sp.cls && sp.cls !== c) continue;
+    n++;
+    check(`special ${sp.id} ${specialName(sp, c)}`, sp.kind, specialBase(sp, c), sp.id);
+  }
+  try { $('#equip').hidden = false; buildEquip(); $('#equip').hidden = true; } catch (e) { bad.push('equip window: ' + e.message); }
+  for (const [k, v] of Object.entries(keep)) if (!k.endsWith('Sp')) wear(k, v, keep[k + 'Sp'] || null);
+  return { cls: c, tried: ['weapon', 'armor', 'shield'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
+};
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
