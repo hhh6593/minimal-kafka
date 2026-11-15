@@ -4180,7 +4180,7 @@ function partyAct(m) {
           if (!downed.down) return;
           downed.down = 0;
           downed.hp = downed.maxHp * 0.5;
-          addFx(FX.revive, downed.x, downed.y - 26);
+          addFx(FX.revive, downed.x, downed.y + 2, { anchor: 'bottom' });
           audio.play('revive');
           downed.bubble = { text: '고마워!', t: G.t + 0.3 };
         });
@@ -4704,7 +4704,7 @@ function die() {
     p.hp = p.maxHp * 0.5;
     G.buffs.guard = G.t + 3;
     say('성황령의 힘으로 다시 일어났습니다.', 'sys');
-    addFx(FX.revive, 0, -26, { follow: true });
+    addFx(FX.revive, 0, 2, { follow: true, anchor: 'bottom' });
     audio.play('revive');
     return;
   }
@@ -4714,7 +4714,7 @@ function die() {
     G.buffs.guard = G.t + 3;
     G.bubble = { text: '부활!', t: G.t };
     say('부활 마법으로 다시 일어났습니다.');
-    addFx(FX.revive, 0, -26, { follow: true });
+    addFx(FX.revive, 0, 2, { follow: true, anchor: 'bottom' });
     audio.play('revive');
     return;
   }
