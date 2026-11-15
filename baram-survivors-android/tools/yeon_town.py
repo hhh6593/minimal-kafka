@@ -12,7 +12,8 @@ inside 털보's smithy, 떼보's armour shop or 왈숙 이모's inn (each its ow
 own exit warp); the market's gates are portals to the hunting grounds.
 
 Writes OUT_DIR/ytown/:
-  <area>.png        each area rendered from its own 32-pixel tiles (market, smithy, armor, inn)
+  <area>.png        each area rendered from its own 32-pixel tiles (market, smithy, armor, jumak;
+                    named apart from the folk's pictures)
   <role>.png        the townsfolk: 연's 국내성 NPCs (털보, 떼보, 왈숙 이모, the palace lady, the board)
   warp.png, warp_light.png, illusion.png   연's warp floor, its glow, the phantom portal (4 frames)
   index.json        {"areas": {area: {"w", "h", "tile", "cols", "rows", "walk": [rows, "." walkable],
@@ -39,7 +40,7 @@ AREAS = {
     'market': ('chip_kow_guknesung_marget', (6, 6, 58, 55)),
     'smithy': ('chip_kow_guknesung_smithy', None),
     'armor': ('chip_kow_guknesung_armor', None),
-    'inn': ('chip_kow_guknesung_jumakwalsuk', None),
+    'jumak': ('chip_kow_guknesung_jumakwalsuk', None),
 }
 FOLK = {
     'smith': {'prefab': 'Baram_Unit_305', 'name': '털보'},
@@ -49,12 +50,12 @@ FOLK = {
 STILL = {'guide': 'baram_Unit_328', 'clerk': 'baram_Unit_378'}
 # Where each stands, in its map's own pixels: the house-keepers where 연 puts them (their NPC
 # spawns), the board and the palace lady in the market (by the lower stall and the gate).
-SPOTS = {'smith': ('smithy', 400, 300), 'merchant': ('armor', 384, 262), 'inn': ('inn', 416, 424),
+SPOTS = {'smith': ('smithy', 400, 300), 'merchant': ('armor', 384, 262), 'inn': ('jumak', 416, 424),
          'clerk': ('market', 1312, 1088), 'guide': ('market', 928, 1328)}
 # Doors from the market (at the stalls' signboards) into the houses; a house's way out is its
 # own @WARP object.
 DOORS = [('market', 640, 640, 'smithy', '대장간'), ('market', 1376, 640, 'armor', '갑옷점'),
-         ('market', 736, 1088, 'inn', '주막')]
+         ('market', 736, 1088, 'jumak', '주막')]
 # The market's gates as portals: its lower gate and its upper warp (연's own), and the two
 # sides. tab: the hunting-ground map they open.
 PORTALS = [(992, 1600, 'gungnae', '남문 · 국내성 사냥터', 'warp'), (560, 352, 'world_1', '북문 · 대륙', 'warp'),
