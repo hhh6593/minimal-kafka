@@ -1954,7 +1954,7 @@ function spawn(dt) {
       // 압박: a hero who stays well (over 3/4 of its life) for 25 seconds is pressed harder, a step
       // at a time up to three (one more monster a second and 12% harder blows each); being hurt
       // eases it again. The strong are kept busy; the struggling are not piled on.
-      const p = G.player, well = p.hp / p.maxHp > 0.75;
+      const p = G.player, well = p.hp / p.maxHp > 0.75 && t >= 90;
       G.calm = well ? (G.calm || 0) + 1 : Math.max(0, (G.calm || 0) - 3);
       const press = Math.min(3, Math.floor(G.calm / 20));
       if (press > (G.press || 0)) {
@@ -2122,7 +2122,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 2000),
     // Deeper grounds bite harder: +15% a step (흉가, the 7th, twice the first).
-    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.15 * G.level)
+    dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.1 * G.level)
       * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
