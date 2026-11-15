@@ -4165,7 +4165,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
-  v *= 1.7 / Math.sqrt(viewCrowd());
+  v *= 1.7;
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
