@@ -88,7 +88,8 @@ async function boot() {
     ...avatarPaths(M),
     ...(M.npc || []).map(n => `npc/${n}.png`),
     ...(M.ui.town ? ['ui/town.png'] : []),
-    ...(M.ui.ytown ? ['ytown/market.png', ...Object.keys(M.ui.ytown.folk).map(k => `ytown/${k}.png`)] : []),
+    ...(M.ui.ytown ? [...Object.keys(M.ui.ytown.areas).map(k => `ytown/${k}.png`), ...Object.keys(M.ui.ytown.folk).map(k => `ytown/${k}.png`),
+      'ytown/warp.png', 'ytown/warp_light.png', 'ytown/illusion.png'] : []),
     ...(M.ui.ytitle ? ['ui/title_bg.jpg'] : []),
     ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
     ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
@@ -3459,17 +3460,41 @@ const TOWNSFOLK = [
 // hunting grounds and the notice board of the town's 의뢰.
 const YTOWN_LOOK = { smith: 'smith', merchant: 'merchant', inn: 'inn', guide: 'guide', clerk: 'clerk' };
 const YTOWN_NAME = { smith: '털보', merchant: '떼보', inn: '왈숙 이모', guide: '궁인', clerk: '알림판' };
+// 국내성 as 연 joins its maps: the market square is the hub, its doors' warp floors lead into
+// 털보's smithy, 떼보's armour shop and 왈숙 이모's inn (each 연's own map, left by its own exit
+// warp), and its gates are portals to the hunting grounds — each opens the grounds of its region.
+const WARP_R = 18;
 
-/** The town's people where they stand, in the map's pixels (feet). */
-function townFolk() {
+/** The town's people of the area the hero is in, where they stand (feet). */
+function townFolk(area) {
   const yt = M.ui.ytown;
   return TOWNSFOLK.map(n => {
     if (yt && yt.spots[n.id]) {
-      const [x, y] = yt.spots[n.id];
-      return { ...n, x, y, look: YTOWN_LOOK[n.id], label: YTOWN_NAME[n.id] || n.name };
+      const sp = yt.spots[n.id];
+      return { ...n, x: sp.x, y: sp.y, area: sp.area, look: YTOWN_LOOK[n.id], label: YTOWN_NAME[n.id] || n.name };
     }
     return { ...n, x: n.tx * TOWN_TILE + TOWN_TILE / 2, y: n.ty * TOWN_TILE + TOWN_TILE - 6, label: n.name };
-  });
+  }).filter(n => !yt || n.area === area);
+}
+
+/** The area of 연's town the hero stands in (null: the old town). */
+function townArea() {
+  return M.ui.ytown ? M.ui.ytown.areas[T.area] : null;
+}
+
+/** Moves the hero to another area of the town, standing at (x, y). */
+function goArea(area, x, y, fdy) {
+  T.area = area;
+  T.x = x;
+  T.y = y;
+  T.fdx = 0;
+  T.fdy = fdy;
+  T.folk = townFolk(area);
+  T.near = null;
+  $('#talk').hidden = true;
+  // Arrived on a warp floor: it takes the hero nowhere until stepped off.
+  T.warpLock = true;
+  audio && audio.play('enter');
 }
 
 function enterTown(cls) {
@@ -3480,9 +3505,10 @@ function enterTown(cls) {
   }
   const gear = savedGear(cls);
   const yt = M.ui.ytown;
-  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: yt ? yt.map.spawn[0] : 7.5 * TOWN_TILE,
-    y: yt ? yt.map.spawn[1] : 5 * TOWN_TILE - 6, fdx: 0, fdy: yt ? -1 : 1, moving: false, walkT: 0, near: null,
-    folk: townFolk() };
+  const sp = yt ? yt.areas.market.spawn : [7.5 * TOWN_TILE, 5 * TOWN_TILE - 6];
+  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: sp[0], y: sp[1], fdx: 0, fdy: yt ? -1 : 1, moving: false,
+    walkT: 0, near: null, area: 'market' };
+  T.folk = townFolk('market');
   showScreen('town');
   audio.bgm('town');
   $('#town-gold').textContent = `${progress.gold || 0}전`;
@@ -3490,15 +3516,52 @@ function enterTown(cls) {
 }
 
 function townBlocked(x, y) {
-  const yt = M.ui.ytown;
-  if (yt) {
-    const m = yt.map, tx = Math.floor(x / m.tile), ty = Math.floor((y - 2) / m.tile);
+  const m = townArea();
+  if (m) {
+    const tx = Math.floor(x / m.tile), ty = Math.floor((y - 2) / m.tile);
     if (tx < 0 || ty < 0 || tx >= m.cols || ty >= m.rows || m.walk[ty][tx] !== '.') return true;
     return T.folk.some(n => Math.abs(n.x - x) < 14 && y > n.y - 14 && y < n.y + 6);
   }
   const tx = Math.floor(x / TOWN_TILE), ty = Math.floor((y - 4) / TOWN_TILE);
   if (tx < 0 || ty < 0 || tx > 15 || ty > 9) return true;
   return TOWN_WALLS.has(`${tx},${ty}`) || TOWNSFOLK.some(n => n.tx === tx && n.ty === ty);
+}
+
+/** A portal's gate opens the hunting grounds of its region, its tab chosen. */
+function openPortal(tab) {
+  showScreen('stages');
+  const b = document.querySelector(`#map-tabs button[data-map="${tab}"]`);
+  if (b) b.click();
+}
+
+/** The warp floors under the hero's feet: doors between areas, the gates out of town. */
+function townWarps() {
+  const yt = M.ui.ytown;
+  if (!yt) return;
+  const on = (x, y) => Math.hypot(x - T.x, y - T.y) < WARP_R;
+  let hit = null;
+  if (T.area === 'market') {
+    for (const pt of yt.portals) if (on(pt.x, pt.y)) hit = () => openPortal(pt.tab);
+    for (const d of yt.doors) {
+      if (d.area === T.area && on(d.x, d.y)) {
+        const ex = yt.exits[d.to] || { x: yt.areas[d.to].spawn[0], y: yt.areas[d.to].spawn[1] + 40 };
+        hit = () => goArea(d.to, ex.x, ex.y - 40, -1);
+      }
+    }
+  } else {
+    const ex = yt.exits[T.area];
+    if (ex && on(ex.x, ex.y)) {
+      const d = yt.doors.find(dd => dd.to === T.area);
+      hit = () => goArea('market', d.x, d.y + 40, 1);
+    }
+  }
+  if (!hit) {
+    T.warpLock = false;
+    return;
+  }
+  if (T.warpLock) return;
+  T.warpLock = true;
+  hit();
 }
 
 function updateTown(dt) {
@@ -3516,8 +3579,9 @@ function updateTown(dt) {
     }
     T.walkT += dt * 1000;
   }
-  // Who is close enough to talk to: the nearest within a step and a half.
-  const reach = M.ui.ytown ? 52 : TOWN_TILE * 1.6;
+  townWarps();
+  // Who is close enough to talk to: the nearest within reach (across a shop's counter in a house).
+  const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 72) : TOWN_TILE * 1.6;
   const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)
     .sort((a, b) => a[1] - b[1]).map(([n]) => n)[0] || null;
   if ((near && near.id) !== (T.near && T.near.id)) {
@@ -3527,10 +3591,33 @@ function updateTown(dt) {
   }
 }
 
+/** 연's warp floor (or the phantom portal) with its label, glowing. */
+function drawWarp(x, y, label, art, now) {
+  const floor = images['ytown/warp.png'], light = images['ytown/warp_light.png'], ill = images['ytown/illusion.png'];
+  ctx.save();
+  if (art === 'illusion' && ill && ill.width) {
+    // The phantom gate: its four frames (a 2 x 2 sheet) in turn.
+    const fw = ill.width / 2, fh = ill.height / 2, i = Math.floor(now * 8) % 4;
+    ctx.drawImage(ill, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh, Math.round(x - fw / 2), Math.round(y - fh * 0.62), fw, fh);
+  } else if (floor && floor.width) {
+    const w = floor.width * 0.6, h = floor.height * 0.6 * 0.55;
+    ctx.drawImage(floor, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
+    if (light && light.width) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(now * 3);
+      ctx.drawImage(light, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
+    }
+  }
+  ctx.restore();
+  ctx.font = '8px G7';
+  ctx.textAlign = 'center';
+  outline(label, x, y - (art === 'illusion' ? 52 : 16), '#9fe8ff');
+}
+
 function drawTown(now) {
-  const yt = M.ui.ytown;
-  const map = images[yt ? 'ytown/market.png' : 'ui/town.png'];
-  const mw = yt ? yt.map.w : M.ui.town.w, mh = yt ? yt.map.h : M.ui.town.h;
+  const yt = M.ui.ytown, area = townArea();
+  const map = images[yt ? `ytown/${T.area}.png` : 'ui/town.png'];
+  const mw = yt ? area.w : M.ui.town.w, mh = yt ? area.h : M.ui.town.h;
   let camX = Math.round(T.x - VW / 2), camY = Math.round(T.y - 30 - VH / 2);
   camX = VW >= mw ? Math.round((mw - VW) / 2) : Math.max(0, Math.min(mw - VW, camX));
   camY = VH >= mh ? Math.round((mh - VH) / 2) : Math.max(0, Math.min(mh - VH, camY));
@@ -3541,6 +3628,12 @@ function drawTown(now) {
   ctx.fillStyle = yt ? '#000' : '#2a1a0e';
   ctx.fillRect(camX, camY, VW, VH);
   if (map && map.width) ctx.drawImage(map, 0, 0);
+  if (yt) {
+    if (T.area === 'market') {
+      for (const pt of yt.portals) drawWarp(pt.x, pt.y, pt.label, pt.art, now);
+      for (const d of yt.doors) drawWarp(d.x, d.y, d.label, 'warp', now);
+    } else if (yt.exits[T.area]) drawWarp(yt.exits[T.area].x, yt.exits[T.area].y, '장터로', 'warp', now);
+  }
   const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }]);
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
