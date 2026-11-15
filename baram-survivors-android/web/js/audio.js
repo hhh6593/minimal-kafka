@@ -32,7 +32,7 @@ const MIN_GAP = { hit: 0.12, kill: 0.09, crit: 0.18, pickup: 0.03, skill_aura: 0
   skill_w_sword: 1.6, skill_m_fire3: 1.8, skill_p_wave: 1.4, skill_r_dance: 0.6, skill_r_storm: 0.7,
   skill_r_heaven: 0.9, skill_r_formless: 2.0 };
 // Sounds that come many times a second play softer than spells.
-const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45 };
+const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45, combo: 0.9 };
 
 export class Audio {
   constructor(manifest) {

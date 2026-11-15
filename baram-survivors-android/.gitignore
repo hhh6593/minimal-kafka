@@ -9,3 +9,4 @@ audio/sfx/*
 
 # The sound names list comes with the sound files.
 audio/names.json
+__pycache__/

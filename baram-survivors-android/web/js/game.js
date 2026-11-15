@@ -4,6 +4,7 @@ import {
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
+import { YEON_SOUNDS, YEON_BGM } from './yeon_sounds.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -100,6 +101,11 @@ async function boot() {
   for (const [id, fx] of Object.entries(YEON_FX)) {
     if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
+  // Better still, the spell's own effect out of 연's client, where it has one by that name.
+  for (const id of Object.keys(SKILLS)) {
+    const fx = 'k_' + id;
+    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
+  }
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
     if (def.tint && M.fx[def.fx]) M.fx['s_' + id] = { ...M.fx[def.fx], src: def.fx, tint: def.tint, k: def.fxk };
@@ -142,23 +148,26 @@ function stageMonsters(stage) {
 
 let menuGround;
 
-// Props on each kind of ground, from the original maps: [name, weight]. 'fence' is the wooden
-// palisade, laid in runs like the walls round the old hunting grounds.
-const PROPS = {
-  field: [['tree1', 3], ['tree2', 3], ['tree3', 3], ['stone', 4], ['fence', 2]],
-  field2: [['tree1', 4], ['tree2', 4], ['tree3', 4], ['stone', 2], ['fence', 2]],
-  cave: [['stone', 6], ['jar1', 1], ['jar3', 1]],
-  house: [['jar1', 2], ['jar2', 2], ['jar3', 2], ['jar4', 1], ['fence', 2]],
-  island: [['tree2', 1], ['stone', 4]],
-  sea: [['stone', 3]],
-  lava: [['stone', 3]],
-};
+// Props on each kind of ground: 연's own map objects for the terrain (prop/<terrain>_<name>,
+// with what each is), and the old town's fruit trees on the open fields. [name, weight].
+const OLD_TREES = { field: ['tree1', 'tree2', 'tree3'], field2: ['tree1', 'tree2', 'tree3'] };
+const PROP_WEIGHT = { rock: 4, grass: 4, plant: 4, wall: 2, wood: 2, jar: 2, decal: 2, torch: 1, statue: 1, pit: 1 };
+const propCache = {};
+function propKinds(terrain) {
+  if (propCache[terrain]) return propCache[terrain];
+  const list = [];
+  for (const [name, meta] of Object.entries(M.prop || {})) {
+    if (meta[2] === terrain) list.push([name, PROP_WEIGHT[meta[3]] || 1]);
+  }
+  for (const t of OLD_TREES[terrain] || []) if (M.prop && M.prop[t]) list.push([t, 3]);
+  return (propCache[terrain] = list);
+}
 const PROP_CELL = 160;
 
 /** The props standing in view: one cell of the endless ground at a time, the same every visit. */
 function propsInView(camX, camY) {
-  const kinds = PROPS[G.stage.terrain];
-  if (!kinds || !M.prop) return [];
+  const kinds = propKinds(G.stage.terrain);
+  if (!kinds.length) return [];
   const list = kinds.filter(([n]) => M.prop[n] && images[`prop/${n}.png`] && images[`prop/${n}.png`].width);
   const total = list.reduce((a, [, w]) => a + w, 0);
   if (!total) return [];
@@ -176,10 +185,11 @@ function propsInView(camX, camY) {
       for (const [n, w] of list) if ((pick -= w) < 0) { name = n; break; }
       const x = cx * PROP_CELL + Math.floor(r() * (PROP_CELL - 40)) + 20, y = cy * PROP_CELL + Math.floor(r() * (PROP_CELL - 30)) + 20;
       out.push({ prop: name, x, y });
-      // Jars and stones come in little groups.
-      if (name.startsWith('jar') || name === 'stone') {
+      // Rocks, grass and jars come in little groups.
+      const kind = M.prop[name][3];
+      if (kind === 'rock' || kind === 'grass' || kind === 'plant' || kind === 'jar') {
         const more = Math.floor(r() * 3);
-        for (let i = 0; i < more; i++) out.push({ prop: name === 'stone' ? 'stone' : `jar${1 + Math.floor(r() * 4)}`, x: x + 16 + i * 18, y: y + Math.floor(r() * 12) - 6 });
+        for (let i = 0; i < more; i++) out.push({ prop: name, x: x + 18 + i * 20, y: y + Math.floor(r() * 14) - 7 });
       }
     }
   }
@@ -2274,6 +2284,7 @@ function moveEnemies(dt) {
       if (e.march && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1 && !hidden && e.atk <= 0) {
         e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
+        e.atkAt = G.t;
         hurtPlayer(e.dmg, e);
       }
       if (e.cd > 0) continue;
@@ -2307,6 +2318,7 @@ function moveEnemies(dt) {
       if (by && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > 1 && e.atk <= 0) {
         e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
+        e.atkAt = G.t;
         faceTo(e, by.tx, by.ty);
         hurtMember(by, e.dmg * 0.8);
       }
@@ -2327,6 +2339,7 @@ function moveEnemies(dt) {
         if (e.atk <= 0) {
           e.atk = TEMPERS[e.temper || 'normal'].atk;
           e.lunge = 0.15;
+          e.atkAt = G.t;
           hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * 0.16 * raidK() : e.dmg * 0.8);
         }
         continue;
@@ -2344,6 +2357,7 @@ function moveEnemies(dt) {
       if (e.atk <= 0 && !barred(e)) {
         e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
+        e.atkAt = G.t;
         hurtPlayer(e.dmg, e);
       }
       continue;
@@ -2490,6 +2504,8 @@ function killEnemy(e) {
   c.best = Math.max(c.best, c.n);
   if (COMBO_AT.includes(c.n)) {
     banner(`연속 처치 ${c.n}!`);
+    // 연's kill-streak voice, one step louder at each mark.
+    audio.play('combo', null, COMBO_AT.indexOf(c.n) + 1);
     G.flash = G.t;
     G.shake = Math.max(G.shake, 0.15);
     audio.play('levelup');
@@ -2707,7 +2723,8 @@ function fireSkill(s, k) {
 // ---------------------------------------------------------------- 기술 연계 (바람의나라 연)
 // 연's skill chain: the spells set in a chain wait until all of them are ready, then go off one
 // after another ahead of everything else, while a little window shows the chain running. Here
-// the chain is the hero's three slowest strikes (the big ones); the rest keep firing alone.
+// the chain is the hero's slowest strikes (two or three, each 2.5 seconds or more); the rest
+// keep firing alone.
 // Before a chain the 전사 and 도적 use 유인, drawing the foes around them into one heap first.
 
 const CHAIN_GAP = 0.2, CHAIN_POWER = 1.25;
@@ -2715,11 +2732,12 @@ const CHAIN_GAP = 0.2, CHAIN_POWER = 1.25;
 /** The spells of the chain: the three with the longest wait among those that strike. */
 function chainSkills() {
   if (G.stage.raid && G.party.length) return [];
+  // Only the big, slow strikes: a quick blow (이중공격) held back for them would lose its hits.
   const strikes = G.skills.filter(s => {
     const def = SKILLS[s.id];
-    return def && !['ult', 'buff', 'aura', 'passive', 'heal'].includes(def.kind) && stats(s).dmg > 0;
+    return def && !['ult', 'buff', 'aura', 'passive', 'heal'].includes(def.kind) && stats(s).dmg > 0 && stats(s).cd >= 2.5;
   });
-  if (strikes.length < 3) return [];
+  if (strikes.length < 2) return [];
   return strikes.map(s => [s, stats(s).cd]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s);
 }
 
@@ -4815,7 +4833,11 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
-  ctx.drawImage(im, i * f.w, 0, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
+  if (f.ax !== undefined) {
+    // 연's effects carry their pivot: the target's feet (a little under a body's middle).
+    const k = scale * (f.k || 1);
+    ctx.drawImage(im, i * f.w, 0, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
+  } else ctx.drawImage(im, i * f.w, 0, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
   ctx.restore();
 }
 
@@ -4941,7 +4963,65 @@ function drawBeast(b, alpha, ox = 0, oy = 0, k = 0.62) {
   ctx.restore();
 }
 
+// ---------------------------------------------------------------- 연's own monsters
+// The monsters as 바람의나라 연 draws them (tools/yeon_units.py): a sheet per monster with walk,
+// idle, attack and death in three directions (the side one faces left; mirrored for right),
+// every frame standing on the same foot point. Loaded the first time the monster is drawn.
+
+function yunit(m) {
+  const u = M.yunit && M.yunit[m.id];
+  if (!u) return null;
+  const path = `yunit/${m.id}.png`;
+  if (!(path in images)) loadImage(path);
+  const im = images[path];
+  return im && im.complete && im.width ? { u, im } : null;
+}
+
+/** Which row: the way it last moved (or faces), and what it is doing. */
+function yunitAnim(u, b) {
+  const dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
+  const dir = dx ? 'side' : dy < 0 ? 'up' : 'down';
+  const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
+  const atk = pick(`atk_${dir}`, 'atk_side', 'atk_down');
+  if (atk && b.atkAt !== undefined && (G.t - b.atkAt) * 1000 < atk.n * atk.ms) {
+    return { a: atk, f: Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms)), dir, dx };
+  }
+  const walk = pick(`walk_${dir}`, 'walk_side', 'walk_down');
+  const idle = pick(`idle_${dir}`);
+  const a = b.moving || !idle ? walk : idle;
+  if (!a) return null;
+  b.seed = b.seed || Math.floor(Math.random() * 1000);
+  return { a, f: Math.floor((performance.now() + b.seed) / a.ms) % a.n, dir, dx };
+}
+
+function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
+  const { u, im } = y, [cw, ch] = u.cell, [fx, fy] = u.foot;
+  const w = cw * s, h = ch * s;
+  ctx.save();
+  ctx.globalAlpha = 0.3 * alpha;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(Math.round(x), Math.round(yy - 1), Math.max(6, (u.foot_w || 16) * s * 0.6), 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(Math.round(x), Math.round(yy));
+  if (mirror) ctx.scale(-1, 1);
+  ctx.drawImage(im, f * cw, row * ch, cw, ch, -fx * s, -fy * s, w, h);
+  if (b.flash > 0) ctx.drawImage(white(im), f * cw, row * ch, cw, ch, -fx * s, -fy * s, w, h);
+  ctx.restore();
+}
+
 function drawMonster(b, x, y, s, alpha = 1) {
+  const yu = yunit(b.m);
+  if (yu) {
+    const r = yunitAnim(yu.u, b);
+    if (r) {
+      drawYunit(yu, b, x, y, s, alpha, r.a.row, r.f, r.dir === 'side' && (r.dx > 0 || (!r.dx && b.face > 0)));
+      return;
+    }
+  }
   const img = b.m.img, id = b.m.id, dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
   const turn = TOP_DOWN.has(id) ? 0 : SNAKES.has(id) ? Math.PI : null;
   if (turn === null) {
@@ -5092,6 +5172,13 @@ function render(now) {
     }
   }
   for (const d of G.dying) {
+    // 연's own death, where the monster has one: its dead row, then a fade.
+    const yd = !d.e.beast && yunit(d.e.m), dead = yd && yd.u.anims.dead;
+    if (dead) {
+      const f = Math.min(dead.n - 1, Math.floor(d.t * 1000 / dead.ms));
+      drawYunit(yd, d.e, d.e.x, d.e.y, d.e.scale, Math.max(0, 1 - Math.max(0, d.t - 0.7) / 0.5), dead.row, f, (d.e.mdx || 0) > 0);
+      continue;
+    }
     // The body falls on its side, darkens and fades, as slain monsters did.
     const e = d.e, im = e.m.img, k = Math.min(1, d.t / 0.15);
     const w = im.width * e.scale, h = im.height * e.scale;
@@ -5752,6 +5839,10 @@ function soundDefaults() {
     // '-' is a choice too: no sound at all.
     if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x.split('@')[0]))) d[use] = n;
   }
+  // 바람의나라 연's own clips win wherever the build carries them.
+  for (const [use, n] of Object.entries(YEON_SOUNDS)) {
+    if ((Array.isArray(n) ? n : [n]).every(x => x === '-' || bank.has(x.split('@')[0]))) d[use] = n;
+  }
   const mids = M.audio.bgm.map(b => b.key).filter(k => k.startsWith('mid'));
   if (mids.length) {
     const has = k => mids.includes(k);
@@ -5771,6 +5862,13 @@ function soundDefaults() {
   if (has('nx_10_4way_battle')) d.bgm_boss = 'nx_10_4way_battle';
   for (const st of STAGES) if (has(st.bgm)) d['bgm_stage_' + st.id] = st.bgm;
   for (const r of RAIDS) if (has(r.bgm)) d['bgm_raid_' + r.id] = r.bgm;
+  // 연's boss and raid music: the boss theme, and each raid's by where it is fought.
+  if (has(YEON_BGM.boss)) d.bgm_boss = YEON_BGM.boss;
+  const raidBgm = { sea: YEON_BGM.raid_sea, lava: YEON_BGM.raid_fire, house: YEON_BGM.raid_hell };
+  for (const r of RAIDS) {
+    const k = raidBgm[r.terrain] || YEON_BGM.raid;
+    if (has(k)) d['bgm_raid_' + r.id] = k;
+  }
   return d;
 }
 
@@ -5792,10 +5890,10 @@ function migrateSettings() {
 function applySounds() {
   migrateSettings();
   // Picks made before the sounds had names were guesses: start again from the game's own.
-  if (settings.soundsVer !== 5) {
+  if (settings.soundsVer !== 6) {
     delete settings.sounds;
     delete settings.kinds;
-    settings.soundsVer = 5;
+    settings.soundsVer = 6;
     saveJson('bs_settings', settings);
   }
   audio.map = Object.assign(soundDefaults(), settings.sounds || {});

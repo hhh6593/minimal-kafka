@@ -1,0 +1,615 @@
+{
+ "objects": "dec/MapObjects.unity3d",
+ "terrains": {
+  "field": {
+   "floor": {
+    "bundle": "dec/Maps_1001.unity3d",
+    "map": "kow_map_cave_noob1",
+    "tiles": [
+     [
+      3,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "rock1",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      508,
+      252,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "rock2",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      1276,
+      220,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "fence",
+     "kind": "wall",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      200,
+      150,
+      200,
+      50
+     ]
+    },
+    {
+     "name": "grass",
+     "kind": "grass",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_deer1",
+     "box": [
+      324,
+      262,
+      48,
+      30
+     ]
+    },
+    {
+     "name": "rock3",
+     "kind": "rock",
+     "obj": "0014"
+    },
+    {
+     "name": "barrel",
+     "kind": "jar",
+     "obj": "1016"
+    }
+   ]
+  },
+  "field2": {
+   "floor": {
+    "bundle": "dec/Maps_411001.unity3d",
+    "map": "kow_island_01_gogyundo_02_03_beach1",
+    "tiles": [
+     [
+      0,
+      12
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "plant1",
+     "kind": "grass",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      444,
+      511,
+      40,
+      31
+     ]
+    },
+    {
+     "name": "plant2",
+     "kind": "grass",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      1152,
+      486,
+      30,
+      24
+     ]
+    },
+    {
+     "name": "stone",
+     "kind": "rock",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      1183,
+      616,
+      32,
+      24
+     ]
+    },
+    {
+     "name": "rock1",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      508,
+      252,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "fence",
+     "kind": "wall",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      200,
+      150,
+      200,
+      50
+     ]
+    },
+    {
+     "name": "tuft",
+     "kind": "grass",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_deer1",
+     "box": [
+      735,
+      383,
+      34,
+      33
+     ]
+    }
+   ]
+  },
+  "cave": {
+   "floor": {
+    "bundle": "dec/Maps_1001.unity3d",
+    "map": "kow_map_cave_deer1",
+    "tiles": [
+     [
+      1,
+      8
+     ],
+     [
+      4,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "grass1",
+     "kind": "grass",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_deer1",
+     "box": [
+      324,
+      262,
+      48,
+      30
+     ]
+    },
+    {
+     "name": "grass2",
+     "kind": "grass",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_deer1",
+     "box": [
+      578,
+      290,
+      30,
+      30
+     ]
+    },
+    {
+     "name": "grass3",
+     "kind": "grass",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_deer1",
+     "box": [
+      381,
+      260,
+      37,
+      28
+     ]
+    },
+    {
+     "name": "rock1",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      508,
+      252,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "rock2",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      1276,
+      220,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "roots",
+     "kind": "wall",
+     "obj": "0015"
+    },
+    {
+     "name": "torch",
+     "kind": "torch",
+     "obj": "0016"
+    }
+   ]
+  },
+  "house": {
+   "floor": {
+    "bundle": "dec/Maps_1001.unity3d",
+    "map": "kow_map_cave_hauntedhouse1",
+    "tiles": [
+     [
+      0,
+      12
+     ],
+     [
+      7,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "well",
+     "kind": "statue",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      1052,
+      700,
+      122,
+      136
+     ]
+    },
+    {
+     "name": "rock1",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      508,
+      252,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "rock2",
+     "kind": "rock",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      1276,
+      220,
+      40,
+      40
+     ]
+    },
+    {
+     "name": "crack",
+     "kind": "decal",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      1158,
+      1294,
+      48,
+      22
+     ]
+    },
+    {
+     "name": "fence",
+     "kind": "wall",
+     "bundle": "dec/Maps_1001.unity3d",
+     "map": "kow_map_cave_hauntedhouse1",
+     "box": [
+      200,
+      150,
+      200,
+      50
+     ]
+    },
+    {
+     "name": "barrel",
+     "kind": "jar",
+     "obj": "1016"
+    },
+    {
+     "name": "lantern",
+     "kind": "torch",
+     "obj": "1052"
+    }
+   ]
+  },
+  "island": {
+   "floor": {
+    "bundle": "dec/Maps_411001.unity3d",
+    "map": "kow_island_01_gogyundo_02_03_beach1",
+    "tiles": [
+     [
+      7,
+      14
+     ],
+     [
+      23,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "driftwood1",
+     "kind": "wood",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      2205,
+      796,
+      43,
+      67
+     ]
+    },
+    {
+     "name": "driftwood2",
+     "kind": "wood",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      2236,
+      775,
+      39,
+      51
+     ]
+    },
+    {
+     "name": "shells",
+     "kind": "decal",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      1715,
+      1633,
+      49,
+      32
+     ]
+    },
+    {
+     "name": "starfish",
+     "kind": "decal",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      1884,
+      1888,
+      40,
+      35
+     ]
+    },
+    {
+     "name": "stone",
+     "kind": "rock",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      769,
+      867,
+      33,
+      31
+     ]
+    },
+    {
+     "name": "plant",
+     "kind": "grass",
+     "bundle": "dec/Maps_411001.unity3d",
+     "map": "kow_island_01_gogyundo_02_03_beach1",
+     "box": [
+      444,
+      511,
+      40,
+      31
+     ]
+    }
+   ]
+  },
+  "sea": {
+   "floor": {
+    "bundle": "dec/Maps_409001.unity3d",
+    "map": "kow_dragonpalace_01_01_palace_road",
+    "tiles": [
+     [
+      0,
+      10
+     ],
+     [
+      4,
+      1
+     ],
+     [
+      8,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "kelp1",
+     "kind": "plant",
+     "obj": "0223"
+    },
+    {
+     "name": "kelp2",
+     "kind": "plant",
+     "obj": "0224"
+    },
+    {
+     "name": "coral",
+     "kind": "rock",
+     "obj": "0222"
+    },
+    {
+     "name": "shells",
+     "kind": "decal",
+     "bundle": "dec/Maps_409001.unity3d",
+     "map": "kow_dragonpalace_01_01_palace_road",
+     "box": [
+      1075,
+      1505,
+      49,
+      32
+     ]
+    },
+    {
+     "name": "rock",
+     "kind": "rock",
+     "bundle": "dec/Maps_409001.unity3d",
+     "map": "kow_dragonpalace_01_01_palace_road",
+     "box": [
+      552,
+      835,
+      36,
+      29
+     ]
+    },
+    {
+     "name": "starfish",
+     "kind": "decal",
+     "bundle": "dec/Maps_409001.unity3d",
+     "map": "kow_dragonpalace_01_01_palace_road",
+     "box": [
+      1084,
+      1568,
+      40,
+      35
+     ]
+    }
+   ]
+  },
+  "lava": {
+   "floor": {
+    "bundle": "dec/Maps_414001.unity3d",
+    "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+    "tiles": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
+   "props": [
+    {
+     "name": "mesa",
+     "kind": "rock",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      381,
+      2112,
+      194,
+      195
+     ]
+    },
+    {
+     "name": "rock1",
+     "kind": "rock",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      448,
+      1259,
+      33,
+      55
+     ]
+    },
+    {
+     "name": "rock2",
+     "kind": "rock",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      833,
+      1747,
+      30,
+      45
+     ]
+    },
+    {
+     "name": "rock3",
+     "kind": "rock",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      2844,
+      1623,
+      40,
+      45
+     ]
+    },
+    {
+     "name": "ember1",
+     "kind": "decal",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      606,
+      2688,
+      36,
+      35
+     ]
+    },
+    {
+     "name": "ember2",
+     "kind": "decal",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      1469,
+      544,
+      39,
+      35
+     ]
+    },
+    {
+     "name": "lavapit",
+     "kind": "pit",
+     "bundle": "dec/Maps_414001.unity3d",
+     "map": "kow_hell_01_underworld_02_02_hwatangjiok1",
+     "box": [
+      1596,
+      1756,
+      248,
+      264
+     ],
+     "layers": [
+      0,
+      1,
+      2,
+      3,
+      4
+     ]
+    }
+   ]
+  }
+ }
+}

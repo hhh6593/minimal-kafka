@@ -17,6 +17,7 @@ What it writes:
   icon/<id>.png    each effect's fullest frame, cropped, for spell slots
   skillicon/<id>.png  the 8·9차 spells' own icons (GEAR_DIR/skillicon/)
   prop/<name>.png     trees, palisade, jars, stones from the original map (GEAR_DIR/prop/)
+  yunit/<id>.png      연's monster sheets: walk/idle/attack/death by direction (GEAR_DIR/yunit/)
   floor/<terrain>.png 연's own floors, one seamless tile per terrain (GEAR_DIR/floor/)
   ui/...           the world maps for the hunting-ground picker
   audio/...        whatever sound files AUDIO_DIR holds (see README)
@@ -124,6 +125,19 @@ def is_additive(frames):
             px += 1
             black += data[i] + data[i + 1] + data[i + 2] < 40
     return px > 0 and black / px > 0.4
+
+
+# 연 units the name match got wrong (호랑이 → a small yellow creature).
+YUNIT_WRONG = {"Monster_0164"}
+# Our monsters whose 연 namesake is plainly another creature, by eye (은여우 → a jellyfish).
+YUNIT_WRONG_IDS = {"6005"}
+
+
+
+def yunit_sure(u):
+    """A sure name match: exact or by suffix, or 연's name holding the old one (맹오 → 맹오(환))."""
+    t = u.get("tier", 9)
+    return t <= 1 or (t == 2 and u.get("name", "@") in u.get("yeon", ""))
 
 
 def icon(frames, add):
@@ -355,6 +369,30 @@ def main():
             icon(pics, True).save(os.path.join(out, "icon", fid + ".png"))
             manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": len(pics), "durs": d2, "add": True, "cls": "yeon"}
 
+    # 연's own spell effects (GEAR_DIR/yskill/<skill id>.png strips + index.json, from
+    # tools/yeon_skills.py): fx "k_<skill id>", drawn with their own pivot on the target's feet.
+    # The screen-wide ones are stored at most 360 pixels and drawn back at their size.
+    kdir = os.path.join(gear_src, "yskill") if gear_src else None
+    if kdir and os.path.isfile(os.path.join(kdir, "index.json")):
+        with open(os.path.join(kdir, "index.json"), encoding="utf-8") as f:
+            kindex = json.load(f)
+        for sid, k in kindex.items():
+            ksrc = os.path.join(kdir, sid + ".png")
+            if not os.path.isfile(ksrc):
+                continue
+            (cw, ch), n = k["cell"], k["n"]
+            sheet = Image.open(ksrc).convert("RGBA")
+            pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+            z = min(1.0, 360 / max(cw, ch))
+            if z < 1:
+                pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
+            fid = "k_" + sid
+            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+            icon(pics, k.get("add", False)).save(os.path.join(out, "icon", fid + ".png"))
+            manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
+                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / z, 3),
+                                   "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+
     for fid in HEROES:
         im = Image.open(os.path.join(src, "magics", fid + ".gif"))
         im = dehalo(im) if fid == "1001" else trim(im.convert("RGBA"))
@@ -416,16 +454,28 @@ def main():
         for n in sorted(x for x in os.listdir(sdir) if x.endswith(".png")):
             Image.open(os.path.join(sdir, n)).convert("RGBA").save(os.path.join(out, "skillicon", n), optimize=True)
             manifest["skillicon"].append(n[:-4])
+    # 연's official skill icons from its own atlas (GEAR_DIR/skillicon_y/, tools/yeon_skills.py).
+    sydir = os.path.join(gear_src, "skillicon_y") if gear_src else None
+    if sydir and os.path.isdir(sydir):
+        os.makedirs(os.path.join(out, "skillicon"), exist_ok=True)
+        for n in sorted(x for x in os.listdir(sydir) if x.endswith(".png")):
+            Image.open(os.path.join(sydir, n)).convert("RGBA").save(os.path.join(out, "skillicon", n), optimize=True)
+            if n[:-4] not in manifest["skillicon"]:
+                manifest["skillicon"].append(n[:-4])
 
     # Floors from 바람의나라 연's own hunting grounds (GEAR_DIR/floor/<terrain>.png, made seamless
     # by tools/yeon_floor.py); the game falls back to its plain pattern for a terrain without one.
-    fdir = os.path.join(gear_src, "floor") if gear_src else None
+    # The maps' own ground tiles (GEAR_DIR/floor_y/, tools/yeon_maps.py) win over the crops.
     manifest["floor"] = []
-    if fdir and os.path.isdir(fdir):
+    for sub in ("floor", "floor_y"):
+        fdir = os.path.join(gear_src, sub) if gear_src else None
+        if not (fdir and os.path.isdir(fdir)):
+            continue
         os.makedirs(os.path.join(out, "floor"), exist_ok=True)
         for n in sorted(x for x in os.listdir(fdir) if x.endswith(".png")):
             Image.open(os.path.join(fdir, n)).convert("RGB").save(os.path.join(out, "floor", n), optimize=True)
-            manifest["floor"].append(n[:-4])
+            if n[:-4] not in manifest["floor"]:
+                manifest["floor"].append(n[:-4])
 
     # Props from the original maps (GEAR_DIR/prop/<name>.png, cut by tools/yeon_props.py):
     # trees, the wooden palisade, jars and stones the hunting grounds are dotted with.
@@ -437,6 +487,49 @@ def main():
             im = Image.open(os.path.join(pdir, n)).convert("RGBA")
             im.save(os.path.join(out, "prop", n), optimize=True)
             manifest["prop"][n[:-4]] = [im.width, im.height]
+    # 연's map objects (GEAR_DIR/prop_y/<terrain>_<name>.png + index.json, tools/yeon_maps.py):
+    # each with the ground it stands on and what it is (rock, wall, plant, ...).
+    pydir = os.path.join(gear_src, "prop_y") if gear_src else None
+    if pydir and os.path.isfile(os.path.join(pydir, "index.json")):
+        os.makedirs(os.path.join(out, "prop"), exist_ok=True)
+        with open(os.path.join(pydir, "index.json"), encoding="utf-8") as f:
+            pindex = json.load(f)["props"]
+        for name, meta in pindex.items():
+            psrc = os.path.join(pydir, name + ".png")
+            if not os.path.isfile(psrc):
+                continue
+            im = Image.open(psrc).convert("RGBA")
+            # Whole squares of ground (a lava pool, a kelp bed) are map pieces, not objects.
+            if im.getchannel("A").getextrema()[0] == 255:
+                continue
+            im.save(os.path.join(out, "prop", name + ".png"), optimize=True)
+            manifest["prop"][name] = [im.width, im.height, meta.get("terrain"), meta.get("kind")]
+
+    # 바람의나라 연's own monsters (GEAR_DIR/yunit/<monster id>.png + index.json, from
+    # tools/yeon_units.py): walk, idle, attack and death in three directions. Only the sure
+    # matches (by name, tiers 0-2) replace the old pictures; the loose ones keep the old.
+    udir = os.path.join(gear_src, "yunit") if gear_src else None
+    manifest["yunit"] = {}
+    old_h = {m["id"]: m["h"] for m in manifest["monsters"]}
+    if udir and os.path.isfile(os.path.join(udir, "index.json")):
+        os.makedirs(os.path.join(out, "yunit"), exist_ok=True)
+        with open(os.path.join(udir, "index.json"), encoding="utf-8") as f:
+            index = json.load(f)
+        for mid, u in index.items():
+            usrc = os.path.join(udir, mid + ".png")
+            if not yunit_sure(u) or u.get("prefab") in YUNIT_WRONG or mid in YUNIT_WRONG_IDS or not os.path.isfile(usrc):
+                continue
+            # A namesake can be another creature altogether (연's 흑다람쥐 is a wrestler): a
+            # picture far taller or shorter than the old one is not the same monster.
+            first = u["anims"].get("walk_down") or next(iter(u["anims"].values()))
+            cw, ch = u["cell"]
+            box = Image.open(usrc).crop((0, first["row"] * ch, cw, (first["row"] + 1) * ch)).getchannel("A").getbbox()
+            vh = (box[3] - box[1]) if box else 0
+            oh = old_h.get(mid)
+            if not vh or (oh and not 0.45 <= vh / oh <= 2.2):
+                continue
+            shutil.copyfile(usrc, os.path.join(out, "yunit", mid + ".png"))
+            manifest["yunit"][mid] = {"cell": u["cell"], "foot": u["foot"], "anims": u["anims"]}
 
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
