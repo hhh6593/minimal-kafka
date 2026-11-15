@@ -2460,14 +2460,6 @@ function hurtEnemy(e, dmg, push = null) {
     G.texts.push({ x: e.x + rand(-5, 5), y: e.y - e.m.h * e.scale - 10 - e.numN * 10, text: String(Math.round(dmg)), t: 0, num: true,
       crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
-  // 연's hit spark on the struck body (its crit flash for a crit), not on every one of a crowd.
-  if (G.t - (e.sparkT || -9) > 0.25 && G.fxs.length < 60) {
-    const spark = crit ? 'h_hit_light' : 'h_hit_6';
-    if (M.fx[spark]) {
-      e.sparkT = G.t;
-      fxOn(spark, e, { scale: crit ? 0.8 : 0.6 });
-    }
-  }
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
