@@ -421,6 +421,12 @@ function buildSelect() {
   }
 }
 
+/** What opens a closed ground: the boss of the ground before it (or of the ground it hangs on). */
+function lockReason(i) {
+  const s = STAGES[i], need = s.open ? STAGES.find(x => x.id === s.open) : STAGES[i - 1];
+  return need ? `${need.name}의 보스를 쓰러뜨리면 열립니다` : '앞 사냥터를 정복하면 열립니다';
+}
+
 function unlocked(i) {
   // The first fourteen open one after another; an added ground when its own is conquered.
   const s = STAGES[i];
@@ -459,14 +465,21 @@ function buildStages() {
     return;
   }
   map.innerHTML = `<img src="assets/ui/${mapTab}.webp" alt="">`;
+  // The goal: the first ground open and not yet conquered, named over the map wherever it is.
+  const nextI = STAGES.findIndex((s, i) => unlocked(i) && !progress.cleared[s.id]);
+  const goal = document.createElement('div');
+  goal.id = 'map-goal';
+  goal.textContent = nextI >= 0 ? `다음 목표: ${STAGES[nextI].name}` : '모든 사냥터를 정복했습니다';
+  map.append(goal);
   STAGES.forEach((s, i) => {
     if (s.map !== mapTab) return;
     const b = document.createElement('button');
-    b.className = 'pin' + (unlocked(i) ? '' : ' locked') + (progress.cleared[s.id] ? ' cleared' : '')
+    const open = unlocked(i), done = !!progress.cleared[s.id];
+    b.className = 'pin' + (open ? '' : ' locked') + (done ? ' cleared' : open ? ' next' : '')
       + (s === pickedStage ? ' on' : '');
     b.style.left = s.at[0] * 100 + '%';
     b.style.top = s.at[1] * 100 + '%';
-    b.innerHTML = `<i></i><span>${s.name}</span>`;
+    b.innerHTML = `<b>${done ? '정복' : open ? '도전' : '잠김'}</b><i></i><span>${s.name}</span>`;
     b.onclick = () => {
       pickedStage = s;
       buildStages();
@@ -481,10 +494,10 @@ function buildStages() {
     <div class="mons">${show.map(m => `<img src="assets/mon/${m.id}.png" alt="">`).join('')}</div>
     <div class="boss">보스: <b>${boss.name}</b></div>
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
-      : open ? '아직 정복하지 못한 사냥터' : '앞 사냥터의 보스를 쓰러뜨리면 열린다'}</div>`;
+      : open ? '도전할 수 있는 사냥터' : `잠김: ${lockReason(i)}`}</div>`;
   pactRow(buildStages);
   $('#go').disabled = !open;
-  $('#go').textContent = `${josa(chosenClass.name, '으로', '로')} 입장`;
+  $('#go').textContent = open ? `${josa(chosenClass.name, '으로', '로')} 입장` : '잠긴 사냥터';
 }
 
 /** The 규약 toggles under a ground's or raid's card: harder monsters for richer spoils. */
@@ -4019,9 +4032,9 @@ function drawSkillBar() {
     const im = skillIconImage(s.id);
     if (im && im.width) {
       ctx.save();
-      if (def.tint && !(M.skillicon && M.skillicon.includes(s.id))) ctx.filter = def.tint;
+      const ic = def.tint && !(M.skillicon && M.skillicon.includes(s.id)) ? tinted(im, def.tint) : im;
       const k = Math.min(sz / im.width, sz / im.height);
-      ctx.drawImage(im, x + (sz - im.width * k) / 2, y + (sz - im.height * k) / 2, im.width * k, im.height * k);
+      ctx.drawImage(ic, x + (sz - im.width * k) / 2, y + (sz - im.height * k) / 2, im.width * k, im.height * k);
       ctx.restore();
     }
     // The wait, as 연 shows it: the icon darkened, the seconds over it.
@@ -4929,7 +4942,7 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
   ctx.save();
   if (f.add) ctx.globalCompositeOperation = 'lighter';
-  if (f.tint) ctx.filter = f.tint;
+  const pic = f.tint ? tinted(im, f.tint) : im;
   // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks.
   if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
   ctx.translate(x, y);
@@ -4937,8 +4950,8 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   if (f.ax !== undefined) {
     // 연's effects carry their pivot: the target's feet (a little under a body's middle).
     const k = scale * (f.k || 1);
-    ctx.drawImage(im, sx, sy, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
-  } else ctx.drawImage(im, sx, sy, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
+    ctx.drawImage(pic, sx, sy, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
+  } else ctx.drawImage(pic, sx, sy, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
   ctx.restore();
 }
 
@@ -5082,6 +5095,29 @@ function drawBeast(b, alpha, ox = 0, oy = 0, k = 0.62) {
     Math.round(cw * k), Math.round(ch * k));
   ctx.restore();
 }
+
+// A picture in a colour filter, made once and kept: a canvas filter set every frame (a treasure
+// monster's gold, a tinted spell, a dimmed body) took phones off their fast drawing path, and
+// the game stuttered while one was on screen.
+const tintCache = new Map();
+function tinted(img, filter) {
+  if (!filter || !img || !img.width) return img;
+  let byImg = tintCache.get(img);
+  if (!byImg) tintCache.set(img, byImg = new Map());
+  let c = byImg.get(filter);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const g = c.getContext('2d');
+    g.filter = filter;
+    g.drawImage(img, 0, 0);
+    byImg.set(filter, c);
+  }
+  return c;
+}
+const GOLD_TINT = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
+let monsterTint = null;
 
 // ---------------------------------------------------------------- 연's damage digits
 // The bitmap font 연 draws hits with (tools/yeon_hud.py): white digits in a black edge. Each
@@ -5286,7 +5322,7 @@ function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   ctx.translate(Math.round(x), Math.round(yy));
   if (mirror) ctx.scale(-1, 1);
   const cols = u.cols || 1e9, sx = (f % cols) * cw, sy = (row + Math.floor(f / cols)) * ch;
-  ctx.drawImage(im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
+  ctx.drawImage(monsterTint ? tinted(im, monsterTint) : im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
   if (b.flash > 0) ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
   ctx.restore();
 }
@@ -5332,6 +5368,7 @@ function drawMonster(b, x, y, s, alpha = 1) {
 }
 
 function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1, lean = 0) {
+  if (monsterTint) img = tinted(img, monsterTint);
   const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
   const lift = moving && Math.floor(phase / Math.PI) % 2 === 0 ? 1 : 0;
   x = Math.round(x);
@@ -5429,10 +5466,11 @@ function render(now) {
     const kick = b.kickAt !== undefined && G.t - b.kickAt < 0.1 ? 4 : 0;
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
-    if (b.flee) ctx.filter = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
+    // The treasure-bearer in gold, from a tinted copy made once.
+    monsterTint = b.flee ? GOLD_TINT : null;
     if (b.beast) drawBeast(b, 1, lx, ly, 0.62 * s);
     else drawMonster(b, b.x + lx, b.y + ly, s);
-    if (b.flee) ctx.filter = 'none';
+    monsterTint = null;
     if (!b.kind && b.shown && G.t - b.shown < 3) {
       // A struck monster shows its health over its head for a while.
       const bx = Math.round(b.x - 12), by = Math.round(b.y - b.m.h * s - 5);
@@ -5464,12 +5502,10 @@ function render(now) {
     ctx.globalAlpha = Math.max(0, 1 - Math.max(0, d.t - 0.6) / 0.6);
     ctx.translate(Math.round(e.x), Math.round(e.y));
     ctx.rotate((Math.PI / 2) * k * e.face);
-    ctx.filter = 'brightness(0.7)';
     if (d.t > 0.12 && d.t < 0.9) {
       // 연 marks the fallen: a small red DEAD over the body.
       ctx.save();
       ctx.rotate(-(Math.PI / 2) * k * e.face);
-      ctx.filter = 'none';
       ctx.font = 'bold 8px G7';
       ctx.textAlign = 'center';
       ctx.globalAlpha = Math.min(1, (0.9 - d.t) * 3);
@@ -5479,7 +5515,7 @@ function render(now) {
     if (e.beast && M.beast[e.beast]) {
       const d = M.beast[e.beast], k = 0.62 * e.scale;
       ctx.drawImage(images[`beast/${e.beast}.png`], 0, 0, d.cell[0], d.cell[1], -d.feet[0] * k, -d.feet[1] * k, d.cell[0] * k, d.cell[1] * k);
-    } else ctx.drawImage(im, -w / 2, -h, w, h);
+    } else ctx.drawImage(tinted(im, 'brightness(0.7)'), -w / 2, -h, w, h);
     ctx.restore();
   }
 
@@ -6420,6 +6456,7 @@ window.__gearTest = () => {
 window.__dragonTier = () => dragonTier(G.cls);
 window.__Z = () => Z;
 window.__hurtPlayer = d => hurtPlayer(d, null);
+window.__event = k => huntEvent(k);
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
