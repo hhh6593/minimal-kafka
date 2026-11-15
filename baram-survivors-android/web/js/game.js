@@ -1583,7 +1583,8 @@ function floorCount(t) {
   const a = Math.min(4, Math.round((G.level / 13) * 4));
   // The counts were set for a view of 860 x 400; a wider view (the 연 layout, a big phone)
   // holds as many monsters a screen, not fewer.
-  const view = viewCrowd();
+  // The wider view's extra monsters come in over the first two minutes, not at the gate.
+  const view = 1 + (viewCrowd() - 1) * Math.min(1, t / 120);
   return Math.round((FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 200)) * view);
 }
 
@@ -4164,7 +4165,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
-  v *= 1.7 / viewCrowd();
+  v *= 1.7 / Math.sqrt(viewCrowd());
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
