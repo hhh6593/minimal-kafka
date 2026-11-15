@@ -80,7 +80,8 @@ async function boot() {
   audio.setSfx(settings.sfx);
   const paths = [
     ...Object.keys(M.fx).map(id => `fx/${id}.png`),
-    ...Object.keys(M.fx).filter(id => !id.startsWith('new_')).map(id => `icon/${id}.png`),
+    // Hit sparks and the level-up burst are never in a spell slot: no icon of their own.
+    ...Object.keys(M.fx).filter(id => !id.startsWith('new_') && !id.startsWith('h_')).map(id => `icon/${id}.png`),
     ...M.heroes.map(h => `hero/${h.id}.png`),
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
