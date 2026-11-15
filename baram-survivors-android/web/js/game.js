@@ -1481,7 +1481,7 @@ function update(dt) {
     p.poseT = Math.max(0, p.poseT - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * (1 + 0.3 * opt('mana')) * dt);
     // Health comes back slowly by itself, as it did in the old game.
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.005 * (1 + opt('regen')) * dt);
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * (1 + opt('regen')) * dt);
   }
   G.shake = Math.max(0, G.shake - dt);
 
