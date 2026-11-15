@@ -6412,6 +6412,7 @@ window.__gearTest = () => {
   return { cls: c, tried: ['weapon', 'armor', 'shield'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
 };
 window.__dragonTier = () => dragonTier(G.cls);
+window.__Z = () => Z;
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
