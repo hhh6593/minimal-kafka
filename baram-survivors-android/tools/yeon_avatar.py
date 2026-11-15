@@ -184,7 +184,19 @@ def render(state, swap, cache):
                 if not b:
                     drop = True  # an empty swap takes the part off (the template's helmet, beard...)
                     break
-                alt = cache['byname'].get(b + name[len(a):])
+                if b.startswith('tex:'):
+                    # A sheet named by its texture: hair styles all share sprite names
+                    # (Hair_0000_<n>), only the texture tells one style from another.
+                    # tex:<texture id>:<prefix>[:<from>=<to>,...] - the real hair sheets keep the
+                    # front at 0 and the back at 2, the template's dummy the other way round.
+                    bits = b.split(':')
+                    rest = name[len(a):]
+                    if len(bits) > 3:
+                        remap = dict(x.split('=') for x in bits[3].split(','))
+                        rest = remap.get(rest, rest)
+                    alt = cache['bytex'].get((int(bits[1]), bits[2] + rest))
+                else:
+                    alt = cache['byname'].get(b + name[len(a):])
                 if alt is not None:
                     # The slot keeps its geometry: a worn piece is drawn where the template
                     # piece was (armor sheets carry a corner pivot of their own).
@@ -223,7 +235,7 @@ def main():
     env = UnityPy.load(units, items)
     parts, clips = build(env)
     byname = {}
-    prefixes = {b for sw in classes.values() for b in sw.values() if b}
+    prefixes = {b for sw in classes.values() for b in sw.values() if b and not b.startswith('tex:')}
     for o in env.objects:
         if o.type.name == 'Sprite':
             n = o.peek_name()
@@ -238,7 +250,20 @@ def main():
                     if n not in byname or own:
                         byname[n] = sp
                     break
-    cache = {'img': {}, 'byname': byname}
+    texids = {int(b.split(':')[1]) for sw in classes.values() for b in sw.values() if b and b.startswith('tex:')}
+    bytex = {}
+    if texids:
+        for o in env.objects:
+            if o.type.name == 'Sprite':
+                sp = None
+                n = o.peek_name()
+                if n.startswith('Hair_'):
+                    sp = o.read()
+                    tid = sp.m_RD.texture.path_id
+                    if tid in texids:
+                        # Keyed by texture and the name without its style number.
+                        bytex[(tid, re.sub(r'^Hair_\d{4}', 'Hair', n))] = sp
+    cache = {'img': {}, 'byname': byname, 'bytex': bytex}
     index = {}
     for cls, swap in classes.items():
         rows = []

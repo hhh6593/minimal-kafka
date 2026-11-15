@@ -226,6 +226,57 @@ def strip(frames):
     return out
 
 
+# 연's sheets as extracted keep every frame of every motion in cells wide enough for the widest
+# attack slash: some monsters came to 3000×2000 pixels, and a hunt loading a dozen of them
+# overflowed a phone's graphics memory (the game crawled). Only the motions the game draws are
+# kept, at most a few frames each, in cells cut round the body (an attack may reach half as
+# far again), and no sheet is wider than 2048 pixels.
+UNIT_KEEP = {"walk": 8, "idle": 1, "atk": 5, "cast": 4, "dead": 4}
+
+
+def repack_unit(path, u):
+    sheet = Image.open(path).convert("RGBA")
+    cw, ch = u["cell"]
+    fx0, fy0 = u["foot"]
+    keep = {}
+    for name, a in u["anims"].items():
+        kind = name.split("_")[0]
+        if kind not in UNIT_KEEP:
+            continue
+        cap = UNIT_KEEP[kind]
+        idx = [round(i * (a["n"] - 1) / max(1, cap - 1)) for i in range(cap)] if a["n"] > cap else list(range(a["n"]))
+        idx = sorted(set(idx))
+        frames = [sheet.crop((i * cw, a["row"] * ch, (i + 1) * cw, (a["row"] + 1) * ch)) for i in idx]
+        keep[name] = (frames, round(a["ms"] * a["n"] / len(idx)))
+    if not keep:
+        return None, None
+    def box_of(names):
+        b = None
+        for nm in names:
+            for f in keep[nm][0]:
+                bb = f.getchannel("A").getbbox()
+                if bb:
+                    b = bb if b is None else (min(b[0], bb[0]), min(b[1], bb[1]), max(b[2], bb[2]), max(b[3], bb[3]))
+        return b
+    body = box_of([n for n in keep if n.startswith(("walk", "idle"))]) or box_of(list(keep)) or (0, 0, cw, ch)
+    allb = box_of(list(keep)) or body
+    bw, bh = body[2] - body[0], body[3] - body[1]
+    lim = (body[0] - bw // 2, body[1] - bh // 2, body[2] + bw // 2, body[3] + bh // 2)
+    x0, y0 = max(allb[0], lim[0], 0), max(allb[1], lim[1], 0)
+    x1, y1 = min(allb[2], lim[2], cw), min(allb[3], lim[3], ch)
+    ncw, nch = x1 - x0, y1 - y0
+    cols = max(1, min(max(len(v[0]) for v in keep.values()), 2048 // max(1, ncw)))
+    rows_needed = sum(-(-len(v[0]) // cols) for v in keep.values())
+    out = Image.new("RGBA", (cols * ncw, rows_needed * nch))
+    anims, row = {}, 0
+    for name, (frames, ms) in keep.items():
+        for i, f in enumerate(frames):
+            out.paste(f.crop((x0, y0, x1, y1)), ((i % cols) * ncw, (row + i // cols) * nch))
+        anims[name] = {"row": row, "n": len(frames), "ms": ms}
+        row += -(-len(frames) // cols)
+    return out, {"cell": [ncw, nch], "foot": [fx0 - x0, fy0 - y0], "anims": anims, "cols": cols}
+
+
 def trim(im):
     box = im.getbbox()
     return im.crop(box) if box else im
@@ -565,8 +616,11 @@ def main():
             oh = old_h.get(mid)
             if not vh or (oh and not 0.45 <= vh / oh <= 2.2):
                 continue
-            shutil.copyfile(usrc, os.path.join(out, "yunit", mid + ".png"))
-            manifest["yunit"][mid] = {"cell": u["cell"], "foot": u["foot"], "anims": u["anims"]}
+            sheet, nu = repack_unit(usrc, u)
+            if sheet is None:
+                continue
+            sheet.save(os.path.join(out, "yunit", mid + ".png"), optimize=True)
+            manifest["yunit"][mid] = nu
 
     # 바람의나라 연's own heroes (GEAR_DIR/yhero/<class>[_<a|b|c>].png + index.json, from
     # tools/yeon_avatar.py): each class in 연's parts, an outfit per armour tier.
@@ -579,8 +633,10 @@ def main():
         for key, u in yindex.items():
             ysrc = os.path.join(hydir, key + ".png")
             if os.path.isfile(ysrc) and "anims" in u:
-                shutil.copyfile(ysrc, os.path.join(out, "yhero", key + ".png"))
-                manifest["yhero"][key] = {"cell": u["cell"], "foot": u["foot"], "anims": u["anims"]}
+                sheet, nu = repack_unit(ysrc, u)
+                if sheet is not None:
+                    sheet.save(os.path.join(out, "yhero", key + ".png"), optimize=True)
+                    manifest["yhero"][key] = nu
 
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
@@ -706,6 +762,21 @@ def main():
                     manifest["audio"]["bgm"].append({"key": key, "file": "audio/bgm/" + name})
                 else:
                     manifest["audio"]["sfx"][key] = "audio/sfx/" + name
+
+    # A strip wider than 4096 pixels is more than a phone's graphics can hold as one picture:
+    # such effects are folded into rows ("cols" frames to a row).
+    for fid, f in manifest["fx"].items():
+        if f.get("src") or f["w"] * f["n"] <= 4096:
+            continue
+        fp = os.path.join(out, "fx", fid + ".png")
+        im = Image.open(fp)
+        cols = max(1, 4096 // f["w"])
+        rows = -(-f["n"] // cols)
+        g = Image.new("RGBA", (cols * f["w"], rows * f["h"]))
+        for k in range(f["n"]):
+            g.paste(im.crop((k * f["w"], 0, (k + 1) * f["w"], f["h"])), ((k % cols) * f["w"], (k // cols) * f["h"]))
+        g.save(fp, optimize=True)
+        f["cols"] = cols
 
     with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, ensure_ascii=False, separators=(",", ":"))

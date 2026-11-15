@@ -358,11 +358,16 @@ function resize() {
       if (top < 160) el.style.visibility = top < cut + 22 ? 'hidden' : '';
     }
   }
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(canvas.clientWidth * dpr);
-  canvas.height = Math.round(canvas.clientHeight * dpr);
-  // In 연's full-screen hunt the field is framed closer (a hero about a sixth of the height).
-  Z = Math.max(1, Math.round(canvas.height / (document.body.classList.contains('yeon') ? 600 : 470) * 2) / 2);
+  // The field is pixel art: it is drawn at one canvas pixel per game pixel (or the screen's
+  // own pixels where that is finer) and the screen scales it up, rather than filling every one
+  // of a phone's three-per-point pixels each frame (the game crawled on a phone). The framing
+  // is the same either way: in 연's full-screen hunt a hero is about a sixth of the height.
+  const full = window.devicePixelRatio || 1;
+  const zFull = Math.max(1, Math.round(canvas.clientHeight * full / (document.body.classList.contains('yeon') ? 600 : 470) * 2) / 2);
+  const r = Math.max(1, full / zFull);
+  canvas.width = Math.round(canvas.clientWidth * r);
+  canvas.height = Math.round(canvas.clientHeight * r);
+  Z = zFull * r / full;
   VW = canvas.width / Z;
   VH = canvas.height / Z;
 }
@@ -1438,7 +1443,9 @@ function might() {
 }
 
 function frame(now) {
-  const dt = Math.min(0.05, (now - (frame.last || now)) / 1000);
+  // A slow frame now and then is caught up (up to a tenth of a second) rather than played as
+  // slow motion.
+  const dt = Math.min(0.1, (now - (frame.last || now)) / 1000);
   frame.last = now;
   // A ground already conquered may be hunted at x2 or x3 (the 속도 key): farming goes quicker.
   const fast = G && G.wasCleared ? settings.speed || 1 : 1;
@@ -2781,7 +2788,7 @@ function lure() {
     e.dur = 0.22;
     e.moving = true;
   }
-  say('유인!', 'info');
+  shout('유인');
   return 0.28;
 }
 
@@ -4814,8 +4821,18 @@ function addFx(id, x, y, o = {}) {
   if (!M.fx[id]) return 0;
   const life = durs(id).reduce((a, b) => a + b, 0);
   if (G.fxs.length > 260) return life; // a phone draws only so many at once
+  // A screen-filling effect (연's 포효검황, 혈겁만파 ...) is shown once at a time, and no more
+  // than two of them together: stacked they hid the field and slowed a phone to a crawl.
+  const area = M.fx[id].w * M.fx[id].h * (M.fx[id].k || 1) ** 2 * (o.scale || 1) ** 2;
+  if (area > 120000) {
+    const big = G.fxs.filter(f => f.big);
+    if (big.length >= 2 || big.some(f => f.id === id)) return life;
+  }
+  // A middling one (a meteor, a pillar of fire) four at a time: the fifth adds nothing to see
+  // and much to draw.
+  if (area > 12000 && G.fxs.filter(f => f.id === id).length >= 4) return life;
   G.fxs.push({ id, x, y, t: -(o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
-    follow: o.follow, anchor: o.anchor || 'center' });
+    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000 });
   return life;
 }
 
@@ -4832,6 +4849,9 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   const f = M.fx[id];
   const im = images[`fx/${f.src || id}.png`];
   const i = fxFrame(durs(id), t, loop);
+  // Long effects are folded into rows of "cols" frames (a phone holds no picture past 4096).
+  const cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9;
+  const sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h;
   const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
   ctx.save();
   if (f.add) ctx.globalCompositeOperation = 'lighter';
@@ -4843,8 +4863,8 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   if (f.ax !== undefined) {
     // 연's effects carry their pivot: the target's feet (a little under a body's middle).
     const k = scale * (f.k || 1);
-    ctx.drawImage(im, i * f.w, 0, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
-  } else ctx.drawImage(im, i * f.w, 0, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
+    ctx.drawImage(im, sx, sy, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
+  } else ctx.drawImage(im, sx, sy, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
   ctx.restore();
 }
 
@@ -5074,6 +5094,26 @@ function yunitAnim(u, b) {
   return { a, f: Math.floor((performance.now() + b.seed) / a.ms) % a.n, dir, dx };
 }
 
+// Struck, a monster flashes white: a white copy of that one frame, not of its whole sheet.
+const whiteFrames = new Map();
+function whiteFrame(im, sx, sy, w, h) {
+  const k = im.src + '|' + sx + '|' + sy;
+  let c = whiteFrames.get(k);
+  if (!c) {
+    if (whiteFrames.size > 400) whiteFrames.clear();
+    c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(im, sx, sy, w, h, 0, 0, w, h);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, w, h);
+    whiteFrames.set(k, c);
+  }
+  return c;
+}
+
 function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   const { u, im } = y, [cw, ch] = u.cell, [fx, fy] = u.foot;
   const w = cw * s, h = ch * s;
@@ -5088,8 +5128,9 @@ function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   ctx.globalAlpha = alpha;
   ctx.translate(Math.round(x), Math.round(yy));
   if (mirror) ctx.scale(-1, 1);
-  ctx.drawImage(im, f * cw, row * ch, cw, ch, -fx * s, -fy * s, w, h);
-  if (b.flash > 0) ctx.drawImage(white(im), f * cw, row * ch, cw, ch, -fx * s, -fy * s, w, h);
+  const cols = u.cols || 1e9, sx = (f % cols) * cw, sy = (row + Math.floor(f / cols)) * ch;
+  ctx.drawImage(im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
+  if (b.flash > 0) ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
   ctx.restore();
 }
 
