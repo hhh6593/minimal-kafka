@@ -2107,7 +2107,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (!at) return null;
   const t = G.t;
   // Monsters toughen with time: x2.5 by 5:00 (matched to spells growing 15% a 단).
-  const tough = (1 + G.level * 0.15) * (1 + t / 133) * (G.cleared ? 1.5 : 1);
+  const tough = (1 + G.level * 0.1) * (1 + t / 133) * (G.cleared ? 1.5 : 1);
   const rank = kind ? 1 : m.rank;
   let hp = (6 + m.area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
