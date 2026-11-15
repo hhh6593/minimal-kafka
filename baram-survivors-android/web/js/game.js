@@ -88,6 +88,8 @@ async function boot() {
     ...avatarPaths(M),
     ...(M.npc || []).map(n => `npc/${n}.png`),
     ...(M.ui.town ? ['ui/town.png'] : []),
+    ...(M.ui.ytown ? ['ytown/market.png', ...Object.keys(M.ui.ytown.folk).map(k => `ytown/${k}.png`)] : []),
+    ...(M.ui.ytitle ? ['ui/title_bg.jpg'] : []),
     ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
     ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
     ...(M.floor || []).map(k => `floor/${k}.png`),
@@ -122,6 +124,8 @@ async function boot() {
   initAvatars(M, images);
   $('#version').textContent = M.version ? `빌드 ${M.version}` : '';
   $('#heroes').innerHTML = CLASSES.map(c => `<img src="${heroPicture(c)}" alt="${c.name}">`).join('');
+  // 연's own title art carries the name: the drawn title and figures make way for it.
+  if (M.ui.ytitle) document.body.classList.add('ytitle');
   showScreen('title');
   requestAnimationFrame(frame);
 }
@@ -3332,15 +3336,36 @@ const TOWNSFOLK = [
   { id: 'clerk', name: '관원', img: '계산기1', tx: 12, ty: 8, line: '나라에서 내린 의뢰가 있소. 해내면 칭호를 내리리다.' },
 ];
 
+// 바람의나라 연's town (tools/yeon_town.py), where the build has it: 국내성's market square at
+// its own 32-pixel tiles, walked by its own walk grid, its people 연's 국내성 NPCs — 털보 the smith,
+// 떼보 of the armour stall, 왈숙 이모 of the inn, the palace lady who points the way to the
+// hunting grounds and the notice board of the town's 의뢰.
+const YTOWN_LOOK = { smith: 'smith', merchant: 'merchant', inn: 'inn', guide: 'guide', clerk: 'clerk' };
+const YTOWN_NAME = { smith: '털보', merchant: '떼보', inn: '왈숙 이모', guide: '궁인', clerk: '알림판' };
+
+/** The town's people where they stand, in the map's pixels (feet). */
+function townFolk() {
+  const yt = M.ui.ytown;
+  return TOWNSFOLK.map(n => {
+    if (yt && yt.spots[n.id]) {
+      const [x, y] = yt.spots[n.id];
+      return { ...n, x, y, look: YTOWN_LOOK[n.id], label: YTOWN_NAME[n.id] || n.name };
+    }
+    return { ...n, x: n.tx * TOWN_TILE + TOWN_TILE / 2, y: n.ty * TOWN_TILE + TOWN_TILE - 6, label: n.name };
+  });
+}
+
 function enterTown(cls) {
   chosenClass = cls;
-  if (!M.ui.town) {
+  if (!M.ui.town && !M.ui.ytown) {
     showScreen('stages');
     return;
   }
   const gear = savedGear(cls);
-  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: 7.5 * TOWN_TILE, y: 5 * TOWN_TILE - 6,
-    fdx: 0, fdy: 1, moving: false, walkT: 0, near: null };
+  const yt = M.ui.ytown;
+  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: yt ? yt.map.spawn[0] : 7.5 * TOWN_TILE,
+    y: yt ? yt.map.spawn[1] : 5 * TOWN_TILE - 6, fdx: 0, fdy: yt ? -1 : 1, moving: false, walkT: 0, near: null,
+    folk: townFolk() };
   showScreen('town');
   audio.bgm('town');
   $('#town-gold').textContent = `${progress.gold || 0}전`;
@@ -3348,6 +3373,12 @@ function enterTown(cls) {
 }
 
 function townBlocked(x, y) {
+  const yt = M.ui.ytown;
+  if (yt) {
+    const m = yt.map, tx = Math.floor(x / m.tile), ty = Math.floor((y - 2) / m.tile);
+    if (tx < 0 || ty < 0 || tx >= m.cols || ty >= m.rows || m.walk[ty][tx] !== '.') return true;
+    return T.folk.some(n => Math.abs(n.x - x) < 14 && y > n.y - 14 && y < n.y + 6);
+  }
   const tx = Math.floor(x / TOWN_TILE), ty = Math.floor((y - 4) / TOWN_TILE);
   if (tx < 0 || ty < 0 || tx > 15 || ty > 9) return true;
   return TOWN_WALLS.has(`${tx},${ty}`) || TOWNSFOLK.some(n => n.tx === tx && n.ty === ty);
@@ -3368,39 +3399,57 @@ function updateTown(dt) {
     }
     T.walkT += dt * 1000;
   }
-  const tx = Math.floor(T.x / TOWN_TILE), ty = Math.floor((T.y - 4) / TOWN_TILE);
-  const near = TOWNSFOLK.find(n => Math.abs(n.tx - tx) + Math.abs(n.ty - ty) <= 1) || null;
-  if (near !== T.near) {
+  // Who is close enough to talk to: the nearest within a step and a half.
+  const reach = M.ui.ytown ? 52 : TOWN_TILE * 1.6;
+  const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)
+    .sort((a, b) => a[1] - b[1]).map(([n]) => n)[0] || null;
+  if ((near && near.id) !== (T.near && T.near.id)) {
     T.near = near;
     $('#talk').hidden = !near;
-    if (near) $('#talk').textContent = `${near.name}에게 말 걸기`;
+    if (near) $('#talk').textContent = near.id === 'clerk' && M.ui.ytown ? '알림판 보기' : `${near.label}에게 말 걸기`;
   }
 }
 
 function drawTown(now) {
-  const map = images['ui/town.png'];
-  const mw = M.ui.town.w, mh = M.ui.town.h;
+  const yt = M.ui.ytown;
+  const map = images[yt ? 'ytown/market.png' : 'ui/town.png'];
+  const mw = yt ? yt.map.w : M.ui.town.w, mh = yt ? yt.map.h : M.ui.town.h;
   let camX = Math.round(T.x - VW / 2), camY = Math.round(T.y - 30 - VH / 2);
   camX = VW >= mw ? Math.round((mw - VW) / 2) : Math.max(0, Math.min(mw - VW, camX));
   camY = VH >= mh ? Math.round((mh - VH) / 2) : Math.max(0, Math.min(mh - VH, camY));
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
-  ctx.fillStyle = '#2a1a0e';
+  ctx.fillStyle = yt ? '#000' : '#2a1a0e';
   ctx.fillRect(camX, camY, VW, VH);
   if (map && map.width) ctx.drawImage(map, 0, 0);
-  const bodies = TOWNSFOLK.map(n => ({ n, y: n.ty * TOWN_TILE + TOWN_TILE - 6 })).concat([{ hero: true, y: T.y }]);
+  const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }]);
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
     if (b.hero) {
       if (T.av) drawAvatar(ctx, T.av, T.x, T.y, facing(T.fdx, T.fdy), T.moving ? 'walk' : 'idle', Math.floor(T.walkT / WALK_MS));
       continue;
     }
-    const im = images[`npc/${b.n.img}.png`], x = b.n.tx * TOWN_TILE + TOWN_TILE / 2;
-    if (im && im.width) drawWalker(im, x, b.y, 1, now * 2, false, 0);
+    const n = b.n;
+    const f = yt && n.look && yt.folk[n.look], fim = f && images[`ytown/${n.look}.png`];
+    if (fim && fim.width) {
+      // 연's NPC, its idle frames in turn, standing on its feet; a soft round shadow under it.
+      const [cw, ch] = f.cell, [fx, fy] = f.foot, i = Math.floor(now * 1000 / f.ms) % f.n;
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(Math.round(n.x), Math.round(n.y) - 1, n.id === 'clerk' ? 22 : 9, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.drawImage(fim, i * cw, f.row * ch, cw, ch, Math.round(n.x - fx), Math.round(n.y - fy), cw, ch);
+    } else {
+      const im = images[`npc/${n.img}.png`];
+      if (im && im.width) drawWalker(im, n.x, n.y, 1, now * 2, false, 0);
+    }
     ctx.font = '8px G7';
     ctx.textAlign = 'center';
-    outline(b.n.name, x, b.y + 10, b.n === T.near ? '#ffe070' : '#efe3c2');
+    outline(n.label, n.x, n.y + 10, n === T.near || (T.near && T.near.id === n.id) ? '#ffe070' : '#efe3c2');
   }
-  if (T.near) drawBubble(T.near.line, T.near.tx * TOWN_TILE + TOWN_TILE / 2, T.near.ty * TOWN_TILE - 22, 0);
+  if (T.near) {
+    const top = yt && yt.folk[T.near.look] ? yt.folk[T.near.look].foot[1] + 6 : 28;
+    drawBubble(T.near.line, T.near.x, T.near.y - top, 0);
+  }
 }
 
 function talk() {
@@ -4291,7 +4340,7 @@ function drawParty(m) {
   const dir = facing(m.fdx, m.fdy);
   const alpha = m.down ? 0.4 : m.hidden > G.t ? 0.35 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
   const mPose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
-  if (drawYhero(m.cls.id || m.cls, m.gear ? m.gear.armor : 0, m, m.x, y, mPose, alpha)) {
+  if ((m.cls.id && drawYhero2(m.cls, m.gear, m, m.x, y, mPose, alpha)) || drawYhero(m.cls.id || m.cls, m.gear ? m.gear.armor : 0, m, m.x, y, mPose, alpha)) {
     // drawn in 연's own figure
   } else if (m.av) {
     const pose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
@@ -5051,6 +5100,65 @@ function yheroKey(clsId, armor) {
   return null;
 }
 
+/** The 연 variant of each worn piece: a special by its id, the 용무기 by its step, else its tier. */
+function yGearVariants(cls, gear) {
+  const H = M.yhero2 && M.yhero2[cls.id];
+  if (!H) return null;
+  const out = { body: 'base', head: 'base' };
+  for (const kind of ['armor', 'weapon', 'shield', 'helmet', 'cape']) {
+    const map = H.map[kind] || {}, sp = gear[kind + 'Sp'], t = gear[kind];
+    let v = null;
+    if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
+    else if (kind === 'weapon' && t === dragonTier(cls)) v = map['dragon' + starOf(cls, `weapon:${t}`)] || map['t' + t];
+    else if (t !== undefined && t >= 0) v = map['t' + t];
+    if (v && H.layers[kind] && H.layers[kind][v]) out[kind] = v;
+  }
+  return out;
+}
+
+/** Draws a hero from 연's layers in the frame's own order; false when the class has none. */
+function drawYhero2(cls, gear, b, x, y, pose, alpha) {
+  const H = M.yhero2 && M.yhero2[cls.id];
+  if (!H) return false;
+  const want = b.yv && b.yvGear === gear ? b.yv : (b.yvGear = gear, b.yv = yGearVariants(cls, gear || {}));
+  const sheets = {};
+  for (const [kind, v] of Object.entries(want)) {
+    const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
+    if (!(path in images)) loadImage(path);
+    const im = images[path];
+    if (!im || !im.complete || !im.width) {
+      // Body and head first: without them the old sheet is drawn; a piece still loading waits.
+      if (kind === 'body' || kind === 'head') return false;
+      continue;
+    }
+    sheets[kind] = { im, cols: meta.cols || 1e9 };
+  }
+  const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
+  const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
+  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle' }[pose] || 'idle';
+  const a = H.anims[`${name}_${dir}`] || H.anims[`idle_${dir}`] || H.anims.walk_down;
+  let f = 0;
+  if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
+  else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
+  const [cw, ch] = H.cell, [fx, fy] = H.foot, mirror = dir === 'side' && fdx > 0;
+  ctx.save();
+  ctx.globalAlpha = 0.3 * alpha;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(Math.round(x), Math.round(y - 1), 10, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = alpha;
+  ctx.translate(Math.round(x), Math.round(y));
+  if (mirror) ctx.scale(-1, 1);
+  for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
+    const sh = sheets[kind];
+    if (!sh) continue;
+    ctx.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, -fx, -fy, cw, ch);
+  }
+  ctx.restore();
+  return true;
+}
+
 /** Draws a hero from 연's sheet; false when there is none for the class. */
 function drawYhero(clsId, armor, b, x, y, pose, alpha) {
   const yh = yheroKey(clsId, armor);
@@ -5451,6 +5559,7 @@ function drawHero(now, hidden) {
   if (G.dead) {
     // The ghost the dead become: the hero, pale and see-through, floating.
     const y = p.y - 4 - Math.sin(now * 2) * 3;
+    if (drawYhero2(G.cls, p.gear, p, p.x, y, 'idle', 0.45)) return;
     if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, y, 'idle', 0.45)) return;
     if (p.av) drawAvatar(ctx, p.av, p.x, y, facing(p.fdx, p.fdy), 'idle', 0, 0.45);
     else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
@@ -5458,6 +5567,7 @@ function drawHero(now, hidden) {
   }
   // 연's own figure for the class, in the outfit of the armour worn.
   const yPose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
+  if (drawYhero2(G.cls, p.gear, p, p.x, p.y, yPose, hidden ? 0.35 : 1)) return;
   if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, p.y, yPose, hidden ? 0.35 : 1)) return;
   // Struck, the hero does not flicker: the client showed a blow only in the health bar.
   if (!p.av) {
@@ -5584,6 +5694,22 @@ function drawJoystick() {
 }
 
 function drawMenuBackdrop(now) {
+  // 바람의나라 연's title: its emblem over the snowy peaks at dusk, filling the screen (the
+  // menus after the title see it dimmed).
+  const tb = M.ui.ytitle && images['ui/title_bg.jpg'];
+  if (tb && tb.width) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    const k = Math.max(canvas.width / tb.width, canvas.height / tb.height);
+    const w = tb.width * k, h = tb.height * k;
+    ctx.drawImage(tb, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    ctx.imageSmoothingEnabled = false;
+    if ($('#title').hidden) {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    return;
+  }
   // Behind the menus: the beginners' field with a slow parade of its animals.
   if (!menuGround) return;
   ctx.setTransform(Z, 0, 0, Z, 0, 0);

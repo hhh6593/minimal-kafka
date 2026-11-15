@@ -638,6 +638,21 @@ def main():
                     sheet.save(os.path.join(out, "yhero", key + ".png"), optimize=True)
                     manifest["yhero"][key] = nu
 
+    # 바람의나라 연's heroes in layers (GEAR_DIR/yhero2/<class>/<layer>_<variant>.png + index.json,
+    # from tools/yeon_gear.py): body, head, armour, helmet, shield and weapon drawn one over
+    # another in 연's own order for each frame, so every piece worn shows.
+    h2 = os.path.join(gear_src, "yhero2") if gear_src else None
+    manifest["yhero2"] = {}
+    if h2 and os.path.isfile(os.path.join(h2, "index.json")):
+        with open(os.path.join(h2, "index.json"), encoding="utf-8") as f:
+            h2index = json.load(f)
+        for cls_id, c in h2index.items():
+            os.makedirs(os.path.join(out, "yhero2", cls_id), exist_ok=True)
+            for kind, variants in c["layers"].items():
+                for v, meta in variants.items():
+                    shutil.copyfile(os.path.join(h2, meta["file"]), os.path.join(out, "yhero2", meta["file"]))
+            manifest["yhero2"][cls_id] = c
+
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
     edir = os.path.join(gear_src, "emote") if gear_src else None
@@ -709,6 +724,23 @@ def main():
                 im = Image.open(p).convert("RGB")
                 im.save(os.path.join(out, "ui", key + ".png"), optimize=True)
                 manifest["ui"][key] = {"w": im.width, "h": im.height}
+
+    # 바람의나라 연's town and title (GEAR_DIR/ytown/ from tools/yeon_town.py: 국내성's market map,
+    # its walk grid and 연's NPCs; GEAR_DIR/ytitle/: the logo over the snowy peaks from 연's
+    # ending film and its login-wait picture). Where present they replace the 1996 town and
+    # the drawn title.
+    ydir = os.path.join(gear_src, "ytown") if gear_src else None
+    if ydir and os.path.isfile(os.path.join(ydir, "index.json")):
+        os.makedirs(os.path.join(out, "ytown"), exist_ok=True)
+        for n in os.listdir(ydir):
+            if n.endswith(".png"):
+                shutil.copyfile(os.path.join(ydir, n), os.path.join(out, "ytown", n))
+        with open(os.path.join(ydir, "index.json"), encoding="utf-8") as f:
+            manifest["ui"]["ytown"] = json.load(f)
+    tdir = os.path.join(gear_src, "ytitle") if gear_src else None
+    if tdir and os.path.isfile(os.path.join(tdir, "title_bg.jpg")):
+        shutil.copyfile(os.path.join(tdir, "title_bg.jpg"), os.path.join(out, "ui", "title_bg.jpg"))
+        manifest["ui"]["ytitle"] = True
 
     # 국내성 seen whole (TOWN_DIR/gungnae.png, a labelled overview): the hunting-ground picker's
     # first map, its caves where the city has them.
