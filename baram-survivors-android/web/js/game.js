@@ -1064,7 +1064,8 @@ function buildEquip() {
   }
   for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패'], ['helmet', '투구'], ['cape', '망토']]) {
     // 투구·망토 rows only once one is owned.
-    if ((kind === 'helmet' || kind === 'cape') && !b.some(x => x.startsWith('sp:') && SPECIAL[x.slice(3)] && SPECIAL[x.slice(3)].kind === kind)) continue;
+    if ((kind === 'helmet' || kind === 'cape') && !(GEAR[cls.id][kind] || []).length
+      && !b.some(x => x.startsWith('sp:') && SPECIAL[x.slice(3)] && SPECIAL[x.slice(3)].kind === kind)) continue;
     const h = document.createElement('h4');
     h.textContent = label;
     box.append(h);
@@ -1118,7 +1119,7 @@ let codexCls = null, codexGrade = 'all', codexOwned = false;
 
 function codexItems(cls) {
   const b = bag(cls), out = [];
-  for (const kind of ['weapon', 'armor', 'shield']) {
+  for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     GEAR[cls.id][kind].forEach((name, t) => {
       const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
       const rc = craft && craftRecipe(cls.id);
@@ -2668,8 +2669,11 @@ function fieldFalls() {
 
 /** A piece of the class's gear on the ground, about as good as the ground is deep. */
 function dropGear(e, dx = 0) {
-  const line = GEAR[G.cls.id], kinds = ['weapon', 'armor', 'shield'];
-  const kind = kinds[Math.floor(Math.random() * 3)];
+  // 투구 and 망토 drop too (a little rarer than the weapon, armour and shield), from their own lines.
+  const line = GEAR[G.cls.id];
+  const kinds = ['weapon', 'armor', 'shield', 'weapon', 'armor', 'shield', 'helmet', 'cape']
+    .filter(k => (line[k] || []).length && plainList(G.cls.id, k).length);
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
   // Hunting grounds never drop a raid's or a crafted piece.
   const list = plainList(G.cls.id, kind), top = list.length - 1;
   const tier = list[Math.max(0, Math.min(top, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0)
@@ -3581,7 +3585,7 @@ function updateTown(dt) {
   }
   townWarps();
   // Who is close enough to talk to: the nearest within reach (across a shop's counter in a house).
-  const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 72) : TOWN_TILE * 1.6;
+  const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 84) : TOWN_TILE * 1.6;
   const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)
     .sort((a, b) => a[1] - b[1]).map(([n]) => n)[0] || null;
   if ((near && near.id) !== (T.near && T.near.id)) {
@@ -3667,8 +3671,9 @@ function drawTown(now) {
   }
 }
 
-// Test: the town as it stands (the hero, the folk, who is near).
+// Test: the town as it stands (the hero, the folk, who is near), and whether a spot is walkable.
 window.__town = () => T;
+window.__townWalk = (x, y) => !townBlocked(x, y);
 
 function talk() {
   const n = T && T.near;
@@ -3853,10 +3858,10 @@ function openTrade(who) {
   } else {
     // The first piece of each kind the bag lacks, priced by its tier.
     const b = bag(cls);
-    for (const kind of ['weapon', 'armor', 'shield']) {
-      const tier = GEAR[cls.id][kind].findIndex((_, i) => !b.includes(`${kind}:${i}`));
+    for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+      const tier = (GEAR[cls.id][kind] || []).findIndex((_, i) => !b.includes(`${kind}:${i}`));
       if (tier < 0) continue;
-      row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[kind]} · ${tier + 1}단계`,
+      row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' }[kind]} · ${tier + 1}단계`,
         250 * (tier + 1) * (tier + 1), false, () => b.push(`${kind}:${tier}`));
     }
     if (!box.children.length) box.textContent = '더 팔 물건이 없소.';
@@ -6621,7 +6626,7 @@ window.__gearTest = () => {
       bad.push(label + ': ' + e.message);
     }
   };
-  for (const kind of ['weapon', 'armor', 'shield']) {
+  for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     (GEAR[c][kind] || []).forEach((name, t) => check(`${kind} ${t} ${name}`, kind, t, null));
   }
   let n = 0;
@@ -6632,7 +6637,7 @@ window.__gearTest = () => {
   }
   try { $('#equip').hidden = false; buildEquip(); $('#equip').hidden = true; } catch (e) { bad.push('equip window: ' + e.message); }
   for (const [k, v] of Object.entries(keep)) if (!k.endsWith('Sp')) wear(k, v, keep[k + 'Sp'] || null);
-  return { cls: c, tried: ['weapon', 'armor', 'shield'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
+  return { cls: c, tried: ['weapon', 'armor', 'shield', 'helmet', 'cape'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
 };
 window.__dragonTier = () => dragonTier(G.cls);
 window.__Z = () => Z;
