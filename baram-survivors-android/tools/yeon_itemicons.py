@@ -32,7 +32,8 @@ def main():
         for kind, mm in v['map'].items():
             for key, var in mm.items():
                 if var:
-                    want.add(ARMOR[cls][var] if kind == 'armor' else int(var))
+                    i = ARMOR[cls][var] if kind == 'armor' else int(var)
+                    want.update(range(i - 9, i + 1) if key.startswith('dragon') else [i])
     env = UnityPy.load(items)
     icons = {}
     for o in env.objects:
@@ -65,6 +66,11 @@ def main():
                     continue
                 iid = ARMOR[cls][var] if kind == 'armor' else int(var)
                 im = icons.get(iid)
+                # A 용무기 step the client ships no icon for shows the step below it.
+                back = iid
+                while im is None and key.startswith('dragon') and back > iid - 9:
+                    back -= 1
+                    im = icons.get(back)
                 if im is None:
                     missing.append((cls, kind, key, iid))
                     continue
