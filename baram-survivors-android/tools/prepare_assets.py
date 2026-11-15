@@ -16,6 +16,8 @@ What it writes:
   hero/<id>.png    the four class portraits
   icon/<id>.png    each effect's fullest frame, cropped, for spell slots
   skillicon/<id>.png  the 8·9차 spells' own icons (GEAR_DIR/skillicon/)
+  prop/<name>.png     trees, palisade, jars, stones from the original map (GEAR_DIR/prop/)
+  floor/<terrain>.png 연's own floors, one seamless tile per terrain (GEAR_DIR/floor/)
   ui/...           the world maps for the hunting-ground picker
   audio/...        whatever sound files AUDIO_DIR holds (see README)
   manifest.json    sizes, frame timings and blending of all of the above
@@ -396,6 +398,27 @@ def main():
         for n in sorted(x for x in os.listdir(sdir) if x.endswith(".png")):
             Image.open(os.path.join(sdir, n)).convert("RGBA").save(os.path.join(out, "skillicon", n), optimize=True)
             manifest["skillicon"].append(n[:-4])
+
+    # Floors from 바람의나라 연's own hunting grounds (GEAR_DIR/floor/<terrain>.png, made seamless
+    # by tools/yeon_floor.py); the game falls back to its plain pattern for a terrain without one.
+    fdir = os.path.join(gear_src, "floor") if gear_src else None
+    manifest["floor"] = []
+    if fdir and os.path.isdir(fdir):
+        os.makedirs(os.path.join(out, "floor"), exist_ok=True)
+        for n in sorted(x for x in os.listdir(fdir) if x.endswith(".png")):
+            Image.open(os.path.join(fdir, n)).convert("RGB").save(os.path.join(out, "floor", n), optimize=True)
+            manifest["floor"].append(n[:-4])
+
+    # Props from the original maps (GEAR_DIR/prop/<name>.png, cut by tools/yeon_props.py):
+    # trees, the wooden palisade, jars and stones the hunting grounds are dotted with.
+    pdir = os.path.join(gear_src, "prop") if gear_src else None
+    manifest["prop"] = {}
+    if pdir and os.path.isdir(pdir):
+        os.makedirs(os.path.join(out, "prop"), exist_ok=True)
+        for n in sorted(x for x in os.listdir(pdir) if x.endswith(".png")):
+            im = Image.open(os.path.join(pdir, n)).convert("RGBA")
+            im.save(os.path.join(out, "prop", n), optimize=True)
+            manifest["prop"][n[:-4]] = [im.width, im.height]
 
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.

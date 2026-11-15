@@ -88,6 +88,8 @@ async function boot() {
     ...(M.ui.town ? ['ui/town.png'] : []),
     ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
     ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
+    ...(M.floor || []).map(k => `floor/${k}.png`),
+    ...Object.keys(M.prop || {}).map(k => `prop/${k}.png`),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -140,8 +142,65 @@ function stageMonsters(stage) {
 
 let menuGround;
 
+// Props on each kind of ground, from the original maps: [name, weight]. 'fence' is the wooden
+// palisade, laid in runs like the walls round the old hunting grounds.
+const PROPS = {
+  field: [['tree1', 3], ['tree2', 3], ['tree3', 3], ['stone', 4], ['fence', 2]],
+  field2: [['tree1', 4], ['tree2', 4], ['tree3', 4], ['stone', 2], ['fence', 2]],
+  cave: [['stone', 6], ['jar1', 1], ['jar3', 1]],
+  house: [['jar1', 2], ['jar2', 2], ['jar3', 2], ['jar4', 1], ['fence', 2]],
+  island: [['tree2', 1], ['stone', 4]],
+  sea: [['stone', 3]],
+  lava: [['stone', 3]],
+};
+const PROP_CELL = 160;
+
+/** The props standing in view: one cell of the endless ground at a time, the same every visit. */
+function propsInView(camX, camY) {
+  const kinds = PROPS[G.stage.terrain];
+  if (!kinds || !M.prop) return [];
+  const list = kinds.filter(([n]) => M.prop[n] && images[`prop/${n}.png`] && images[`prop/${n}.png`].width);
+  const total = list.reduce((a, [, w]) => a + w, 0);
+  if (!total) return [];
+  const out = [];
+  const x0 = Math.floor((camX - 220) / PROP_CELL), x1 = Math.floor((camX + VW + 220) / PROP_CELL);
+  const y0 = Math.floor((camY - 60) / PROP_CELL), y1 = Math.floor((camY + VH + 120) / PROP_CELL);
+  for (let cy = y0; cy <= y1; cy++) {
+    for (let cx = x0; cx <= x1; cx++) {
+      let h = (Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ G.stage.id.length * 83492791) >>> 0;
+      const r = () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0) % 10000) / 10000;
+      if (r() > 0.55) continue;
+      // The start stays clear.
+      if (Math.abs(cx * PROP_CELL) < 260 && Math.abs(cy * PROP_CELL) < 200) continue;
+      let pick = r() * total, name = list[0][0];
+      for (const [n, w] of list) if ((pick -= w) < 0) { name = n; break; }
+      const x = cx * PROP_CELL + Math.floor(r() * (PROP_CELL - 40)) + 20, y = cy * PROP_CELL + Math.floor(r() * (PROP_CELL - 30)) + 20;
+      out.push({ prop: name, x, y });
+      // Jars and stones come in little groups.
+      if (name.startsWith('jar') || name === 'stone') {
+        const more = Math.floor(r() * 3);
+        for (let i = 0; i < more; i++) out.push({ prop: name === 'stone' ? 'stone' : `jar${1 + Math.floor(r() * 4)}`, x: x + 16 + i * 18, y: y + Math.floor(r() * 12) - 6 });
+      }
+    }
+  }
+  return out;
+}
+
+/** A prop with its foot at (x, y); a tree goes see-through while the hero is behind it. */
+function drawProp(b, p) {
+  const im = images[`prop/${b.prop}.png`];
+  const left = Math.round(b.x - im.width / 2), top = Math.round(b.y - im.height);
+  const behind = b.prop.startsWith('tree') && p.x > left && p.x < left + im.width && p.y < b.y - 4 && p.y > top + 10;
+  if (behind) ctx.globalAlpha = 0.5;
+  ctx.drawImage(im, left, top);
+  ctx.globalAlpha = 1;
+}
+
 /** A ground pattern for a terrain kind, drawn once per hunt. */
 function makeGround(kind) {
+  // 연's own floor for the terrain, one game pixel per picture pixel.
+  const tile = images[`floor/${kind}.png`];
+  if (tile && tile.width) return ctx.createPattern(tile, 'repeat');
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');
@@ -4872,13 +4931,17 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies, G.party);
+  const bodies = G.enemies.concat(G.allies, G.party, propsInView(camX, camY));
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
   for (const b of bodies) {
     if (b === p) {
       drawHero(now, hidden);
+      continue;
+    }
+    if (b.prop) {
+      drawProp(b, p);
       continue;
     }
     if (b.cls) {
@@ -5807,6 +5870,7 @@ window.__appBack = () => {
 // For testing in a browser console.
 window.__game = () => G;
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
+window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
