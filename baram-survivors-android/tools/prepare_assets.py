@@ -387,14 +387,14 @@ def main():
             im.save(os.path.join(out, "gear", f"g{i}.png"), optimize=True)
             manifest["gear"][n[:-4]] = {"id": f"g{i}", "w": im.width, "h": im.height}
 
-    # The 8·9차 spells' own icons, cut from the game's skill window (GEAR_DIR/skillicon/<id>.png,
-    # tools/skill_icons.py).
+    # 바람의나라 연's own spell icons (GEAR_DIR/skillicon/<id>.png): the 8·9차 ones cut from its skill
+    # window (tools/skill_icons.py), the 1~4차 ones from the official patch notes' skill tables.
     sdir = os.path.join(gear_src, "skillicon") if gear_src else None
     manifest["skillicon"] = []
     if sdir and os.path.isdir(sdir):
         os.makedirs(os.path.join(out, "skillicon"), exist_ok=True)
         for n in sorted(x for x in os.listdir(sdir) if x.endswith(".png")):
-            Image.open(os.path.join(sdir, n)).convert("RGB").save(os.path.join(out, "skillicon", n), optimize=True)
+            Image.open(os.path.join(sdir, n)).convert("RGBA").save(os.path.join(out, "skillicon", n), optimize=True)
             manifest["skillicon"].append(n[:-4])
 
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
