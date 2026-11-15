@@ -424,7 +424,7 @@ export const YEON_FX = {
   p_skyspirit: 'y_jeongi',
   // 4차 승급 previews (the official 4차 승급 notice) and 6차 승급 (its patch notes).
   w_ungong: 'y_ungong', w_roar2: 'y_geukbaekho', r_gaehyeol: 'y_gaehyeol', p_phoenix: 'y_phoenix', p_guard: 'y_geumgang',
-  m_twin: 'y_saseul', w_chohon: 'y_chohon', r_hidden: 'y_chimyeong', m_inferno: 'y_jiok', p_bagua: 'y_bagua',
+  m_twin: 'y_saseul', r_hidden: 'y_chimyeong', m_inferno: 'y_jiok', p_bagua: 'y_bagua',
   w_blood: 'y_geukjin', r_shuriken: 'y_hwasal', w_dragon: 'y_hwaryong', r_kill: 'y_jaa',
   m_shards: 'y_seori',
 };

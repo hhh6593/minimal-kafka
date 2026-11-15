@@ -329,7 +329,7 @@ function buildSelect() {
     const rec = best[c.id];
     b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
-      <em>필살기 ${SKILLS[c.ult].name}</em>
+      <em>필살기 ${ultLook(c.id).name}</em>
       <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급` : ''}</small>`;
     b.onclick = () => {
       chosenClass = c;
@@ -1573,12 +1573,17 @@ const FIELD_MAX = 420;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
 const HORDE = { hp: 1, dmg: 1 };
 
+/** How many times the 860 x 400 view the field shows (1 to 2): more monsters, each worth less. */
+function viewCrowd() {
+  return Math.min(2, Math.max(1, (VW * VH) / (860 * 400)));
+}
+
 function floorCount(t) {
   // The grounds' strength runs 0 to 13, mapped onto D2 Survivors' five acts.
   const a = Math.min(4, Math.round((G.level / 13) * 4));
   // The counts were set for a view of 860 x 400; a wider view (the 연 layout, a big phone)
   // holds as many monsters a screen, not fewer.
-  const view = Math.min(2, Math.max(1, (VW * VH) / (860 * 400)));
+  const view = viewCrowd();
   return Math.round((FLOOR_OPEN[a] + (FLOOR_FIVE[a] - FLOOR_OPEN[a]) * Math.min(1, t / 200)) * view);
 }
 
@@ -2868,9 +2873,10 @@ function cast(skill, st) {
     }
     case 'nova': {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
-      addFx(fxid, 0, -26, { follow: true, scale: M.fx[fxid] && M.fx[fxid].add ? 2.2 : 1.4 });
+      const nf = M.fx[fxid];
+      addFx(fxid, 0, -26, { follow: true, scale: nf && nf.cls === 'yeon' ? 1 : nf && nf.add ? 2.2 : 1.4 });
       // A ring of the picture round the hero, out to the spell's reach (light pictures only).
-      for (let k = 0; k < (M.fx[fxid] && M.fx[fxid].add ? 8 : 0); k++) {
+      for (let k = 0; k < (nf && nf.add && nf.cls !== 'yeon' ? 8 : 0); k++) {
         const a = (k / 8) * Math.PI * 2, r = (st.radius || 2) * TILE;
         addFx(fxid, p.x + Math.cos(a) * r, p.y - 20 + Math.sin(a) * r * 0.7, { delay: 0.04 * k, scale: 1.3 });
       }
@@ -2975,23 +2981,46 @@ function plainAttack(dt) {
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
+/** The 필살기 grows with 승급: the class's great spell of its highest tier, by its own name and
+ * picture (건곤대나이 → 혈겁만파 → 광야건곤 → 흑룡광참 → 만검귀종 for the 전사), stronger a tier. */
+const ULT_PATH = {
+  warrior: [[0, 'w_ult'], [4, 'w_blood'], [5, 'w_rush'], [8, 'w_blackdragon'], [9, 'w_myriad']],
+  rogue: [[0, 'r_ult'], [4, 'r_heaven'], [6, 'r_shuriken'], [7, 'r_kill'], [9, 'r_gale']],
+  mage: [[0, 'm_ult'], [4, 'm_fire3'], [6, 'm_twin'], [7, 'm_inferno'], [9, 'm_kalpa']],
+  poet: [[0, 'p_ult'], [4, 'p_phoenix'], [6, 'p_burst'], [7, 'p_bagua'], [9, 'p_taiji']],
+};
+function ultLook(cls) {
+  const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
+  let id = null;
+  for (const [at, sid] of ULT_PATH[cls] || []) if (promo >= at && SKILLS[sid]) id = sid;
+  const d = SKILLS[id] || base;
+  const fx = d.yeon ? d.fx : d.modern && M.fx[d.modern] ? d.modern : d.fxs ? d.fxs[d.fxs.length - 1] : d.fx;
+  return { ...base, id: id || CLASSES.find(c => c.id === cls).ult, name: d.name, fx: M.fx[fx] ? fx : base.fx };
+}
+function ultIcon(cls) {
+  const l = ultLook(cls);
+  if (M.skillicon && M.skillicon.includes(l.id)) return `assets/skillicon/${l.id}.png`;
+  const d = SKILLS[l.id];
+  const fx = d.fxs ? d.fxs[d.fxs.length - 1] : d.fx;
+  return `assets/icon/${fx}.png`;
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
   if (p.mp < p.maxMp) return;
-  const def = SKILLS[G.cls.ult];
+  const def = ultLook(G.cls.id);
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   G.bubble = { text: `${def.name}!`, t: G.t };
   strikePose(G.cls.id === 'warrior' || G.cls.id === 'rogue' ? 'attack' : 'magic');
   say(`${def.name}!`);
-  audio.play('skill_' + G.cls.ult, 'ult');
+  audio.play('skill_' + def.id, 'ult');
   G.shake = 0.5;
   // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
   addFx(grownFx(def.fx, 8), 0, -26, { follow: true, scale: 2.4 });
   scatterFx(grownFx(def.fx, 8), 10, 1.5);
-  G.flash = G.t;
-  const lvl = p.lvl, pw = 1 + 0.1 * G.passives.power;
+  const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
   const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
   switch (G.cls.ult) {
@@ -3657,7 +3686,7 @@ function grownFx(id, lv) {
   if (!M.fx[key]) {
     // 연's spells are drawn large over the field: a quarter larger to begin, 6% more a 단.
     const f = M.fx[id];
-    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * 1.4 * (1 + 0.06 * (lv - 1)) };
+    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * (1 + 0.04 * (lv - 1)) };
   }
   return key;
 }
@@ -3702,14 +3731,13 @@ function drawSkillBar() {
   const x0 = yeon ? W - (100 * dpr) - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
   G.skills.slice(0, 8).forEach((s, i) => {
     const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap), y = y0 + (yeon && i >= 4 ? sz + gap : 0);
-    const tier = def.promo >= 8 ? '#e8a020' : def.promo >= 5 ? '#9a5cff' : def.promo ? '#3aa0ff' : '#5ac83a';
-    ctx.fillStyle = 'rgba(10,8,6,0.75)';
-    ctx.fillRect(x - 2, y - 2, sz + 4, sz + 4);
-    ctx.fillStyle = tier;
-    ctx.fillRect(x - 2, y - 2, sz + 4, 2);
-    ctx.fillRect(x - 2, y + sz, sz + 4, 2);
-    ctx.fillRect(x - 2, y - 2, 2, sz + 4);
-    ctx.fillRect(x + sz, y - 2, 2, sz + 4);
+    // 연's slot: a purple frame in a black line.
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x - 4, y - 4, sz + 8, sz + 8);
+    ctx.fillStyle = 'rgb(148,48,219)';
+    ctx.fillRect(x - 3, y - 3, sz + 6, sz + 6);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x - 1, y - 1, sz + 2, sz + 2);
     const im = skillIconImage(s.id);
     if (im && im.width) {
       ctx.save();
@@ -3718,26 +3746,17 @@ function drawSkillBar() {
       ctx.drawImage(im, x + (sz - im.width * k) / 2, y + (sz - im.height * k) / 2, im.width * k, im.height * k);
       ctx.restore();
     }
-    // The wait: a dark sector that shrinks clockwise as the spell comes ready.
+    // The wait, as 연 shows it: the icon darkened, the seconds over it.
     const left = s.cdMax ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0;
     if (left > 0.02) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, y, sz, sz);
-      ctx.clip();
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.beginPath();
-      ctx.moveTo(x + sz / 2, y + sz / 2);
-      ctx.arc(x + sz / 2, y + sz / 2, sz, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      ctx.fillRect(x, y, sz, sz);
       if (s.timer >= 1) {
         ctx.font = `bold ${Math.round(10 * u)}px G9`;
         ctx.textAlign = 'center';
         outline(`${Math.ceil(s.timer)}초`, x + sz / 2, y + sz / 2 + 4 * u, '#ffffff');
       }
-    } else if (G.t - (s.readyFlash || 0) > 0.3 && s.timer > -0.05 && s.timer <= 0.05) s.readyFlash = G.t;
+    }
     ctx.font = `bold ${Math.round(9 * u)}px G9`;
     ctx.textAlign = 'right';
     outline(String(s.lv), x + sz - 1, y + sz - 2, '#fff');
@@ -3786,36 +3805,38 @@ function classFlourish(def, skill, st) {
 
 
 
-/** 연's status at the top left: level, then health (red) and mana (blue) bars with their numbers. */
+/** 연's status at the top left, as its screen draws it: the weapon's picture with the level
+ * under it, then flat red and blue bars in a black line with their numbers in white. */
 function drawYeonStatus() {
   if (!document.body.classList.contains('yeon')) return;
   const p = G.player, cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
-  const x = 10 * d, y = 10 * d, w = 170 * d, h = 13 * d;
+  const x = 8 * d, y = 8 * d, w = 150 * d, h = 15 * d;
   ctx.save();
-  ctx.fillStyle = 'rgba(10,8,6,0.55)';
-  ctx.fillRect(x - 4 * d, y - 4 * d, w + 44 * d, h * 2 + 12 * d);
-  ctx.font = `bold ${Math.round(16 * d)}px G11`;
+  const wp = gearImage({ kind: 'weapon', tier: p.gear ? p.gear.weapon : 0 });
+  if (wp && wp.width) {
+    const k = Math.min(26 * d / wp.width, 26 * d / wp.height);
+    ctx.drawImage(wp, x + (26 * d - wp.width * k) / 2, y, wp.width * k, wp.height * k);
+  }
+  ctx.font = `bold ${Math.round(12 * d)}px G11`;
   ctx.textAlign = 'center';
-  outline(String(p.lvl), x + 14 * d, y + h + 6 * d, '#fff');
-  const bx = x + 32 * d;
-  const barRow = (yy, k, c1, c2, text) => {
-    ctx.fillStyle = '#1a0a04';
+  outline(String(p.lvl), x + 13 * d, y + 2 * h + 2 * d, '#ffffff');
+  const bx = x + 30 * d;
+  const row = (yy, k, fill, text) => {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(bx - d, yy - d, w + 2 * d, h + 2 * d);
+    ctx.fillStyle = '#2a1410';
     ctx.fillRect(bx, yy, w, h);
-    const g = ctx.createLinearGradient(0, yy, 0, yy + h);
-    g.addColorStop(0, c1);
-    g.addColorStop(1, c2);
-    ctx.fillStyle = g;
-    ctx.fillRect(bx + d, yy + d, Math.max(0, (w - 2 * d) * k), h - 2 * d);
-    ctx.font = `${Math.round(9 * d)}px G9`;
+    ctx.fillStyle = fill;
+    ctx.fillRect(bx, yy, Math.max(0, w * Math.min(1, k)), h);
+    ctx.font = `bold ${Math.round(10 * d)}px G9`;
     ctx.textAlign = 'right';
-    outline(text, bx + w - 4 * d, yy + h - 3 * d, '#fff');
+    outline(text, bx + w - 3 * d, yy + h - 3 * d, '#ffffff');
   };
-  barRow(y, Math.max(0, p.hp / p.maxHp), '#ff5a3a', '#a01808', `${Math.ceil(Math.max(0, p.hp))}`);
-  barRow(y + h + 3 * d, Math.min(1, p.mp / p.maxMp), '#5aa0ff', '#1840b0', `${Math.floor(p.mp)}`);
-  // Experience: a thin line along the screen's foot.
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  row(y, p.hp / p.maxHp, 'rgb(180,43,0)', `${Math.ceil(Math.max(0, p.hp))}`);
+  row(y + h + 2 * d, p.mp / p.maxMp, 'rgb(62,102,196)', `${Math.floor(p.mp)}`);
+  ctx.fillStyle = '#000';
   ctx.fillRect(0, canvas.height - 3 * d, canvas.width, 3 * d);
-  ctx.fillStyle = '#7aff6a';
+  ctx.fillStyle = 'rgb(62,180,60)';
   ctx.fillRect(0, canvas.height - 3 * d, canvas.width * Math.min(1, p.xp / p.next), 3 * d);
   ctx.restore();
 }
@@ -4143,7 +4164,7 @@ function heal(n, sound, quiet = false) {
 function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
-  v *= 1.7;
+  v *= 1.7 / viewCrowd();
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   while (p.xp >= p.next) {
@@ -5006,11 +5027,6 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  // A streak's round number: a short white flash.
-  if (G.flash && G.t - G.flash < 0.18) {
-    ctx.fillStyle = `rgba(255,250,220,${0.35 * (1 - (G.t - G.flash) / 0.18)})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
   // 연속 처치: the count at the top right while a streak runs.
   const c = G.combo;
   if (c.n >= 10 && G.t - c.t < 3) {
@@ -5240,9 +5256,9 @@ function syncUlt() {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
     // The 필살기 button is outside the panel: it is kept up to date without it too.
     const ready = p.mp >= p.maxMp && !G.dead;
-    put('#ult span', SKILLS[G.cls.ult].name);
+    put('#ult span', ultLook(G.cls.id).name);
     put('#ult small', ready ? '준비됨' : `${Math.floor(100 * p.mp / p.maxMp)}%`);
-    const ic = `url(assets/icon/${SKILLS[G.cls.ult].fx}.png)`;
+    const ic = `url(${ultIcon(G.cls.id)})`;
     if (shown.ultIcon !== ic) { shown.ultIcon = ic; ultBtn.style.backgroundImage = ic; }
     ultBtn.classList.toggle('ready', ready);
     return;
@@ -5302,7 +5318,7 @@ function syncUlt() {
     $('#side-slots').innerHTML = slots;
   }
   const ready = p.mp >= p.maxMp && !G.dead;
-  put('#ult span', SKILLS[G.cls.ult].name);
+  put('#ult span', ultLook(G.cls.id).name);
   put('#ult small', ready ? '준비됨' : `마력 ${Math.floor(p.mp)}/${p.maxMp}`);
   ultBtn.classList.toggle('ready', ready);
 }
