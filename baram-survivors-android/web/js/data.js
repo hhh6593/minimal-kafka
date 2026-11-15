@@ -393,7 +393,7 @@ const c = h => `sepia(1) saturate(5) hue-rotate(${h - 40}deg)`;
 const LOOKS = {
   w_rush: ['22', c(205), 1.3], w_stone: ['9', c(35), 1.2], w_dragon: ['140', c(55), 1.3],
   w_frenzy: ['25', c(0), 1], w_thunder: ['141', c(55), 1], w_flash: ['139', c(200), 1],
-  w_blackdragon: ['141', c(350), 1.25], w_sentence: ['20', c(170), 1.2], w_dawn: ['21', c(15), 1.3],
+  w_blackdragon: ['141', c(350), 1.25], w_sentence: ['20', c(170), 1.2], w_dawn: ['42', c(15), 1.3],
   w_swords: ['22', c(185), 1.4], w_advance: ['121', c(45), 1.2],
   r_venom: ['37', c(110), 1.2], r_phantom: ['33', c(275), 1.2], r_shuriken: ['145', c(0), 0.9],
   r_hidden: ['144', c(260), 1], r_bloom: ['145', c(330), 1], r_kill: ['144', c(0), 1],
