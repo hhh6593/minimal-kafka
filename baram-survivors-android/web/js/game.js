@@ -680,6 +680,7 @@ function startRun(cls, stage) {
     buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
     enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], feed: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
+    chainRun: null,
     bubble: null, spawnT: 0, minis: MINI_AT.slice(), champs: CHAMPIONS_AT.slice(), packs: 0, bossDue: true, events: eventPlan(),
     pendingLevels: 0, shake: 0, plainDropAt: 0,
     rerolls: 2 + up('reroll'), skips: 2 + up('skip'), banishes: 2 + up('banish'), banished: new Set(),
@@ -1548,28 +1549,18 @@ function update(dt) {
   spawn(dt);
   moveEnemies(dt);
   if (!G.dead) {
+    const chain = chainSkills();
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
       s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste'));
-      if (s.timer <= 0) {
-        const st = stats(s);
-        s.cdMax = st.cd;
-        s.timer += st.cd;
-        if (s.timer < 0) s.timer = st.cd;
-        // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
-        if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
-        // In a raid the 전사 is the party's main blade: its strikes cut the boss more than twice as deep
-        // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
-        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.8;
-        cast(s, st);
-        // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
-        // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
-        if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) {
-          const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0 && tdist(e, p) <= 5);
-          if (bo) later(0.2, () => { if (bo.hp > 0) hurtEnemy(bo, st.dmg * 0.8); });
-        }
+      // A spell in the 기술 연계 waits, ready, for the others of the chain.
+      if (chain.includes(s)) {
+        s.timer = Math.max(0, s.timer);
+        continue;
       }
+      if (s.timer <= 0) fireSkill(s, 1);
     }
+    if (chain.length && !G.chainRun && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
   }
   runTimers();
@@ -2489,6 +2480,8 @@ function killEnemy(e) {
   const at = G.enemies.indexOf(e);
   if (at < 0) return;
   G.kills++;
+  // 이동기 한방컷 (연's 차사): a foe felled just after a dash brings the next dash sooner.
+  if (G.dashAt !== undefined && G.t - G.dashAt < 0.6) G.dashAt -= 0.35;
   // 연속 처치: kills within three seconds of each other chain; the round numbers are called out.
   const c = G.combo;
   c.n = G.t - c.t < 3 ? c.n + 1 : 1;
@@ -2687,6 +2680,121 @@ function fxOn(id, b, o = {}) {
   const tall = f.h > f.w * 1.4;
   const h = b.m ? b.m.h * b.scale : b.img.height;
   return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...o });
+}
+
+/** One spell going off: its wait starts again and it is cast, k times as strong. */
+function fireSkill(s, k) {
+  const p = G.player;
+  const st = stats(s);
+  s.cdMax = st.cd;
+  s.timer += st.cd;
+  if (s.timer < 0) s.timer = st.cd;
+  if (st.dmg) st.dmg *= k;
+  // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
+  if (G.cls.id === 'poet' && !G.party.length && st.dmg) st.dmg *= 1.35;
+  // In a raid the 전사 is the party's main blade: its strikes cut the boss more than twice as deep
+  // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
+  if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.8;
+  cast(s, st);
+  // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
+  // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
+  if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) {
+    const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0 && tdist(e, p) <= 5);
+    if (bo) later(0.2, () => { if (bo.hp > 0) hurtEnemy(bo, st.dmg * 0.8); });
+  }
+}
+
+// ---------------------------------------------------------------- 기술 연계 (바람의나라 연)
+// 연's skill chain: the spells set in a chain wait until all of them are ready, then go off one
+// after another ahead of everything else, while a little window shows the chain running. Here
+// the chain is the hero's three slowest strikes (the big ones); the rest keep firing alone.
+// Before a chain the 전사 and 도적 use 유인, drawing the foes around them into one heap first.
+
+const CHAIN_GAP = 0.2, CHAIN_POWER = 1.25;
+
+/** The spells of the chain: the three with the longest wait among those that strike. */
+function chainSkills() {
+  if (G.stage.raid && G.party.length) return [];
+  const strikes = G.skills.filter(s => {
+    const def = SKILLS[s.id];
+    return def && !['ult', 'buff', 'aura', 'passive', 'heal'].includes(def.kind) && stats(s).dmg > 0;
+  });
+  if (strikes.length < 3) return [];
+  return strikes.map(s => [s, stats(s).cd]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s);
+}
+
+function startChain(chain) {
+  const melee = G.cls.id === 'warrior' || G.cls.id === 'rogue';
+  const lead = melee ? lure() : 0;
+  G.chainRun = { ids: chain.map(s => s.id), at: G.t + lead, done: 0, end: G.t + lead + chain.length * CHAIN_GAP + 1 };
+  chain.forEach((s, i) => later(lead + i * CHAIN_GAP, () => {
+    if (G.dead || !G.skills.includes(s)) return;
+    fireSkill(s, CHAIN_POWER);
+    if (G.chainRun) G.chainRun.done = i + 1;
+  }));
+  later(lead + chain.length * CHAIN_GAP + 1, () => { G.chainRun = null; });
+}
+
+/** 유인: the foes within five tiles slide in to the tiles around the hero; the time it takes. */
+function lure() {
+  const p = G.player;
+  const foes = G.enemies.filter(e => !e.kind && e.hp > 0 && tdist(e, p) <= 5 && tdist(e, p) > 1)
+    .sort((a, b) => tdist(a, p) - tdist(b, p)).slice(0, 14);
+  if (!foes.length) return 0;
+  const ring = [];
+  for (let r = 1; r <= 3; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) ring.push([p.tx + dx, p.ty + dy]);
+    }
+  }
+  for (const e of foes) {
+    const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p))
+      .sort((a, b) => Math.hypot(a[0] - e.tx, a[1] - e.ty) - Math.hypot(b[0] - e.tx, b[1] - e.ty))[0];
+    if (!spot) continue;
+    occ.delete(key(e.tx, e.ty));
+    e.fx = e.tx;
+    e.fy = e.ty;
+    e.tx = spot[0];
+    e.ty = spot[1];
+    occ.set(key(e.tx, e.ty), e);
+    e.mt = 0;
+    e.dur = 0.22;
+    e.moving = true;
+  }
+  say('유인!', 'info');
+  return 0.28;
+}
+
+/** 연's 기술 연계 window while a chain runs: its spells' icons in order, lit as each goes off. */
+function drawChain() {
+  const c = G.chainRun;
+  if (!c || G.dead) return;
+  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const sz = 26 * d, gap = 4 * d, n = c.ids.length;
+  const w = n * sz + (n - 1) * gap + 12 * d, h = sz + 24 * d;
+  const x = 8 * d, y = 64 * d;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgb(148,48,219)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.font = `bold ${Math.round(10 * d)}px G9`;
+  ctx.textAlign = 'left';
+  outline('기술 연계', x + 6 * d, y + 13 * d, '#ffe070');
+  c.ids.forEach((id, i) => {
+    const ix = x + 6 * d + i * (sz + gap), iy = y + 18 * d;
+    const im = skillIconImage(id);
+    if (im && im.width) ctx.drawImage(im, ix, iy, sz, sz);
+    if (i >= c.done) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(ix, iy, sz, sz);
+    }
+    ctx.strokeStyle = i === c.done - 1 ? '#ffe070' : '#000';
+    ctx.lineWidth = (i === c.done - 1 ? 2 : 1) * d;
+    ctx.strokeRect(ix, iy, sz, sz);
+  });
+  ctx.restore();
 }
 
 function cast(skill, st) {
@@ -3779,6 +3887,8 @@ function skillIconImage(id) {
     return (iconCache[id] = im);
   }
   const fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
+  // A plain weapon strike (이중공격) has no spell picture: its slot shows the weapon itself.
+  if (!fx && def.kind === 'slash') return G ? (iconCache[id] = gearImage({ kind: 'weapon', tier: 1 }) || null) : null;
   return (iconCache[id] = fx ? images[`icon/${fx}.png`] || null : null);
 }
 function drawSkillBar() {
@@ -5109,6 +5219,7 @@ function render(now) {
   }
   drawSkillBar();
   drawYeonStatus();
+  drawChain();
   drawLootFeed();
   drawJoystick();
 }

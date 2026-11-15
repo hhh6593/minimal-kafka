@@ -139,7 +139,12 @@ def icon(frames, add):
         m = mask(f)
         px = [c for c, on in zip(f.convert("RGB").getdata(), m.getdata()) if on]
         return len(set((r >> 3, g >> 3, b >> 3) for r, g, b in px))
-    best = max(frames, key=richness)
+    # Weighed by how much is drawn too: a faint spell (퇴마주's specks) would else pick a frame of
+    # a few dots, and its slot would look empty.
+    def worth(f):
+        lit = sum(1 for v in mask(f).getdata() if v)
+        return richness(f) * (lit ** 0.5)
+    best = max(frames, key=worth)
     box = mask(best).getbbox() or (0, 0, best.width, best.height)
     out = best.crop(box)
     if add:
@@ -150,6 +155,19 @@ def icon(frames, add):
                 r, g, b, a = px[x, y]
                 m = max(r, g, b)
                 px[x, y] = (r, g, b, 0) if m < 24 else (r, g, b, min(255, m * 2))
+    # A dim spell (중독's and 절망's faint glyphs) is stretched so its brightest strokes read in
+    # the slot: the same picture, only its levels raised.
+    px = out.load()
+    lit = sorted(max(px[x, y][:3]) for y in range(out.height) for x in range(out.width) if px[x, y][3] > 0)
+    if lit:
+        top = lit[int(len(lit) * 0.95)]
+        if 0 < top < 200:
+            k = 230 / top
+            for y in range(out.height):
+                for x in range(out.width):
+                    r, g, b, a = px[x, y]
+                    if a:
+                        px[x, y] = (min(255, int(r * k)), min(255, int(g * k)), min(255, int(b * k)), min(255, int(a * k)) if add else a)
     return out
 
 
