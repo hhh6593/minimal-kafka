@@ -52,8 +52,10 @@
   #heroes { display: flex; gap: 18px; align-items: flex-end; height: 76px; }
   /* 바람의나라 연's title (its emblem and name are in the picture): the buttons below the peaks,
      in 연's dark lacquer with a gold edge. */
-  body.ytitle #title { justify-content: flex-end; padding-bottom: 6vh; gap: 8px; background: none; }
-  body.ytitle #title h1, body.ytitle #title #heroes, body.ytitle #title > .note:first-of-type { display: none; }
+  body.ytitle #title { flex-direction: row; flex-wrap: wrap; align-content: flex-end; justify-content: center;
+      padding-bottom: 3vh; gap: 6px 10px; background: none; }
+  body.ytitle #title h1, body.ytitle #title #heroes, body.ytitle #title .tagline { display: none; }
+  body.ytitle #title .note { flex-basis: 100%; text-align: center; }
   body.ytitle #title .btn { min-width: 180px; background: linear-gradient(#3a2614, #1c120a); color: #f4e2b0;
       border: 2px solid #c9a24a; box-shadow: 0 0 0 1px #000, 0 2px 6px rgba(0,0,0,0.6); text-shadow: 1px 1px 0 #000; }
   body.ytitle #title .note { color: #fff; text-shadow: 1px 1px 0 #000, 0 0 4px #000; }
@@ -444,7 +446,7 @@
 <div id="title" class="screen" hidden>
   <div id="heroes"></div>
   <h1>바람 서바이버</h1>
-  <div class="note">몰려오는 몬스터를 버티며 사냥터를 정복하라</div>
+  <div class="note tagline">몰려오는 몬스터를 버티며 사냥터를 정복하라</div>
   <button id="start-btn" class="btn">시작</button>
   <button id="backup-btn" class="btn">기록 백업</button>
   <div class="note" id="version"></div>

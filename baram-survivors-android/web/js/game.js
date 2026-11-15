@@ -3452,6 +3452,9 @@ function drawTown(now) {
   }
 }
 
+// Test: the town as it stands (the hero, the folk, who is near).
+window.__town = () => T;
+
 function talk() {
   const n = T && T.near;
   if (!n) return;
@@ -5702,7 +5705,8 @@ function drawMenuBackdrop(now) {
     ctx.imageSmoothingEnabled = true;
     const k = Math.max(canvas.width / tb.width, canvas.height / tb.height);
     const w = tb.width * k, h = tb.height * k;
-    ctx.drawImage(tb, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    // Held by its top, so the emblem is always whole; on a wide phone the clouds below go first.
+    ctx.drawImage(tb, (canvas.width - w) / 2, 0, w, h);
     ctx.imageSmoothingEnabled = false;
     if ($('#title').hidden) {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
