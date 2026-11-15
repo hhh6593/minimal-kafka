@@ -472,7 +472,10 @@ function buildStages() {
     raidInfo(pickedStage);
     return;
   }
-  map.innerHTML = `<img src="assets/ui/${mapTab}.webp" alt="">`;
+  // 연's own map for the tab where the build has it (the 대륙, 환상의 섬); the old one else.
+  const ym = M.ymap && M.ymap[mapTab];
+  map.innerHTML = ym ? `<img src="assets/ymap/${ym.file}" alt="">` : `<img src="assets/ui/${mapTab}.webp" alt="">`;
+  map.classList.toggle('ymap', !!ym);
   // The goal: the first ground open and not yet conquered, named over the map wherever it is.
   const nextI = STAGES.findIndex((s, i) => unlocked(i) && !progress.cleared[s.id]);
   const goal = document.createElement('div');
@@ -480,7 +483,7 @@ function buildStages() {
   goal.textContent = nextI >= 0 ? `다음 목표: ${STAGES[nextI].name}` : '모든 사냥터를 정복했습니다';
   map.append(goal);
   // The town on its own map: straight back to it from here, as through the guide.
-  const townAt = (M.ymap && M.ymap[mapTab] && M.ymap[mapTab].town) || (mapTab === 'gungnae' ? [0.5, 0.52] : null);
+  const townAt = (M.ymap && M.ymap[mapTab] && M.ymap[mapTab].town) || (mapTab === 'gungnae' ? [0.07, 0.06] : null);
   if (townAt) {
     const t = document.createElement('button');
     t.className = 'pin town';
@@ -496,8 +499,9 @@ function buildStages() {
     const open = unlocked(i), done = !!progress.cleared[s.id];
     b.className = 'pin' + (open ? '' : ' locked') + (done ? ' cleared' : open ? ' next' : '')
       + (s === pickedStage ? ' on' : '');
-    b.style.left = s.at[0] * 100 + '%';
-    b.style.top = s.at[1] * 100 + '%';
+    const at = (ym && ym.stages[s.id]) || s.at;
+    b.style.left = at[0] * 100 + '%';
+    b.style.top = at[1] * 100 + '%';
     b.innerHTML = `<b>${done ? '정복' : open ? '도전' : '잠김'}</b><i></i><span>${s.name}</span>`;
     b.onclick = () => {
       pickedStage = s;

@@ -667,6 +667,18 @@ def main():
                     shutil.copyfile(os.path.join(ii, rel), os.path.join(out, "yitemicon", rel))
         manifest["yitemicon"] = iidx
 
+    # 바람의나라 연's own maps for the ground-select tabs (GEAR_DIR/ymap/<tab>.png + index.json:
+    # the image, each ground's place on it as fractions, and the town's).
+    ym = os.path.join(gear_src, "ymap") if gear_src else None
+    manifest["ymap"] = {}
+    if ym and os.path.isfile(os.path.join(ym, "index.json")):
+        os.makedirs(os.path.join(out, "ymap"), exist_ok=True)
+        with open(os.path.join(ym, "index.json"), encoding="utf-8") as f:
+            yidx = json.load(f)
+        for tab, t in yidx.items():
+            shutil.copyfile(os.path.join(ym, t["file"]), os.path.join(out, "ymap", os.path.basename(t["file"])))
+            manifest["ymap"][tab] = {"file": os.path.basename(t["file"]), "stages": t["stages"], "town": t.get("town")}
+
     # The official 2024 emoticons (baram.nexon.com/MultiMedia, GEAR_DIR/emote/<key>.gif): each
     # one a strip of its frames at 64 pixels, for the companions' reaction bubbles.
     edir = os.path.join(gear_src, "emote") if gear_src else None
