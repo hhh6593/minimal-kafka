@@ -200,6 +200,9 @@
       animation: tip-out 9s forwards; pointer-events: none; }
   @keyframes tip-out { 0%, 80% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
   #town:not([hidden]) .town-tip { animation-name: tip-out; }
+  /* Shortcuts: every errand of the town without the walk. */
+  #town-quick { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 34px; display: flex; flex-direction: column; gap: 4px; }
+  #town-quick .btn { min-width: 0; padding: 4px 10px; font-size: 11px; }
   #talk { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: 40px; min-width: 0; padding: 10px 16px; }
   #trade { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
@@ -294,6 +297,12 @@
   .equip img { max-width: 40px; max-height: 36px; margin: auto 0; }
   .equip span { width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .equip.on { background: #fff0c0; border-color: #7a1800; }
+  /* Against what is worn: 전투력 up or down, and the row's strongest marked 추천. */
+  .equip em.cmp { font: normal 9px G9, monospace; font-style: normal; }
+  .equip em.up { color: #1a7a10; } .equip em.down { color: #b02010; } .equip em.same, .equip em.worn { color: #6a5030; }
+  .equip.best { box-shadow: 0 0 0 2px #2a9a20 inset; position: relative; }
+  .equip.best::before { content: '추천'; position: absolute; top: -1px; right: -1px; font: 8px G9, monospace; color: #fff; background: #2a9a20; padding: 0 3px; }
+  .wear-best { grid-column: 1 / -1; justify-self: center; margin: 2px 0 4px; padding: 4px 12px; font-size: 11px; }
   .equip.special { width: 96px; height: 66px; background: #f0d890; border-color: #ffe890 #a07010 #a07010 #ffe890; }
   .equip.special span { color: #7a3a00; font-weight: 700; }
   .equip.special small { display: block; width: 100%; font: 9px/11px G9, monospace; color: #2a5a10; white-space: nowrap;
@@ -505,6 +514,14 @@
   <button id="town-back" class="btn">직업 선택</button>
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 성문·길·석상으로 나가거나 궁인에게 사냥터를</div>
   <button id="talk" class="btn" hidden></button>
+  <div id="town-quick">
+    <button class="btn" data-go="guide">사냥터</button>
+    <button class="btn" data-go="raid">레이드</button>
+    <button class="btn" data-go="smith">장비</button>
+    <button class="btn" data-go="merchant">상점</button>
+    <button class="btn" data-go="inn">주막</button>
+    <button class="btn" data-go="clerk">의뢰</button>
+  </div>
 </div>
 
 <div id="trade" hidden>

@@ -1045,10 +1045,62 @@ function wear(kind, tier, sp = null) {
   } else if (T && T.cls === cls && hasAvatars()) T.av = dressed(cls, g);
 }
 
+/** 전투력 were this piece worn in place of what is worn now (the rest as it is). */
+function powerWith(cls, kind, tier, sp = null) {
+  progress.gear = progress.gear || {};
+  const keep = progress.gear[cls.id];
+  progress.gear[cls.id] = Object.assign(savedGear(cls), { [kind]: tier, [kind + 'Sp']: sp });
+  const v = combatPower(cls);
+  progress.gear[cls.id] = keep;
+  return v;
+}
+
+/** The pieces of a kind the bag holds, as [tier, special id or null]. */
+function bagPieces(cls, kind) {
+  const b = bag(cls);
+  const out = b.filter(x => x.startsWith(kind + ':')).map(x => [+x.split(':')[1], null]);
+  if (kind === 'shield' || kind === 'helmet' || kind === 'cape') out.unshift([-1, null]);
+  for (const id of b.filter(x => x.startsWith('sp:')).map(x => x.slice(3))) {
+    const sp = SPECIAL[id];
+    if (sp && sp.kind === kind) out.push([specialBase(sp, cls.id), id]);
+  }
+  return out;
+}
+
+/** Wears the strongest piece of every kind. */
+function wearBest(cls) {
+  for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+    const ps = bagPieces(cls, kind);
+    if (!ps.length) continue;
+    const top = ps.reduce((a, q) => (powerWith(cls, kind, q[0], q[1]) > powerWith(cls, kind, a[0], a[1]) ? q : a), ps[0]);
+    wear(kind, top[0], top[1]);
+  }
+}
+
+/** A piece's button gets its 전투력 change against what is worn, and 추천 on the row's best. */
+function markCompare(btn, cls, kind, tier, sp, now, top) {
+  const d = powerWith(cls, kind, tier, sp) - now;
+  const em = document.createElement('em');
+  em.className = 'cmp ' + (btn.classList.contains('on') ? 'worn' : d > 0 ? 'up' : d < 0 ? 'down' : 'same');
+  em.textContent = btn.classList.contains('on') ? '착용 중' : d > 0 ? `▲${d.toLocaleString()}` : d < 0 ? `▼${(-d).toLocaleString()}` : '같음';
+  btn.append(em);
+  if (top && !btn.classList.contains('on')) btn.classList.add('best');
+}
+
 function buildEquip() {
   const cls = G ? G.cls : chosenClass, g = savedGear(cls), b = bag(cls);
   const box = $('#equip-rows');
   box.innerHTML = '';
+  const now = combatPower(cls);
+  // One tap to the strongest set, where something stronger lies in the bag.
+  const better = ['weapon', 'armor', 'shield', 'helmet', 'cape'].some(k => bagPieces(cls, k).some(q => powerWith(cls, k, q[0], q[1]) > now));
+  if (better) {
+    const bb = document.createElement('button');
+    bb.className = 'btn wear-best';
+    bb.textContent = '가장 강한 장비로 갈아입기';
+    bb.onclick = () => { wearBest(cls); buildEquip(); };
+    box.append(bb);
+  }
   // The old wardrobe's hair picks do not reach a hero drawn in 연's own figure: no row for them.
   if (hasAvatars() && !(M.yhero2 && M.yhero2[cls.id])) {
     // 머리 모양: any of the wardrobe's hair, kept per class, as the 미용실 did.
@@ -1080,6 +1132,8 @@ function buildEquip() {
     const row = document.createElement('div');
     row.className = 'equip-row';
     const tiers = b.filter(x => x.startsWith(kind + ':')).map(x => +x.split(':')[1]).sort((x, y) => x - y);
+    const ps = bagPieces(cls, kind);
+    const rowTop = ps.length ? ps.reduce((a, q) => (powerWith(cls, kind, q[0], q[1]) > powerWith(cls, kind, a[0], a[1]) ? q : a), ps[0]) : [];
     if (kind === 'shield' || kind === 'helmet' || kind === 'cape') tiers.unshift(-1);
     for (const t of tiers) {
       const btn = document.createElement('button');
@@ -1087,6 +1141,7 @@ function buildEquip() {
       const icon = pieceIcon(cls, kind, t);
       const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
+      markCompare(btn, cls, kind, t, null, now, rowTop[0] === t && rowTop[1] === null);
       btn.onclick = () => {
         wear(kind, t);
         buildEquip();
@@ -1101,6 +1156,7 @@ function buildEquip() {
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
       const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.opt.text}</small>`;
+      markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
       btn.onclick = () => {
         wear(kind, t, id);
         buildEquip();
@@ -3865,6 +3921,19 @@ function drawTown(now) {
 // Test: the town as it stands (the hero, the folk, who is near), and whether a spot is walkable.
 window.__town = () => T;
 window.__townWalk = (x, y) => !townBlocked(x, y);
+
+/** The town's shortcut buttons: an errand by the NPC's id, or the raid list. */
+function townErrand(id) {
+  if (id === 'raid') {
+    mapTab = 'raid';
+    showScreen('stages');
+    return;
+  }
+  const n = (T && T.folk || []).find(f => f.id === id) || TOWNSFOLK.find(f => f.id === id);
+  if (T) T.near = n;
+  talk();
+}
+document.querySelectorAll('#town-quick button').forEach(b => { b.onclick = () => townErrand(b.dataset.go); });
 
 function talk() {
   const n = T && T.near;
