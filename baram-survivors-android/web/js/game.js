@@ -1941,7 +1941,7 @@ function stats(skill) {
 
 /** The hero's damage multiplier right now. */
 function might() {
-  let k = G.player.gearPower || 1;
+  let k = (G.player.gearPower || 1) * (G.cls.dmgK || 1); // the class's own weight (data.js), from bot clears of 왕초보
   if (G.buffs.g_power > G.t) k *= 1 + (G.buffs.g_powerK || 0);
   if (G.buffs.g_pierce > G.t) k *= 1 + (G.buffs.g_pierceK || 0);
   if (G.player.sts && heroStatusOn('despair')) k *= 0.8;
