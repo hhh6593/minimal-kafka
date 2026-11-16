@@ -112,6 +112,15 @@ MAP = {
         'a_inferno': 'SFX_Archer_5th_1', 'a_fetter': 'SFX_Archer_5th_2', 'a_bloodsuck': 'SFX_Archer_5th_3', 'a_chase': 'SFX_Archer_6th_1',
         'a_chain': 'SFX_Archer_ChainBlast_Shot', 'a_shadow': 'SFX_Archer_ShadowShield_Cast', 'a_eagle': 'SFX_Archer_EagleAttack', 'a_weebo': 'SFX_Archer_WeeBo',
         'a_bless': 'SFX_Archer_BlessOfBow', 'a_air': 'SFX_Archer_AirArrow', 'a_blood5': 'SFX_Archer_BloodStrikeR5_Hit', 'a_ult': 'SFX_Archer_WhipShot',
+        # 무사 (Job_7): each skill's own SFX_Lancer_* clip (its record's sound, or its effect's).
+        'l_moon': 'SFX_Lancer_F_01', 'l_halfmoon': 'SFX_Lancer_F_03', 'l_phantom': 'SFX_Lancer_F_02', 'l_meteor': 'SFX_Lancer_F_02_T2',
+        'l_wind': 'SFX_Lancer_T_01', 'l_rise': 'SFX_Lancer_F_05', 'l_spiral': 'SFX_Lancer_1st_01', 'l_illusion': 'SFX_Lancer_1st_02',
+        'l_release': 'SFX_Lancer_T_05_2', 'l_extinct': 'SFX_Lancer_2nd_01', 'l_innate': 'SFX_Lancer_T_06', 'l_waves': 'SFX_Lancer_3rd_01',
+        'l_rush': 'SFX_Lancer_3rd_02', 'l_burst': 'SFX_Lancer_3rd_03', 'l_unity': 'SFX_Lancer_T_04', 'l_firedragon': 'SFX_Lancer_4th_02',
+        'l_genesis': 'SFX_Lancer_4th_03_3', 'l_extinct2': 'SFX_Lancer_5th_1', 'l_formless': 'SFX_Lancer_5th_2', 'l_guard': 'SFX_Lancer_5th_3',
+        'l_annihil': 'SFX_Lancer_6th_1', 'l_dragon': 'SFX_Lancer_F_06', 'l_spirit': 'SFX_Lancer_T_02', 'l_javelin': 'SFX_Lancer_IntangibleJavelin',
+        'l_thunder': 'SFX_Lancer_T_07', 'l_union': 'SFX_Lancer_T_03', 'l_reflect': 'SFX_Lancer_S_01_1', 'l_moonfull': 'SFX_Lancer_T_04_Super',
+        'l_ult': 'SFX_Lancer_F_03_Super',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are

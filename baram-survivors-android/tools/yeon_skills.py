@@ -3,7 +3,8 @@
 
     yeon_skills.py SKILLS_BUNDLE MAPPING_JSON OUT_DIR [ICON_OUT_DIR]
 
-MAPPING_JSON: {ourSkillId: {"prefab": "Skill_Effect_0162", "icon": "skill_fighter_110401"}}
+MAPPING_JSON: {ourSkillId: {"prefab": "Skill_Effect_0162", "icon": "skill_fighter_110401"}} ("add_own": true
+when the prefab's own materials are additive, see render())
 (made from the game's Skills_Player table and its Korean names; see yeon_skill_map.py).
 
 Each effect prefab is a root (or nested) Animator driving child SpriteRenderers: the clip swaps
@@ -143,7 +144,19 @@ def is_additive(r):
     return False
 
 
-def render(go):
+def material_names(r):
+    out = []
+    for m in r.m_Materials:
+        try:
+            out.append(m.read().m_Name)
+        except Exception:
+            pass
+    return out
+
+
+def render(go, add_own=False):
+    """add_own: renderers with a material of their own (not Sprites-Default) are additive. Their
+    shaders live in another bundle, so the name test above cannot tell; the mapping says so."""
     root_tr = comp(go, 'Transform')
     nodes = [('', root_tr)] + child_paths(root_tr)
     by_hash = {zlib.crc32(p.encode()) & 0xffffffff: (p, t) for p, t in nodes}
@@ -153,7 +166,8 @@ def render(go):
         r = comp(g, 'SpriteRenderer')
         if r is not None and g.m_IsActive is not False:
             rends.append({'path': p, 'tr': t, 'r': r, 'sprite': r.m_Sprite if r.m_Sprite.path_id else None,
-                          'alpha': r.m_Color.a, 'add': is_additive(r), 'order': r.m_SortingOrder,
+                          'alpha': r.m_Color.a, 'add': is_additive(r) or (add_own and any(
+                              n != 'Sprites-Default' for n in material_names(r))), 'order': r.m_SortingOrder,
                           'flip': (r.m_FlipX, r.m_FlipY), 'anim': {}})
     if not rends:
         return None
@@ -310,7 +324,7 @@ def main():
         pf = spec.get('prefab')
         if pf and pf.lower() in cont:
             try:
-                res = render(cont[pf.lower()].read())
+                res = render(cont[pf.lower()].read(), bool(spec.get('add_own')))
             except Exception as e:
                 print(sid, pf, 'render failed', e)
                 res = None

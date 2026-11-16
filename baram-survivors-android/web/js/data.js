@@ -27,6 +27,9 @@ export const CLASSES = [
   // 바람의나라 연's 궁사 (Job_6): its figure, bows, skills and sounds come only from 연's resources.
   { id: 'archer', name: '궁사', hero: '1002', hp: 120, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
+  // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
+  { id: 'lancer', name: '무사', hero: '1001', hp: 160, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
+    desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -449,6 +452,77 @@ export const SKILLS = {
     desc: '궁극기. 피를 태운 다섯 번째 화살이 화면의 모든 몬스터를 꿰뚫는다' },
   a_ult: { cls: 'archer', name: '일환탄시', kind: 'ult', fx: '144', hpCost: 0.15,
     desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터에게 강력한 일격을 가한다' },
+
+  // 무사 (바람의나라 연 Job_7): its own skill list (Skills_Player 2071xxxx 일반, 2072xxxx 승급; icons by
+  // the older 10xxxx numbers the records name), each with the effect, icon and sound of that 연
+  // record (fx k_<id>, tools/yeon_lancer_skills.json). 1차~6차 are 연's own (창객·창제·창황·창성·
+  // 신창·창극); 연 has no 7차~9차 for the 무사, so those take its remaining 일반 techniques
+  // (맹룡승천, 무형투창, 신창합일, 월하멸섬 ...). The fx here is only the old fallback.
+  l_moon: { cls: 'lancer', req: 1, name: '월하일섬', kind: 'line', fx: '55', dmg: 15, cd: 0.8, depth: 3,
+    desc: '창을 내질러 몬스터가 가장 많은 쪽 일렬 세 칸을 꿰찌른다' },
+  l_halfmoon: { cls: 'lancer', req: 1, name: '반월참', kind: 'cleave', fx: '20', dmg: 18, cd: 2, depth: 2, max: 5,
+    desc: '창을 반달처럼 휘둘러 앞쪽 역삼각형의 몬스터 다섯을 벤다' },
+  l_phantom: { cls: 'lancer', req: 1, name: '환영창', kind: 'spell', fx: '53', dmg: 20, cd: 1.6, range: 6, count: 1,
+    desc: '창의 환영을 던져 가까운 몬스터를 꿰뚫는다. 4·7단에 환영이 하나씩 는다' },
+  l_wind: { cls: 'lancer', req: 6, name: '풍운보', kind: 'buff', buff: 'haste', fx: '7', cd: 14, duration: 4,
+    desc: '바람과 구름처럼 몸이 가벼워져 잠시 모든 기술이 빨리 돈다' },
+  l_meteor: { cls: 'lancer', req: 6, name: '유성창', kind: 'strike', fx: '147', dmg: 24, cd: 2.6, range: 6, radius: 1, count: 1,
+    hitAt: 0.3, desc: '유성처럼 창을 내리꽂아 대상과 그 주위를 친다' },
+  l_rise: { cls: 'lancer', req: 12, name: '잠룡승천', kind: 'strike', fx: '24', dmg: 22, cd: 3, range: 5, radius: 0, count: 2,
+    hitAt: 0.25, stun: 1, desc: '잠든 용이 솟구치듯 몬스터 둘을 창끝으로 띄워 잠시 멈춘다' },
+  // 1차 창객
+  l_spiral: { promo: 1, cls: 'lancer', req: 6, name: '나선창', kind: 'line', fx: '22', dmg: 20, cd: 2, depth: 5,
+    up: 'l_firedragon', desc: '나선으로 도는 창날이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  l_illusion: { promo: 1, cls: 'lancer', req: 6, name: '환영참', kind: 'cleave', fx: '20', dmg: 22, cd: 2.4, depth: 2, max: 6,
+    desc: '환영과 함께 앞쪽을 크게 베어 몬스터 여섯을 친다' },
+  // 2차 창제
+  l_release: { promo: 2, cls: 'lancer', req: 10, name: '뇌기방출', kind: 'nova', fx: '89', dmg: 20, cd: 3, radius: 1, stun: 0.6,
+    desc: '몸에 모은 뇌기를 터뜨려 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  l_extinct: { promo: 2, cls: 'lancer', req: 10, name: '멸화참', kind: 'strike', fx: '148', dmg: 18, cd: 3, range: 6, radius: 2, count: 1,
+    hitAt: 0.35, curse: 2, desc: '불꽃의 고리로 대상과 그 주위를 태우고 약화시킨다' },
+  l_innate: { promo: 2, cls: 'lancer', req: 10, name: '선천기공', kind: 'heal', fx: '125', heal: 20, cd: 13, shieldT: 2,
+    desc: '타고난 기공을 돌려 체력을 회복하고 잠시 보호막을 두른다' },
+  // 3차 창황
+  l_waves: { promo: 3, cls: 'lancer', req: 14, name: '만경창파', kind: 'cleave', fx: '24', dmg: 22, cd: 3, depth: 3, max: 9,
+    desc: '만 겹의 물결처럼 창을 휘몰아 앞쪽 넓은 범위의 몬스터 아홉을 친다' },
+  l_rush: { promo: 3, cls: 'lancer', req: 14, name: '환영쇄도', kind: 'line', fx: '144', dmg: 24, cd: 2.6, depth: 5, dash: true,
+    desc: '환영과 함께 바라보는 쪽으로 돌진하며 지나는 일렬 다섯 칸을 찌른다' },
+  l_burst: { promo: 3, cls: 'lancer', req: 14, name: '환영지폭', kind: 'strike', fx: '147', dmg: 20, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.4, desc: '하늘에서 쏟아지는 창의 환영이 대상과 그 주위를 터뜨린다' },
+  // 4차 창성
+  l_unity: { promo: 4, cls: 'lancer', req: 18, name: '혼연체식', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.6,
+    desc: '몸과 창이 하나가 되어 잠시 모든 피해가 크게 늘어난다' },
+  l_firedragon: { promo: 4, cls: 'lancer', req: 18, evolved: true, name: '화룡멸진', kind: 'line', fx: '140', dmg: 26, cd: 2.4, depth: 7,
+    desc: '나선창 8단 + 4차 승급. 불의 용이 몬스터가 가장 많은 쪽 일렬 일곱 칸을 태운다' },
+  l_genesis: { promo: 4, cls: 'lancer', req: 18, name: '천지개벽', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '하늘과 땅을 가르는 창격으로 화면의 모든 몬스터를 친다' },
+  // 5차 신창
+  l_extinct2: { promo: 5, cls: 'lancer', req: 21, name: '극멸화참', kind: 'nova', fx: '148', dmg: 34, cd: 3.2, radius: 2, curse: 3,
+    desc: '무사의 궁극오의. 거대한 불꽃 고리로 둘레 두 칸의 몬스터를 태우고 약화시킨다' },
+  l_formless: { promo: 5, cls: 'lancer', req: 21, name: '무형지창', kind: 'strike', fx: '115', dmg: 26, cd: 3.2, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, slow: 3, desc: '형체 없는 창을 대상 주위에 꽂아 피해를 주고 둔화시킨다' },
+  l_guard: { promo: 5, cls: 'lancer', req: 21, name: '진기보호', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '진기로 몸을 감싸 잠시 받는 피해를 절반으로 줄인다' },
+  // 6차 창극
+  l_annihil: { promo: 6, cls: 'lancer', req: 24, name: '화룡사멸', kind: 'line', fx: '144', dmg: 34, cd: 3, depth: 7, dash: true,
+    desc: '화룡과 함께 바라보는 쪽으로 내달리며 일렬 일곱 칸의 몬스터를 불사른다' },
+  // 7차~9차: 연's other 무사 techniques
+  l_dragon: { promo: 7, cls: 'lancer', req: 27, name: '맹룡승천', kind: 'strike', fx: '24', dmg: 34, cd: 2.4, range: 6, radius: 1, count: 3,
+    hitAt: 0.25, stun: 0.6, desc: '용처럼 솟구치는 창격이 몬스터 셋과 그 주위를 띄워 친다' },
+  l_spirit: { promo: 7, cls: 'lancer', req: 27, name: '패기발산', kind: 'nova', fx: '25', dmg: 30, cd: 3.4, radius: 2,
+    desc: '패기를 터뜨려 둘레 두 칸의 몬스터를 밀쳐 낸다' },
+  l_javelin: { promo: 8, cls: 'lancer', req: 30, name: '무형투창', kind: 'spell', fx: '55', dmg: 32, cd: 1.8, range: 8, count: 3,
+    desc: '보이지 않는 창을 던져 몬스터 셋을 꿰뚫는다' },
+  l_thunder: { promo: 8, cls: 'lancer', req: 30, name: '뇌신화', kind: 'buff', buff: 'haste', fx: '89', cd: 16, duration: 5,
+    desc: '뇌신의 힘을 몸에 받아 잠시 모든 기술이 빨리 돈다' },
+  l_union: { promo: 8, cls: 'lancer', req: 30, name: '신창합일', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '창과 혼이 하나가 되어 잠시 공격력이 크게 오른다' },
+  l_reflect: { promo: 9, cls: 'lancer', req: 33, name: '반탄강기', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '강기를 둘러 잠시 어떤 공격도 튕겨 낸다(무적)' },
+  l_moonfull: { promo: 9, cls: 'lancer', req: 33, name: '월하멸섬', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 달빛 아래 번개를 두른 창격이 화면의 모든 몬스터를 벤다' },
+  l_ult: { cls: 'lancer', name: '백월난격', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 흰 달의 난격을 퍼붓는다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -481,6 +555,11 @@ export const BRANCHES = {
     { name: '마탄', note: '터뜨리고 쏟아붓는다', ids: ['a_aim', 'a_firewall', 'a_flame', 'a_bomb', 'a_freeze', 'a_storm', 'a_breakair', 'a_whirl', 'a_allwhirl', 'a_fetter', 'a_eagle'] },
     { name: '궁술', note: '화살을 강화하고 몸을 지킨다', ids: ['a_ice', 'a_coverfire', 'a_thunder', 'a_bloodsuck', 'a_shadow', 'a_weebo', 'a_bless'] },
   ],
+  lancer: [
+    { name: '창술', note: '일렬로 꿰찌른다', ids: ['l_moon', 'l_phantom', 'l_spiral', 'l_rush', 'l_firedragon', 'l_annihil', 'l_javelin', 'l_moonfull'] },
+    { name: '창격', note: '휘두르고 내리꽂는다', ids: ['l_halfmoon', 'l_meteor', 'l_rise', 'l_illusion', 'l_extinct', 'l_waves', 'l_burst', 'l_genesis', 'l_extinct2', 'l_formless', 'l_dragon', 'l_release', 'l_spirit'] },
+    { name: '기공', note: '기를 돌려 몸을 지킨다', ids: ['l_wind', 'l_innate', 'l_unity', 'l_guard', 'l_thunder', 'l_union', 'l_reflect'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -498,8 +577,10 @@ const PRE = {
   a_inferno: 'a_tempest', a_chase: 'a_inferno', a_chain: 'a_chase', a_air: 'a_chain',
   a_fetter: 'a_whirl', a_eagle: 'a_fetter',
   a_bloodsuck: 'a_thunder', a_shadow: 'a_bloodsuck', a_weebo: 'a_shadow', a_bless: 'a_shadow',
+  l_extinct2: 'l_extinct', l_annihil: 'l_rush', l_dragon: 'l_annihil', l_javelin: 'l_dragon', l_formless: 'l_burst',
+  l_guard: 'l_unity', l_thunder: 'l_guard', l_union: 'l_guard', l_reflect: 'l_union', l_spirit: 'l_release',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -557,8 +638,8 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
-// The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for the 궁사's tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'] };
+// The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {
