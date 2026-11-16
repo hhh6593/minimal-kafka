@@ -12,6 +12,7 @@ the material does: a vertical gradient and a two-pixel dark outline.
 Output, in OUT_DIR (the yhud folder):
     font_dmgk_o.png / .json   orange (an ordinary blow)
     font_dmgk_r.png / .json   red-gold (a 치명타)
+    font_dmgk_w.png / .json   white (the instant a number appears, as 연 pops it before it turns)
     json: {"height": h, "glyphs": {char: [x, y, w, h, advance]}}
 """
 import json
@@ -25,6 +26,9 @@ CHARS = '0123456789만억조'
 STYLES = {
     'o': ((255, 236, 120), (255, 132, 24), (60, 18, 0)),   # top, bottom, outline
     'r': ((255, 214, 90), (232, 40, 20), (50, 0, 0)),
+    'w': ((255, 255, 255), (214, 222, 236), (30, 24, 40)),   # the blow's first instant, before it turns orange
+    'g': ((200, 255, 150), (60, 200, 60), (0, 40, 0)),       # life restored
+    'b': ((170, 220, 255), (50, 120, 240), (0, 20, 60)),     # mana restored
 }
 
 

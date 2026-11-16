@@ -502,7 +502,7 @@ def main():
                 entry.update({"ax": k["anchor"][0], "ay": k["anchor"][1]})
             manifest["fx"][fid] = entry
         os.makedirs(os.path.join(out, "hud"), exist_ok=True)
-        for font in ("font_damage", "font_gold", "font_dmgk_o", "font_dmgk_r"):
+        for font in ("font_damage", "font_gold", "font_dmgk_o", "font_dmgk_r", "font_dmgk_w", "font_dmgk_g", "font_dmgk_b"):
             if os.path.isfile(os.path.join(hdir, font + ".png")):
                 shutil.copyfile(os.path.join(hdir, font + ".png"), os.path.join(out, "hud", font + ".png"))
                 with open(os.path.join(hdir, font + ".json"), encoding="utf-8") as f:

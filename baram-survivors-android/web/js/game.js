@@ -99,6 +99,8 @@ async function boot() {
     ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
     ...(M.hud && M.hud.font_gold ? ['hud/font_gold.png'] : []),
     ...(M.hud && M.hud.font_dmgk_o ? ['hud/font_dmgk_o.png', 'hud/font_dmgk_r.png'] : []),
+    ...(M.hud && M.hud.font_dmgk_w ? ['hud/font_dmgk_w.png'] : []),
+    ...(M.hud && M.hud.font_dmgk_g ? ['hud/font_dmgk_g.png', 'hud/font_dmgk_b.png'] : []),
     ...(M.hud && M.hud.ui ? M.hud.ui.map(k => `hud/${k}.png`) : []),
     ...(M.status_icons || []).map(k => `hud/st_${k}.png`),
   ];
@@ -4642,7 +4644,7 @@ function healMember(m, n, fx = null) {
   n = Math.min(n, m.maxHp - m.hp);
   if (n <= 0) return;
   m.hp += n;
-  floatText(m.x, m.y - 58, '+' + shownNum(n), '#7dff8a');
+  healText(m, n, 58);
   if (fx) addFx(fx, m.x, m.y - 26, { scale: 0.8 });
 }
 
@@ -5367,7 +5369,7 @@ function heal(n, sound, quiet = false) {
   n = Math.min(n, p.maxHp - p.hp);
   if (n <= 0) return;
   p.hp += n;
-  floatText(p.x, p.y - 64, '+' + shownNum(n), '#7dff8a');
+  healText(p, n);
   if (!quiet) addFx(FX.heal, 0, -26, { follow: true });
   if (sound) audio.play('heal');
 }
@@ -6153,6 +6155,13 @@ function goldFont() {
   const im = images['hud/font_gold.png'];
   return M.hud && M.hud.font_gold && im && im.width ? im : null;
 }
+/** Life (green) or mana (blue) given back, in 연's digits over the one healed, as its clips show them. */
+function healText(b, n, up = 64, mana = false) {
+  if (M.hud && M.hud.font_dmgk_g && dmgkFont()) {
+    if (G.texts.length > 90) G.texts.shift();
+    G.texts.push({ x: b.x + rand(-4, 4), y: b.y - up, text: shownNum(n), t: 0, num: true, heal: !mana, mana });
+  } else floatText(b.x, b.y - up, '+' + shownNum(n), mana ? '#7ab8ff' : '#7dff8a');
+}
 /** 연's Korean-unit damage font, where the build has it. */
 function dmgkFont() {
   const im = images['hud/font_dmgk_o.png'];
@@ -6598,8 +6607,11 @@ function render(now) {
     } else if (t.num && dmgkFont()) {
       // 연's damage lines (font_dmgk, morris9 with its orange material): pop in, settle, rise.
       const base = t.ally ? 0.42 : t.crit ? 0.85 : t.heavy ? 0.7 : t.dot ? 0.45 : 0.6;
-      const pop = t.t < 0.1 ? (t.crit ? 1.6 : 1.3) - t.t * (t.crit ? 6 : 3) : 1;
-      drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, base * pop, t.crit ? 'font_dmgk_r' : 'font_dmgk_o');
+      // As 연 shows a blow: it pops in large and white, then settles in its colour.
+      const fresh = t.t < 0.16 && !t.dot && M.hud.font_dmgk_w;
+      const pop = t.t < 0.16 ? (t.crit ? 1.7 : 1.4) - t.t * (t.crit ? 4.4 : 2.5) : 1;
+      const font = t.heal ? 'font_dmgk_g' : t.mana ? 'font_dmgk_b' : fresh ? 'font_dmgk_w' : t.crit ? 'font_dmgk_r' : 'font_dmgk_o';
+      drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, (t.heal || t.mana ? 0.5 : base) * pop, font);
     } else if (t.num && dmgFont()) {
       // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
       // to a third larger and settle in a tenth of a second, a crit bigger still.
