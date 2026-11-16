@@ -98,6 +98,7 @@ async function boot() {
     ...Object.keys(M.prop || {}).map(k => `prop/${k}.png`),
     ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
     ...(M.hud && M.hud.font_gold ? ['hud/font_gold.png'] : []),
+    ...(M.hud && M.hud.font_dmgk_o ? ['hud/font_dmgk_o.png', 'hud/font_dmgk_r.png'] : []),
     ...(M.hud && M.hud.ui ? M.hud.ui.map(k => `hud/${k}.png`) : []),
     ...(M.status_icons || []).map(k => `hud/st_${k}.png`),
   ];
@@ -997,7 +998,7 @@ function dotHit(e, d, color) {
   }
   e.hp -= d;
   e.shown = G.t;
-  if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: String(Math.round(d)), t: 0, num: true, crit: false, color });
+  if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: shownNum(d), t: 0, num: true, dot: true, crit: false, color });
   if (e.hp <= 0) killEnemy(e);
 }
 
@@ -1452,15 +1453,34 @@ $('#close-codex').onclick = () => { $('#codex').hidden = true; };
 // rank each. 조합: the 용무기, made only here, from the best hunting-ground weapon at ★3, dragon
 // scales, a pearl and gold.
 
-function openCraft() {
+/**
+ * The smith's 강화·조합. With a sink (the 조합 window, openForge) the recipes are gathered as
+ * entries — section, name, text, button, and the materials they ask — instead of laid out as
+ * rows of the trade window.
+ */
+function openCraft(sink = null) {
   const cls = G ? G.cls : chosenClass, b = bag(cls), box = $('#trade-rows');
-  box.innerHTML = '';
+  let sec = '', meta = null;
+  if (!sink) box.innerHTML = '';
   $('#trade-title').textContent = '대장장이 · 강화·조합';
   const mats = progress.mats || {};
   $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전 · `
     + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
   let icon = null;
   const row = (name, desc, label, can, act) => {
+    if (sink) {
+      sink.push({ sec, name, desc, label, can, icon, meta, act: () => {
+        act();
+        saveJson('bs_progress', progress);
+        if ($('#town-gold')) $('#town-gold').textContent = `${progress.gold || 0}전`;
+        if (G) applyGear();
+        refreshAvatars();
+        openForge();
+      } });
+      icon = null;
+      meta = null;
+      return;
+    }
     const r = document.createElement('div');
     r.className = 'trade-row';
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
@@ -1481,7 +1501,14 @@ function openCraft() {
     r.append(btn);
     box.append(r);
   };
-  const head = text => { const h = document.createElement('h4'); h.textContent = text; h.style.margin = '6px 0 2px'; box.append(h); };
+  const head = text => {
+    sec = text;
+    if (sink) return;
+    const h = document.createElement('h4');
+    h.textContent = text;
+    h.style.margin = '6px 0 2px';
+    box.append(h);
+  };
   head(`조합 · ${cls.name}의 용무기`);
   const rc = craftRecipe(cls.id), dragon = CRAFT_GEAR[cls.id], dt = GEAR[cls.id].weapon.indexOf(dragon);
   const baseKey = `weapon:${rc.base}`, baseName = GEAR[cls.id].weapon[rc.base];
@@ -1489,6 +1516,7 @@ function openCraft() {
   const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
     && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
   icon = picture(dragonName(cls.id, 1));
+  meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) / 2}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${rc.gold}전`,
     has ? '가짐' : '조합', ok, () => {
@@ -1526,7 +1554,8 @@ function openCraft() {
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
-    icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
+    icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1)) || pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id);
+    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text, got };
     row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}`,
       got ? '가짐' : '조합', !got && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
@@ -1550,6 +1579,7 @@ function openCraft() {
     for (const [sid, sn] of Object.entries(SINSU)) {
       const now = progress.dragonSinsu[cls.id] === sid, need = { [sn.mat]: 4, essence: 5 };
       icon = picture(dragonName(cls.id, DRAGON_MAX));
+      meta = { mats: need, gold: 20000, gyeok: GYEOK[sn.gyeok], got: now };
       row(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(need)} + 20000전 · ${gyeokText(sn.gyeok)}`,
         now ? '새김' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
           progress.gold -= 20000;
@@ -1587,6 +1617,7 @@ function openCraft() {
       const sc = settings.chanceUp ? { mats: Object.fromEntries(Object.entries(sc0.mats).map(([k, v]) => [k, Math.max(1, Math.ceil(v / 2))])), gold: Math.ceil(sc0.gold / 2) } : sc0;
       icon = pieceIcon(cls, csp ? csp.kind : kind, csp ? specialBase(csp, cls.id) : +t, csp && csp.id);
       const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
+      meta = star < top ? { mats: sc.mats, gold: sc.gold, gyeok: dragon ? dragonGyeok(cls.id, star + 1) : null } : null;
       row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전`
         + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
         star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
@@ -1624,10 +1655,85 @@ function openCraft() {
       });
   }
   if (!any) row('강화할 장비가 없습니다', '같은 장비를 한 번 더 주우면 사본이 되어 강화 재료가 됩니다', '-', false, () => {});
-  $('#trade').hidden = false;
+  if (!sink) $('#trade').hidden = false;
 }
 
-$('#equip-craft').onclick = () => openCraft();
+$('#equip-craft').onclick = () => openForge();
+
+// ---------------------------------------------------------------- 조합 window
+// Every recipe of the smith in one place: a tab per kind of making, the list of that tab,
+// and the chosen recipe in full — its picture, what it gives (격 included), each material
+// with what is held and where it drops, and the button.
+let forgeTab = null, forgePick = null;
+const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['각인', /각인/],
+  ['강화', /강화/], ['레이드 상점', /레이드 상점/]];
+function forgeTabOf(sec) {
+  const t = FORGE_TABS.find(([, re]) => re.test(sec));
+  return t ? t[0] : '기타';
+}
+function openForge() {
+  const list = [];
+  openCraft(list);
+  const mats = progress.mats || {}, cls = G ? G.cls : chosenClass;
+  const tabs = FORGE_TABS.map(([n]) => n).filter(n => list.some(e => forgeTabOf(e.sec) === n));
+  if (!tabs.includes(forgeTab)) forgeTab = tabs[0];
+  $('#forge-title').textContent = `조합 · ${cls.name}`;
+  $('#forge-gold').textContent = `${(progress.gold || 0).toLocaleString()}전 · 레이드주화 ${progress.coins || 0}`;
+  const tb = $('#forge-tabs');
+  tb.innerHTML = '';
+  for (const t of tabs) {
+    const n = list.filter(e => forgeTabOf(e.sec) === t && e.can).length;
+    const bt = document.createElement('button');
+    bt.className = 'btn' + (t === forgeTab ? ' on' : '');
+    bt.innerHTML = t + (n ? ` <i>${n}</i>` : '');
+    bt.onclick = () => { forgeTab = t; forgePick = null; openForge(); };
+    tb.append(bt);
+  }
+  const mine = list.filter(e => forgeTabOf(e.sec) === forgeTab);
+  const pick = mine.find(e => e.name === forgePick) || mine.find(e => e.can) || mine[0];
+  forgePick = pick && pick.name;
+  const done = e => e.label === '가짐' || e.label === '새김' || e.label === '최고';
+  const lb = $('#forge-list');
+  lb.innerHTML = '';
+  for (const e of mine) {
+    const it = document.createElement('button');
+    it.className = 'forge-item' + (e === pick ? ' on' : '') + (e.can ? ' ready' : '') + (done(e) ? ' done' : '');
+    it.innerHTML = (e.icon ? `<img src="${e.icon}" alt="">` : '<span class="noimg"></span>')
+      + `<b>${e.name.replace(/ \(.*\)$/, '')}</b><small>${e.can ? '할 수 있음' : e.label === '가짐' || e.label === '새김' ? '보유' : e.label === '최고' ? '최고 단계' : '재료 부족'}</small>`;
+    it.onclick = () => { forgePick = e.name; openForge(); };
+    lb.append(it);
+  }
+  const d = $('#forge-detail');
+  d.innerHTML = '';
+  if (pick) {
+    const m = pick.meta || {};
+    const where = id => {
+      const names = ((MATS[id] && MATS[id].from) || []).map(sid => (STAGES.find(x => x.id === sid) || RAIDS.find(x => x.id === sid) || {}).name).filter(Boolean);
+      return names.slice(0, 3).join(', ') + (names.length > 3 ? ` 외 ${names.length - 3}곳` : '');
+    };
+    d.innerHTML = `<div class="fd-head">${pick.icon ? `<img src="${pick.icon}" alt="">` : ''}<div><b>${pick.name}</b><span>${pick.sec}</span></div></div>`
+      + (m.gyeok ? `<div class="fd-gyeok">${gyeokLine(m.gyeok)}</div>` : '')
+      + (m.opt ? `<div class="fd-opt">옵션: ${m.opt}</div>` : '')
+      + (m.base ? `<div class="fd-mat">재료 장비: ${m.base}</div>` : '')
+      + (m.mats ? Object.entries(m.mats).map(([id, n]) => `<div class="fd-mat ${(mats[id] || 0) >= n ? 'ok' : 'no'}"><span>${MATS[id].name} ${mats[id] || 0}/${n}</span><small>${where(id)}</small></div>`).join('') : '')
+      + (m.gold ? `<div class="fd-mat ${(progress.gold || 0) >= m.gold ? 'ok' : 'no'}"><span>${m.gold.toLocaleString()}전</span></div>` : '')
+      + (!m.mats ? `<div class="fd-desc">${pick.desc}</div>` : '');
+    const bt = document.createElement('button');
+    bt.className = 'btn fd-go';
+    bt.textContent = pick.label;
+    bt.disabled = !pick.can;
+    bt.onclick = () => pick.act();
+    d.append(bt);
+  }
+  $('#forge').hidden = false;
+}
+/** A 격 (a gyeok.js entry or a 용무기's) as a line. */
+function gyeokLine(g) {
+  const id = Object.keys(GYEOK).find(k => GYEOK[k] === g);
+  if (id) return gyeokText(id);
+  return `${g.name}: 타격 시 ${Math.round(g.chance * 100)}% · 고정 피해${g.st ? ' · 저주' : ''}${g.cdCut ? ` · 핵심 기술 재사용 -${g.cdCut * 100}%` : ''}`;
+}
+$('#forge-close').onclick = () => { $('#forge').hidden = true; if (!$('#equip').hidden) buildEquip(); };
 $('#equip-cards').onclick = () => openCards();
 
 $('#open-equip').onclick = () => {
@@ -2819,7 +2925,7 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   p.hp -= taken;
   p.inv = 0.25;
   audio.play('hurt');
-  floatText(p.x, p.y - 64, '-' + Math.round(taken), '#ff6060');
+  floatText(p.x, p.y - 64, '-' + shownNum(taken), '#ff6060');
   if (p.hp <= 0) die();
 }
 
@@ -2859,28 +2965,15 @@ function hurtEnemy(e, dmg, push = null) {
   // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
   // orange for a heavy blow, grey for a light one.
   if (crit || settings.numbers) {
-    // A burst of blows on one body (오중공격, a chain, a screen spell's ticks): the first two
-    // stand alone, then one gold sum counts on above them, popping at each blow.
-    const bu = e.burst && G.t - e.burst.at < 0.4 ? e.burst : (e.burst = { at: G.t, n: 0, sum: 0, txt: null });
-    bu.at = G.t;
-    bu.n++;
-    bu.sum += dmg;
-    if (bu.n >= 3 && settings.numbers) {
-      if (!bu.txt || !G.texts.includes(bu.txt)) {
-        bu.txt = { x: e.x, y: e.y - e.m.h * e.scale - 34, text: '', t: 0, num: true, sum: true, crit: false, color: '#ffb43a' };
-        G.texts.push(bu.txt);
-      }
-      bu.txt.text = String(Math.round(bu.sum));
-      bu.txt.t = 0;
-      bu.txt.x = e.x;
-    } else {
-      e.numN = G.t - (e.numT || -9) < 0.6 ? Math.min(3, (e.numN || 0) + 1) : 0;
-      e.numT = G.t;
-      if (G.texts.length > 70) G.texts.shift();
-      const heavy = dmg >= e.maxHp * 0.35;
-      G.texts.push({ x: e.x + rand(-3, 3), y: e.y - e.m.h * e.scale - 10 - e.numN * 7, text: String(Math.round(dmg)), t: 0, num: true,
-        crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
-    }
+    // 연's way: every blow its own line, the lines of a quick burst stacked in a column over
+    // the struck (up to eight), in its orange (a 치명타 red-gold and larger); a companion's
+    // blows smaller.
+    e.numN = G.t - (e.numT || -9) < 0.7 ? ((e.numN || 0) + 1) % 8 : 0;
+    e.numT = G.t;
+    if (G.texts.length > 90) G.texts.shift();
+    const heavy = dmg >= e.maxHp * 0.35;
+    G.texts.push({ x: e.x + rand(-2, 2), y: e.y - e.m.h * e.scale - 8 - e.numN * 14, text: shownNum(dmg), t: 0, num: true,
+      crit, heavy, ally: !!G.allyHitting, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
   // 주술사's heavy blow; a crit stops the world for a blink. Budgeted, not on a whole crowd.
@@ -4461,7 +4554,7 @@ function healMember(m, n, fx = null) {
   n = Math.min(n, m.maxHp - m.hp);
   if (n <= 0) return;
   m.hp += n;
-  floatText(m.x, m.y - 58, '+' + Math.round(n), '#7dff8a');
+  floatText(m.x, m.y - 58, '+' + shownNum(n), '#7dff8a');
   if (fx) addFx(fx, m.x, m.y - 26, { scale: 0.8 });
 }
 
@@ -4807,7 +4900,7 @@ function drawYeonStatus() {
     ctx.textAlign = 'right';
     outline(text, bx + w - 3 * d, yy + h - 3 * d, '#ffffff');
   };
-  row(y, p.hp / p.maxHp, 'rgb(180,43,0)', `${Math.ceil(Math.max(0, p.hp))}`);
+  row(y, p.hp / p.maxHp, 'rgb(180,43,0)', shownNum(Math.max(0, p.hp)));
   row(y + h + 2 * d, p.mp / p.maxMp, 'rgb(62,102,196)', `${Math.floor(p.mp)}`);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, canvas.height - 3 * d, canvas.width, 3 * d);
@@ -5186,7 +5279,7 @@ function heal(n, sound, quiet = false) {
   n = Math.min(n, p.maxHp - p.hp);
   if (n <= 0) return;
   p.hp += n;
-  floatText(p.x, p.y - 64, '+' + Math.round(n), '#7dff8a');
+  floatText(p.x, p.y - 64, '+' + shownNum(n), '#7dff8a');
   if (!quiet) addFx(FX.heal, 0, -26, { follow: true });
   if (sound) audio.play('heal');
 }
@@ -5972,8 +6065,29 @@ function goldFont() {
   const im = images['hud/font_gold.png'];
   return M.hud && M.hud.font_gold && im && im.width ? im : null;
 }
+/** 연's Korean-unit damage font, where the build has it. */
+function dmgkFont() {
+  const im = images['hud/font_dmgk_o.png'];
+  return M.hud && M.hud.font_dmgk_o && im && im.width ? im : null;
+}
+
+// Numbers as 연 shows them: in 만·억·조 ("640억2262만"), at its scale — the game's own figures
+// times NUM_SCALE, so a starting blow reads in 만 and a 9차 one in 억, as 연's do.
+const NUM_SCALE = 10000;
+function korNum(n) {
+  n = Math.max(0, Math.round(n));
+  const jo = Math.floor(n / 1e12), eok = Math.floor(n / 1e8) % 10000, man = Math.floor(n / 1e4) % 10000;
+  if (jo) return `${jo}조${eok ? eok + '억' : ''}`;
+  if (eok) return `${eok}억${man ? man + '만' : ''}`;
+  if (man) return `${man}만${n % 10000 >= 1000 ? '' : ''}`;
+  return String(n);
+}
+function shownNum(n) {
+  return korNum(n * NUM_SCALE);
+}
+
 function drawDigits(text, x, y, color, k, font = 'font_damage') {
-  const f = M.hud[font], sheet = font === 'font_gold' ? goldFont() : digitSheet(color);
+  const f = M.hud[font], sheet = font === 'font_gold' ? goldFont() : font.startsWith('font_dmgk') ? images[`hud/${font}.png`] : digitSheet(color);
   const glyphs = [...text].map(ch => f.glyphs[ch]).filter(Boolean);
   const w = glyphs.reduce((a, g) => a + g[4], 0) * k;
   let cx = x - w / 2;
@@ -6387,6 +6501,11 @@ function render(now) {
       ctx.fillText(t.text, Math.round(t.x), y + 9);
     } else if (t.gold && goldFont()) {
       drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, 0.32, 'font_gold');
+    } else if (t.num && dmgkFont()) {
+      // 연's damage lines (font_dmgk, morris9 with its orange material): pop in, settle, rise.
+      const base = t.ally ? 0.42 : t.crit ? 0.85 : t.heavy ? 0.7 : t.dot ? 0.45 : 0.6;
+      const pop = t.t < 0.1 ? (t.crit ? 1.6 : 1.3) - t.t * (t.crit ? 6 : 3) : 1;
+      drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, base * pop, t.crit ? 'font_dmgk_r' : 'font_dmgk_o');
     } else if (t.num && dmgFont()) {
       // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
       // to a third larger and settle in a tenth of a second, a crit bigger still.
@@ -6739,7 +6858,7 @@ function syncUlt() {
   if (big) {
     put('#bb-name', big.name + (G.stage.raid ? ['', ' · 분노', ' · 광폭'][G.phase || 0] : ''));
     $('#bb-fill').style.width = Math.max(0, big.hp / big.maxHp * 100).toFixed(1) + '%';
-    put('#bb-num', `${Math.max(0, Math.ceil(big.hp))} / ${Math.ceil(big.maxHp)}`);
+    put('#bb-num', `${shownNum(Math.max(0, big.hp))} / ${shownNum(big.maxHp)}`);
   }
   if (document.body.classList.contains('panel-off')) {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
@@ -6766,7 +6885,7 @@ function syncUlt() {
   put('#sd-str', String(bs + p.lvl + G.passives.power * 3));
   put('#sd-int', String(bi + p.lvl + G.passives.haste * 3));
   put('#sd-dex', String(bd + p.lvl + G.passives.speed * 3));
-  gauge('#g-hp', p.hp / p.maxHp, String(Math.ceil(Math.max(0, p.hp))));
+  gauge('#g-hp', p.hp / p.maxHp, shownNum(Math.max(0, p.hp)));
   gauge('#g-mp', p.mp / p.maxMp, String(Math.floor(p.mp)));
   put('#sd-exp', String(Math.floor(p.total || 0)));
   put('#sd-gold', String(G.gold));

@@ -204,6 +204,37 @@
   #town-quick { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 34px; display: flex; flex-direction: column; gap: 4px; }
   #town-quick .btn { min-width: 0; padding: 4px 10px; font-size: 11px; }
   #talk { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: 40px; min-width: 0; padding: 10px 16px; }
+  /* 조합 window: tabs, the list of the tab, and the chosen recipe in full. */
+  #forge { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .6); }
+  #forge[hidden] { display: none; }
+  #forge-box { width: min(96vw, 860px); height: min(94vh, 380px); display: flex; flex-direction: column; background: #e8d4a8; border: 3px solid #5a2e0e; padding: 6px; box-sizing: border-box; }
+  #forge-box .caption { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #5a1a00; }
+  #forge-box .caption small { flex: 1; color: #6a4a20; font-weight: 400; font-size: 10px; }
+  #forge-close { min-width: 0; padding: 2px 10px; font-size: 11px; }
+  #forge-tabs { display: flex; gap: 3px; margin: 4px 0; flex-wrap: wrap; }
+  #forge-tabs .btn { min-width: 0; padding: 3px 9px; font-size: 11px; }
+  #forge-tabs .btn.on { background: #7a2a08; color: #ffe8b0; }
+  #forge-tabs i { font-style: normal; background: #2a9a20; color: #fff; border-radius: 6px; padding: 0 4px; font-size: 9px; }
+  #forge-body { flex: 1; min-height: 0; display: flex; gap: 6px; }
+  #forge-list { flex: 1.1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 4px; align-content: start; }
+  .forge-item { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; background: #f4e6c4; border: 1px solid #b08850; font: 10px G9, monospace; color: #4a2a08; cursor: pointer; }
+  .forge-item img, .forge-item .noimg { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+  .forge-item b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .forge-item small { color: #8a6a40; }
+  .forge-item.ready { box-shadow: 0 0 0 2px #2a9a20 inset; }
+  .forge-item.ready small { color: #1a7a10; }
+  .forge-item.done { opacity: .65; }
+  .forge-item.on { background: #fff0c0; border-color: #7a1800; }
+  #forge-detail { flex: 1; overflow-y: auto; background: #f4e6c4; border: 1px solid #b08850; padding: 6px; font: 10px G9, monospace; color: #4a2a08; display: flex; flex-direction: column; gap: 3px; }
+  .fd-head { display: flex; gap: 6px; align-items: center; }
+  .fd-head img { width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated; }
+  .fd-head b { display: block; font-size: 12px; color: #5a1a00; }
+  .fd-head span { color: #8a6a40; }
+  .fd-gyeok { color: #7a1800; }
+  .fd-mat { display: flex; justify-content: space-between; gap: 6px; padding: 1px 3px; background: rgba(0,0,0,.04); }
+  .fd-mat.ok { color: #1a6a10; } .fd-mat.no { color: #a01800; }
+  .fd-mat small { color: #8a6a40; text-align: right; }
+  .fd-go { margin-top: auto; align-self: flex-end; min-width: 90px; }
   #trade { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
   #trade-box { width: min(96vw, 520px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px;
@@ -523,6 +554,14 @@
     <button class="btn" data-go="merchant">상점</button>
     <button class="btn" data-go="inn">주막</button>
     <button class="btn" data-go="clerk">의뢰</button>
+  </div>
+</div>
+
+<div id="forge" hidden>
+  <div id="forge-box">
+    <div class="caption"><span id="forge-title"></span> <small id="forge-gold"></small><button id="forge-close" class="btn">닫기</button></div>
+    <div id="forge-tabs"></div>
+    <div id="forge-body"><div id="forge-list"></div><div id="forge-detail"></div></div>
   </div>
 </div>
 
