@@ -4,6 +4,7 @@ import {
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
+import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
@@ -98,6 +99,7 @@ async function boot() {
     ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
     ...(M.hud && M.hud.font_gold ? ['hud/font_gold.png'] : []),
     ...(M.hud && M.hud.ui ? M.hud.ui.map(k => `hud/${k}.png`) : []),
+    ...(M.status_icons || []).map(k => `hud/st_${k}.png`),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -875,6 +877,159 @@ function applyGear() {
   p.gearHp = hp;
   p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
   p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo);
+  // 격: what the worn pieces loose by themselves (gyeok.js), and the statuses the shields ward off.
+  const gy = [];
+  p.wards = new Set();
+  for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+    const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+    if (!sp) continue;
+    if (sp.gyeok && GYEOK[sp.gyeok]) gy.push({ id: sp.gyeok, ...GYEOK[sp.gyeok] });
+    if (sp.ward) p.wards.add(sp.ward);
+  }
+  p.dragonCut = 0;
+  if (!g.weaponSp && g.weapon === dragonTier(G.cls)) {
+    const step = starOf(G.cls, `weapon:${g.weapon}`), dg = dragonGyeok(c, step);
+    gy.push({ id: 'dragon', ...dg });
+    p.dragonCut = dg.cdCut;
+    const ss = (progress.dragonSinsu || {})[c];
+    if (ss && SINSU[ss] && step >= 10) gy.push({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] });
+  }
+  p.gyeoks = gy;
+}
+
+/** A 격's weight: the hero's own blow at their level (the 격 power multiplies it; might() is
+ * added by hurtEnemy as for any blow). */
+function gyeokBase() {
+  return 6 + 1.2 * G.player.lvl;
+}
+
+// 격 cooldowns are 연's, a little shorter (×0.6) for a hunt of minutes.
+const GYEOK_CD_K = 0.6;
+
+/** The wearer struck ('hit') or was struck ('hurt'): each worn 격 may go off. */
+function gyeokProc(on, t) {
+  const p = G.player;
+  if (!p.gyeoks || !p.gyeoks.length || !t || !t.m) return;
+  G.gyeokCd = G.gyeokCd || {};
+  for (const g of p.gyeoks) {
+    if (g.on !== on || G.t < (G.gyeokCd[g.id] || 0) || Math.random() >= g.chance) continue;
+    G.gyeokCd[g.id] = G.t + (g.cd || 0) * GYEOK_CD_K;
+    fireGyeok(g, t);
+  }
+}
+
+function fireGyeok(g, t) {
+  const p = G.player, base = gyeokBase();
+  const hits = g.area ? G.enemies.filter(e => Math.abs(e.tx - t.tx) <= g.area && Math.abs(e.ty - t.ty) <= g.area)
+    : g.targets ? [t, ...nearestEnemies(g.targets, 5, t).filter(e => e !== t).slice(0, g.targets - 1)] : [t];
+  if (g.fx && M.fx[g.fx] && fxBudget('gyeok', 3)) fxOn(g.fx, t, { scale: g.area ? 0.9 : 0.7 });
+  G.procHitting = true;
+  let dealt = 0;
+  for (const e of hits) {
+    if (e.hp <= 0) continue;
+    if (g.dmg) dealt += hurtEnemy(e, base * g.dmg) || 0;
+    if (g.st) applyStatus(e, ...g.st);
+    if (g.st2) applyStatus(e, ...g.st2);
+  }
+  G.procHitting = false;
+  if (g.heal) {
+    heal(p.maxHp * g.heal, true);
+    p.mp = Math.min(p.maxMp, p.mp + p.maxMp * g.heal);
+  }
+  if (g.drain && dealt) heal(dealt * g.drain * 0.25, false, true);
+  if (g.self) {
+    const [kind, sec, k] = g.self;
+    G.buffs['g_' + kind] = G.t + sec;
+    G.buffs['g_' + kind + 'K'] = k;
+  }
+  G.gyeokShown = { name: g.name, t: G.t };
+  floatText(p.x, p.y - 78, g.name, '#ffd27a', true);
+  (G.gyeokCount = G.gyeokCount || {})[g.id] = (G.gyeokCount[g.id] || 0) + 1;
+  audio.play('crit');
+}
+
+/** A 상태이상 on a monster (gyeok.js STATUS): bosses shake off holds sooner and do not bleed. */
+function applyStatus(e, kind, sec, k = 1) {
+  if (!e || e.hp <= 0 || !STATUS[kind]) return;
+  const big = e.kind === 'boss' || e.kind === 'mini';
+  if (kind === 'stun' || kind === 'para' || kind === 'freeze') {
+    if (big) sec *= 0.4;
+    e.stun = Math.max(e.stun || 0, sec);
+    cutBlast(e);
+  } else if (kind === 'slow') e.slow = Math.max(e.slow || 0, sec);
+  else if (kind === 'curse') e.curse = Math.max(e.curse || 0, sec);
+  if (kind === 'bleed' && big) return;
+  e.st = e.st || {};
+  const cur = e.st[kind], live = cur && cur.until > G.t;
+  e.st[kind] = { until: G.t + sec, k: Math.max(k, live ? cur.k : 0), n: kind === 'bleed' ? Math.min(10, (live ? cur.n : 0) + 1) : 1, tick: live ? cur.tick : G.t };
+  if (STATUS[kind].icon) e.stIcon = kind;
+}
+
+/** Damage over time and the end of statuses, every half second. */
+function tickStatus(e) {
+  let any = false;
+  for (const [kind, s] of Object.entries(e.st)) {
+    if (s.until <= G.t) { delete e.st[kind]; continue; }
+    any = true;
+    if (G.t - s.tick < 0.5) continue;
+    s.tick = G.t;
+    const base = gyeokBase() * might(), big = e.kind === 'boss' || e.kind === 'mini';
+    let d = 0;
+    if (kind === 'poison') d = Math.min(e.maxHp * 0.012, base * 0.6) * s.k;
+    else if (kind === 'venom') d = Math.min(e.maxHp * 0.025, base * 1.1) * s.k;
+    else if (kind === 'bleed') d = e.maxHp * 0.005 * s.n;
+    else if (kind === 'burn') d = base * 0.5 * s.k;
+    if (big) d = Math.min(d, base * 0.8);
+    if (d > 0) dotHit(e, d, STATUS[kind].color);
+  }
+  if (!any) { e.st = null; e.stIcon = null; }
+  else if (e.stIcon && !e.st[e.stIcon]) e.stIcon = Object.keys(e.st).find(k => STATUS[k].icon) || null;
+}
+
+function dotHit(e, d, color) {
+  if (e.hp <= 0) return;
+  if (e.capPerSec) {
+    const sec = Math.floor(G.t);
+    if (e.capSec !== sec) { e.capSec = sec; e.capUsed = 0; }
+    d = Math.min(d, e.maxHp * e.capPerSec - e.capUsed);
+    if (!(d > 0)) return;
+    e.capUsed += d;
+  }
+  e.hp -= d;
+  e.shown = G.t;
+  if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: String(Math.round(d)), t: 0, num: true, crit: false, color });
+  if (e.hp <= 0) killEnemy(e);
+}
+
+/** A boss's nature on the hero: its blows may put its status on them, unless a shield wards it. */
+function heroStatus(kind, from) {
+  const p = G.player;
+  if (p.wards && p.wards.has(kind)) {
+    if (G.t - (G.wardSaid || -9) > 3) { G.wardSaid = G.t; floatText(p.x, p.y - 78, `${STATUS[kind].name} 막음`, '#9ad8ff'); }
+    return;
+  }
+  const sec = { poison: 4, venom: 4, bleed: 4, burn: 4, stun: 0.8, para: 0.8, freeze: 1.2, slow: 2.5, curse: 5, despair: 5, silence: 3, mark: 4 }[kind] || 3;
+  p.sts = p.sts || {};
+  p.sts[kind] = { until: G.t + sec, tick: G.t };
+  if (G.t - (G.stSaid || -9) > 2) { G.stSaid = G.t; floatText(p.x, p.y - 78, STATUS[kind].name, '#ff9a6a'); }
+}
+function heroStatusOn(kind) {
+  const s = G.player.sts && G.player.sts[kind];
+  return !!s && s.until > G.t;
+}
+function tickHeroStatus() {
+  const p = G.player;
+  if (!p.sts) return;
+  for (const [kind, s] of Object.entries(p.sts)) {
+    if (s.until <= G.t) { delete p.sts[kind]; continue; }
+    if (G.t - s.tick < 0.5) continue;
+    s.tick = G.t;
+    const d = { poison: 0.006, venom: 0.012, bleed: 0.008, burn: 0.008 }[kind];
+    if (d && !G.dead) {
+      p.hp -= Math.max(1, p.maxHp * d);
+      if (p.hp <= 0) die();
+    }
+  }
 }
 
 /** A special option's count on the hero (0 when none is worn). */
@@ -1045,6 +1200,24 @@ function wear(kind, tier, sp = null) {
   } else if (T && T.cls === cls && hasAvatars()) T.av = dressed(cls, g);
 }
 
+/** The 격 and wards of a set of gear, as lines for the equipment window. */
+function wornGyeok(cls, g) {
+  const lines = [];
+  for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+    const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+    if (!sp) continue;
+    if (sp.gyeok && GYEOK[sp.gyeok]) lines.push(gyeokText(sp.gyeok));
+    if (sp.ward) lines.push(`${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다`);
+  }
+  if (!g.weaponSp && g.weapon === dragonTier(cls)) {
+    const step = starOf(cls, `weapon:${g.weapon}`), dg = dragonGyeok(cls.id, step);
+    lines.push(`${dg.name}: 타격 시 ${Math.round(dg.chance * 100)}% · 고정 피해${dg.st ? ' · 저주' : ''}${dg.cdCut ? ` · 핵심 기술 재사용 -${dg.cdCut * 100}%` : ''}`);
+    const ss = (progress.dragonSinsu || {})[cls.id];
+    if (ss && SINSU[ss] && step >= 10) lines.push(gyeokText(SINSU[ss].gyeok));
+  }
+  return { lines };
+}
+
 /** 전투력 were this piece worn in place of what is worn now (the rest as it is). */
 function powerWith(cls, kind, tier, sp = null) {
   progress.gear = progress.gear || {};
@@ -1141,6 +1314,12 @@ function buildEquip() {
       const icon = pieceIcon(cls, kind, t);
       const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
+      if (dragon) {
+        const dg = dragonGyeok(cls.id, starOf(cls, `weapon:${t}`));
+        const sm = document.createElement('small');
+        sm.textContent = dg.name;
+        btn.append(sm);
+      }
       markCompare(btn, cls, kind, t, null, now, rowTop[0] === t && rowTop[1] === null);
       btn.onclick = () => {
         wear(kind, t);
@@ -1155,7 +1334,8 @@ function buildEquip() {
       const t = specialBase(sp, cls.id), btn = document.createElement('button');
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
       const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.opt.text}</small>`;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.gyeok && GYEOK[sp.gyeok] ? `${GYEOK[sp.gyeok].name}` : sp.ward ? `${STATUS[sp.ward].name} 막기` : sp.opt.text}</small>`;
+      btn.title = [sp.opt.text, sp.gyeok ? gyeokText(sp.gyeok) : '', sp.ward ? `${STATUS[sp.ward].name}에 걸리지 않는다` : ''].filter(Boolean).join('\n');
       markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
       btn.onclick = () => {
         wear(kind, t, id);
@@ -1172,6 +1352,15 @@ function buildEquip() {
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
     + ` · 방어 +${Math.max(0, pw('shield') + 1) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '');
+  // The 격 worn, each with its rule (gyeok.js), and the statuses warded.
+  const gys = wornGyeok(cls, g);
+  let gl = $('#equip-gyeok');
+  if (!gl) {
+    gl = document.createElement('div');
+    gl.id = 'equip-gyeok';
+    $('#equip-stats').after(gl);
+  }
+  gl.innerHTML = gys.lines.length ? gys.lines.map(t => `<div>${t}</div>`).join('') : '<div class="none">격 없음 — 보스의 스페셜 무기·갑옷, 용무기, 전설 조합 장비에 격이 붙습니다.</div>';
 }
 
 // ---------------------------------------------------------------- 도감
@@ -1195,12 +1384,14 @@ function codexItems(cls) {
     });
   }
   for (const sp of SPECIALS) {
+    if (sp.craft && sp.craft.only && !sp.craft.only.includes(cls.id)) continue;
     const t = specialBase(sp, cls.id);
     const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${sp.craft.gold}전`
       : sp.srcName;
     out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
       icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || gearIcon(cls.id, sp.kind, t),
-      pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from, opt: sp.opt.text });
+      pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from,
+      opt: [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : '', sp.ward ? `${STATUS[sp.ward].name} 막기` : ''].filter(Boolean).join(' · ') });
   }
   return out;
 }
@@ -1327,14 +1518,16 @@ function openCraft() {
   const have = m => Object.entries(m).every(([id, n]) => (mats[id] || 0) >= n);
   const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
   for (const c of CRAFTS) {
+    if (c.only && !c.only.includes(cls.id)) continue;
     const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
     if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
+    if (c.sinsu && c === CRAFTS.find(x => x.sinsu && (!x.only || x.only.includes(cls.id)))) head('조합 · 사신수 지존 장비 (성물 4종 → 신수의 격)');
     // An evolution is made out of its base piece at ★5, which goes into the making.
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
     icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
-    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}`,
+    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}`,
       got ? '가짐' : '조합', !got && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
         for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
@@ -1348,6 +1541,25 @@ function openCraft() {
         say(`${josa(specialName(sp, cls.id), '을', '를')} 조합했습니다!`, 'sys');
         if (c.legend) banner(`조합 성공 · ${specialName(sp, cls.id)}`);
       });
+  }
+  // 사신수 각인: the 용무기 at 제십 takes one 신수's nature (연's 주작의/청룡의/백호의/현무의 용X제십검).
+  const dKey = `weapon:${dragonTier(cls)}`;
+  if (b.includes(dKey) && starOf(cls, dKey) >= DRAGON_MAX) {
+    head('사신수 각인 · 제십 용무기에 신수의 격을 새긴다');
+    progress.dragonSinsu = progress.dragonSinsu || {};
+    for (const [sid, sn] of Object.entries(SINSU)) {
+      const now = progress.dragonSinsu[cls.id] === sid, need = { [sn.mat]: 4, essence: 5 };
+      icon = picture(dragonName(cls.id, DRAGON_MAX));
+      row(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(need)} + 20000전 · ${gyeokText(sn.gyeok)}`,
+        now ? '새김' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
+          progress.gold -= 20000;
+          for (const [id, n] of Object.entries(need)) mats[id] -= n;
+          progress.mats = mats;
+          progress.dragonSinsu[cls.id] = sid;
+          say(`${dragonName(cls.id, DRAGON_MAX)}에 ${sn.name}의 격을 새겼습니다!`, 'sys');
+          banner(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`);
+        });
+    }
   }
   head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
   // 확률 강화 (today's way, optional): half the materials, but it can fail — 손상 (spent for
@@ -1373,7 +1585,7 @@ function openCraft() {
       any = true;
       const sc0 = starMats(csp, star), chance = settings.chanceUp ? Math.max(0.1, 0.9 - 0.1 * (star - 1)) : 1;
       const sc = settings.chanceUp ? { mats: Object.fromEntries(Object.entries(sc0.mats).map(([k, v]) => [k, Math.max(1, Math.ceil(v / 2))])), gold: Math.ceil(sc0.gold / 2) } : sc0;
-      icon = pieceIcon(cls, kind, +t, csp && csp.id);
+      icon = pieceIcon(cls, csp ? csp.kind : kind, csp ? specialBase(csp, cls.id) : +t, csp && csp.id);
       const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
       row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전`
         + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
@@ -1598,6 +1810,9 @@ function stats(skill) {
 /** The hero's damage multiplier right now. */
 function might() {
   let k = G.player.gearPower || 1;
+  if (G.buffs.g_power > G.t) k *= 1 + (G.buffs.g_powerK || 0);
+  if (G.buffs.g_pierce > G.t) k *= 1 + (G.buffs.g_pierceK || 0);
+  if (G.player.sts && heroStatusOn('despair')) k *= 0.8;
   if (G.buffs.power > G.t) k *= 1 + (G.buffs.powerK || 0.5);
   if (G.buffs.stealth > G.t) k *= 3;
   return k;
@@ -1695,7 +1910,10 @@ function stepHero(dx, dy, dt) {
 
 /** Pixels a second the hero walks. */
 function heroSpeed() {
-  return (TILE / 0.24) * (G.player.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed'));
+  const p = G.player;
+  const held = p.sts && (heroStatusOn('stun') || heroStatusOn('para') || heroStatusOn('freeze')) ? 0.3 : p.sts && heroStatusOn('slow') ? 0.65 : 1;
+  return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed'))
+    * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held;
 }
 
 function update(dt) {
@@ -1744,7 +1962,10 @@ function update(dt) {
     plainAttack(dt);
   }
   runTimers();
+  G.allyHitting = true;
   updateAllies(dt);
+  G.allyHitting = false;
+  tickHeroStatus();
   updateParty(dt);
   updateShots(dt);
   updateStyle(dt);
@@ -2443,6 +2664,8 @@ function moveEnemies(dt) {
     e.slow = Math.max(0, e.slow - dt);
     e.stun = Math.max(0, e.stun - dt);
     e.curse = Math.max(0, e.curse - dt);
+    if (e.st) tickStatus(e);
+    if (e.hp <= 0) continue;
     if (e.moving || e.stun > 0) continue;
     if (e.march || e.flee) {
       // Event monsters: the drive walks on in its line; the treasure runs from the hero.
@@ -2579,6 +2802,16 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   const ac = pierce || (from && from.kind === 'boss' && G.stage.raid) ? 0 : Math.max(0, p.armor + 2 * G.passives.armor);
   let taken = Math.max(1, dmg * Math.max(0.3, 20 / (20 + ac)));
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
+  // 절망 on the attacker weakens its blow; 저주 on the hero lets more through; 현무의 철옹's ward.
+  if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
+  if (p.sts && heroStatusOn('curse')) taken *= 1.25;
+  if (G.buffs.g_ward > G.t) taken *= 1 - (G.buffs.g_wardK || 0);
+  // A boss, its lieutenant or a champion strikes in its own nature (gyeok.js SOURCE_GYEOK).
+  if (from && from.m && (from.kind === 'boss' || from.kind === 'mini' || from.kind === 'champ')) {
+    const sg = SOURCE_GYEOK[G.stage.id];
+    if (sg && Math.random() < (from.kind === 'champ' ? 0.12 : 0.3)) heroStatus(sg.st, from);
+  }
+  if (from && from.m) gyeokProc('hurt', from);
   // 반탄공: the blow comes back threefold.
   if (from && from.m && G.buffs.reflect > G.t) later(0.05, () => hurtEnemy(from, taken * 3));
   p.hp -= taken;
@@ -2604,6 +2837,7 @@ function hurtEnemy(e, dmg, push = null) {
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
+    * (e.st && e.st.mark && e.st.mark.until > G.t ? 1 + e.st.mark.k : 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
@@ -2654,6 +2888,8 @@ function hurtEnemy(e, dmg, push = null) {
     e.markT = G.t;
     fxOn(mark, e, { scale: mark === 'h_hit_fire' ? 0.38 : crit ? 0.6 : 0.45 });
   }
+  // The hero's own blow (not a party member's, a summon's, or a 격's own) may loose a 격.
+  if (!G.allyHitting && !G.procHitting) gyeokProc('hit', e);
   if (crit && !G.stage.raid && G.t - (G.hitstopAt || -9) > 0.4) {
     G.hitstop = 0.03;
     G.hitstopAt = G.t;
@@ -2950,6 +3186,8 @@ function fxOn(id, b, o = {}) {
 function fireSkill(s, k) {
   const p = G.player;
   const st = stats(s);
+  // 용무기 제구·제십: the class's core spell comes sooner (the original's 광폭, 파천검무, 헬파이어·삼매, 백호의희원).
+  if (G.player.dragonCut && (DRAGON_CORE[G.cls.id] || []).includes(s.id)) st.cd *= 1 - G.player.dragonCut;
   s.cdMax = st.cd;
   s.timer += st.cd;
   if (s.timer < 0) s.timer = st.cd;
@@ -4318,7 +4556,9 @@ function updateParty(dt) {
     const tick = dt * (G.stage.raid ? 1.4 : 1);
     for (const k of Object.keys(m.cd)) m.cd[k] -= tick;
     if (G.stage.raid && m.hp < m.maxHp * 0.3 && m.cls.id !== 'poet') partyTalk(m, ['힐 좀요!!', '피 없어요!', '저 죽어요!']);
+    G.allyHitting = true;
     partyAct(m);
+    G.allyHitting = false;
   }
 }
 
@@ -5963,7 +6203,7 @@ function render(now) {
 
   // On the ground: experience, money, boxes.
   for (const d of G.drops) {
-    const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? images[`item/${M.items[MATS[d.mat].icon].id}.png`]
+    const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? matImage(d.mat)
       : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
 
@@ -5985,6 +6225,7 @@ function render(now) {
   for (const b of bodies) {
     if (b === p) {
       drawHero(now, hidden);
+      if (p.sts) drawHeroStatus(p);
       continue;
     }
     if (b.prop) {
@@ -6030,6 +6271,11 @@ function render(now) {
       const tag = b.kind === 'boss' || b.kind === 'mini' || (b.shown && G.t - b.shown < 3)
         || Math.abs(b.x - G.player.x) + Math.abs(b.y - G.player.y) < TILE * 5;
       if (b.name && tag) outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
+    }
+    // Its 상태이상, in 연's own debuff icon, over its head.
+    if (b.stIcon && b.st && b.st[b.stIcon]) {
+      const im = images[`hud/st_${STATUS[b.stIcon].icon}.png`];
+      if (im && im.width) ctx.drawImage(im, Math.round(b.x - 6), Math.round(b.y - b.m.h * s - (b.kind ? 26 : 16)), 12, 12);
     }
   }
   for (const d of G.dying) {
@@ -6159,6 +6405,15 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+  // 절망 on the hero: the screen darkens round its edge, as the original's 절망 blinds.
+  if (p.sts && heroStatusOn('despair')) {
+    const gr = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.25,
+      canvas.width / 2, canvas.height / 2, Math.hypot(canvas.width, canvas.height) / 2);
+    gr.addColorStop(0, 'rgba(0,0,0,0)');
+    gr.addColorStop(1, 'rgba(0,0,0,0.75)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   // 연속 처치: the count at the top right while a streak runs.
   const c = G.combo;
   if (c.n >= 10 && G.t - c.t < 3) {
@@ -6195,6 +6450,28 @@ function heroHeight() {
   const p = G.player;
   if (M.yhero && M.yhero[G.cls.id]) return 44;
   return p.av ? p.av.top : p.img.height;
+}
+
+/** A material's picture: an old item icon, or 연's own (st:<name> → hud/st_<name>.png). */
+function matImage(id) {
+  const ic = MATS[id].icon;
+  return ic.startsWith('st:') ? images[`hud/st_${ic.slice(3)}.png`] : images[`item/${M.items[ic].id}.png`];
+}
+
+/** The hero's 상태이상 over their head: 연's icons, or the status's name in its colour. */
+function drawHeroStatus(p) {
+  const live = Object.keys(p.sts).filter(k => p.sts[k].until > G.t);
+  if (!live.length) return;
+  let x = Math.round(p.x - live.length * 7);
+  const y = Math.round(p.y - 86);
+  ctx.font = '8px G9';
+  ctx.textAlign = 'center';
+  for (const k of live) {
+    const def = STATUS[k], im = def.icon && images[`hud/st_${def.icon}.png`];
+    if (im && im.width) ctx.drawImage(im, x, y, 12, 12);
+    else outline(def.name[0], x + 6, y + 9, def.color || '#ffd27a');
+    x += 14;
+  }
 }
 
 function drawHero(now, hidden) {
@@ -7039,6 +7316,7 @@ window.__gearTest = () => {
 window.__dragonTier = () => dragonTier(G.cls);
 window.__Z = () => Z;
 window.__hurtPlayer = d => hurtPlayer(d, null);
+window.__hurtPlayerFrom = (d, e) => hurtPlayer(d, e);
 window.__event = k => huntEvent(k);
 window.__openPortal = t => openPortal(t);
 window.__silentSkills = () => {

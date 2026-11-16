@@ -8,6 +8,7 @@
 
 import { STAGES, RAIDS, CLASSES } from './data.js';
 import { GEAR, RAID_GEAR, raidSet, plainTiers, plainList, gearPower, lookTier } from './avatar.js';
+import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
 
 // The name each source gives its specials.
 const PREFIX = {
@@ -45,8 +46,12 @@ const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !
   ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2 }))]
   .sort((a, b) => !!a.v2 - !!b.v2);
 SOURCES.forEach((src, n) => KINDS.forEach((kind, k) => {
+  // A boss's specials carry its nature (gyeok.js SOURCE_GYEOK): the weapon its 격, the armour
+  // an answer in its status when struck, the shield a ward against that status.
+  const sg = SOURCE_GYEOK[src.id];
+  const gy = !sg ? null : kind === 'weapon' ? sg.weapon : kind === 'armor' ? 'ban_' + sg.st : null;
   SPECIALS.push({ id: `${src.id}:${kind}`, src: src.id, srcName: src.raid ? `${src.name} 레이드` : src.name, raid: src.raid,
-    kind, opt: OPTIONS[(n * 3 + k) % OPTIONS.length], rank: src.i });
+    kind, opt: OPTIONS[(n * 3 + k) % OPTIONS.length], rank: src.i, gyeok: gy, ward: kind === 'shield' && sg ? sg.st : null });
 }));
 export const SPECIAL = Object.fromEntries(SPECIALS.map(s => [s.id, s]));
 
@@ -61,6 +66,13 @@ export function specialBase(sp, cls) {
     const name = raidSet(sp.src, cls).find(([k]) => k === sp.kind)[1];
     return GEAR[cls][sp.kind].indexOf(name);
   }
+  // Its own look where the boss has one in this class's line (a fox's 칠지도, a skull's 참마도).
+  const sg = SOURCE_GYEOK[sp.src];
+  if (sg && sg.looks) {
+    const name = sp.kind === 'weapon' ? sg.looks[['warrior', 'rogue', 'mage', 'poet'].indexOf(cls)] : sg.looks[sp.kind === 'armor' ? 4 : 5];
+    const at = name ? GEAR[cls][sp.kind].indexOf(name) : -1;
+    if (at >= 0) return at;
+  }
   // A class whose plain line of this kind is all crafted looks (the 주술사's shields) takes the
   // line as it stands, so the special still has a base, a name and a picture.
   let list = plainList(cls, sp.kind);
@@ -73,10 +85,10 @@ export function specialName(sp, cls) {
   return `${PREFIX[sp.src]} ${GEAR[cls][sp.kind][specialBase(sp, cls)]}`;
 }
 
-/** A special counts a rank above its base. */
+/** A special counts a rank above its base, and half a rank more for a 격 or a ward. */
 export function specialPower(sp, cls) {
-  if (sp.craft) return sp.craft.pow;
-  return gearPower(cls, sp.kind, specialBase(sp, cls)) + 1;
+  if (sp.craft) return sp.craft.pow + (sp.gyeok ? 0.5 : 0);
+  return gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0);
 }
 
 /** Where an ordinary tier drops: the grounds whose rank (with luck and a boss's +1) reach it. */
@@ -119,6 +131,13 @@ export const MATS = {
   kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
   silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
   silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
+  // The 사신수's 성물 (the original's 신수현신공성전: four of a 신수 make its 지존 piece; 연 keeps
+  // 주작혈안 and 백호광안 among its items, whose icons these are). From the raids of the 신수's
+  // nature, and the 길드대항전.
+  sinsu_jujak: { name: '주작혈안', icon: 'st:mat_jujak', from: ['raid_fire', 'raid_agni'] },
+  sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger'] },
+  sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', from: ['raid_varuna', 'raid_hydra'] },
+  sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', from: ['raid_sea'] },
   silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata'] },
 };
 /** How many of a material a kill drops: most fall from bosses (3-5), some from mini bosses. */
@@ -207,9 +226,21 @@ export const CRAFTS = [
   { id: 'cr_steel_weapon2', kind: 'weapon', name: { warrior: "극'진일신검", rogue: "극'청일기창", mage: "극'황염곤봉", poet: "극'적염곤봉" },
     look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비' }, pow: 14, opt: 'power', from: 'cr_steel_weapon',
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
+  // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
+  // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
+  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 14, opt: 'life',
+    mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
+  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 14, opt: 'mana',
+    mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
+  { id: 'cr_sinsu_baekho', kind: 'cape', name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed',
+    mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
+  { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑',
+    look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마' }, pow: 14, opt: 'life',
+    mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
 for (const c of CRAFTS) {
-  const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0 };
+  const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
+    gyeok: CRAFT_GYEOK[c.id] || null };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
   // Put the look on every class's line now, so the loader fetches its sheets with the rest.

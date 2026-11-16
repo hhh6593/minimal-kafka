@@ -445,6 +445,37 @@ def main():
                                    "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
                                    "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
 
+    # 연's 격 and status effects (GEAR_DIR/ygyeok/: strips rendered by tools/yeon_skills.py from
+    # the 격·debuff prefabs, two assembled from their own atlases in play order, + index.json):
+    # fx "g_<name>", pivot on the target's feet like the k_ spells; status icons (icons/*.png)
+    # copied to hud/st_<name>.png and listed in manifest["status_icons"].
+    gdir = os.path.join(gear_src, "ygyeok") if gear_src else None
+    manifest["status_icons"] = []
+    if gdir and os.path.isfile(os.path.join(gdir, "index.json")):
+        with open(os.path.join(gdir, "index.json"), encoding="utf-8") as f:
+            gindex = json.load(f)
+        for name, k in gindex.items():
+            gsrc = os.path.join(gdir, name + ".png")
+            if not os.path.isfile(gsrc):
+                continue
+            (cw, ch), n = k["cell"], k["n"]
+            sheet = Image.open(gsrc).convert("RGBA")
+            pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+            z = min(1.0, 170 / max(cw, ch))
+            if z < 1:
+                pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
+            fid = "g_" + name
+            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+            manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
+                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / z, 3),
+                                   "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+        idir = os.path.join(gdir, "icons")
+        if os.path.isdir(idir):
+            os.makedirs(os.path.join(out, "hud"), exist_ok=True)
+            for n in sorted(x for x in os.listdir(idir) if x.endswith(".png")):
+                shutil.copyfile(os.path.join(idir, n), os.path.join(out, "hud", "st_" + n))
+                manifest["status_icons"].append(n[:-4])
+
     # 연's hunt presentation (GEAR_DIR/yhud/, tools/yeon_hud.py): hit sparks and the level-up
     # burst as fx "h_<name>" (sparks drawn on the body's middle, the level-up on the feet), the
     # damage-number bitmap font (white digits in black, tinted per kind of hit) and the
