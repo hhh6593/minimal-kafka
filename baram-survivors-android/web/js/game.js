@@ -2741,6 +2741,7 @@ function clearStage() {
   say(`${josa(G.stage.name, '을', '를')} 정복했습니다!`, 'sys');
   if (opened.length) say(`이제 ${opened.map(x => x.name).join(', ')}에 들어갈 수 있습니다.`);
   banner(`${G.stage.name} 정복!`);
+  sweepField();
   // A moment to pick up what the boss left, then the results.
   const run = G;
   // Not over a level-up still being chosen: the card first, then the results.
@@ -2750,6 +2751,26 @@ function clearStage() {
     else showResults(`${G.stage.name} 정복!`);
   };
   setTimeout(end, 6000);
+}
+
+/**
+ * The end of a hunt, as survivors-likes close one: the monsters still on screen fall in a wave
+ * running out from the hero (their experience counts, their drops fall), then everything lying
+ * on the field flies to the hero at once.
+ */
+function sweepField() {
+  const p = G.player, run = G;
+  const reach = Math.hypot(VW, VH) * 0.6;
+  for (const e of G.enemies.slice()) {
+    if (e.kind === 'boss') continue;
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    if (d > reach) continue;
+    later(0.15 + d / 700, () => { if (G === run && !G.dead) killEnemy(e); });
+  }
+  G.shake = Math.max(G.shake, 0.25);
+  G.vacuumAt = G.t + 0.15 + reach / 700 + 0.2;
+  G.vacuumEnd = G.vacuumAt + 4;
+  G.sweepUntil = G.vacuumAt + 1.2;
 }
 
 // ---------------------------------------------------------------- skills
@@ -4706,7 +4727,20 @@ function updatePickups(dt) {
   const p = G.player;
   // 노획 reaches for dropped things from further away.
   const reach = TILE * (0.7 + 0.5 * G.passives.magnet + opt('magnet'));
+  // The closing vacuum: every drop on the field speeds toward the hero.
+  const pull = G.vacuumAt !== undefined && G.t >= G.vacuumAt && G.t < G.vacuumEnd;
+  if (pull && !G.vacuumSaid) {
+    G.vacuumSaid = true;
+    if (G.drops.length) audio.play('pickup');
+  }
   for (const d of G.drops) {
+    if (pull) {
+      const dx = p.x - d.x, dy = p.y - 8 - d.y, l = Math.hypot(dx, dy) || 1;
+      d.v = (d.v || 120) + 1800 * dt;
+      const step = Math.min(l, d.v * dt);
+      d.x += dx / l * step;
+      d.y += dy / l * step;
+    }
     if (Math.hypot(d.x - p.x, d.y - p.y) < reach) {
       d.taken = true;
       if (d.kind === 'gear') pickGear(d.gear);
@@ -4872,6 +4906,14 @@ function drawCards() {
 
 function nextChoice() {
   if (!G.pendingLevels || G.over || G.dead) return;
+  // Not in the middle of the closing sweep and pull: the cards wait until the spoils are in.
+  if (G.sweepUntil && G.t < G.sweepUntil) {
+    if (!G.choiceDeferred) {
+      G.choiceDeferred = true;
+      later(G.sweepUntil - G.t + 0.05, () => { G.choiceDeferred = false; if (!G.choosing) nextChoice(); });
+    }
+    return;
+  }
   G.pendingLevels--;
   const picks = drawCards();
   if (!picks.length) picks.push({ type: 'heal' }, { type: 'gold' });
@@ -6781,6 +6823,7 @@ window.__silentSkills = () => {
     .map(([id, d]) => [id, d.name, d.kind, audio.map['skill_' + id] || null]);
 };
 window.__game = () => G;
+window.__clear = () => clearStage();
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
