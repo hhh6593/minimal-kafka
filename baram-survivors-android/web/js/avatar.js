@@ -33,13 +33,18 @@ export const GEAR = {
   lancer: { head: '17', armor: ['초록색남자경갑', '파란색남자경갑', '구리남자경갑', '숲의권속남자경갑', '은남자경갑', '감시자남자경갑'],
     weapon: ['나무창', '청동창', '철창', '은장철창', '흑영창', '진아광창', '파천비창'],
     shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+  // 격투가: 연's own 대련복 and 권갑 (tools/yeon_job.py), drawn on its own F_ body. 연 gives the
+  // 격투가 no shield either: the slot keeps the old shields' names and stats and is not drawn.
+  monk: { head: '17', armor: ['초록색남자대련복', '파란색남자대련복', '구리남자대련복', '숲의권속남자대련복', '은남자대련복', '감시자남자대련복'],
+    weapon: ['가람권갑', '너울권갑', '라온조갑', '새나권갑', '비조권갑', '경원권갑', '파천권갑'],
+    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
 };
 // 투구 and 망토: 바람의나라 연's own lines, weakest first (their worn sheets and icons come from
 // 연's resources, tools/yeon_gear.py). Helmets end in the class's 제사 dragon helmet; the capes
 // are shared. Today's crafted pieces (items.js) are added after these as crafted-only looks.
 const HELMETS = ['연두색남자투구', '가죽남자투구', '구리남자투구', '청동남자투구', '금장남자투구', '북방의남자투구'];
 const CAPES = ['남옥망토', '얼음망토', '숲의권속망토', '추방자망토', '몰락자망토', '밤의 인도자 날개(남)'];
-const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용랑제사투구', poet: '용겸제사투구', archer: '용섬제사투구', lancer: '용무제사투구' };
+const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용랑제사투구', poet: '용겸제사투구', archer: '용섬제사투구', lancer: '용무제사투구', monk: '용비제사투구' };
 for (const [cls, g] of Object.entries(GEAR)) {
   g.helmet = [...HELMETS, DRAGON_HELMET[cls]];
   g.cape = [...CAPES];
@@ -52,37 +57,37 @@ export const RAID_GEAR = {
   // class. pow is the tier the set counts as (a hunting ground's best is about 4-5): a middling
   // raid gives middling pieces, the last raids the best.
   raid_boar: { pow: 3, armor: '원주민의옷', shield: '대나무방패',
-    weapon: { warrior: '곤봉', rogue: '삼첨도', mage: '횃불', poet: '나비채', archer: '인각궁', lancer: '금장철창' } },
+    weapon: { warrior: '곤봉', rogue: '삼첨도', mage: '횃불', poet: '나비채', archer: '인각궁', lancer: '금장철창', monk: '면권갑' } },
   raid_tiger: { pow: 4, armor: '여자무사옷', shield: '떡갈나무방패',
-    weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱', archer: '영월마궁', lancer: '촉루창' } },
+    weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱', archer: '영월마궁', lancer: '촉루창', monk: '목권갑' } },
   raid_goblin: { pow: 5, armor: '여자갑옷', shield: '문신방패',
-    weapon: { warrior: '도깨비방망이', rogue: '현랑부', mage: '도깨비방망이', poet: '검정깃발', archer: '금강비궁', lancer: '두억창' } },
+    weapon: { warrior: '도깨비방망이', rogue: '현랑부', mage: '도깨비방망이', poet: '검정깃발', archer: '금강비궁', lancer: '두억창', monk: '진목권갑' } },
   raid_hydra: { pow: 7, armor: '용왕의용포', shield: '백룡현갑',
-    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '일월대도', poet: '탁조', archer: '월천마궁', lancer: '벽사창' } },
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '일월대도', poet: '탁조', archer: '월천마궁', lancer: '벽사창', monk: '금강권갑' } },
   raid_sorcerer: { pow: 8, armor: '무녀복', shield: '팔세지도',
-    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '대붕지옥궁', lancer: '길달창' } },
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '대붕지옥궁', lancer: '길달창', monk: '바람제일식권갑' } },
   raid_sea: { pow: 8, armor: '선녀의옷', shield: '거문고',
-    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검', archer: '월빙마궁', lancer: '아광창' } },
+    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검', archer: '월빙마궁', lancer: '아광창', monk: '금홍권갑' } },
   raid_fire: { pow: 9, armor: '불의갑주', shield: '일광방패',
-    weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권', archer: '흑일멸화궁', lancer: '금홍비창' } },
+    weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권', archer: '흑일멸화궁', lancer: '금홍비창', monk: '바람홍옥권갑' } },
   raid_wukong: { pow: 10, armor: '장삼', shield: '연등',
-    weapon: { warrior: '삼첨도', rogue: '진아광검', mage: '백운장', poet: '하늘개비', archer: '명봉재수의궁', lancer: '경원비창' } },
+    weapon: { warrior: '삼첨도', rogue: '진아광검', mage: '백운장', poet: '하늘개비', archer: '명봉재수의궁', lancer: '경원비창', monk: '새나조갑' } },
   raid_musin: { pow: 11, armor: '남자기모노', shield: '월광방패',
-    weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채', archer: '심안강궁', lancer: '바람제일식창' } },
+    weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채', archer: '심안강궁', lancer: '바람제일식창', monk: '진새나조갑' } },
   raid_brit: { pow: 12, armor: '황혼의갑주', shield: '천성대방패',
-    weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '나라강궁', lancer: '바람홍옥창' } },
+    weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '나라강궁', lancer: '바람홍옥창', monk: '제화금홍권갑' } },
   raid_gwoe: { pow: 11, armor: '황혼의갑주', shield: '주술방패',
-    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱', archer: '목인석심의궁', lancer: '흑곡창' } },
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱', archer: '목인석심의궁', lancer: '흑곡창', monk: '진비조권갑' } },
   raid_varuna: { pow: 12, armor: '용왕의용포', shield: '거문고',
-    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비', archer: '천부연궁', lancer: '금강비창' } },
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비', archer: '천부연궁', lancer: '금강비창', monk: '권제철갑' } },
   raid_agni: { pow: 13, armor: '불의갑주', shield: '일광방패',
-    weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱', archer: '흑일멸화궁', lancer: '극독지옥창' } },
+    weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱', archer: '흑일멸화궁', lancer: '극독지옥창', monk: '적풍권갑' } },
   raid_airavata: { pow: 14, armor: '선녀의옷', shield: '천성대방패',
-    weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장', archer: "극'흑일신궁", lancer: '천부연극' } },
+    weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장', archer: "극'흑일신궁", lancer: '천부연극', monk: '백운권갑' } },
 };
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
-export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉', archer: '용섬제일궁', lancer: '용무제일창' };
+export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉', archer: '용섬제일궁', lancer: '용무제일창', monk: '용비제일권갑' };
 export const CRAFT_POWER = 10;
 for (const [cls, name] of Object.entries(CRAFT_GEAR)) if (!GEAR[cls].weapon.includes(name)) GEAR[cls].weapon.push(name);
 

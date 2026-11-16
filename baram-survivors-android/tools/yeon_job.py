@@ -63,6 +63,23 @@ JOBS = {
         'helmet_pool': [243030, 243031, 243000, 243034],
         'cape_craft': {'cr_steel_cape': 254000},
     },
+    # 격투가 (Job_5): its own F_ clips and body, 대련복 (61xxx, their "_f" sheets), 권갑 (60xxx:
+    # fighter_weapon_0001_a in the Weapon slot, _b in Weapon_back), 용비제N권갑, 용비 helmets, 권신의망토.
+    'monk': {
+        'anims': {**{f'{a}_{d}': f'Avatar_0001_F_{c}_{d.capitalize()}' for a, c in (('walk', 'Walk'), ('idle', 'Idle'), ('cast', 'Spell'))
+                     for d in ('down', 'up', 'side')},
+                  **{f'atk_{d}': f'Avatar_0001_F_Attack_{d.capitalize()}_A' for d in ('down', 'up', 'side')},
+                  'dead': 'Avatar_0001_Dead'},
+        'weapon': 'template', 'weapon_files': ('fighter_weapon_0001_a.png', 'fighter_weapon_0001_b.png'),
+        'body': 'F',
+        'armor_pool': [(3, 61001), (5, 61005), (8, 61008), (10, 61010), (12, 61013), (99, 61017)],
+        'dragon': [60022, 60028, 60033, 60048, 60049, 60050, 60078, 60081, 60083, 60084],
+        'weapon_pool': [60900, 60901, 60000, 60001, 60003, 60004, 60006, 60008, 60009, 60011, 60013, 60015,
+                        60017, 60018, 60019, 60021, 60040, 60045, 60065],
+        'dragon_helmet': 63024,
+        'helmet_pool': [63022, 63029, 63030],
+        'cape_craft': {'cr_steel_cape': 66000},
+    },
 }
 
 
@@ -118,6 +135,9 @@ def main():
                 if not fr or not bk or not spear_layout(tex_n.get(fr, 0)) or tex_n.get(fr) != tex_n.get(bk):
                     return {}
                 return {'F': fr, 'B': bk}
+            if J['weapon'] == 'template':
+                fr, bk = (f.get(n) for n in J['weapon_files'])
+                return {'E': fr, 'B': bk} if fr and bk else {}
             return {}
         if kind == 'cape':
             e = next((t for n, t in f.items() if n.endswith('_e.png') and 'cape' in n), None) \
@@ -128,7 +148,10 @@ def main():
                 e = c and c['tid']
             if a is None:
                 a = next((c['tid'] for c in catalog if c['id'] == str(iid) and c['tex'].lower() == f'item_{iid}_a'), None)
-            return {'E': e, 'A': a}
+            # The 격투가's own body frames (51) have a sheet of their own, by the same numbers.
+            fs = next((t for n, t in f.items() if n.endswith('_f.png') and tex_n.get(t) == 51), None) \
+                or next((c['tid'] for c in catalog if c['id'] == str(iid) and c['tex'].lower() == f'item_{iid}_f' and c['n'] == 51), None)
+            return {'E': e, 'A': a, 'F': fs}
         if kind == 'helmet':
             c = YG.tex_for(catalog, iid, 'helmet')
             if c is None:
@@ -143,6 +166,9 @@ def main():
     def add(kind, iid, v=None):
         tx = ftex(iid, kind)
         if not any(tx.values()):
+            return None
+        # A piece without the sheet the class's body needs would leave the figure bare.
+        if kind in ('armor', 'cape') and J.get('body') and not tx.get(J['body']):
             return None
         v = v or ({'armor': 'a'}.get(kind, '') + str(iid))
         variants[(kind, v)] = (tx, iid, names_of.get(str(iid), ''))
@@ -317,7 +343,9 @@ def main():
             k, s = slot(st, 'Cape')
             if not s or not s['active'] or bi is None:
                 return out_l, orders
-            if bk == 'A':
+            if bk == 'F':
+                alt = bytex.get((tx.get('F'), str(bi)))
+            elif bk == 'A':
                 if not tx.get('A'):
                     return out_l, orders
                 n = sum(1 for (t, _) in bytex if t == tx['A'])
@@ -348,7 +376,7 @@ def main():
                 if alt is None:
                     continue
             elif kind in ('helmet', 'weapon', 'wback', 'shield'):
-                alt = bytex.get((tx.get('E'), idx))
+                alt = bytex.get((tx.get('B' if kind == 'wback' else 'E'), idx))
                 if alt is None:
                     continue
             out_l.append(place(s['pos'], tmpl, alt, root if k != 0 else None))
@@ -356,7 +384,7 @@ def main():
         return out_l, orders
 
     lv = [('back', 'base'), ('body', 'base'), ('head', 'base')] + sorted(variants)
-    if J['weapon'] == 'spear':
+    if J['weapon'] in ('spear', 'template'):
         lv += [('wback', v) for (k, v) in sorted(variants) if k == 'weapon']
         for (k, v), val in list(variants.items()):
             if k == 'weapon':

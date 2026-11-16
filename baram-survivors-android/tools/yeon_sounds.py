@@ -121,6 +121,14 @@ MAP = {
         'l_annihil': 'SFX_Lancer_6th_1', 'l_dragon': 'SFX_Lancer_F_06', 'l_spirit': 'SFX_Lancer_T_02', 'l_javelin': 'SFX_Lancer_IntangibleJavelin',
         'l_thunder': 'SFX_Lancer_T_07', 'l_union': 'SFX_Lancer_T_03', 'l_reflect': 'SFX_Lancer_S_01_1', 'l_moonfull': 'SFX_Lancer_T_04_Super',
         'l_ult': 'SFX_Lancer_F_03_Super',
+        # 격투가 (Job_5): its 승급 SFX_Fighter_* clips; its 일반 records carry none, so the fist sounds of 연's own fx_skill_* set.
+        'mk_bung': 'fx_skill_deathfist', 'mk_sudden': 'fx_skill_thunderfist', 'mk_smash': 'SFX_Fighter_4th_03_1', 'mk_body': 'SFX_Fight_BodyCheck',
+        'mk_quake': 'fx_skill_quake', 'mk_switch': 'fx_skill_fightspirit', 'mk_pointblue': 'fx_skill_thunderfist', 'mk_pointlight': 'SFX_Fighter_4th_03',
+        'mk_uppercut': 'SFX_Fighter_4th_03_1', 'mk_endure': 'fx_skill_fightspirit', 'mk_spirit': 'fx_skill_fightspirit', 'mk_pointburst': 'fx_skill_quake',
+        'mk_resonance': 'SFX_Fighter_5th_2', 'mk_rupture': 'fx_skill_quake', 'mk_diamond': 'SFX_Fighter_4th_03', 'mk_wolf': 'SFX_Fighter_4th_02',
+        'mk_buddha': 'SFX_Fighter_4th_03_2', 'mk_combo': 'SFX_Fighter_5th_1', 'mk_technique': 'SFX_Fighter_5th_3', 'mk_advent': 'SFX_Fighter_4th_03_2',
+        'mk_kyokushin': 'SFX_Fighter_6th_1', 'mk_focus': 'fx_skill_fightspirit', 'mk_feint': 'fx_skill_fightspirit', 'mk_point': 'fx_skill_deathfist',
+        'mk_origin': 'fx_skill_fightspirit', 'mk_aventhit': 'SFX_Fighter_6th_1', 'mk_ult': 'SFX_Fighter_5th_1',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are

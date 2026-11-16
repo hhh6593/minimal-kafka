@@ -30,6 +30,9 @@ export const CLASSES = [
   // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
   { id: 'lancer', name: '무사', hero: '1001', hp: 160, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
     desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
+  // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
+  { id: 'monk', name: '격투가', hero: '1001', hp: 175, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
+    desc: '맨주먹의 근접 격수. 파고들어 두들기고, 혈을 짚어 묶고, 땅을 갈라 터뜨린다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -523,6 +526,74 @@ export const SKILLS = {
     desc: '궁극기. 달빛 아래 번개를 두른 창격이 화면의 모든 몬스터를 벤다' },
   l_ult: { cls: 'lancer', name: '백월난격', kind: 'ult', fx: '144', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 흰 달의 난격을 퍼붓는다' },
+
+  // 격투가 (바람의나라 연 Job_5): its own skill list (Skills_Player 2051xxxx 일반, 2052xxxx 승급), each with
+  // the effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_monk_skills.json). 1차~6차 are
+  // 연's own (권사·권호·권왕·권제·권신·권극); 연 has no 7차~9차 for the 격투가, so those take its remaining
+  // 일반 techniques (정신집중, 허허실실, 점혈:통, 권법의기원, 권신강림의 추가타). Most of its 일반 records
+  // carry no sound of their own: they take the 격투가's fist sounds (fx_skill_deathfist, _thunderfist,
+  // _fightspirit, _quake) and its 승급 SFX_Fighter_* clips. The fx here is only the old fallback.
+  mk_bung: { cls: 'monk', req: 1, name: '붕권', kind: 'slash', fx: '19', dmg: 14, cd: 0.6,
+    desc: '곁의 몬스터를 주먹으로 친다. 단이 오르면 더 여러 번, 앞뒤 양옆까지 친다' },
+  mk_sudden: { cls: 'monk', req: 1, name: '전광석화', kind: 'blink', fx: '52', dmg: 16, cd: 1.3, range: 4, count: 2,
+    desc: '번개처럼 몬스터 등 뒤로 파고들며 두 번 친다' },
+  mk_smash: { cls: 'monk', req: 1, name: '비연격', kind: 'cleave', fx: '20', dmg: 20, cd: 1.8, depth: 1, max: 4,
+    desc: '제비처럼 날아올라 앞쪽 몬스터 넷을 걷어찬다' },
+  mk_body: { cls: 'monk', req: 6, name: '철산고', kind: 'line', fx: '144', dmg: 22, cd: 2.4, depth: 3, dash: true, stun: 0.5,
+    desc: '어깨로 들이받으며 바라보는 쪽 일렬 세 칸을 밀고 나간다' },
+  mk_quake: { cls: 'monk', req: 6, name: '천지파동', kind: 'nova', fx: '25', dmg: 24, cd: 2.6, radius: 1, stun: 0.5,
+    desc: '땅을 내려쳐 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  mk_switch: { cls: 'monk', req: 12, name: '혈도개방', kind: 'buff', buff: 'power', fx: '6', cd: 14, duration: 4, power: 0.5,
+    desc: '혈도를 열어 잠시 모든 피해가 늘어난다' },
+  // 1차 권사
+  mk_pointblue: { promo: 1, cls: 'monk', req: 6, name: '점혈:기', kind: 'spell', fx: '53', dmg: 16, cd: 2.2, range: 5, count: 2, stun: 0.8,
+    desc: '몬스터 둘의 혈을 짚어 잠시 기를 막는다(멈춤)' },
+  mk_uppercut: { promo: 1, cls: 'monk', req: 6, name: '격풍권', kind: 'strike', fx: '24', dmg: 24, cd: 2.6, range: 4, radius: 0, count: 2,
+    hitAt: 0.2, stun: 0.6, desc: '바람을 일으키는 올려치기로 몬스터 둘을 띄운다' },
+  // 2차 권호
+  mk_pointlight: { promo: 2, cls: 'monk', req: 10, name: '점혈:광', kind: 'strike', fx: '147', dmg: 20, cd: 2.8, range: 6, radius: 2, count: 1,
+    hitAt: 0.3, up: 'mk_buddha', desc: '혈을 짚은 몬스터에게서 기가 터져 그 주위를 친다' },
+  mk_endure: { promo: 2, cls: 'monk', req: 10, name: '인고의시간', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '고통을 참아 내며 잠시 어떤 공격에도 쓰러지지 않는다(무적)' },
+  mk_spirit: { promo: 2, cls: 'monk', req: 10, name: '투혼', kind: 'buff', buff: 'haste', fx: '7', cd: 15, duration: 4,
+    desc: '투혼을 불태워 잠시 모든 기술이 빨리 돈다' },
+  // 3차 권왕
+  mk_pointburst: { promo: 3, cls: 'monk', req: 14, name: '점혈:폭', kind: 'strike', fx: '147', dmg: 22, cd: 3, range: 6, radius: 1, count: 2,
+    hitAt: 0.3, stun: 1, desc: '짚은 혈을 터뜨려 몬스터 둘과 그 주위를 기절시킨다' },
+  mk_resonance: { promo: 3, cls: 'monk', req: 14, name: '공명권', kind: 'line', fx: '22', dmg: 22, cd: 2.4, depth: 5,
+    desc: '울림이 퍼지는 주먹이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  mk_rupture: { promo: 3, cls: 'monk', req: 14, name: '천지파열', kind: 'nova', fx: '25', dmg: 24, cd: 3.4, radius: 2,
+    desc: '대지를 갈라 둘레 두 칸의 몬스터를 터뜨린다' },
+  // 4차 권제
+  mk_diamond: { promo: 4, cls: 'monk', req: 18, name: '금강불괴', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '금강 같은 몸이 되어 잠시 받는 피해를 절반으로 줄인다' },
+  mk_wolf: { promo: 4, cls: 'monk', req: 18, name: '낭아권', kind: 'cleave', fx: '140', dmg: 26, cd: 2.6, depth: 2, max: 6,
+    desc: '이리의 송곳니 같은 연타로 앞쪽 몬스터 여섯을 물어뜯는다' },
+  mk_buddha: { promo: 4, cls: 'monk', req: 18, evolved: true, name: '여래신장', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '점혈:광 8단 + 4차 승급. 하늘에서 내려찍는 거대한 손바닥이 화면의 모든 몬스터를 친다' },
+  // 5차 권신
+  mk_combo: { promo: 5, cls: 'monk', req: 21, name: '연속필살권무', kind: 'strike', fx: '148', dmg: 30, cd: 3.2, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, desc: '격투가의 궁극오의. 쉴 새 없는 권무로 몬스터 둘과 그 주위를 두들긴다' },
+  mk_technique: { promo: 5, cls: 'monk', req: 21, name: '권신기법', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.7,
+    desc: '권신의 기법을 깨쳐 잠시 공격력이 크게 오른다' },
+  mk_advent: { promo: 5, cls: 'monk', req: 21, name: '권신강림', kind: 'strike', fx: '115', dmg: 26, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.35, curse: 3, desc: '권신을 불러 대상과 그 주위를 내리치고 약화시킨다' },
+  // 6차 권극
+  mk_kyokushin: { promo: 6, cls: 'monk', req: 24, name: '극진권', kind: 'line', fx: '144', dmg: 34, cd: 3, depth: 6, dash: true,
+    desc: '극에 이른 주먹으로 바라보는 쪽 일렬 여섯 칸을 뚫고 나간다' },
+  // 7차~9차: 연's other 격투가 techniques
+  mk_focus: { promo: 7, cls: 'monk', req: 27, name: '정신집중', kind: 'heal', fx: '125', heal: 24, cd: 13, shieldT: 3,
+    desc: '정신을 모아 체력을 회복하고 잠시 보호막을 두른다' },
+  mk_feint: { promo: 7, cls: 'monk', req: 27, name: '허허실실', kind: 'buff', buff: 'stealth', fx: '36', cd: 14, duration: 2.5,
+    desc: '허와 실을 뒤섞어 잠시 몬스터의 눈을 피하고, 그동안 주는 피해가 커진다' },
+  mk_point: { promo: 8, cls: 'monk', req: 30, name: '점혈:통', kind: 'spell', fx: '55', dmg: 32, cd: 1.8, range: 6, count: 3, curse: 2,
+    desc: '몬스터 셋의 통혈을 짚어 피해를 주고 약화시킨다' },
+  mk_origin: { promo: 8, cls: 'monk', req: 30, name: '권법의기원', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '권법의 근원에 닿아 잠시 공격력이 크게 오른다' },
+  mk_aventhit: { promo: 9, cls: 'monk', req: 33, name: '권신강림 추가타', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 강림한 권신이 화면의 모든 몬스터를 다시 내려친다' },
+  mk_ult: { cls: 'monk', name: '필살권무', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 쉴 새 없는 권무를 퍼붓는다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -560,6 +631,11 @@ export const BRANCHES = {
     { name: '창격', note: '휘두르고 내리꽂는다', ids: ['l_halfmoon', 'l_meteor', 'l_rise', 'l_illusion', 'l_extinct', 'l_waves', 'l_burst', 'l_genesis', 'l_extinct2', 'l_formless', 'l_dragon', 'l_release', 'l_spirit'] },
     { name: '기공', note: '기를 돌려 몸을 지킨다', ids: ['l_wind', 'l_innate', 'l_unity', 'l_guard', 'l_thunder', 'l_union', 'l_reflect'] },
   ],
+  monk: [
+    { name: '권법', note: '파고들어 두들긴다', ids: ['mk_bung', 'mk_sudden', 'mk_smash', 'mk_body', 'mk_uppercut', 'mk_wolf', 'mk_combo', 'mk_kyokushin', 'mk_resonance'] },
+    { name: '점혈', note: '혈을 짚어 묶고 터뜨린다', ids: ['mk_pointblue', 'mk_pointlight', 'mk_pointburst', 'mk_buddha', 'mk_quake', 'mk_rupture', 'mk_advent', 'mk_point', 'mk_aventhit'] },
+    { name: '내공', note: '기를 돌려 몸을 지킨다', ids: ['mk_switch', 'mk_endure', 'mk_spirit', 'mk_diamond', 'mk_technique', 'mk_focus', 'mk_feint', 'mk_origin'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -579,8 +655,10 @@ const PRE = {
   a_bloodsuck: 'a_thunder', a_shadow: 'a_bloodsuck', a_weebo: 'a_shadow', a_bless: 'a_shadow',
   l_extinct2: 'l_extinct', l_annihil: 'l_rush', l_dragon: 'l_annihil', l_javelin: 'l_dragon', l_formless: 'l_burst',
   l_guard: 'l_unity', l_thunder: 'l_guard', l_union: 'l_guard', l_reflect: 'l_union', l_spirit: 'l_release',
+  mk_combo: 'mk_wolf', mk_kyokushin: 'mk_combo', mk_advent: 'mk_rupture', mk_point: 'mk_advent', mk_technique: 'mk_diamond',
+  mk_focus: 'mk_technique', mk_feint: 'mk_focus', mk_origin: 'mk_feint',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -639,7 +717,7 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
 // The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'] };
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {
