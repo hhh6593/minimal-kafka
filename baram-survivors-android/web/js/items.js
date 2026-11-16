@@ -228,13 +228,13 @@ export const CRAFTS = [
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
-  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 14, opt: 'life',
+  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 14, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 14, opt: 'mana',
+  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 14, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   { id: 'cr_sinsu_baekho', kind: 'cape', name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed',
     mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑',
+  { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑', pic: 'name', picTop: "진'현무불괴갑",
     look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주' }, pow: 14, opt: 'life',
     mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
@@ -283,6 +283,8 @@ export function craftPicture(sp, cls, star = 1) {
   const c = sp && sp.craft;
   if (!c || !c.pic) return null;
   const name = typeof c.name === 'string' ? c.name : c.name[cls];
+  // A piece with a 진' form (the 사신수 지존 장비) shows it from ★5.
+  if (c.picTop && star >= 5) return c.picTop;
   return c.steps ? name + c.steps[Math.max(1, Math.min(c.steps.length, star)) - 1] + '성' : name;
 }
 
