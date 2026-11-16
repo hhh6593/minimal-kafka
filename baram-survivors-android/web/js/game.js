@@ -2617,7 +2617,8 @@ function killEnemy(e) {
   c.pop = G.t;
   c.best = Math.max(c.best, c.n);
   if (COMBO_AT.includes(c.n)) {
-    banner(`연속 처치 ${c.n}!`);
+    // The closing sweep counts on, but the 정복 banner stays up.
+    if (!(G.sweepUntil && G.t < G.sweepUntil + 3)) banner(`연속 처치 ${c.n}!`);
     // 연's kill-streak voice, one step louder at each mark.
     audio.play('combo', null, COMBO_AT.indexOf(c.n) + 1);
     G.flash = G.t;
@@ -5105,6 +5106,8 @@ function showResults(title) {
   G.over = true;
   // Whatever was open goes: the results are on top of nothing.
   $('#levelup').hidden = true;
+  $('#banner').hidden = true;
+  clearTimeout(banner.t);
   G.choosing = false;
   G.pendingLevels = 0;
   bankGold();
@@ -5181,6 +5184,8 @@ function promote() {
 
 function banner(text) {
   const b = $('#banner');
+  // Nothing over the results window (the field behind it still runs out its last blows).
+  if (G && G.over) return;
   b.textContent = text;
   b.hidden = false;
   clearTimeout(banner.t);
