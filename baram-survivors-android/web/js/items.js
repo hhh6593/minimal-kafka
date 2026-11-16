@@ -155,7 +155,7 @@ export const CRAFTS = [
     look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '횃불' }, pow: 8, opt: 'power', mats: { ember: 12, horn: 4 }, gold: 3500 },
   { id: 'cr_jade_armor', kind: 'armor', name: '옥룡 갑옷', look: '선녀의옷', pow: 9, opt: 'life', mats: { jade: 12, scale: 4 }, gold: 4500 },
   { id: 'cr_jade_shield', kind: 'shield', name: '백옥 방패', look: '정화의방패', pow: 9, opt: 'regen', mats: { jade: 12 }, gold: 4500 },
-  { id: 'cr_dragon_armor', kind: 'armor', name: { warrior: '용천파천갑', rogue: '용마파천갑', mage: '용겸파천의', poet: '용랑파천의' }, look: '용왕의용포', pow: 10, opt: 'guard',
+  { id: 'cr_dragon_armor', kind: 'armor', name: { warrior: '용마파천갑', rogue: '용천파천갑', mage: '용랑파천의', poet: '용겸파천의' }, look: '용왕의용포', pow: 10, opt: 'guard',
     mats: { scale: 20, pearl: 1 }, gold: 6000, pic: 'name', steps: [1, 3, 5, 7, 10] },
   { id: 'cr_dragon_shield', kind: 'shield', name: '용린방패', look: '백룡현갑', pow: 10, opt: 'power', mats: { scale: 15, pearl: 1 }, gold: 6000 },
   // Today's client's legendary gear (중국전설 금린, 일본전설 무신, 타계 고대마령, 용 멸아): drawn
@@ -194,12 +194,12 @@ export const CRAFTS = [
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_steel_cape', kind: 'cape', name: { warrior: "무신귀갑주", rogue: "무신귀갑주", mage: "천신부금장", poet: "천신부금장" }, look: { warrior: "무신귀갑주1성", rogue: "무신귀갑주1성", mage: "천신부금장1성", poet: "천신부금장1성" }, pow: 12, opt: 'boss', mats: { steel: 12, scroll: 1 }, gold: 8000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
-  { id: 'cr_dragon_helm', kind: 'helmet', name: { warrior: "용아투구'천", rogue: "용아투구'마", mage: "용아천관'겸", poet: "용아천관'랑" }, look: { warrior: "용아투구'천1성", rogue: "용아투구'마1성", mage: "용아천관'겸1성", poet: "용아천관'랑1성" }, pow: 13, opt: 'power', mats: { essence: 12, scale: 15, pearl: 1 }, gold: 15000,
+  { id: 'cr_dragon_helm', kind: 'helmet', name: { warrior: "용아투구'마", rogue: "용아투구'천", mage: "용아천관'랑", poet: "용아천관'겸" }, look: { warrior: "용아투구'마1성", rogue: "용아투구'천1성", mage: "용아천관'랑1성", poet: "용아천관'겸1성" }, pow: 13, opt: 'power', mats: { essence: 12, scale: 15, pearl: 1 }, gold: 15000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon2', kind: 'weapon', name: { warrior: '마곡검', rogue: '패협검', mage: '백선마봉', poet: '암혈홍접선' },
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채' }, pow: 13, opt: 'boss', from: 'cr_gold_weapon',
     mats: { gold: 20, kalpa: 15, scroll: 2 }, gold: 15000, pic: 'name', legend: true },
-  { id: 'cr_dragon_armor2', kind: 'armor', name: { warrior: '용천멸아갑', rogue: '용마멸아갑', mage: '용겸멸아의', poet: '용랑멸아의' },
+  { id: 'cr_dragon_armor2', kind: 'armor', name: { warrior: '용마멸아갑', rogue: '용천멸아갑', mage: '용랑멸아의', poet: '용겸멸아의' },
     look: '용왕의용포', pow: 13, opt: 'life', from: 'cr_dragon_armor', mats: { essence: 15, scale: 20, pearl: 2 }, gold: 20000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_brit_shield', kind: 'shield', name: '브리트라한의방패', look: '천성대방패', pow: 13, opt: 'regen', from: 'cr_steel_shield',
@@ -240,7 +240,7 @@ export function starMats(sp, star) {
 
 /** The 용무기 line of each class, 제일 to 제십 (today's client's names). */
 const NUM = ['일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'];
-const DRAGON_LINE = { warrior: ['용천제', '검'], rogue: ['용마제', '검'], mage: ['용겸제', '봉'], poet: ['용랑제', '봉'] };
+const DRAGON_LINE = { warrior: ['용마제', '검'], rogue: ['용천제', '검'], mage: ['용랑제', '봉'], poet: ['용겸제', '봉'] };
 export const DRAGON_MAX = 10;
 export function dragonName(cls, step) {
   const [a, b] = DRAGON_LINE[cls];

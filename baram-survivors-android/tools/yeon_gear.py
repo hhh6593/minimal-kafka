@@ -65,11 +65,11 @@ POOL = {
         'poet': [1089, 1098, 1917, 1926, 1472],
     },
     'shield': [7201, 7202, 7203, 7204, 7006, 7008, 507001, 507023],
-    'helmet': {'warrior': [2006, 202037], 'rogue': [2006, 202043], 'mage': [2006, 202055], 'poet': [2006, 202049]},
+    'helmet': {'warrior': [2006, 202037], 'rogue': [2006, 202043], 'mage': [2006, 202049], 'poet': [2006, 202055]},
 }
 # The 용무기 lines (Items_Weapon tags C(itd1..4) = Job_1..4: 전사, 도적, 주술사, 도사):
 # step n is item base + n - 1; a step without a worn sheet wears the nearest lower one.
-DRAGON = {'warrior': 1207, 'rogue': 1110, 'mage': 1409, 'poet': 1307}
+DRAGON = {'warrior': 1110, 'rogue': 1207, 'mage': 1307, 'poet': 1409}
 POOL['cape'] = {c: [85002, 4055, 504001, 504007, 504021, 803626] for c in ('warrior', 'rogue', 'mage', 'poet')}
 
 

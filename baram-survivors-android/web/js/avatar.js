@@ -12,10 +12,10 @@ export const WALK_MS = 135;
 // Names are the wardrobe's.
 export const GEAR = {
   warrior: { head: '17', armor: ['남자갑옷', '남자갑주', '비늘남자갑주', '궁중무사갑주', '남자무사옷', '불의갑주'],
-    weapon: ['목검', '철검', '백화검', '환두대도', '칠지도', '용천제일검', '청룡의검', '참마도'],
+    weapon: ['목검', '철검', '백화검', '환두대도', '칠지도', '용마제일검', '청룡의검', '참마도'],
     shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
   rogue: { head: '56', armor: ['호위무사옷', '흑영협객도복', '무도가옷', '해골갑옷', '중국풍남자옷', '황혼의갑주'],
-    weapon: ['비늘단도', '가시철단도', '철도', '진아광검', '도룡보도', '용마제일검', '저주의단검'],
+    weapon: ['비늘단도', '가시철단도', '철도', '진아광검', '도룡보도', '용천제일검', '저주의단검'],
     shield: ['보라방패', '월광방패', '일광방패'] },
   mage: { head: '20', armor: ['남자신관복', '남자성광법의', '자개망토옷', '곤룡포', '용왕의용포'],
     weapon: ['해룡의지팡이', '월광천봉', '원혼의낫', '일월대도', '현랑부', '심판의낫', '흑단화염장'],
@@ -29,7 +29,7 @@ export const GEAR = {
 // are shared. Today's crafted pieces (items.js) are added after these as crafted-only looks.
 const HELMETS = ['연두색남자투구', '가죽남자투구', '구리남자투구', '청동남자투구', '금장남자투구', '북방의남자투구'];
 const CAPES = ['남옥망토', '얼음망토', '숲의권속망토', '추방자망토', '몰락자망토', '밤의 인도자 날개(남)'];
-const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용겸제사투구', poet: '용랑제사투구' };
+const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용랑제사투구', poet: '용겸제사투구' };
 for (const [cls, g] of Object.entries(GEAR)) {
   g.helmet = [...HELMETS, DRAGON_HELMET[cls]];
   g.cape = [...CAPES];
@@ -72,7 +72,7 @@ export const RAID_GEAR = {
 };
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
-export const CRAFT_GEAR = { warrior: '용천제일검', rogue: '용마제일검', mage: '용겸제일봉', poet: '용랑제일봉' };
+export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉' };
 export const CRAFT_POWER = 10;
 for (const [cls, name] of Object.entries(CRAFT_GEAR)) if (!GEAR[cls].weapon.includes(name)) GEAR[cls].weapon.push(name);
 
