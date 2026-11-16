@@ -42,6 +42,9 @@ export const CLASSES = [
   // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
   { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
     desc: '방망이를 휘두르는 근접 장사. 후려치고 메치고, 일격필살로 강한 적을 내리찍는다.' },
+  // 바람의나라 연's 차사 (Job_10): 백도, figure, skills and sounds only from 연's resources.
+  { id: 'reaper', name: '차사', hero: '1002', hp: 180, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
+    desc: '저승의 백도를 든 근접 격수. 베고 파고들며, 영혼의 화살과 업화로 넓게 거둔다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -806,6 +809,66 @@ export const SKILLS = {
     desc: '궁극기. 격노한 도깨비의 방망이가 화면의 모든 몬스터를 내리찍는다' },
   dk_ult: { cls: 'dokkaebi', name: '금나와라,뚝딱', kind: 'ult', fx: '144', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 도깨비방망이로 화면의 몬스터를 두들긴다' },
+
+  // 차사 (바람의나라 연 Job_10): its own skill list (Skills_Player 210xxxxx), each with the effect, icon and
+  // sound of that 연 record (fx k_<id>, tools/yeon_reaper_skills.json). 연 numbers the 차사's skills in one
+  // run; its 승급 tiers come from its sound names (SFX_Reaper_1st_ … 6th_): 1차 수라마검·역공, 2차 풍혼일섬 (with
+  // 흡기공·영혼걸음), 3차 무간업화·대영살·영검, 4차 분쇄섬·나선광륜, 5차 영기방출·영기부활, 6차 살극 (사자·사명자·
+  // 사저·천명사·월직·일직). 연 has no 7차~9차 for the 차사: those take its remaining 일반 techniques (영혼족쇄,
+  // 영기방벽, 개안, 저승문). 절섬, 나선광륜, 영기방출 and 저승문 are particle or broken-alpha effects in 연's
+  // bundle: they show the 차사's own 풍혼일섬 swing, 살극 rings, 영기 spirit and 대영살 burst. The fx here
+  // is only the old fallback.
+  rp_cut: { cls: 'reaper', req: 1, name: '절섬', kind: 'cleave', fx: '20', dmg: 18, cd: 0.75, depth: 1, max: 4,
+    desc: '백도로 앞쪽을 베어 몬스터 넷을 끊어 낸다' },
+  rp_flash: { cls: 'reaper', req: 1, name: '진섬\'연', kind: 'blink', fx: '52', dmg: 16, cd: 1.6, range: 5, count: 2,
+    desc: '번쩍이며 몬스터 등 뒤로 파고들어 두 번 벤다' },
+  rp_shot: { cls: 'reaper', req: 1, name: '영살', kind: 'spell', fx: '53', dmg: 18, cd: 1.8, range: 6, count: 2,
+    desc: '영혼의 화살로 몬스터 둘을 꿰뚫는다. 4·7단에 하나씩 는다' },
+  rp_walk: { cls: 'reaper', req: 6, name: '영혼걸음', kind: 'buff', buff: 'haste', fx: '7', cd: 14, duration: 4,
+    desc: '혼의 걸음으로 잠시 모든 기술이 빨리 돈다' },
+  rp_spiral: { cls: 'reaper', req: 6, name: '나선회륜', kind: 'nova', fx: '25', dmg: 24, cd: 2.4, radius: 1,
+    desc: '백도를 나선으로 돌려 둘러싼 몬스터를 벤다' },
+  rp_drain: { cls: 'reaper', req: 12, name: '흡기공', kind: 'heal', fx: '125', heal: 18, cd: 12,
+    desc: '혼의 기운을 빨아들여 이따금 체력을 회복한다' },
+  // 1차 사자
+  rp_asura: { promo: 1, cls: 'reaper', req: 6, name: '수라마검', kind: 'cleave', fx: '20', dmg: 22, cd: 2.2, depth: 2, max: 6,
+    up: 'rp_crush', desc: '수라의 검으로 앞쪽을 크게 베어 몬스터 여섯을 친다' },
+  rp_counter: { promo: 1, cls: 'reaper', req: 6, name: '역공', kind: 'nova', fx: '25', dmg: 18, cd: 3, radius: 1, stun: 0.5,
+    desc: '받아치는 혼의 기운으로 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  // 2차 사명자
+  rp_wind: { promo: 2, cls: 'reaper', req: 10, name: '풍혼일섬', kind: 'line', fx: '22', dmg: 22, cd: 2.4, depth: 5,
+    desc: '바람의 혼을 실은 일섬이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 벤다' },
+  // 3차 사저
+  rp_inferno: { promo: 3, cls: 'reaper', req: 14, name: '무간업화', kind: 'strike', fx: '148', dmg: 18, cd: 3.4, range: 6, radius: 2, count: 1,
+    hitAt: 0.35, ticks: 2, desc: '무간지옥의 업화를 대상 자리에 피워 그 주위를 거듭 태운다' },
+  rp_arrow: { promo: 3, cls: 'reaper', req: 14, name: '대영살', kind: 'strike', fx: '147', dmg: 26, cd: 3, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, desc: '큰 영혼의 화살이 몬스터 둘과 그 주위를 터뜨린다' },
+  rp_soulbuff: { promo: 3, cls: 'reaper', req: 14, name: '영검', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.6,
+    desc: '백도에 영혼을 깃들여 잠시 모든 피해가 크게 늘어난다' },
+  // 4차 천명사
+  rp_crush: { promo: 4, cls: 'reaper', req: 18, evolved: true, name: '분쇄섬', kind: 'cleave', fx: '140', dmg: 28, cd: 2.6, depth: 3, max: 9,
+    desc: '수라마검 8단 + 4차 승급. 앞쪽 넓은 범위의 몬스터 아홉을 부수듯 벤다' },
+  rp_madness: { promo: 4, cls: 'reaper', req: 18, name: '나선광륜', kind: 'nova', fx: '25', dmg: 26, cd: 3.2, radius: 2,
+    desc: '광기의 고리를 휘돌려 둘레 두 칸의 몬스터를 벤다' },
+  // 5차 월직
+  rp_burst: { promo: 5, cls: 'reaper', req: 21, name: '영기방출', kind: 'strike', fx: '115', dmg: 30, cd: 3, range: 6, radius: 1, count: 3,
+    hitAt: 0.3, curse: 3, desc: '차사의 궁극오의. 모은 영기를 풀어 몬스터 셋과 그 주위를 치고 약화시킨다' },
+  rp_resurrect: { promo: 5, cls: 'reaper', req: 21, name: '영기부활', kind: 'heal', fx: '125', heal: 28, cd: 13, shieldT: 3,
+    desc: '영기로 몸을 되살려 체력을 회복하고 잠시 보호막을 두른다' },
+  // 6차 일직
+  rp_deadly: { promo: 6, cls: 'reaper', req: 24, name: '살극', kind: 'strike', fx: '139', dmg: 48, cd: 3, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '가장 강한 몬스터 둘(보스를 먼저)에게 죽음의 일격을 내리친다' },
+  // 7차~9차: 연's other 차사 techniques
+  rp_chain: { promo: 7, cls: 'reaper', req: 27, name: '영혼족쇄', kind: 'spell', fx: '115', dmg: 30, cd: 1.8, range: 7, count: 3, slow: 3,
+    desc: '영혼의 족쇄로 몬스터 셋을 묶어 피해를 주고 느리게 한다' },
+  rp_barrier: { promo: 7, cls: 'reaper', req: 27, name: '영기방벽', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 6,
+    desc: '영기의 방벽을 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  rp_eye: { promo: 8, cls: 'reaper', req: 30, name: '개안', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '저승의 눈을 떠 잠시 공격력이 크게 오른다' },
+  rp_gate: { promo: 9, cls: 'reaper', req: 33, name: '저승문', kind: 'screen', fx: '141', dmg: 60, cd: 9, slow: 2,
+    desc: '궁극기. 저승의 문을 열어 화면의 모든 몬스터를 끌어들여 친다' },
+  rp_ult: { cls: 'reaper', name: '차사강림', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 저승차사의 힘으로 화면의 몬스터를 벤다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -863,6 +926,11 @@ export const BRANCHES = {
     { name: '방망이', note: '휘두르고 휩쓴다', ids: ['dk_repel', 'dk_paddle', 'dk_roar', 'dk_whirl', 'dk_flatten', 'dk_fan', 'dk_weight', 'dk_storm', 'dk_goldhit'] },
     { name: '도깨비불', note: '불을 날리고 몸을 감춘다', ids: ['dk_wisp', 'dk_strength', 'dk_hat', 'dk_wispexp', 'dk_shock', 'dk_firebat', 'dk_body'] },
   ],
+  reaper: [
+    { name: '검술', note: '베고 파고든다', ids: ['rp_cut', 'rp_flash', 'rp_asura', 'rp_wind', 'rp_crush', 'rp_deadly', 'rp_spiral', 'rp_madness', 'rp_counter'] },
+    { name: '영혼', note: '혼을 쏘고 불태운다', ids: ['rp_shot', 'rp_inferno', 'rp_arrow', 'rp_burst', 'rp_chain', 'rp_gate'] },
+    { name: '저승', note: '기운을 빨고 몸을 지킨다', ids: ['rp_walk', 'rp_drain', 'rp_soulbuff', 'rp_resurrect', 'rp_barrier', 'rp_eye'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -890,8 +958,10 @@ const PRE = {
   cl_snake: 'cl_bagua', cl_intrep: 'cl_snake', cl_defense: 'cl_intrep',
   dk_hamstring: 'dk_judgment', dk_firebat: 'dk_shock', dk_weight: 'dk_fan', dk_storm: 'dk_weight', dk_goldhit: 'dk_storm',
   dk_body: 'dk_firebat', dk_nemesis: 'dk_hamstring',
+  rp_burst: 'rp_arrow', rp_resurrect: 'rp_soulbuff', rp_deadly: 'rp_madness', rp_chain: 'rp_deadly', rp_barrier: 'rp_resurrect',
+  rp_eye: 'rp_barrier',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer', dk_nemesis: 'dk_rage' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer', dk_nemesis: 'dk_rage', rp_chain: 'rp_gate' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -950,7 +1020,7 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
 // The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'], dokkaebi: ['귀명', '귀제', '귀황', '귀성', '신각', '귀극'] };
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'], dokkaebi: ['귀명', '귀제', '귀황', '귀성', '신각', '귀극'], reaper: ['사자', '사명자', '사저', '천명사', '월직', '일직'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {

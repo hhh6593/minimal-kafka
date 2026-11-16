@@ -153,6 +153,13 @@ MAP = {
         'dk_flatten': 'SFX_Dokkaebi_3rd_Equalizer', 'dk_fan': 'SFX_Dokkaebi_4th_DokkaebiFan', 'dk_super': 'SFX_Dokkaebi_4th_Supernatural_Cast', 'dk_hamstring': 'SFX_Dokkaebi_5th_HamstringHook',
         'dk_firebat': 'SFX_Dokkaebi_5th_Jwibulnori_Cast', 'dk_weight': 'SFX_Dokkaebi_5th_Weight_Attack', 'dk_storm': 'SFX_Dokkaebi_6th_DokkaebiStorm', 'dk_goldhit': 'SFX_Dokkaebi_WispGet_1',
         'dk_body': 'SFX_Dokkaebi_WispGet_2', 'dk_nemesis': 'SFX_Dokkaebi_Nemesis', 'dk_rage': 'SFX_Dokkaebi_3rd_Judgment_Alt', 'dk_ult': 'SFX_Dokkaebi_ComeOutGold',
+        # 차사 (Job_10): each skill's own SFX_Reaper_* clip (영혼걸음 and 흡기공 have none: its 영혼공명 and 영혼족쇄 hit).
+        'rp_cut': 'SFX_Reaper_Cutoff', 'rp_flash': 'SFX_Reaper_Flash', 'rp_shot': 'SFX_Reaper_SoulShot', 'rp_walk': 'SFX_Reaper_Resonate',
+        'rp_spiral': 'SFX_Reaper_Spiral', 'rp_drain': 'SFX_Reaper_Redemption_Hit', 'rp_asura': 'SFX_Reaper_1st_AsuraBalde', 'rp_counter': 'SFX_Reaper_1st_Counter',
+        'rp_wind': 'SFX_Reaper_2nd_WindSlash', 'rp_inferno': 'SFX_Reaper_3rd_InfernoBlaze', 'rp_arrow': 'SFX_Reaper_3rd_SoulArrow', 'rp_soulbuff': 'SFX_Reaper_3rd_SoulBuff',
+        'rp_crush': 'SFX_Reaper_4th_Crush', 'rp_madness': 'SFX_Reaper_4th_Madness', 'rp_burst': 'SFX_Reaper_5th_SoulBurst', 'rp_resurrect': 'SFX_Reaper_5th_Resurrect',
+        'rp_deadly': 'SFX_Reaper_6th_DeadlySlash', 'rp_chain': 'SFX_Reaper_Redemption', 'rp_barrier': 'SFX_Reaper_Barrier', 'rp_eye': 'SFX_Reaper_MindEye',
+        'rp_gate': 'SFX_Reaper_4th_HellGate', 'rp_ult': 'SFX_Reaper_5th_Advent',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are

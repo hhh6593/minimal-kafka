@@ -399,7 +399,29 @@ export const YEON_SOUNDS = {
  "skill_dk_body": "SFX_Dokkaebi_WispGet_2",
  "skill_dk_nemesis": "SFX_Dokkaebi_Nemesis",
  "skill_dk_rage": "SFX_Dokkaebi_3rd_Judgment_Alt",
- "skill_dk_ult": "SFX_Dokkaebi_ComeOutGold"
+ "skill_dk_ult": "SFX_Dokkaebi_ComeOutGold",
+ "skill_rp_cut": "SFX_Reaper_Cutoff",
+ "skill_rp_flash": "SFX_Reaper_Flash",
+ "skill_rp_shot": "SFX_Reaper_SoulShot",
+ "skill_rp_walk": "SFX_Reaper_Resonate",
+ "skill_rp_spiral": "SFX_Reaper_Spiral",
+ "skill_rp_drain": "SFX_Reaper_Redemption_Hit",
+ "skill_rp_asura": "SFX_Reaper_1st_AsuraBalde",
+ "skill_rp_counter": "SFX_Reaper_1st_Counter",
+ "skill_rp_wind": "SFX_Reaper_2nd_WindSlash",
+ "skill_rp_inferno": "SFX_Reaper_3rd_InfernoBlaze",
+ "skill_rp_arrow": "SFX_Reaper_3rd_SoulArrow",
+ "skill_rp_soulbuff": "SFX_Reaper_3rd_SoulBuff",
+ "skill_rp_crush": "SFX_Reaper_4th_Crush",
+ "skill_rp_madness": "SFX_Reaper_4th_Madness",
+ "skill_rp_burst": "SFX_Reaper_5th_SoulBurst",
+ "skill_rp_resurrect": "SFX_Reaper_5th_Resurrect",
+ "skill_rp_deadly": "SFX_Reaper_6th_DeadlySlash",
+ "skill_rp_chain": "SFX_Reaper_Redemption",
+ "skill_rp_barrier": "SFX_Reaper_Barrier",
+ "skill_rp_eye": "SFX_Reaper_MindEye",
+ "skill_rp_gate": "SFX_Reaper_4th_HellGate",
+ "skill_rp_ult": "SFX_Reaper_5th_Advent"
 };
 
 // 연's music for the moments the old soundtrack has nothing for.

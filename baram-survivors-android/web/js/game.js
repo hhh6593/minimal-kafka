@@ -3696,6 +3696,7 @@ const ULT_PATH = {
   magus: [[0, 'md_ult'], [4, 'md_exfrenzy'], [5, 'md_bloodbat'], [9, 'md_wavefrenzy']],
   celestial: [[0, 'cl_ult'], [4, 'cl_thunder'], [5, 'cl_tiger'], [9, 'cl_reindeer']],
   dokkaebi: [[0, 'dk_ult'], [4, 'dk_super'], [6, 'dk_storm'], [9, 'dk_rage']],
+  reaper: [[0, 'rp_ult'], [4, 'rp_crush'], [6, 'rp_deadly'], [9, 'rp_gate']],
 };
 function ultLook(cls) {
   const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
@@ -3734,10 +3735,10 @@ function syncUltMode() {
 const ULT_REST = 25;
 // Each class's 필살기 against a boss: a single-target technique of its own (from 연's skills).
 // The close-in classes: they leap to the foe (돌진, the 필살기's boss blows) and lure before a chain.
-const MELEE = new Set(['warrior', 'rogue', 'lancer', 'monk', 'celestial', 'dokkaebi']);
+const MELEE = new Set(['warrior', 'rogue', 'lancer', 'monk', 'celestial', 'dokkaebi', 'reaper']);
 // Classes whose every damaging technique is their weapon's own attack clip (연's bow draw, spear thrust).
-const WEAPON_POSE = new Set(['archer', 'lancer', 'monk', 'dokkaebi']);
-const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim', lancer: 'l_meteor', monk: 'mk_sudden', magus: 'md_arrow', celestial: 'cl_moment', dokkaebi: 'dk_judgment' };
+const WEAPON_POSE = new Set(['archer', 'lancer', 'monk', 'dokkaebi', 'reaper']);
+const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim', lancer: 'l_meteor', monk: 'mk_sudden', magus: 'md_arrow', celestial: 'cl_moment', dokkaebi: 'dk_judgment', reaper: 'rp_flash' };
 function ultWait() {
   return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
 }
@@ -4414,6 +4415,7 @@ const PARTY = {
   magus: { names: ['나형', '흑마', '현월'], role: '멀리서 기공구슬로 얼리고 마비시킨다' },
   celestial: { names: ['천랑', '재천', '삼족오'], role: '번개와 불꽃을 떨구고 적 사이로 뛰어든다' },
   dokkaebi: { names: ['두억시니', '어둑시니', '뚝딱이'], role: '방망이로 앞을 막고 일격필살로 내리찍는다' },
+  reaper: { names: ['강림', '월직', '일직'], role: '백도로 파고들어 거둔다' },
 };
 
 function joinParty(cls) {
@@ -4524,7 +4526,7 @@ function memberAnchor(m) {
     let ax = Math.sign(p.tx - foe.tx), ay = Math.sign(p.ty - foe.ty);
     if (!ax && !ay) ax = 1;
     if (cls === 'warrior' || cls === 'lancer' || cls === 'dokkaebi') at = ax ? [foe.tx + ax, foe.ty] : [foe.tx, foe.ty + ay];
-    else if (cls === 'rogue' || cls === 'monk' || cls === 'celestial') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
+    else if (cls === 'rogue' || cls === 'monk' || cls === 'celestial' || cls === 'reaper') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
     else if (cls === 'mage' || cls === 'magus') at = ax ? [foe.tx + ax * 3, foe.ty + 2 * side] : [foe.tx + 2 * side, foe.ty + ay * 3];
     else if (cls === 'archer') at = ax ? [foe.tx + ax * 4, foe.ty - 2 * side] : [foe.tx - 2 * side, foe.ty + ay * 4];
     else at = [p.tx + ax * 3, p.ty + ay * 3 + (ax ? side : 0)];
@@ -4677,7 +4679,7 @@ function drawShots() {
 // ground, light when a spell is cast.
 
 /** The glow of a class's flying spells: [halo, core]. */
-const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'], archer: ['#9adf6a', '#f0ffe0'], lancer: ['#7fd0ff', '#eaf8ff'], monk: ['#ffb35a', '#fff1d8'], magus: ['#c27bff', '#f6e8ff'], celestial: ['#ffe06a', '#fffbe8'], dokkaebi: ['#ff6a4a', '#ffe8d8'] };
+const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'], archer: ['#9adf6a', '#f0ffe0'], lancer: ['#7fd0ff', '#eaf8ff'], monk: ['#ffb35a', '#fff1d8'], magus: ['#c27bff', '#f6e8ff'], celestial: ['#ffe06a', '#fffbe8'], dokkaebi: ['#ff6a4a', '#ffe8d8'], reaper: ['#8fb4ff', '#eef3ff'] };
 
 /** The effect picture of a spell at its 단: a second name for the same frames, 6% larger a step. */
 function grownFx(id, lv) {
@@ -5231,6 +5233,44 @@ function partyAct(m) {
         hurtEnemy(t, 10 * pw);
         audio.play('skill_dk_repel', 'cleave');
         if (Math.random() < 0.2) partySay(m, '퇴격');
+        pose('attack');
+      }
+      break;
+    }
+    case 'reaper': {
+      // 차사: in close from the far side like the rogue — 절섬 at what stands near, 나선회륜 into a
+      // crowd, 진섬'연 on the boss now and then; 흡기공 when hurt.
+      const t = boss || near(1)[0];
+      if (!t || Math.hypot(t.x - m.x, t.y - m.y) > TILE * 1.8) break;
+      face(t);
+      if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
+        m.cd.e = 13;
+        addFx(SKILLS.rp_drain.fx, m.x, m.y - 20, { scale: 0.8 });
+        audio.play('skill_rp_drain', 'heal');
+        partySay(m, '흡기공');
+        healMember(m, m.maxHp * 0.2);
+      }
+      if (boss && t === boss && m.cd.d <= 0) {
+        m.cd.d = 10;
+        fxOn(SKILLS.rp_flash.fx, t);
+        later(0.2, () => hurtEnemy(t, 45 * pw));
+        audio.play('skill_rp_flash', 'blink');
+        partySay(m, "진섬'연");
+        if (Math.random() < 0.5) partyTalk(m, ['저승길로 모신다!', '명부에 이름이 올랐다!']);
+        pose('attack');
+      } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
+        m.cd.b = 7;
+        addFx(SKILLS.rp_spiral.fx, m.x, m.y - 20);
+        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        audio.play('skill_rp_spiral', 'nova');
+        partySay(m, '나선회륜');
+        pose('attack');
+      } else if (m.cd.a <= 0) {
+        m.cd.a = 0.8;
+        fxOn(SKILLS.rp_cut.fx, t);
+        hurtEnemy(t, 10 * pw);
+        audio.play('skill_rp_cut', 'cleave');
+        if (Math.random() < 0.2) partySay(m, '절섬');
         pose('attack');
       }
       break;
@@ -6942,7 +6982,7 @@ function gauge(sel, k, text) {
 // The gear slots as placed on the old panel: two on the left, the helmet above the figure,
 // two at its feet, three darker ones down the right.
 const SLOT_AT = [[117, 160], [35, 164], [35, 208], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
-const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12], archer: [14, 12, 28], lancer: [26, 9, 18], monk: [24, 8, 22], magus: [8, 32, 12], celestial: [14, 24, 20], dokkaebi: [32, 6, 12] };
+const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12], archer: [14, 12, 28], lancer: [26, 9, 18], monk: [24, 8, 22], magus: [8, 32, 12], celestial: [14, 24, 20], dokkaebi: [32, 6, 12], reaper: [20, 14, 22] };
 const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
 
 /** The side panel and the map tab, kept in step with the hunt. */

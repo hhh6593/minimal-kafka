@@ -120,6 +120,21 @@ JOBS = {
         'helmet_pool': [283030, 283031, 283000],
         'cape_craft': {'cr_steel_cape': 294000},
     },
+    # 차사 (Job_10): the warrior's clips; 흑의 (311xxx); 백도·명도 (310xxx, weapon_0001_e in the Weapon slot,
+    # frames read as the 마도사's 단봉 are); 용라제N명도 (연 has no 제십, and its 제구 sheet has no sweeps
+    # to read: both wear the 제팔), 용라 helmets,
+    # 월직의망토.
+    'reaper': {
+        'anims': dict(Y.ANIMS),
+        'weapon': 'wand', 'weapon_file': 'weapon_0001_e.png',
+        'armor_pool': [(3, 311001), (5, 311005), (8, 311008), (10, 311011), (12, 311014), (99, 311013)],
+        'dragon': [310045, 310050, 310055, 310060, 310065, 310070, 310075, 310076, 310076, 310076],
+        'weapon_pool': [310001, 310002, 310003, 310004, 310005, 310006, 310007, 310008, 310009, 310010, 310011,
+                        310013, 310014, 310015, 310016, 310017, 310019, 310020, 310021, 310022, 310024],
+        'dragon_helmet': 313023,
+        'helmet_pool': [313026, 313027, 313001],
+        'cape_craft': {'cr_steel_cape': 324001},
+    },
 }
 
 
