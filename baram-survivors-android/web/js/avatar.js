@@ -23,13 +23,18 @@ export const GEAR = {
   poet: { head: '19', armor: ['도포', '장삼', '남자도복', '남자제사장의상', '여명의치마'],
     weapon: ['흑단부채', '대붓', '백운장', '하늘개비', '자월초롱'],
     shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
+  // 궁사: 바람의나라 연's own 궁포 and bows (worn as 연 draws them, tools/yeon_archer.py). The shield
+  // slot holds what a 궁사 carries on its back in 연, the quiver; it keeps the old shields' names.
+  archer: { head: '56', armor: ['초록색궁포', '파란색궁포', '구리궁포', '숲의권속궁포', '은궁포', '감시자궁포'],
+    weapon: ['목궁', '청동궁', '철태궁', '녹각궁', '대명궁', '진아광궁', '파천비궁'],
+    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
 };
 // 투구 and 망토: 바람의나라 연's own lines, weakest first (their worn sheets and icons come from
 // 연's resources, tools/yeon_gear.py). Helmets end in the class's 제사 dragon helmet; the capes
 // are shared. Today's crafted pieces (items.js) are added after these as crafted-only looks.
 const HELMETS = ['연두색남자투구', '가죽남자투구', '구리남자투구', '청동남자투구', '금장남자투구', '북방의남자투구'];
 const CAPES = ['남옥망토', '얼음망토', '숲의권속망토', '추방자망토', '몰락자망토', '밤의 인도자 날개(남)'];
-const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용랑제사투구', poet: '용겸제사투구' };
+const DRAGON_HELMET = { warrior: '용마제사투구', rogue: '용천제사투구', mage: '용랑제사투구', poet: '용겸제사투구', archer: '용섬제사투구' };
 for (const [cls, g] of Object.entries(GEAR)) {
   g.helmet = [...HELMETS, DRAGON_HELMET[cls]];
   g.cape = [...CAPES];
@@ -42,37 +47,37 @@ export const RAID_GEAR = {
   // class. pow is the tier the set counts as (a hunting ground's best is about 4-5): a middling
   // raid gives middling pieces, the last raids the best.
   raid_boar: { pow: 3, armor: '원주민의옷', shield: '대나무방패',
-    weapon: { warrior: '곤봉', rogue: '삼첨도', mage: '횃불', poet: '나비채' } },
+    weapon: { warrior: '곤봉', rogue: '삼첨도', mage: '횃불', poet: '나비채', archer: '인각궁' } },
   raid_tiger: { pow: 4, armor: '여자무사옷', shield: '떡갈나무방패',
-    weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱' } },
+    weapon: { warrior: '백호의검', rogue: '얼음칼', mage: '건곤권', poet: '초롱', archer: '영월마궁' } },
   raid_goblin: { pow: 5, armor: '여자갑옷', shield: '문신방패',
-    weapon: { warrior: '도깨비방망이', rogue: '현랑부', mage: '도깨비방망이', poet: '검정깃발' } },
+    weapon: { warrior: '도깨비방망이', rogue: '현랑부', mage: '도깨비방망이', poet: '검정깃발', archer: '금강비궁' } },
   raid_hydra: { pow: 7, armor: '용왕의용포', shield: '백룡현갑',
-    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '일월대도', poet: '탁조' } },
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '일월대도', poet: '탁조', archer: '월천마궁' } },
   raid_sorcerer: { pow: 8, armor: '무녀복', shield: '팔세지도',
-    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '대붕지옥궁' } },
   raid_sea: { pow: 8, armor: '선녀의옷', shield: '거문고',
-    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검' } },
+    weapon: { warrior: '현무의검', rogue: '탁조', mage: '얼음칼', poet: '현무의검', archer: '월빙마궁' } },
   raid_fire: { pow: 9, armor: '불의갑주', shield: '일광방패',
-    weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권' } },
+    weapon: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '건곤권', archer: '흑일멸화궁' } },
   raid_wukong: { pow: 10, armor: '장삼', shield: '연등',
-    weapon: { warrior: '삼첨도', rogue: '진아광검', mage: '백운장', poet: '하늘개비' } },
+    weapon: { warrior: '삼첨도', rogue: '진아광검', mage: '백운장', poet: '하늘개비', archer: '명봉재수의궁' } },
   raid_musin: { pow: 11, armor: '남자기모노', shield: '월광방패',
-    weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채' } },
+    weapon: { warrior: '일월대도', rogue: '비늘단도', mage: '해룡의지팡이', poet: '흑단부채', archer: '심안강궁' } },
   raid_brit: { pow: 12, armor: '황혼의갑주', shield: '천성대방패',
-    weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱' } },
+    weapon: { warrior: '현무의검', rogue: '저주의단검', mage: '심판의낫', poet: '자월초롱', archer: '나라강궁' } },
   raid_gwoe: { pow: 11, armor: '황혼의갑주', shield: '주술방패',
-    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱' } },
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱', archer: '목인석심의궁' } },
   raid_varuna: { pow: 12, armor: '용왕의용포', shield: '거문고',
-    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비' } },
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비', archer: '천부연궁' } },
   raid_agni: { pow: 13, armor: '불의갑주', shield: '일광방패',
-    weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱' } },
+    weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱', archer: '흑일멸화궁' } },
   raid_airavata: { pow: 14, armor: '선녀의옷', shield: '천성대방패',
-    weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장' } },
+    weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장', archer: "극'흑일신궁" } },
 };
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
-export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉' };
+export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉', archer: '용섬제일궁' };
 export const CRAFT_POWER = 10;
 for (const [cls, name] of Object.entries(CRAFT_GEAR)) if (!GEAR[cls].weapon.includes(name)) GEAR[cls].weapon.push(name);
 
@@ -183,12 +188,15 @@ export function dress(cls, gear) {
   // gear.looks: today's dress-room look of a piece (its name), when its sheet is loaded.
   const looks = gear.looks || {};
   const pick = kind => (looks[kind] && lookReady(kind, looks[kind]) ? looks[kind] : gearName(cls, kind, gear[kind]));
-  const armor = images[`avatar/armor/${index('armor', pick('armor'))}.png`];
+  // A class the wardrobe never dressed (the 궁사, drawn from 연's own layers) stands in the first
+  // armour another class wears, so this old sheet is still whole.
+  const armor = images[`avatar/armor/${index('armor', pick('armor'))}.png`]
+    || Object.values(GEAR).map(l => images[`avatar/armor/${index('armor', l.armor[0])}.png`]).find(im => im && im.width);
   const c = document.createElement('canvas');
   c.width = cw * 8;
   c.height = ch * 4;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(armor, 0, 0);
+  if (armor) g.drawImage(armor, 0, 0);
   const out = g.getImageData(0, 0, c.width, c.height);
   const lay = (kind, name) => {
     const i = name ? index(kind, name) : -1;

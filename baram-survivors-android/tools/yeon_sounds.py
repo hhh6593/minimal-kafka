@@ -104,6 +104,14 @@ MAP = {
         'p_wargod': 'SFX_Fighter_5th_3', 'p_skyspirit': 'fx_skill_heal_11', 'p_bagua': 'SFX_Celestial_5th_Bagua',
         'p_judge': 'SFX_Shaman_ThunderCloud', 'p_burst': 'SFX_Common_Explosion_1', 'p_dragongod': 'SFX_Shaman_4th_03',
         'p_flash': 'fx_skill_420101', 'p_warmth': 'fx_skill_heal_10', 'p_taiji': 'SFX_Shaman_4th_03_1',
+        # 궁사 (Job_6): each skill's own SFX_Archer_* clip (its record's sound, or its effect's).
+        'a_shot': 'SFX_Archer_Attack_Bow_1_1', 'a_aim': 'SFX_Archer_Attack_Bow_3_1', 'a_firewall': 'SFX_Archer_FireWall_1', 'a_flame': 'SFX_Archer_FlameArrow',
+        'a_spiral': 'SFX_Archer_WindArrow_Base', 'a_ice': 'SFX_Archer_CoverIce', 'a_bomb': 'SFX_Archer_BombArrow_Hit', 'a_freeze': 'SFX_Archer_FreezeArrow_Shot',
+        'a_coverfire': 'SFX_Archer_CoverFire', 'a_storm': 'SFX_Archer_RainArrow', 'a_silence': 'SFX_Archer_Silence', 'a_breakair': 'SFX_Archer_BreakAir',
+        'a_tempest': 'SFX_Archer_RainForceArrowTornado', 'a_thunder': 'SFX_Archer_ThunderCharge', 'a_whirl': 'SFX_Archer_Tornado', 'a_allwhirl': 'SFX_Archer_Tornado_All',
+        'a_inferno': 'SFX_Archer_5th_1', 'a_fetter': 'SFX_Archer_5th_2', 'a_bloodsuck': 'SFX_Archer_5th_3', 'a_chase': 'SFX_Archer_6th_1',
+        'a_chain': 'SFX_Archer_ChainBlast_Shot', 'a_shadow': 'SFX_Archer_ShadowShield_Cast', 'a_eagle': 'SFX_Archer_EagleAttack', 'a_weebo': 'SFX_Archer_WeeBo',
+        'a_bless': 'SFX_Archer_BlessOfBow', 'a_air': 'SFX_Archer_AirArrow', 'a_blood5': 'SFX_Archer_BloodStrikeR5_Hit', 'a_ult': 'SFX_Archer_WhipShot',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are
