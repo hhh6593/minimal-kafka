@@ -923,7 +923,11 @@ function fireGyeok(g, t) {
   const p = G.player, base = gyeokBase();
   const hits = g.area ? G.enemies.filter(e => Math.abs(e.tx - t.tx) <= g.area && Math.abs(e.ty - t.ty) <= g.area)
     : g.targets ? [t, ...nearestEnemies(g.targets, 5, t).filter(e => e !== t).slice(0, g.targets - 1)] : [t];
-  if (g.fx && M.fx[g.fx] && fxBudget('gyeok', 3)) fxOn(g.fx, t, { scale: g.area ? 0.9 : 0.7 });
+  if (g.fx && M.fx[g.fx] && fxBudget('gyeok', 3)) {
+    fxOn(g.fx, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) });
+    // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) fxOn(g.fx2, e, { scale: 0.8 * (g.fxK || 1) });
+  }
   G.procHitting = true;
   let dealt = 0;
   for (const e of hits) {
