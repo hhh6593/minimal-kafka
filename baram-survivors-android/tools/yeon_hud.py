@@ -102,7 +102,15 @@ def effects(envs, out):
     json.dump(index, open(os.path.join(out, 'index.json'), 'w'), indent=1)
 
 
-UI_SPRITES = ['Img_KillCombo_Base', 'Img_Kill', 'Img_KillLog', 'Icon_KillLog', 'Img_Dead_Killername']
+UI_SPRITES = ['Img_KillCombo_Base', 'Img_Kill', 'Img_KillLog', 'Icon_KillLog', 'Img_Dead_Killername',
+              # 길드대항전 (game.js war.js): the ▼ over each fighter, the flags, the 사신수 공성전 art,
+              # 勝/敗 and the team tags.
+              'event_red_arrow', 'flag_red_win_0', 'flag_black_fall_0', 'sinsu_castlebattle_01', 'sinsu_castlebattle_02',
+              'sinsu_castlebattle_03', 'sinsu_castlebattle_04', 'img_sinsu_1', 'img_sinsu_2', 'img_sinsu_3', 'img_sinsu_4',
+              'attack_result_win', 'attack_result_lose', 'tag_blue_team', 'tag_red_team', 'vs', 'icon_target',
+              'icon_castle_war', 'attack_arrow_blue', 'attack_arrow_red',
+              # the ink countdown and the result: 연's brush blots, the spotlight, reward medallions.
+              'bg_brush_05', 'ink_nine', 'Muhan_regult_ink_2', 'light02', 'Light', 'icon_medal01', 'Icon_Medal_Gold_01', 'ink_ff_04', 'ink_ff_06']
 
 
 def ui(env, out):

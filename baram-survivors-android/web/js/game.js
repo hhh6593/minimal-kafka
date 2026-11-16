@@ -6,6 +6,7 @@ import {
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
+import { initWar } from './war.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -502,6 +503,12 @@ function buildStages() {
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
     }
+    // 대항전 (war.js): the guild wars from the raid list too.
+    const wb = document.createElement('button');
+    wb.className = 'raid';
+    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_icon_castle_war') ? '<img src="assets/hud/ui_icon_castle_war.png" alt="">' : ''}<div><b>사신수 길드대항전</b><span>청룡·백호·주작·현무 — 25 대 25 길드전</span><span>역할을 골라 출전</span></div>`;
+    wb.onclick = () => War.openBoard();
+    map.append(wb);
     raidInfo(pickedStage);
     return;
   }
@@ -804,6 +811,7 @@ function startRun(cls, stage) {
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
   if (stage.raid) raidSetup();
+  if (stage.war) War.setup();
   G.wasCleared = stage.raid ? !!(progress.raids || {})[stage.id] : !!progress.cleared[stage.id];
   syncSpeed();
   nextChoice();
@@ -1002,6 +1010,7 @@ function dotHit(e, d, color) {
     if (!(d > 0)) return;
     e.capUsed += d;
   }
+  if (e.war) d = War.scale(d);
   e.hp -= d;
   e.shown = G.t;
   if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: shownNum(d), t: 0, num: true, dot: true, crit: false, color });
@@ -1886,6 +1895,7 @@ function strikePose(kind) {
 function huntMusic() {
   // Each raid its own grand track, from the start to the end of the fight.
   if (G.stage.raid) return 'raid_' + G.stage.id;
+  if (G.stage.war) return 'raid_raid_goblin'; // 대항전: the raids' battle drums
   return 'stage_' + G.stage.id;
 }
 
@@ -1996,10 +2006,15 @@ function stepHero(dx, dy, dt) {
     return;
   }
   const nx = p.tx + dx, ny = p.ty + dy, there = occ.get(key(nx, ny));
-  if (there && there.hp > 0) {
+  // 대항전 (war.js): the castle's walls and the enemy's gate stop the hero; its own guild does not.
+  if (G.war && !War.open(nx, ny)) {
+    p.moving = false;
+    return;
+  }
+  if (there && there.hp > 0 && !(G.war && there.team === 0)) {
     p.moving = false;
     p.pushT = (p.pushT || 0) + dt;
-    if (p.pushT < 0.5 || there.moving || there.kind === 'boss') return;
+    if (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr) return;
     // Pushed long enough, the hero and the monster trade places: never two on one tile.
     occ.delete(key(nx, ny));
     place(there, p.tx, p.ty);
@@ -2030,12 +2045,14 @@ function heroSpeed() {
 }
 
 function update(dt) {
+  // 대항전 (war.js): the opening count holds the field.
+  if (G.war && War.hold(dt)) return;
   G.t += dt;
   const p = G.player;
 
   if (!G.dead) {
     const [dx, dy] = input();
-    if (settings.tiles) stepHero(dx, dy, dt);
+    if (settings.tiles || G.war) stepHero(dx, dy, dt);
     else {
     p.moving = !!(dx || dy);
     if (p.moving) {
@@ -2187,7 +2204,7 @@ function applyBuild(start) {
 
 /** A hunt's build, kept for the class when it went well (its raids start from it). */
 function keepBuild() {
-  if (!G || G.stage.raid || G.player.lvl < 8) return;
+  if (!G || G.stage.raid || G.war || G.player.lvl < 8) return;
   progress.builds = progress.builds || {};
   const old = progress.builds[G.cls.id];
   if (old && !G.cleared && old.lvl > G.player.lvl) return;
@@ -2499,6 +2516,7 @@ function endlessSpawn(dt) {
 }
 
 function spawn(dt) {
+  if (G.war) return; // 대항전 (war.js): the guilds are the field
   if (G.endless) {
     endlessSpawn(dt);
     return;
@@ -2772,6 +2790,7 @@ function moveEnemies(dt) {
   const hidden = G.buffs.stealth > G.t || G.dead;
   const gone = [];
   for (const e of G.enemies) {
+    if (e.war) continue; // 대항전: war.js moves its fighters
     advance(e, dt);
     e.flash = Math.max(0, e.flash - dt);
     e.lunge = Math.max(0, e.lunge - dt);
@@ -2966,9 +2985,12 @@ function hurtEnemy(e, dmg, push = null) {
     if (!(dmg > 0)) return 0;
     e.capUsed += dmg;
   }
+  // 대항전 (war.js): 전장 보정 — the hero's blows on fighters are matched to the field's.
+  if (e.war) dmg = War.scale(dmg);
   e.hp -= dmg;
   e.flash = 0.12;
   e.shown = G.t;
+  if (e.war) War.credit(e, dmg); // 대항전: the hero's contribution
   // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
   // orange for a heavy blow, grey for a light one.
   if (crit || settings.numbers) {
@@ -3037,6 +3059,7 @@ function rollMats(e) {
 const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200];
 
 function killEnemy(e) {
+  if (e.war) return War.down(e); // 대항전: a fighter falls and gets up at its camp
   // Each monster dies once: a second call (two blows landing in the same instant) must not
   // count it again, nor — through indexOf -1 — take the last monster in the list (often the
   // boss, the newest) off the field with it.
@@ -3726,6 +3749,7 @@ function cast(skill, st) {
       if (p.hp >= p.maxHp && (!low || low === p)) return retry(1);
       heal(st.heal, false);
       if (low && low !== p) healMember(low, st.heal, fxid);
+      if (G.war) War.heroHeal(st.heal, fxid); // 대항전: the 기원 reaches the allies near
       // A 도사 hero in a raid is the party's healer: its 기원 reach everyone standing.
       if (G.stage.raid && G.cls.id === 'poet') for (const m of G.party) if (m !== low && !m.down) healMember(m, m.maxHp * st.heal / p.maxHp * 0.6);
       if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
@@ -4365,6 +4389,7 @@ window.__townWalk = (x, y) => !townBlocked(x, y);
 
 /** The town's shortcut buttons: an errand by the NPC's id, or the raid list. */
 function townErrand(id) {
+  if (id === 'war') return War.openBoard();
   if (id === 'raid') {
     mapTab = 'raid';
     showScreen('stages');
@@ -4665,9 +4690,11 @@ function hurtMember(m, dmg) {
 /** Healing a companion: its 기원's picture over its head. */
 function healMember(m, n, fx = null) {
   if (m.down) return;
+  if (G.war && m.war) n = Math.min(m.maxHp * 0.12, n * G.war.refHp / G.player.maxHp); // 대항전: a fighter's life is in the field's units
   n = Math.min(n, m.maxHp - m.hp);
   if (n <= 0) return;
   m.hp += n;
+  if (G.war) War.healed(m, n);
   healText(m, n, 58);
   if (fx) addFx(fx, m.x, m.y - 26, { scale: 0.8 });
 }
@@ -4677,6 +4704,7 @@ function healMember(m, n, fx = null) {
  * below 60% (75%). Nobody when all are well enough, so the heal is ready when it is needed.
  */
 function neediest() {
+  if (G.war) return War.neediest();
   const p = G.player, raid = G.stage.raid;
   const hk = p.hp / p.maxHp;
   if (hk < (raid ? 0.85 : 0.8)) return [p, hk];
@@ -4734,6 +4762,7 @@ function memberAnchor(m) {
 }
 
 function updateParty(dt) {
+  if (G.war) return War.update(dt); // 대항전: both guilds are war.js's
   if (G.joining && G.joining.length && !G.choosing && !G.paused) {
     G.joinWait = (G.joinWait || 0) + dt;
     if (G.joinWait > 0.8) {
@@ -5952,6 +5981,7 @@ function itemIcon(role) {
 /** Death: a 도사 rises once; anyone else becomes a ghost, as in the game. */
 function die() {
   const p = G.player;
+  if (G.war && War.heroDown()) return; // 대항전: down for a few seconds, up again at the camp
   if (G.extraLives > 0) {
     // 성황령, bought in town: back on one's feet at half health.
     G.extraLives--;
@@ -6031,6 +6061,9 @@ function leaveHunt() {
   }
   const cls = G ? G.cls : chosenClass;
   G = null;
+  const wb = document.getElementById('war-sb-btn'); // 대항전's 현황 key goes with the war
+  if (wb) wb.hidden = true;
+  document.body.classList.remove('war');
   enterTown(cls);
 }
 
@@ -6044,6 +6077,7 @@ function bankGold() {
 }
 
 function record() {
+  if (G.war) return; // a war's floored level is not the class's record
   const r = best[G.cls.id];
   if (!r || G.player.lvl > r.lvl || (G.player.lvl === r.lvl && G.kills > r.kills)) {
     best[G.cls.id] = { lvl: G.player.lvl, kills: G.kills };
@@ -6702,6 +6736,8 @@ function render(now) {
   }
   const p = G.player;
   let camX = Math.round(p.x - VW / 2), camY = Math.round(p.y - 30 - VH / 2);
+  // 대항전 (war.js): the camera stays on the battlefield's map.
+  if (G.war) [camX, camY] = War.cam(camX, camY);
   if (G.shake > 0) {
     // Harder blows shake harder.
     const a = Math.min(5, 1 + G.shake * 12);
@@ -6709,8 +6745,13 @@ function render(now) {
     camY += Math.round(rand(-a, a));
   }
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
-  ctx.fillStyle = G.ground;
-  ctx.fillRect(camX, camY, VW, VH);
+  if (G.war) {
+    War.drawMap(camX, camY);
+    War.drawGround();
+  } else {
+    ctx.fillStyle = G.ground;
+    ctx.fillRect(camX, camY, VW, VH);
+  }
 
   // On the ground: experience, money, boxes.
   for (const d of G.drops) {
@@ -6735,11 +6776,15 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies, G.party, propsInView(camX, camY), G.pet ? [G.pet] : []);
+  const bodies = G.enemies.concat(G.allies, G.party, G.war ? War.props() : propsInView(camX, camY), G.pet ? [G.pet] : []);
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
   for (const b of bodies) {
+    if (b.war) {
+      War.drawBody(b);
+      continue;
+    }
     if (b === p) {
       drawHero(now, hidden);
       if (p.sts) drawHeroStatus(p);
@@ -6889,6 +6934,9 @@ function render(now) {
       thick(t.text, 0, 0, t.color);
       ctx.restore();
       ctx.font = '10px G9';
+    } else if (t.heal && dmgFont()) {
+      // 대항전: heals in green, in 연's digits.
+      drawDigits(t.text.replace('+', ''), Math.round(t.x), Math.round(t.y), t.color, 0.5);
     } else thick(t.text, t.x, t.y, t.color);
   }
   ctx.globalAlpha = 1;
@@ -6972,6 +7020,7 @@ function render(now) {
   drawYeonStatus();
   drawChain();
   drawLootFeed();
+  if (G.war) War.hud();
   drawJoystick();
 }
 
@@ -7860,5 +7909,19 @@ window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
+
+// ---------------------------------------------------------------- 사신수 길드대항전 (war.js)
+// The war lives in war.js; these are the hunt's own pieces it builds on (the hero, its spells,
+// the grid, the effects, the screens). Kept together here so the two files merge apart.
+const War = initWar({
+  G: () => G, setG: v => { G = v; }, M: () => M, Z: () => Z, VW: () => VW, VH: () => VH, settings: () => settings,
+  progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
+  saveProgress: () => saveJson('bs_progress', progress),
+  ctx, canvas, images, occ, CLASSES, SKILLS, FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
+  place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble,
+  drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
+  applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage,
+  heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
+});
 
 boot();
