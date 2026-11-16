@@ -146,6 +146,13 @@ MAP = {
         'cl_thunder': 'SFX_Celestial_4th_ThunderDragon', 'cl_tiger': 'SFX_Celestial_5th_TigerMaw_Alt', 'cl_crowfire': 'SFX_Celestial_5th_CrowFire', 'cl_bagua': 'SFX_Celestial_5th_Bagua',
         'cl_ego': 'SFX_Celestial_6th_1', 'cl_gumiho': 'SFX_Celestial_GuardianGumiho', 'cl_snake': 'SFX_Celestial_Snake', 'cl_intrep': 'SFX_Celestial_Intrepidity',
         'cl_defense': 'SFX_Celestial_CompleteDefense_Cast', 'cl_reindeer': 'SFX_Celestial_Reindeer', 'cl_ult': 'SFX_Celestial_LossFormer',
+        # 도깨비 (Job_9): each skill's own SFX_Dokkaebi_* clip (금은보화로구나 and 귀체 take its 도깨비불 pickup sounds).
+        'dk_repel': 'SFX_Dokkaebi_Repelling', 'dk_paddle': 'SFX_Dokkaebi_Paddling', 'dk_wisp': 'SFX_Dokkaebi_WispFire', 'dk_strength': 'SFX_Dokkaebi_Strength',
+        'dk_punish': 'SFX_Dokkaebi_Punishment', 'dk_hat': 'SFX_Dokkaebi_DokkaebiHat', 'dk_roar': 'SFX_Dokkaebi_1st_RepellingReinForce', 'dk_throw': 'SFX_Dokkaebi_1st_ThrowUp',
+        'dk_whirl': 'SFX_Dokkaebi_2nd_WhirlWind', 'dk_wispexp': 'SFX_Dokkaebi_2nd_WispExplosion', 'dk_judgment': 'SFX_Dokkaebi_3rd_Judgment', 'dk_shock': 'SFX_Dokkaebi_3rd_WispElectricShock',
+        'dk_flatten': 'SFX_Dokkaebi_3rd_Equalizer', 'dk_fan': 'SFX_Dokkaebi_4th_DokkaebiFan', 'dk_super': 'SFX_Dokkaebi_4th_Supernatural_Cast', 'dk_hamstring': 'SFX_Dokkaebi_5th_HamstringHook',
+        'dk_firebat': 'SFX_Dokkaebi_5th_Jwibulnori_Cast', 'dk_weight': 'SFX_Dokkaebi_5th_Weight_Attack', 'dk_storm': 'SFX_Dokkaebi_6th_DokkaebiStorm', 'dk_goldhit': 'SFX_Dokkaebi_WispGet_1',
+        'dk_body': 'SFX_Dokkaebi_WispGet_2', 'dk_nemesis': 'SFX_Dokkaebi_Nemesis', 'dk_rage': 'SFX_Dokkaebi_3rd_Judgment_Alt', 'dk_ult': 'SFX_Dokkaebi_ComeOutGold',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are

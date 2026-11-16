@@ -375,7 +375,31 @@ export const YEON_SOUNDS = {
  "skill_cl_intrep": "SFX_Celestial_Intrepidity",
  "skill_cl_defense": "SFX_Celestial_CompleteDefense_Cast",
  "skill_cl_reindeer": "SFX_Celestial_Reindeer",
- "skill_cl_ult": "SFX_Celestial_LossFormer"
+ "skill_cl_ult": "SFX_Celestial_LossFormer",
+ "skill_dk_repel": "SFX_Dokkaebi_Repelling",
+ "skill_dk_paddle": "SFX_Dokkaebi_Paddling",
+ "skill_dk_wisp": "SFX_Dokkaebi_WispFire",
+ "skill_dk_strength": "SFX_Dokkaebi_Strength",
+ "skill_dk_punish": "SFX_Dokkaebi_Punishment",
+ "skill_dk_hat": "SFX_Dokkaebi_DokkaebiHat",
+ "skill_dk_roar": "SFX_Dokkaebi_1st_RepellingReinForce",
+ "skill_dk_throw": "SFX_Dokkaebi_1st_ThrowUp",
+ "skill_dk_whirl": "SFX_Dokkaebi_2nd_WhirlWind",
+ "skill_dk_wispexp": "SFX_Dokkaebi_2nd_WispExplosion",
+ "skill_dk_judgment": "SFX_Dokkaebi_3rd_Judgment",
+ "skill_dk_shock": "SFX_Dokkaebi_3rd_WispElectricShock",
+ "skill_dk_flatten": "SFX_Dokkaebi_3rd_Equalizer",
+ "skill_dk_fan": "SFX_Dokkaebi_4th_DokkaebiFan",
+ "skill_dk_super": "SFX_Dokkaebi_4th_Supernatural_Cast",
+ "skill_dk_hamstring": "SFX_Dokkaebi_5th_HamstringHook",
+ "skill_dk_firebat": "SFX_Dokkaebi_5th_Jwibulnori_Cast",
+ "skill_dk_weight": "SFX_Dokkaebi_5th_Weight_Attack",
+ "skill_dk_storm": "SFX_Dokkaebi_6th_DokkaebiStorm",
+ "skill_dk_goldhit": "SFX_Dokkaebi_WispGet_1",
+ "skill_dk_body": "SFX_Dokkaebi_WispGet_2",
+ "skill_dk_nemesis": "SFX_Dokkaebi_Nemesis",
+ "skill_dk_rage": "SFX_Dokkaebi_3rd_Judgment_Alt",
+ "skill_dk_ult": "SFX_Dokkaebi_ComeOutGold"
 };
 
 // 연's music for the moments the old soundtrack has nothing for.

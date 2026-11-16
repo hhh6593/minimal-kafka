@@ -98,13 +98,27 @@ JOBS = {
     # item_0001_atk_f/_b, each in thirds by direction. 용주제N도, 용주 helmets.
     'celestial': {
         'anims': dict(Y.ANIMS),
-        'weapon': 'gourd', 'weapon_files': ('item_0001_i.png', 'item_0001_atk_f.png', 'item_0001_atk_b.png'),
+        'weapon': 'gourd', 'weapon_files': ('item_0001_i.png', 'item_0001_atk_f.png', 'item_0001_atk_b.png'), 'orders': (22, -12),
         'armor_pool': [(3, 261000), (5, 261004), (8, 261007), (10, 261010), (12, 261013), (99, 261017)],
         'dragon': [260029, 260035, 260040, 260051, 260052, 260075, 260086, 260089, 260091, 260092],
         'weapon_pool': [260000, 260001, 260002, 260003, 260004, 260005, 260006, 260007, 260008, 260010, 260011,
                         260013, 260015, 260016, 260018, 260020, 260022, 260024, 260025, 260026, 260028],
         'dragon_helmet': 263024,
         'helmet_pool': [263030, 263031, 263000],
+    },
+    # 도깨비 (Job_9): the warrior's clips; 귀의 (281xxx); 방망이·퇴 (280xxx) laid as the 천인's are, by its own
+    # prefab (Weapon 18, Weapon_back -8), held from item_0001_idle or else the strike's first frame.
+    # 용린제N퇴, 용린 helmets, 신각의인화.
+    'dokkaebi': {
+        'anims': dict(Y.ANIMS),
+        'weapon': 'gourd', 'weapon_files': ('item_0001_idle.png', 'item_0001_atk_f.png', 'item_0001_atk_b.png'), 'orders': (18, -8),
+        'armor_pool': [(3, 281000), (5, 281004), (8, 281007), (10, 281010), (12, 281013), (99, 281017)],
+        'dragon': [280029, 280035, 280040, 280051, 280052, 280075, 280086, 280089, 280091, 280092],
+        'weapon_pool': [280000, 280001, 280002, 280003, 280004, 280005, 280006, 280007, 280008, 280010, 280011,
+                        280013, 280015, 280016, 280018, 280020, 280022, 280024, 280025, 280026, 280028],
+        'dragon_helmet': 283024,
+        'helmet_pool': [283030, 283031, 283000],
+        'cape_craft': {'cr_steel_cape': 294000},
     },
 }
 
@@ -168,7 +182,7 @@ def main():
                 return {'E': f.get(J['weapon_file'])}
             if J['weapon'] == 'gourd':
                 i, fr, bk = (f.get(n) for n in J['weapon_files'])
-                if not (i and fr and bk) or tex_n.get(i, 0) % 3 or tex_n.get(fr, 0) % 3 or tex_n.get(fr) != tex_n.get(bk):
+                if not (fr and bk) or (i and tex_n.get(i, 0) % 3) or tex_n.get(fr, 0) % 3 or tex_n.get(fr) != tex_n.get(bk):
                     return {}
                 return {'I': i, 'F': fr, 'B': bk}
             return {}
@@ -410,15 +424,17 @@ def main():
                 k, nf = tex_n[t] // 3, len(anim_frames[key][0])
                 f = d * k + round(fi * (k - 1) / max(1, nf - 1))
             elif kind == 'wback':
-                t = tx['I']
+                # Held: the idle sheet, or, for an item without one (the 도깨비's plain 방망이), the first
+                # frame of its strike, as its prefab's Weapon_back shows (Item_0001_Atk_b_0).
+                t = tx['I'] or tx['B']
                 k = tex_n[t] // 3
-                f = d * k + fi % k
+                f = d * k + (fi % k if tx['I'] else 0)
             else:
                 return out_l, orders
             alt = bytex.get((t, str(f)))
             if alt is not None:
                 out_l.append(place((0, 0), alt, alt, root))
-                orders.append(22 if kind == 'weapon' else -12)
+                orders.append(J['orders'][0 if kind == 'weapon' else 1])
             return out_l, orders
         if kind == 'weapon' and J['weapon'] == 'wand':
             # The Weapon slot as the clip keys it (its place and order), the 단봉's own frame in it.
@@ -516,8 +532,8 @@ def main():
                             orders[kind] = s['order']
                             break
             if J['weapon'] in ('spear', 'gourd'):
-                orders.setdefault('weapon', 16 if J['weapon'] == 'spear' else 22)
-                orders.setdefault('wback', -4 if J['weapon'] == 'spear' else -12)
+                orders.setdefault('weapon', 16 if J['weapon'] == 'spear' else J['orders'][0])
+                orders.setdefault('wback', -4 if J['weapon'] == 'spear' else J['orders'][1])
             z[key].append([k for k, _ in sorted(orders.items(), key=lambda kv: (kv[1], KINDS.index(kv[0])))])
     allp = [p for v in drawn.values() for p in v]
     left = math.ceil(-min(x for _, x, _ in allp))

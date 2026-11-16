@@ -154,9 +154,10 @@ def material_names(r):
     return out
 
 
-def render(go, add_own=False):
+def render(go, add_own=False, alpha_only=False):
     """add_own: renderers with a material of their own (not Sprites-Default) are additive. Their
-    shaders live in another bundle, so the name test above cannot tell; the mapping says so."""
+    shaders live in another bundle, so the name test above cannot tell; the mapping says so.
+    alpha_only: none is (a material whose name merely ends in _a, as the 도깨비's Totem_A)."""
     root_tr = comp(go, 'Transform')
     nodes = [('', root_tr)] + child_paths(root_tr)
     by_hash = {zlib.crc32(p.encode()) & 0xffffffff: (p, t) for p, t in nodes}
@@ -166,7 +167,7 @@ def render(go, add_own=False):
         r = comp(g, 'SpriteRenderer')
         if r is not None and g.m_IsActive is not False:
             rends.append({'path': p, 'tr': t, 'r': r, 'sprite': r.m_Sprite if r.m_Sprite.path_id else None,
-                          'alpha': r.m_Color.a, 'add': is_additive(r) or (add_own and any(
+                          'alpha': r.m_Color.a, 'add': not alpha_only and (is_additive(r) or add_own) and (is_additive(r) or any(
                               n != 'Sprites-Default' for n in material_names(r))), 'order': r.m_SortingOrder,
                           'flip': (r.m_FlipX, r.m_FlipY), 'anim': {}})
     if not rends:
@@ -325,7 +326,7 @@ def main():
         pf = spec.get('prefab')
         if pf and pf.lower() in cont:
             try:
-                res = render(cont[pf.lower()].read(), bool(spec.get('add_own')))
+                res = render(cont[pf.lower()].read(), bool(spec.get('add_own')), bool(spec.get('alpha_only')))
             except Exception as e:
                 print(sid, pf, 'render failed', e)
                 res = None

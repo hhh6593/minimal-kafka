@@ -39,6 +39,9 @@ export const CLASSES = [
   // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
   { id: 'celestial', name: '천인', hero: '1003', hp: 130, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
     desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
+  // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
+  { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
+    desc: '방망이를 휘두르는 근접 장사. 후려치고 메치고, 일격필살로 강한 적을 내리찍는다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -741,6 +744,68 @@ export const SKILLS = {
     desc: '궁극기. 하늘의 신록이 강림해 화면의 모든 몬스터를 짓밟는다' },
   cl_ult: { cls: 'celestial', name: '전의상실', kind: 'ult', fx: '144', hpCost: 0.15,
     desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터의 전의를 꺾는 일격을 가한다' },
+
+  // 도깨비 (바람의나라 연 Job_9): its own skill list (Skills_Player 2091xxxx 일반, 2092xxxx 승급), each with the
+  // effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_dokkaebi_skills.json). 1차~3차 are its
+  // 비급 books' (귀명·귀제·귀황), 4차~6차 by 연's numbering (귀성·신각·귀극); 연 has no 7차~9차 for the 도깨비, so
+  // those take its remaining 일반 techniques (금은보화로구나, 귀체, 권선징악, 도깨비의 격노). 평탄화, 일격필살'괴력난신
+  // and 도깨비폭풍 are particle effects in 연, which this renderer does not draw: they show the 도깨비's own
+  // 금나와라 swing, 천벌 club and 쥐불놀이 wheel instead. The fx here is only the old fallback.
+  dk_repel: { cls: 'dokkaebi', req: 1, name: '퇴격', kind: 'cleave', fx: '20', dmg: 17, cd: 0.8, depth: 1, max: 4,
+    desc: '방망이를 휘둘러 앞쪽 몬스터 넷을 밀쳐 낸다' },
+  dk_paddle: { cls: 'dokkaebi', req: 1, name: '밭다리걸기', kind: 'cleave', fx: '19', dmg: 16, cd: 2.2, depth: 1, max: 2, stun: 1,
+    desc: '다리를 걸어 앞의 몬스터 둘을 넘어뜨린다(멈춤)' },
+  dk_wisp: { cls: 'dokkaebi', req: 1, name: '도깨비불\'염류', kind: 'spell', fx: '7', dmg: 16, cd: 1.6, range: 6, count: 2,
+    desc: '도깨비불을 날려 몬스터 둘을 태운다. 4·7단에 불이 하나씩 는다' },
+  dk_strength: { cls: 'dokkaebi', req: 6, name: '완력', kind: 'buff', buff: 'power', fx: '6', cd: 14, duration: 4, power: 0.5,
+    desc: '타고난 완력을 끌어올려 잠시 모든 피해가 늘어난다' },
+  dk_punish: { cls: 'dokkaebi', req: 6, name: '일격필살\'징벌', kind: 'strike', fx: '139', dmg: 40, cd: 3.4, range: 4, radius: 0, count: 1,
+    hitAt: 0.3, strongest: true, up: 'dk_super', desc: '가장 강한 몬스터(보스를 먼저)에게 징벌의 일격을 내리친다' },
+  dk_hat: { cls: 'dokkaebi', req: 12, name: '도깨비감투', kind: 'buff', buff: 'stealth', fx: '36', cd: 14, duration: 2.5,
+    desc: '도깨비감투를 써서 잠시 모습을 감춘다. 그동안 주는 피해가 커진다' },
+  // 1차 귀명
+  dk_roar: { promo: 1, cls: 'dokkaebi', req: 6, name: '괴성격', kind: 'cleave', fx: '20', dmg: 22, cd: 2.4, depth: 2, max: 6, stun: 0.5,
+    desc: '괴성과 함께 앞쪽을 크게 후려쳐 몬스터 여섯을 친다' },
+  dk_throw: { promo: 1, cls: 'dokkaebi', req: 6, name: '업어던지기', kind: 'strike', fx: '24', dmg: 26, cd: 2.8, range: 3, radius: 1, count: 1,
+    hitAt: 0.3, stun: 1, desc: '몬스터를 업어 메쳐 그 자리와 주위를 친다' },
+  // 2차 귀제
+  dk_whirl: { promo: 2, cls: 'dokkaebi', req: 10, name: '회전회오리', kind: 'nova', fx: '25', dmg: 22, cd: 2.8, radius: 1,
+    desc: '방망이를 들고 회오리처럼 돌아 둘러싼 몬스터를 친다' },
+  dk_wispexp: { promo: 2, cls: 'dokkaebi', req: 10, name: '도깨비불\'폭살', kind: 'strike', fx: '147', dmg: 20, cd: 2.8, range: 6, radius: 1, count: 2,
+    hitAt: 0.3, desc: '도깨비불을 터뜨려 몬스터 둘과 그 주위를 태운다' },
+  // 3차 귀황
+  dk_judgment: { promo: 3, cls: 'dokkaebi', req: 14, name: '일격필살\'천벌', kind: 'strike', fx: '139', dmg: 46, cd: 3.4, range: 5, radius: 1, count: 1,
+    hitAt: 0.35, strongest: true, desc: '하늘의 벌로 가장 강한 몬스터와 그 주위를 내리찍는다' },
+  dk_shock: { promo: 3, cls: 'dokkaebi', req: 14, name: '도깨비불\'뇌격', kind: 'spell', fx: '89', dmg: 18, cd: 2.4, range: 7, count: 3, stun: 0.6,
+    desc: '번개 도깨비불이 몬스터 셋을 치고 잠시 마비시킨다' },
+  dk_flatten: { promo: 3, cls: 'dokkaebi', req: 14, name: '평탄화', kind: 'screen', fx: '141', dmg: 14, cd: 6, stun: 0.5,
+    desc: '땅을 평평하게 내리쳐 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  // 4차 귀성
+  dk_fan: { promo: 4, cls: 'dokkaebi', req: 18, name: '도깨비부채', kind: 'line', fx: '22', dmg: 24, cd: 2.6, depth: 6,
+    desc: '도깨비부채를 부쳐 몬스터가 가장 많은 쪽 일렬 여섯 칸을 날려 버린다' },
+  dk_super: { promo: 4, cls: 'dokkaebi', req: 18, evolved: true, name: '일격필살\'괴력난신', kind: 'strike', fx: '139', dmg: 60, cd: 3.4, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '일격필살\'징벌 8단 + 4차 승급. 괴력으로 가장 강한 몬스터 둘과 그 주위를 부순다' },
+  // 5차 신각
+  dk_hamstring: { promo: 5, cls: 'dokkaebi', req: 21, name: '오금걸이', kind: 'strike', fx: '115', dmg: 28, cd: 3, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, slow: 3, desc: '오금을 걸어 몬스터 둘과 그 주위에 가시를 솟게 하고 둔화시킨다' },
+  dk_firebat: { promo: 5, cls: 'dokkaebi', req: 21, name: '쥐불놀이', kind: 'spell', fx: '148', dmg: 30, cd: 2.4, range: 7, count: 3,
+    desc: '도깨비의 궁극오의. 쥐불을 돌려 몬스터 셋에 불을 붙인다' },
+  dk_weight: { promo: 5, cls: 'dokkaebi', req: 21, name: '천근추', kind: 'nova', fx: '25', dmg: 30, cd: 3.4, radius: 2, stun: 1,
+    desc: '천 근의 무게로 내려앉아 둘레 두 칸의 몬스터를 짓누르고 멈춘다' },
+  // 6차 귀극
+  dk_storm: { promo: 6, cls: 'dokkaebi', req: 24, name: '도깨비폭풍', kind: 'nova', fx: '25', dmg: 36, cd: 3.4, radius: 2,
+    desc: '불타는 바퀴처럼 몰아치는 폭풍으로 둘레 두 칸의 몬스터를 휩쓴다' },
+  // 7차~9차: 연's other 도깨비 techniques
+  dk_goldhit: { promo: 7, cls: 'dokkaebi', req: 27, name: '금은보화로구나', kind: 'strike', fx: '147', dmg: 32, cd: 2.4, range: 6, radius: 1, count: 3,
+    hitAt: 0.3, desc: '방망이에서 쏟아진 금은보화가 몬스터 셋과 그 주위를 친다' },
+  dk_body: { promo: 7, cls: 'dokkaebi', req: 27, name: '귀체', kind: 'heal', fx: '125', heal: 30, cd: 12, shieldT: 3,
+    desc: '도깨비불을 몸에 받아들여 체력을 회복하고 잠시 보호막을 두른다' },
+  dk_nemesis: { promo: 8, cls: 'dokkaebi', req: 30, name: '권선징악', kind: 'strike', fx: '139', dmg: 52, cd: 2.8, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '악을 벌하는 일격이 가장 강한 몬스터 둘과 그 주위를 친다' },
+  dk_rage: { promo: 9, cls: 'dokkaebi', req: 33, name: '도깨비의 격노', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 격노한 도깨비의 방망이가 화면의 모든 몬스터를 내리찍는다' },
+  dk_ult: { cls: 'dokkaebi', name: '금나와라,뚝딱', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 도깨비방망이로 화면의 몬스터를 두들긴다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -793,6 +858,11 @@ export const BRANCHES = {
     { name: '질주', note: '몬스터 사이로 뛰어든다', ids: ['cl_ago', 'cl_moment', 'cl_acumen', 'cl_brilliant', 'cl_slam', 'cl_claw', 'cl_tiger'] },
     { name: '수호', note: '피를 빼앗고 몸을 지킨다', ids: ['cl_blood', 'cl_yeorae', 'cl_wall', 'cl_blood2', 'cl_bagua', 'cl_snake', 'cl_intrep', 'cl_defense'] },
   ],
+  dokkaebi: [
+    { name: '일격', note: '강한 적을 내리찍는다', ids: ['dk_punish', 'dk_throw', 'dk_judgment', 'dk_super', 'dk_hamstring', 'dk_nemesis', 'dk_rage'] },
+    { name: '방망이', note: '휘두르고 휩쓴다', ids: ['dk_repel', 'dk_paddle', 'dk_roar', 'dk_whirl', 'dk_flatten', 'dk_fan', 'dk_weight', 'dk_storm', 'dk_goldhit'] },
+    { name: '도깨비불', note: '불을 날리고 몸을 감춘다', ids: ['dk_wisp', 'dk_strength', 'dk_hat', 'dk_wispexp', 'dk_shock', 'dk_firebat', 'dk_body'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -818,8 +888,10 @@ const PRE = {
   md_boundary: 'md_recovery', md_yinyang: 'md_boundary', md_frenetic: 'md_yinyang', md_manafill: 'md_frenetic',
   cl_tiger: 'cl_claw', cl_crowfire: 'cl_storm2', cl_bagua: 'cl_blood2', cl_ego: 'cl_crowfire', cl_gumiho: 'cl_ego',
   cl_snake: 'cl_bagua', cl_intrep: 'cl_snake', cl_defense: 'cl_intrep',
+  dk_hamstring: 'dk_judgment', dk_firebat: 'dk_shock', dk_weight: 'dk_fan', dk_storm: 'dk_weight', dk_goldhit: 'dk_storm',
+  dk_body: 'dk_firebat', dk_nemesis: 'dk_hamstring',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer', dk_nemesis: 'dk_rage' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -878,7 +950,7 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
 // The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'] };
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'], dokkaebi: ['귀명', '귀제', '귀황', '귀성', '신각', '귀극'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {
