@@ -2076,6 +2076,7 @@ function update(dt) {
   G.allyHitting = true;
   updateAllies(dt);
   G.allyHitting = false;
+  if (!G.dead) updatePet(dt);
   tickHeroStatus();
   updateParty(dt);
   updateShots(dt);
@@ -3928,6 +3929,89 @@ function runTimers() {
 }
 
 /** Summoned helpers walk the grid like monsters and bite what stands beside them. */
+// ---------------------------------------------------------------- 백호환령부, the pet weapon
+// The original's fastest mount, worn here as a weapon that lives: 연's own white tiger (the
+// 사신수 백호, Units sinsu_whitetiger tiger_roar: prowl 0-3, pounce 4-6, back 7-11, front 13-24)
+// walks at the hero's heel and, every second and a half, leaps on the nearest monster — its
+// landing tears the ground around (백호의 맹렬's claws) and may set the struck bleeding.
+const PET_PROWL = [0, 1, 2, 3], PET_POUNCE = [4, 5, 6, 12], PET_BACK = [7, 8, 9, 10], PET_FRONT = [19, 20, 21, 22, 23, 24];
+function petWorn() {
+  const g = G.player.gear || {};
+  return g.capeSp === 'cr_sinsu_baekho';
+}
+function updatePet(dt) {
+  const p = G.player;
+  if (!petWorn() || !M.fx.g_pet_baekho) { G.pet = null; return; }
+  const pet = G.pet = G.pet || { pet: true, x: p.x - 30, y: p.y, face: 1, state: 'heel', t: 0, cd: 1, row: PET_PROWL, f: 0 };
+  pet.t += dt;
+  pet.cd -= dt;
+  if (pet.state === 'leap') {
+    const k = Math.min(1, pet.t / 0.35);
+    pet.x = pet.fx + (pet.tx - pet.fx) * k;
+    pet.y = pet.fy + (pet.ty - pet.fy) * k - Math.sin(k * Math.PI) * 26;
+    pet.f = PET_POUNCE[Math.min(PET_POUNCE.length - 1, Math.floor(k * PET_POUNCE.length))];
+    if (k >= 1) {
+      // The landing: the claws round about, 연's 백호 hit.
+      const base = gyeokBase() * 2.4 * (1 + 0.15 * (starOf(G.cls, 'sp:cr_sinsu_baekho') - 1));
+      G.allyHitting = true;
+      for (const e of G.enemies.filter(e => Math.abs(e.x - pet.x) < TILE * 1.4 && Math.abs(e.y - pet.y) < TILE * 1.4).slice(0, 8)) {
+        hurtEnemy(e, base);
+        if (Math.random() < 0.3) applyStatus(e, 'bleed', 5, 1);
+      }
+      G.allyHitting = false;
+      if (fxBudget('pet', 2)) {
+        if (M.fx.g_sw_backho) addFx('g_sw_backho', pet.x, pet.y, { scale: 1.8, anchor: 'bottom' });
+        if (M.fx.g_tf_backho_hit) addFx('g_tf_backho_hit', pet.x, pet.y - 20, { scale: 0.9 });
+      }
+      G.shake = Math.max(G.shake, 0.06);
+      audio.play('kill');
+      pet.state = 'roar';
+      pet.t = 0;
+    }
+    return;
+  }
+  if (pet.state === 'roar') {
+    pet.f = PET_FRONT[Math.min(PET_FRONT.length - 1, Math.floor(pet.t / 0.08))];
+    if (pet.t > 0.5) { pet.state = 'heel'; pet.t = 0; }
+    return;
+  }
+  // At the hero's heel, a little behind; a monster near enough is leapt on.
+  const prey = pet.cd <= 0 && nearestEnemies(1, 4.5, p)[0];
+  if (prey) {
+    Object.assign(pet, { state: 'leap', t: 0, fx: pet.x, fy: pet.y, tx: prey.x, ty: prey.y, cd: 1.5 });
+    pet.face = Math.sign(prey.x - pet.x) || pet.face;
+    return;
+  }
+  const hx = p.x - (p.face || 1) * 30, hy = p.y + 4;
+  const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
+  if (d > TILE * 8) { pet.x = hx; pet.y = hy; }
+  else if (d > 6) {
+    const v = Math.min(d, heroSpeed() * 1.3 * dt);
+    pet.x += dx / d * v;
+    pet.y += dy / d * v;
+    if (Math.abs(dx) > 2) pet.face = Math.sign(dx);
+    pet.row = Math.abs(dy) > Math.abs(dx) * 1.5 ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
+    pet.f = pet.row[Math.floor(pet.t / 0.1) % pet.row.length];
+  } else pet.f = PET_PROWL[Math.floor(pet.t / 0.25) % 2];
+}
+function drawPet(pet) {
+  const f = M.fx.g_pet_baekho, im = images['fx/g_pet_baekho.png'];
+  if (!f || !im || !im.width) return;
+  const k = 0.55 * (f.k || 1);
+  ctx.save();
+  ctx.translate(Math.round(pet.x), Math.round(pet.y));
+  // The sheet's tiger faces left; turned for the right.
+  if (pet.face > 0) ctx.scale(-1, 1);
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(0, -2, 20, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.drawImage(im, pet.f * f.w, 0, f.w, f.h, -f.ax * k, -f.ay * k, f.w * k, f.h * k);
+  ctx.restore();
+}
+
 function updateAllies(dt) {
   for (const a of G.allies) {
     a.t += dt;
@@ -6129,6 +6213,8 @@ function yGearVariants(cls, gear) {
   const out = { body: 'base', head: 'base' };
   for (const kind of ['armor', 'weapon', 'shield', 'helmet', 'cape']) {
     const map = H.map[kind] || {}, sp = gear[kind + 'Sp'], t = gear[kind];
+    // 백호환령부 is not worn on the back: it walks beside the hero (updatePet).
+    if (sp === 'cr_sinsu_baekho') continue;
     let v = null;
     if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
     else if (kind === 'weapon' && t === dragonTier(cls)) v = map['dragon' + starOf(cls, `weapon:${t}`)] || map['t' + t];
@@ -6380,7 +6466,7 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies, G.party, propsInView(camX, camY));
+  const bodies = G.enemies.concat(G.allies, G.party, propsInView(camX, camY), G.pet ? [G.pet] : []);
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
@@ -6388,6 +6474,10 @@ function render(now) {
     if (b === p) {
       drawHero(now, hidden);
       if (p.sts) drawHeroStatus(p);
+      continue;
+    }
+    if (b.pet) {
+      drawPet(b);
       continue;
     }
     if (b.prop) {

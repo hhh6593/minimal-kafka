@@ -232,7 +232,8 @@ export const CRAFTS = [
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
   { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 14, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_baekho', kind: 'cape', name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
+  // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
+  { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
     mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
   { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑', pic: 'name', picTop: "진'현무불괴갑",
     look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주' }, pow: 14, opt: 'life',
