@@ -479,7 +479,7 @@ function mkCommanders(W) {
     const unit = A.M().yunit && A.M().yunit[units[team]] ? units[team] : null;
     const c = {
       war: true, cmdr: true, id: W.nextId++, team, role: 'tank', cls: null, unit, name: `${W.teams[team].name} 진영대장`, lv: 50, pw: 1,
-      maxHp: W.refHp * (W.mode === 'commander' ? 18 : W.mode === 'siege' ? 14 : 20), hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.4, moving: false, phase: 0,
+      maxHp: W.refHp * (W.mode === 'commander' ? 10 : W.mode === 'siege' ? 14 : 20), hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.4, moving: false, phase: 0,
       face: 1, mdx: 0, mdy: 1, fdx: 0, fdy: 1, walkT: 0, pose: null, poseT: 0, flash: 0, stun: 0, slow: 0, curse: 0, st: null,
       m: { h: 96, area: 9000, id: unit || 'c' }, scale: 1.25, cd: { a: 1, b: 3, c: 6, d: 9, e: 4, r: 0 }, thinkT: 0, target: null, dest: null,
       stats: blankStats(), hitBy: new Map(), dmgIn: [], shield: 0, speed: 55, dead: false, respawnAt: 0, home: snap(W, ...at[team]), quietT: 0,
@@ -628,7 +628,7 @@ export const War = {
     while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
     const span = Math.max(3, Math.min(8, G.t - win[0][0]));
     const rate = W.rawSum / span;
-    const target = W.U * 4 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
+    const target = W.U * 3.2 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
     return rate > target ? dmg * target / rate : dmg;
   },
   heroDown: () => heroDown(),
@@ -926,7 +926,8 @@ function thinkHealer(W, b, order) {
   if (hurt >= 3 && b.cd.d <= 0) {
     b.cd.d = 12;
     const gid = b.kit.group || b.kit.heal;
-    castFx(W, b, gid, b, 1.0);
+    // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
+    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
     shout(W, b, gid ? SK[gid].name : '천공의희원');
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
@@ -974,7 +975,8 @@ function supportBuffs(W, b) {
       b.cd.b = 13;
       for (const m of mates) guard(W, m, 5);
       shout(W, b, pick(['보호', '무장', '의지의 외침']));
-      if (onScreen(b) && fxOk()) A.addFx(A.FX.shield, b.x, b.y - 26, { scale: 0.9 });
+      // 차폐's ground ward round the supporter: the squad within takes less.
+      castFx(W, b, SK.p_barrier ? 'p_barrier' : null, b, 1.2);
       credit(b, 'obj', 4);
       pose(b, 'cast');
     }
@@ -1016,7 +1018,7 @@ function thinkCmdr(W, b) {
       b.cd.a = 1.6;
       b.atkAt = G.t;
       A.faceTo(b, near[0][0].tx, near[0][0].ty);
-      for (const [e] of near) hit(W, b, e, W.U * 2.2);
+      for (const [e] of near) hit(W, b, e, W.U * 1.6);
       if (onScreen(b) && fxOk()) A.fxOn(SK.w_tiger.fx, near[0][0], { scale: 1.1 });
     }
     if (b.cd.d <= 0 && near.length >= 3 && !b.wind) {
@@ -1693,7 +1695,7 @@ function orders(W, team, loud = false) {
     const myC = T.cmd, theirC = foe.cmd;
     const mid = W.def.mid;
     const underAttack = W.alive[1 - team].filter(e => d2(e, myC) < 7).length >= 3;
-    const push = ahead >= 3 || W.left < 120 || (W.score[team] < W.score[1 - team] && W.left < 180);
+    const push = ahead >= 2 || W.left < 200 || W.score[team] < W.score[1 - team] - 5;
     set(squads[0], myC.home[0] + Math.sign(mid[0] - myC.home[0]) * 3, myC.home[1], 'defend', null, '대장 곁을 지킵니다');
     if (underAttack) blob(myC.tx, myC.ty, 'defend', null, '대장이 공격받아요! 전원 복귀!');
     else if (push && !theirC.dead) blob(theirC.tx, theirC.ty, 'assault', theirC, '적 진영대장 돌격! 다 같이!');
@@ -1825,6 +1827,19 @@ function tables(W, rows) {
   return `<div class="wr-cols">${[0, 1].map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name} 길드${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
 }
 
+/** The hero as it stood in the war, in 연's layers and its own gear, for the result's spotlight. */
+function heroShot(G) {
+  const b = { cls: G.cls, gear: G.player.gear, fdx: 0, fdy: 1, walkT: 0, poseT: 0 };
+  if (!drawFighterKey(b, 'idle')) return '';
+  const e = frames.get(b.lastKey);
+  if (!e) return '';
+  const c = document.createElement('canvas');
+  c.width = e.pic.width;
+  c.height = e.pic.height;
+  c.getContext('2d').drawImage(e.pic, 0, 0);
+  try { return c.toDataURL(); } catch (err) { return ''; }
+}
+
 function showResult(W) {
   const G = A.G();
   if (!G || G.war !== W) return;
@@ -1838,7 +1853,7 @@ function showResult(W) {
   const matIcon = A.matPicture ? A.matPicture(W.def.mat) : '';
   box.innerHTML = `<div class="wr-title" style="${hud('ui_ink_nine') ? `background-image:url(${hud('ui_ink_nine')})` : ''}">${won ? '승리' : '패배'}</div>
     <div class="wr-stage" style="${hud('ui_light02') ? `background-image:url(${hud('ui_light02')})` : ''}">
-      <img class="wr-hero" src="${A.heroPicture(G.cls)}" alt="">
+      <img class="wr-hero" src="${heroShot(G) || A.heroPicture(G.cls)}" alt="">
       ${art ? `<img class="wr-flag" src="${hud(won ? 'ui_attack_result_win' : 'ui_attack_result_lose')}" alt="">` : ''}</div>
     <div class="wr-sub">${W.def.name} · ${W.def.title} — ${r.why}<br>내 기여: 길드 ${r.rank}위 · ${ROLES[W.role].name} · 등급 <b class="wr-tier">${r.tier}</b></div>
     <div class="wr-medals">${medal(mat.name, '+' + r.mats, matIcon)}${medal('전', '+' + r.gold.toLocaleString(), '')}${medal('등급', r.tier, '')}</div>
@@ -2154,7 +2169,8 @@ function drawUnit(yu, b, row, f, mirror, alpha) {
 // kept: one drawImage a fighter instead of six, and the shadow from one small picture.
 const frames = new Map(), labels = new Map();
 let shadowPic = null;
-function drawFighter(b, x, y, pose, alpha) {
+const drawFighterKey = (b, pose) => drawFighter(b, 0, 0, pose, 1, true);
+function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   const M = A.M(), H = M.yhero2 && M.yhero2[b.cls.id];
   if (!H) return false;
   if (!b.yvKey) {
@@ -2199,6 +2215,8 @@ function drawFighter(b, x, y, pose, alpha) {
     }
     c = keepFrame(k, c);
   }
+  b.lastKey = k;
+  if (noDraw) return true;
   const ctx = A.ctx;
   if (!shadowPic) {
     shadowPic = document.createElement('canvas');

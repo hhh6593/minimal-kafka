@@ -501,6 +501,12 @@ function buildStages() {
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
     }
+    // 대항전 (war.js): the guild wars from the raid list too.
+    const wb = document.createElement('button');
+    wb.className = 'raid';
+    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_icon_castle_war') ? '<img src="assets/hud/ui_icon_castle_war.png" alt="">' : ''}<div><b>사신수 길드대항전</b><span>청룡·백호·주작·현무 — 25 대 25 길드전</span><span>역할을 골라 출전</span></div>`;
+    wb.onclick = () => War.openBoard();
+    map.append(wb);
     raidInfo(pickedStage);
     return;
   }
