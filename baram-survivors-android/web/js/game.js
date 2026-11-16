@@ -1386,7 +1386,8 @@ function treeSpell(id, opts = {}) {
   const cls = def.cls === 'all' ? null : def.cls;
   if (def.promo && cls && promoOf(cls) < def.promo) {
     const at = STAGES.find(x => x.id === PROMOS[cls][def.promo - 1].at);
-    opts.note = `${def.promo}차 승급 · ${at.name} 정복`;
+    // What still closes it, all of it: the 승급 first, then the spell before it in the line.
+    opts.note = `${def.promo}차 승급 · ${at.name} 정복` + (opts.note ? ` · ${opts.note}` : '');
     el.classList.add('lock');
   }
   if (grown) el.classList.add('have');
@@ -1456,7 +1457,10 @@ function buildTree(cls, hot = new Set()) {
         const from = mine.find(([, x]) => x.up === id);
         note = `${from ? from[1].name : ''} 8단에서 각성`;
       } else if (d.up) note = `8단 → ${SKILLS[d.up].name}(${SKILLS[d.up].promo}차)`;
-      if (d.pre) note = (note ? note + ' · ' : '') + `${SKILLS[d.pre[0]].name} ${d.pre[1]}단이면 열림`;
+      if (d.pre) {
+        const q = SKILLS[d.pre[0]];
+        note = (note ? note + ' · ' : '') + `${q.name}(${q.promo ? q.promo + '차' : '일반'}) 배우면 열림`;
+      }
       if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 나옴';
       const el = treeSpell(id, note ? { note } : {});
       if (hot.has(id)) el.style.outline = '2px solid #7a1800';
@@ -4842,8 +4846,10 @@ function drawCards() {
     for (const [id, d] of Object.entries(SKILLS)) {
       if (!mine(id) || d.evolved || d.kind === 'ult' || (d.req || 1) > lvl || have(id)) continue;
       if (d.promo && promoOf(G.cls.id) < d.promo) continue;
-      // 계열: the spell before it in the tree, raised to 3단 in this hunt, opens it.
-      if (d.pre && !G.skills.some(x => x.id === d.pre[0] && x.lv >= d.pre[1])) continue;
+      // 계열: the spell before it in the tree, learned in this hunt, opens it (it once had to be
+      // raised to 3단 first, which with every hunt starting over and the slots filling up was
+      // hardly ever reached).
+      if (d.pre && !G.skills.some(x => x.id === d.pre[0])) continue;
       opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
     }
   }

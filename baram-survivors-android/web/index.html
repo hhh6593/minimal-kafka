@@ -271,7 +271,8 @@
   .spell img { flex: none; width: 28px; height: 28px; object-fit: contain; background: #1a0e06; image-rendering: pixelated; }
   .spell div { min-width: 0; font: 10px/12px G9, monospace; }
   .spell b { display: block; font: 700 11px/13px G11, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .spell span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6a3e16; }
+  /* The note under a spell (what opens it) wraps to a second line rather than being cut off. */
+  .spell span { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; color: #6a3e16; }
   .spell.lock { opacity: .55; }
   .spell.have { background: #fff0c0; }
   .spell.final b { color: #7a1800; }
