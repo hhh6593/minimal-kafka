@@ -4664,7 +4664,7 @@ function hurtMember(m, dmg) {
 /** Healing a companion: its 기원's picture over its head. */
 function healMember(m, n, fx = null) {
   if (m.down) return;
-  if (G.war && m.war) n = Math.min(m.maxHp * 0.2, n * G.war.refHp / G.player.maxHp); // 대항전: a fighter's life is in the field's units
+  if (G.war && m.war) n = Math.min(m.maxHp * 0.12, n * G.war.refHp / G.player.maxHp); // 대항전: a fighter's life is in the field's units
   n = Math.min(n, m.maxHp - m.hp);
   if (n <= 0) return;
   m.hp += n;

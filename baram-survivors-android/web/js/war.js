@@ -628,7 +628,7 @@ export const War = {
     while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
     const span = Math.max(3, Math.min(8, G.t - win[0][0]));
     const rate = W.rawSum / span;
-    const target = W.U * 3.2 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
+    const target = W.U * 2.6 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
     return rate > target ? dmg * target / rate : dmg;
   },
   heroDown: () => heroDown(),
@@ -1409,7 +1409,7 @@ function heroRole(W, dt) {
     if (low) {
       const fx = SK.c_heal.fxs[Math.min(7, Math.floor(p.lvl / 5))];
       if (fx) A.addFx(fx, low.x, low.y - 26, { scale: 0.9 });
-      healBody(W, h, low, low.maxHp * 0.12 * W.roleK);
+      healBody(W, h, low, low.maxHp * 0.08 * W.roleK);
       A.floatText(low.x, low.y - 70, '기원', '#fff', true);
     }
   } else if (W.role === 'support') {
@@ -1441,7 +1441,7 @@ function neediest() {
 /** The hero's 기원 in a war also mends the allies close by (a healer's more). */
 function heroHeal(n, fx) {
   const G = A.G(), W = G.war, p = G.player;
-  const k = Math.min(W.role === 'healer' ? 0.14 * W.roleK : 0.05, (W.role === 'healer' ? 1.6 * W.roleK : 0.6) * n / p.maxHp);
+  const k = Math.min(W.role === 'healer' ? 0.08 * W.roleK : 0.04, (W.role === 'healer' ? 1.6 * W.roleK : 0.6) * n / p.maxHp);
   for (const m of G.party) {
     if (m.dead || d2(m, W.hero) > 4) continue;
     healBody(W, W.hero, m, m.maxHp * k);
