@@ -27,6 +27,24 @@ export const CLASSES = [
   // 바람의나라 연's 궁사 (Job_6): its figure, bows, skills and sounds come only from 연's resources.
   { id: 'archer', name: '궁사', hero: '1002', hp: 120, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
+  // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
+  { id: 'lancer', name: '무사', hero: '1001', hp: 160, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
+    desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
+  // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
+  { id: 'monk', name: '격투가', hero: '1001', hp: 175, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
+    desc: '맨주먹의 근접 격수. 파고들어 두들기고, 혈을 짚어 묶고, 땅을 갈라 터뜨린다.' },
+  // 바람의나라 연's 마도사 (Job_11): 단봉, figure, skills and sounds only from 연's resources.
+  { id: 'magus', name: '마도사', hero: '1003', hp: 105, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
+    desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
+  // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
+  { id: 'celestial', name: '천인', hero: '1003', hp: 130, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
+    desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
+  // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
+  { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
+    desc: '방망이를 휘두르는 근접 장사. 후려치고 메치고, 일격필살로 강한 적을 내리찍는다.' },
+  // 바람의나라 연's 차사 (Job_10): 백도, figure, skills and sounds only from 연's resources.
+  { id: 'reaper', name: '차사', hero: '1002', hp: 180, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
+    desc: '저승의 백도를 든 근접 격수. 베고 파고들며, 영혼의 화살과 업화로 넓게 거둔다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -449,6 +467,408 @@ export const SKILLS = {
     desc: '궁극기. 피를 태운 다섯 번째 화살이 화면의 모든 몬스터를 꿰뚫는다' },
   a_ult: { cls: 'archer', name: '일환탄시', kind: 'ult', fx: '144', hpCost: 0.15,
     desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터에게 강력한 일격을 가한다' },
+
+  // 무사 (바람의나라 연 Job_7): its own skill list (Skills_Player 2071xxxx 일반, 2072xxxx 승급; icons by
+  // the older 10xxxx numbers the records name), each with the effect, icon and sound of that 연
+  // record (fx k_<id>, tools/yeon_lancer_skills.json). 1차~6차 are 연's own (창객·창제·창황·창성·
+  // 신창·창극); 연 has no 7차~9차 for the 무사, so those take its remaining 일반 techniques
+  // (맹룡승천, 무형투창, 신창합일, 월하멸섬 ...). The fx here is only the old fallback.
+  l_moon: { cls: 'lancer', req: 1, name: '월하일섬', kind: 'line', fx: '55', dmg: 15, cd: 0.8, depth: 3,
+    desc: '창을 내질러 몬스터가 가장 많은 쪽 일렬 세 칸을 꿰찌른다' },
+  l_halfmoon: { cls: 'lancer', req: 1, name: '반월참', kind: 'cleave', fx: '20', dmg: 18, cd: 2, depth: 2, max: 5,
+    desc: '창을 반달처럼 휘둘러 앞쪽 역삼각형의 몬스터 다섯을 벤다' },
+  l_phantom: { cls: 'lancer', req: 1, name: '환영창', kind: 'spell', fx: '53', dmg: 20, cd: 1.6, range: 6, count: 1,
+    desc: '창의 환영을 던져 가까운 몬스터를 꿰뚫는다. 4·7단에 환영이 하나씩 는다' },
+  l_wind: { cls: 'lancer', req: 6, name: '풍운보', kind: 'buff', buff: 'haste', fx: '7', cd: 14, duration: 4,
+    desc: '바람과 구름처럼 몸이 가벼워져 잠시 모든 기술이 빨리 돈다' },
+  l_meteor: { cls: 'lancer', req: 6, name: '유성창', kind: 'strike', fx: '147', dmg: 24, cd: 2.6, range: 6, radius: 1, count: 1,
+    hitAt: 0.3, desc: '유성처럼 창을 내리꽂아 대상과 그 주위를 친다' },
+  l_rise: { cls: 'lancer', req: 12, name: '잠룡승천', kind: 'strike', fx: '24', dmg: 22, cd: 3, range: 5, radius: 0, count: 2,
+    hitAt: 0.25, stun: 1, desc: '잠든 용이 솟구치듯 몬스터 둘을 창끝으로 띄워 잠시 멈춘다' },
+  // 1차 창객
+  l_spiral: { promo: 1, cls: 'lancer', req: 6, name: '나선창', kind: 'line', fx: '22', dmg: 20, cd: 2, depth: 5,
+    up: 'l_firedragon', desc: '나선으로 도는 창날이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  l_illusion: { promo: 1, cls: 'lancer', req: 6, name: '환영참', kind: 'cleave', fx: '20', dmg: 22, cd: 2.4, depth: 2, max: 6,
+    desc: '환영과 함께 앞쪽을 크게 베어 몬스터 여섯을 친다' },
+  // 2차 창제
+  l_release: { promo: 2, cls: 'lancer', req: 10, name: '뇌기방출', kind: 'nova', fx: '89', dmg: 20, cd: 3, radius: 1, stun: 0.6,
+    desc: '몸에 모은 뇌기를 터뜨려 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  l_extinct: { promo: 2, cls: 'lancer', req: 10, name: '멸화참', kind: 'strike', fx: '148', dmg: 18, cd: 3, range: 6, radius: 2, count: 1,
+    hitAt: 0.35, curse: 2, desc: '불꽃의 고리로 대상과 그 주위를 태우고 약화시킨다' },
+  l_innate: { promo: 2, cls: 'lancer', req: 10, name: '선천기공', kind: 'heal', fx: '125', heal: 20, cd: 13, shieldT: 2,
+    desc: '타고난 기공을 돌려 체력을 회복하고 잠시 보호막을 두른다' },
+  // 3차 창황
+  l_waves: { promo: 3, cls: 'lancer', req: 14, name: '만경창파', kind: 'cleave', fx: '24', dmg: 22, cd: 3, depth: 3, max: 9,
+    desc: '만 겹의 물결처럼 창을 휘몰아 앞쪽 넓은 범위의 몬스터 아홉을 친다' },
+  l_rush: { promo: 3, cls: 'lancer', req: 14, name: '환영쇄도', kind: 'line', fx: '144', dmg: 24, cd: 2.6, depth: 5, dash: true,
+    desc: '환영과 함께 바라보는 쪽으로 돌진하며 지나는 일렬 다섯 칸을 찌른다' },
+  l_burst: { promo: 3, cls: 'lancer', req: 14, name: '환영지폭', kind: 'strike', fx: '147', dmg: 20, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.4, desc: '하늘에서 쏟아지는 창의 환영이 대상과 그 주위를 터뜨린다' },
+  // 4차 창성
+  l_unity: { promo: 4, cls: 'lancer', req: 18, name: '혼연체식', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.6,
+    desc: '몸과 창이 하나가 되어 잠시 모든 피해가 크게 늘어난다' },
+  l_firedragon: { promo: 4, cls: 'lancer', req: 18, evolved: true, name: '화룡멸진', kind: 'line', fx: '140', dmg: 26, cd: 2.4, depth: 7,
+    desc: '나선창 8단 + 4차 승급. 불의 용이 몬스터가 가장 많은 쪽 일렬 일곱 칸을 태운다' },
+  l_genesis: { promo: 4, cls: 'lancer', req: 18, name: '천지개벽', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '하늘에서 빛의 기둥이 쏟아져 화면의 모든 몬스터를 친다' },
+  // 5차 신창
+  l_extinct2: { promo: 5, cls: 'lancer', req: 21, name: '극멸화참', kind: 'nova', fx: '148', dmg: 34, cd: 3.2, radius: 2, curse: 3,
+    desc: '무사의 궁극오의. 거대한 불꽃 고리로 둘레 두 칸의 몬스터를 태우고 약화시킨다' },
+  l_formless: { promo: 5, cls: 'lancer', req: 21, name: '무형지창', kind: 'strike', fx: '115', dmg: 26, cd: 3.2, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, slow: 3, desc: '형체 없는 창을 대상 주위에 꽂아 피해를 주고 둔화시킨다' },
+  l_guard: { promo: 5, cls: 'lancer', req: 21, name: '진기보호', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '진기로 몸을 감싸 잠시 받는 피해를 절반으로 줄인다' },
+  // 6차 창극
+  l_annihil: { promo: 6, cls: 'lancer', req: 24, name: '화룡사멸', kind: 'strike', fx: '139', dmg: 40, cd: 3, range: 7, radius: 1, count: 3,
+    hitAt: 0.35, strongest: true, desc: '하늘에서 화룡의 불기둥 셋을 가장 강한 몬스터들(보스를 먼저)과 그 주위에 내리꽂는다' },
+  // 7차~9차: 연's other 무사 techniques
+  l_dragon: { promo: 7, cls: 'lancer', req: 27, name: '맹룡승천', kind: 'strike', fx: '24', dmg: 34, cd: 2.4, range: 6, radius: 1, count: 3,
+    hitAt: 0.25, stun: 0.6, desc: '용처럼 솟구치는 창격이 몬스터 셋과 그 주위를 띄워 친다' },
+  l_spirit: { promo: 7, cls: 'lancer', req: 27, name: '패기발산', kind: 'nova', fx: '25', dmg: 30, cd: 3.4, radius: 2,
+    desc: '패기를 터뜨려 둘레 두 칸의 몬스터를 밀쳐 낸다' },
+  l_javelin: { promo: 8, cls: 'lancer', req: 30, name: '무형투창', kind: 'spell', fx: '55', dmg: 32, cd: 1.8, range: 8, count: 3,
+    desc: '보이지 않는 창을 던져 몬스터 셋을 꿰뚫는다' },
+  l_thunder: { promo: 8, cls: 'lancer', req: 30, name: '뇌신화', kind: 'buff', buff: 'haste', fx: '89', cd: 16, duration: 5,
+    desc: '뇌신의 힘을 몸에 받아 잠시 모든 기술이 빨리 돈다' },
+  l_union: { promo: 8, cls: 'lancer', req: 30, name: '신창합일', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '창과 혼이 하나가 되어 잠시 공격력이 크게 오른다' },
+  l_reflect: { promo: 9, cls: 'lancer', req: 33, name: '반탄강기', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '강기를 둘러 잠시 어떤 공격도 튕겨 낸다(무적)' },
+  l_moonfull: { promo: 9, cls: 'lancer', req: 33, name: '월하멸섬', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 달빛 아래 번개를 두른 창격이 화면의 모든 몬스터를 벤다' },
+  l_ult: { cls: 'lancer', name: '백월난격', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 흰 달의 난격을 퍼붓는다' },
+
+  // 격투가 (바람의나라 연 Job_5): its own skill list (Skills_Player 2051xxxx 일반, 2052xxxx 승급), each with
+  // the effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_monk_skills.json). 1차~6차 are
+  // 연's own (권사·권호·권왕·권제·권신·권극); 연 has no 7차~9차 for the 격투가, so those take its remaining
+  // 일반 techniques (정신집중, 허허실실, 점혈:통, 권법의기원, 권신강림의 추가타). Most of its 일반 records
+  // carry no sound of their own: they take the 격투가's fist sounds (fx_skill_deathfist, _thunderfist,
+  // _fightspirit, _quake) and its 승급 SFX_Fighter_* clips. The fx here is only the old fallback.
+  mk_bung: { cls: 'monk', req: 1, name: '붕권', kind: 'slash', fx: '19', dmg: 14, cd: 0.6,
+    desc: '곁의 몬스터를 주먹으로 친다. 단이 오르면 더 여러 번, 앞뒤 양옆까지 친다' },
+  mk_sudden: { cls: 'monk', req: 1, name: '전광석화', kind: 'blink', fx: '52', dmg: 16, cd: 1.3, range: 4, count: 2,
+    desc: '번개처럼 몬스터 등 뒤로 파고들며 두 번 친다' },
+  mk_smash: { cls: 'monk', req: 1, name: '비연격', kind: 'cleave', fx: '20', dmg: 20, cd: 1.8, depth: 1, max: 4,
+    desc: '제비처럼 날아올라 앞쪽 몬스터 넷을 걷어찬다' },
+  mk_body: { cls: 'monk', req: 6, name: '철산고', kind: 'line', fx: '144', dmg: 22, cd: 2.4, depth: 3, dash: true, stun: 0.5,
+    desc: '어깨로 들이받으며 바라보는 쪽 일렬 세 칸을 밀고 나간다' },
+  mk_quake: { cls: 'monk', req: 6, name: '천지파동', kind: 'nova', fx: '25', dmg: 24, cd: 2.6, radius: 1, stun: 0.5,
+    desc: '땅을 내려쳐 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  mk_switch: { cls: 'monk', req: 12, name: '혈도개방', kind: 'buff', buff: 'power', fx: '6', cd: 14, duration: 4, power: 0.5,
+    desc: '혈도를 열어 잠시 모든 피해가 늘어난다' },
+  // 1차 권사
+  mk_pointblue: { promo: 1, cls: 'monk', req: 6, name: '점혈:기', kind: 'spell', fx: '53', dmg: 16, cd: 2.2, range: 5, count: 2, stun: 0.8,
+    desc: '몬스터 둘의 혈을 짚어 잠시 기를 막는다(멈춤)' },
+  mk_uppercut: { promo: 1, cls: 'monk', req: 6, name: '격풍권', kind: 'strike', fx: '24', dmg: 24, cd: 2.6, range: 4, radius: 0, count: 2,
+    hitAt: 0.2, stun: 0.6, desc: '바람을 일으키는 올려치기로 몬스터 둘을 띄운다' },
+  // 2차 권호
+  mk_pointlight: { promo: 2, cls: 'monk', req: 10, name: '점혈:광', kind: 'strike', fx: '147', dmg: 20, cd: 2.8, range: 6, radius: 2, count: 1,
+    hitAt: 0.3, up: 'mk_buddha', desc: '혈을 짚은 몬스터에게서 기가 터져 그 주위를 친다' },
+  mk_endure: { promo: 2, cls: 'monk', req: 10, name: '인고의시간', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '고통을 참아 내며 잠시 어떤 공격에도 쓰러지지 않는다(무적)' },
+  mk_spirit: { promo: 2, cls: 'monk', req: 10, name: '투혼', kind: 'buff', buff: 'haste', fx: '7', cd: 15, duration: 4,
+    desc: '투혼을 불태워 잠시 모든 기술이 빨리 돈다' },
+  // 3차 권왕
+  mk_pointburst: { promo: 3, cls: 'monk', req: 14, name: '점혈:폭', kind: 'strike', fx: '147', dmg: 22, cd: 3, range: 6, radius: 1, count: 2,
+    hitAt: 0.3, stun: 1, desc: '짚은 혈을 터뜨려 몬스터 둘과 그 주위를 기절시킨다' },
+  mk_resonance: { promo: 3, cls: 'monk', req: 14, name: '공명권', kind: 'line', fx: '22', dmg: 22, cd: 2.4, depth: 5,
+    desc: '울림이 퍼지는 주먹이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  mk_rupture: { promo: 3, cls: 'monk', req: 14, name: '천지파열', kind: 'nova', fx: '25', dmg: 24, cd: 3.4, radius: 2,
+    desc: '대지를 갈라 둘레 두 칸의 몬스터를 터뜨린다' },
+  // 4차 권제
+  mk_diamond: { promo: 4, cls: 'monk', req: 18, name: '금강불괴', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '금강 같은 몸이 되어 잠시 받는 피해를 절반으로 줄인다' },
+  mk_wolf: { promo: 4, cls: 'monk', req: 18, name: '낭아권', kind: 'cleave', fx: '140', dmg: 26, cd: 2.6, depth: 2, max: 6,
+    desc: '이리의 송곳니 같은 연타로 앞쪽 몬스터 여섯을 물어뜯는다' },
+  mk_buddha: { promo: 4, cls: 'monk', req: 18, evolved: true, name: '여래신장', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '점혈:광 8단 + 4차 승급. 하늘에서 내려찍는 거대한 손바닥이 화면의 모든 몬스터를 친다' },
+  // 5차 권신
+  mk_combo: { promo: 5, cls: 'monk', req: 21, name: '연속필살권무', kind: 'strike', fx: '148', dmg: 30, cd: 3.2, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, desc: '격투가의 궁극오의. 쉴 새 없는 권무로 몬스터 둘과 그 주위를 두들긴다' },
+  mk_technique: { promo: 5, cls: 'monk', req: 21, name: '권신기법', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.7,
+    desc: '권신의 기법을 깨쳐 잠시 공격력이 크게 오른다' },
+  mk_advent: { promo: 5, cls: 'monk', req: 21, name: '권신강림', kind: 'strike', fx: '115', dmg: 26, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.35, curse: 3, desc: '권신을 불러 대상과 그 주위를 내리치고 약화시킨다' },
+  // 6차 권극
+  mk_kyokushin: { promo: 6, cls: 'monk', req: 24, name: '극진권', kind: 'line', fx: '144', dmg: 34, cd: 3, depth: 6, dash: true,
+    desc: '극에 이른 주먹으로 바라보는 쪽 일렬 여섯 칸을 뚫고 나간다' },
+  // 7차~9차: 연's other 격투가 techniques
+  mk_focus: { promo: 7, cls: 'monk', req: 27, name: '정신집중', kind: 'heal', fx: '125', heal: 24, cd: 13, shieldT: 3,
+    desc: '정신을 모아 체력을 회복하고 잠시 보호막을 두른다' },
+  mk_feint: { promo: 7, cls: 'monk', req: 27, name: '허허실실', kind: 'buff', buff: 'stealth', fx: '36', cd: 14, duration: 2.5,
+    desc: '허와 실을 뒤섞어 잠시 몬스터의 눈을 피하고, 그동안 주는 피해가 커진다' },
+  mk_point: { promo: 8, cls: 'monk', req: 30, name: '점혈:통', kind: 'spell', fx: '55', dmg: 32, cd: 1.8, range: 6, count: 3, curse: 2,
+    desc: '몬스터 셋의 통혈을 짚어 피해를 주고 약화시킨다' },
+  mk_origin: { promo: 8, cls: 'monk', req: 30, name: '권법의기원', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '권법의 근원에 닿아 잠시 공격력이 크게 오른다' },
+  mk_aventhit: { promo: 9, cls: 'monk', req: 33, name: '권신강림 추가타', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 강림한 권신이 화면의 모든 몬스터를 다시 내려친다' },
+  mk_ult: { cls: 'monk', name: '필살권무', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 쉴 새 없는 권무를 퍼붓는다' },
+
+  // 마도사 (바람의나라 연 Job_11): its own skill list (Skills_Player 230xxxxx), each with the effect, icon
+  // and sound of that 연 record (fx k_<id>, tools/yeon_magus_skills.json). 연 numbers the 마도사's
+  // skills in one run; those after its 승급의 힘 (23001600) are taken three a tier, 1차~4차
+  // (마학사·마현선·마광사·마진선), 혈마광폭열파 at 5차 (마선사); its 광폭 forms of the 일반 orbs and beams
+  // (광폭십자광선, 광폭신장, 광폭파장) fill 5차~6차 (마천선), and 7차~9차 take its remaining 일반 techniques.
+  md_sphere: { cls: 'magus', req: 1, name: '마력구회격', kind: 'spell', fx: '31', dmg: 11, cd: 1.1, range: 7, count: 2,
+    desc: '마력의 구슬을 날려 가까운 몬스터 둘을 따로따로 친다. 4·7단에 구슬이 하나씩 는다' },
+  md_arrow: { cls: 'magus', req: 1, name: '마력화살', kind: 'spell', fx: '53', dmg: 18, cd: 1.8, range: 7, count: 2,
+    desc: '마력의 화살 둘이 몬스터를 꿰뚫는다' },
+  md_orbice: { cls: 'magus', req: 1, name: '기공구슬\'수', kind: 'strike', fx: '68', dmg: 10, cd: 2.6, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, slow: 2, desc: '물의 기공구슬이 몬스터 둘과 그 주위를 얼려 느리게 한다. 4·7단에 하나씩 는다' },
+  md_orblight: { cls: 'magus', req: 6, name: '기공구슬\'뇌', kind: 'spell', fx: '89', dmg: 16, cd: 2.4, range: 7, count: 3, stun: 0.6,
+    desc: '번개의 기공구슬이 몬스터 셋을 이어 치며 잠시 마비시킨다' },
+  md_orbfire: { cls: 'magus', req: 6, name: '기공구슬\'화', kind: 'strike', fx: '147', dmg: 14, cd: 3, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, desc: '불의 기공구슬이 몬스터 둘과 그 주위를 터뜨린다. 4·7단에 하나씩 는다' },
+  md_enhance: { cls: 'magus', req: 12, name: '마법강화', kind: 'buff', buff: 'power', fx: '15', cd: 14, duration: 4, power: 0.5,
+    desc: '마법을 강화해 잠시 모든 피해가 늘어난다' },
+  md_heal: { cls: 'magus', req: 12, name: '금기의기원', kind: 'heal', fx: '125', heal: 18, cd: 12,
+    desc: '금기된 기원으로 이따금 체력을 회복한다' },
+  // 1차 마학사
+  md_spirit: { promo: 1, cls: 'magus', req: 6, name: '마령소환', kind: 'line', fx: '144', dmg: 20, cd: 2.4, depth: 6,
+    desc: '마령을 불러 몬스터가 가장 많은 쪽 일렬 여섯 칸을 휩쓴다' },
+  md_amulet: { promo: 1, cls: 'magus', req: 6, name: '광폭보호부', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '광폭의 보호부를 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  md_frenzyexp: { promo: 1, cls: 'magus', req: 6, name: '광폭기폭사', kind: 'nova', fx: '25', dmg: 20, cd: 3, radius: 1,
+    desc: '광폭기를 터뜨려 둘러싼 몬스터를 밀쳐 낸다' },
+  // 2차 마현선
+  md_cross: { promo: 2, cls: 'magus', req: 10, name: '기공십자광선', kind: 'strike', fx: '24', dmg: 22, cd: 3, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, shape: 'plus', up: 'md_exfrenzy', desc: '십자로 뻗는 기공광선이 대상과 그 상하좌우를 꿰뚫는다' },
+  md_decay: { promo: 2, cls: 'magus', req: 10, name: '광폭부패', kind: 'spell', fx: '115', dmg: 16, cd: 2.6, range: 7, count: 3, curse: 3,
+    desc: '몬스터 셋을 썩게 하여 피해를 주고 약화시킨다' },
+  md_recovery: { promo: 2, cls: 'magus', req: 10, name: '광폭즉축기', kind: 'heal', fx: '125', heal: 22, cd: 13, shieldT: 2,
+    desc: '광폭기를 거두어 체력을 회복하고 잠시 보호막을 두른다' },
+  // 3차 마광사
+  md_wave: { promo: 3, cls: 'magus', req: 14, name: '마력파장', kind: 'nova', fx: '25', dmg: 22, cd: 3.2, radius: 2,
+    desc: '마력의 물결이 둘레 두 칸의 몬스터를 친다' },
+  md_silence: { promo: 3, cls: 'magus', req: 14, name: '광폭침묵염파', kind: 'strike', fx: '148', dmg: 24, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.4, stun: 1, desc: '침묵의 불길이 대상과 그 주위를 태우고 잠시 멈춘다' },
+  md_bust: { promo: 3, cls: 'magus', req: 14, name: '광폭기대방출', kind: 'strike', fx: '147', dmg: 30, cd: 2.8, range: 7, radius: 0, count: 2,
+    hitAt: 0.25, desc: '광폭기를 한꺼번에 내리꽂아 몬스터 둘에게 큰 피해를 준다' },
+  // 4차 마진선
+  md_ray: { promo: 4, cls: 'magus', req: 18, name: '광폭기조사', kind: 'line', fx: '22', dmg: 26, cd: 2.6, depth: 7,
+    desc: '광폭기의 빛줄기가 몬스터가 가장 많은 쪽 일렬 일곱 칸을 꿰뚫는다' },
+  md_absorb: { promo: 4, cls: 'magus', req: 18, name: '광폭체마', kind: 'spell', fx: '49', dmg: 20, cd: 2.8, range: 6, count: 1,
+    drain: 0.3, weakest: true, desc: '몬스터의 체력과 마력을 빨아들여 체력을 회복한다' },
+  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', fx: '141', dmg: 18, cd: 6, darken: 0.8,
+    desc: '기공십자광선 8단 + 4차 승급. 하늘을 멸하는 광폭기가 화면의 모든 몬스터에게 떨어진다' },
+  // 5차 마선사
+  md_bloodbat: { promo: 5, cls: 'magus', req: 21, name: '혈마광폭열파', kind: 'line', fx: '144', dmg: 32, cd: 3, depth: 7,
+    curse: 3, desc: '마도사의 궁극오의. 피의 박쥐떼가 일렬 일곱 칸을 휩쓸며 약화시킨다' },
+  md_crossfrenzy: { promo: 5, cls: 'magus', req: 21, name: '광폭십자광선', kind: 'strike', fx: '24', dmg: 28, cd: 3.2, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, shape: 'plus', desc: '광폭기를 실은 십자광선이 대상과 그 상하좌우를 불사른다' },
+  // 6차 마천선
+  md_stormfrenzy: { promo: 6, cls: 'magus', req: 24, name: '광폭신장', kind: 'strike', fx: '89', dmg: 30, cd: 2.8, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '광폭의 신장이 몬스터 셋과 그 주위를 내리친다' },
+  // 7차~9차: 연's other 마도사 techniques
+  md_storm: { promo: 7, cls: 'magus', req: 27, name: '기공신장', kind: 'strike', fx: '89', dmg: 32, cd: 2.2, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '기공의 신장이 몬스터 셋과 그 주위를 친다' },
+  md_boundary: { promo: 7, cls: 'magus', req: 27, name: '질서결계', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '질서의 결계를 쳐 잠시 어떤 공격도 받지 않는다(무적)' },
+  md_yinyang: { promo: 8, cls: 'magus', req: 30, name: '오행구슬', kind: 'heal', fx: '125', heal: 30, cd: 12, shieldT: 3,
+    desc: '오행의 구슬이 체력을 회복하고 잠시 보호막을 두른다' },
+  md_resonance: { promo: 8, cls: 'magus', req: 30, name: '마도공명', kind: 'spell', fx: '98', dmg: 30, cd: 1.8, range: 8, count: 3, curse: 3,
+    desc: '마도의 공명으로 몬스터 셋에게 피해를 주고 약화시킨다' },
+  md_frenetic: { promo: 8, cls: 'magus', req: 30, name: '광폭화', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '광폭해져 잠시 공격력이 크게 오른다' },
+  md_manafill: { promo: 9, cls: 'magus', req: 33, name: '마력증폭', kind: 'buff', buff: 'haste', fx: '7', cd: 16, duration: 5,
+    desc: '마력을 증폭해 잠시 모든 기술이 빨리 돈다' },
+  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', fx: '141', dmg: 60, cd: 9, darken: 0.8,
+    desc: '궁극기. 광폭의 파장이 화면의 모든 몬스터를 덮친다' },
+  md_ult: { cls: 'magus', name: '광폭구회격', kind: 'ult', fx: '144', hpCost: 0.1, darken: 0.8,
+    desc: '체력 10%와 마력을 모두 써서, 화면의 몬스터에게 광폭의 구슬을 퍼붓는다' },
+
+  // 천인 (바람의나라 연 Job_8): its own skill list (Skills_Player 2081xxxx 일반, 2082xxxx 승급), each with the
+  // effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_celestial_skills.json). A caster that
+  // dives: its magic falls on the field (spell, strike, screen) and its charges (비암격, 찰나, 예리함'극,
+  // 범아귀) carry it through the foes as blinks. 1차~6차 are 연's own (천랑·천무·천군·천위·재천·천신; the
+  // 1차~3차 by its 비급 books); 연 has no 7차~9차 for the 천인, so those take its remaining 일반 techniques
+  // (수호구미호, 홍무기, 깨달음, 완전방어, 강림술'신록). The fx here is only the old fallback.
+  cl_boom: { cls: 'celestial', req: 1, name: '염화', kind: 'spell', fx: '7', dmg: 12, cd: 1.1, range: 7, count: 2,
+    desc: '불꽃을 피워 가까운 몬스터 둘을 따로따로 태운다. 4·7단에 하나씩 는다' },
+  cl_crow: { cls: 'celestial', req: 1, name: '삼족오', kind: 'spell', fx: '52', dmg: 15, cd: 2, range: 7, count: 2,
+    desc: '세 발 까마귀를 날려 몬스터 둘을 쪼아 댄다' },
+  cl_ago: { cls: 'celestial', req: 1, name: '비암격', kind: 'blink', fx: '53', dmg: 16, cd: 2.2, range: 5, count: 2,
+    desc: '바위를 일으키며 몬스터에게 돌진해 두 번 친다' },
+  cl_armor: { cls: 'celestial', req: 6, name: '갑옷파괴', kind: 'strike', fx: '147', dmg: 18, cd: 2.6, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, curse: 3, desc: '번개의 기둥이 몬스터 둘과 그 주위의 갑옷을 깨뜨린다(약화)' },
+  cl_moment: { cls: 'celestial', req: 6, name: '찰나', kind: 'blink', fx: '52', dmg: 20, cd: 1.8, range: 5, count: 1,
+    desc: '찰나에 몬스터 등 뒤로 파고들어 친다' },
+  cl_storm: { cls: 'celestial', req: 12, name: '불가살이선풍', kind: 'strike', fx: '24', dmg: 16, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.35, ticks: 3, up: 'cl_thunder', desc: '불가살이가 일으킨 소용돌이가 대상 자리에 남아 그 주위를 거듭 휩쓴다' },
+  cl_blood: { cls: 'celestial', req: 12, name: '혈류강탈', kind: 'spell', fx: '49', dmg: 18, cd: 2.8, range: 6, count: 1,
+    drain: 0.3, weakest: true, desc: '몬스터의 피를 빼앗아 체력을 회복한다' },
+  // 1차 천랑
+  cl_acumen: { promo: 1, cls: 'celestial', req: 6, name: '예리함\'극', kind: 'blink', fx: '144', dmg: 14, cd: 1.8, range: 5, count: 3,
+    desc: '날카로운 기운을 두르고 몬스터 사이를 누비며 세 번 벤다' },
+  cl_yeorae: { promo: 1, cls: 'celestial', req: 6, name: '여래의장', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '여래의 장막을 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  // 2차 천무
+  cl_wall: { promo: 2, cls: 'celestial', req: 10, name: '철옹벽', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '쇠 항아리 같은 벽을 세워 잠시 어떤 공격도 받지 않는다(무적)' },
+  cl_brilliant: { promo: 2, cls: 'celestial', req: 10, name: '빙글번쩍', kind: 'nova', fx: '89', dmg: 20, cd: 3, radius: 1, stun: 0.5,
+    desc: '빙글 돌며 번쩍이는 번개로 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  cl_blood2: { promo: 2, cls: 'celestial', req: 10, name: '혈류강탈\'극', kind: 'spell', fx: '49', dmg: 18, cd: 2.6, range: 6, count: 3,
+    drain: 0.15, desc: '몬스터 셋의 피를 한꺼번에 빼앗아 체력을 회복한다' },
+  // 3차 천군
+  cl_slam: { promo: 3, cls: 'celestial', req: 14, name: '지열각', kind: 'line', fx: '144', dmg: 24, cd: 2.6, depth: 5, dash: true, stun: 0.5,
+    desc: '땅을 가르며 바라보는 쪽 일렬 다섯 칸을 짓밟고 나아간다' },
+  cl_storm2: { promo: 3, cls: 'celestial', req: 14, name: '불가살이장군폭풍', kind: 'strike', fx: '24', dmg: 18, cd: 3.4, range: 7, radius: 2, count: 2,
+    hitAt: 0.35, ticks: 2, desc: '불가살이 장군의 폭풍이 몬스터 둘의 자리에 머물며 그 주위를 거듭 휩쓴다' },
+  cl_bind: { promo: 3, cls: 'celestial', req: 14, name: '영역속박', kind: 'screen', fx: '115', dmg: 10, cd: 6, stun: 1,
+    desc: '영역을 묶어 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  // 4차 천위
+  cl_claw: { promo: 4, cls: 'celestial', req: 18, name: '용조수', kind: 'blink', fx: '144', dmg: 24, cd: 2.4, range: 6, count: 3,
+    desc: '용의 발톱으로 몬스터 사이를 누비며 세 번 할퀸다' },
+  cl_thunder: { promo: 4, cls: 'celestial', req: 18, evolved: true, name: '뇌격룡', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '불가살이선풍 8단 + 4차 승급. 번개의 용이 화면의 모든 몬스터를 내리친다' },
+  // 5차 재천
+  cl_tiger: { promo: 5, cls: 'celestial', req: 21, name: '범아귀', kind: 'blink', fx: '144', dmg: 30, cd: 2.6, range: 6, count: 3,
+    desc: '천인의 궁극오의. 범의 아가리처럼 몬스터 사이로 뛰어들어 세 번 물어뜯는다' },
+  cl_crowfire: { promo: 5, cls: 'celestial', req: 21, name: '삼족오\'염화발출', kind: 'strike', fx: '148', dmg: 26, cd: 3, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '삼족오가 불꽃을 뿜어 몬스터 셋과 그 주위를 태운다' },
+  cl_bagua: { promo: 5, cls: 'celestial', req: 21, name: '영혼방패\'팔괘진', kind: 'heal', fx: '125', heal: 24, cd: 13, shieldT: 3,
+    desc: '팔괘진의 영혼방패로 체력을 회복하고 잠시 보호막을 두른다' },
+  // 6차 천신
+  cl_ego: { promo: 6, cls: 'celestial', req: 24, name: '자아파괴', kind: 'strike', fx: '115', dmg: 34, cd: 3, range: 7, radius: 2, count: 2,
+    hitAt: 0.3, curse: 3, desc: '몬스터 둘과 그 주위의 자아를 부수어 큰 피해를 주고 약화시킨다' },
+  // 7차~9차: 연's other 천인 techniques
+  cl_gumiho: { promo: 7, cls: 'celestial', req: 27, name: '수호구미호', kind: 'strike', fx: '52', dmg: 32, cd: 2.4, range: 7, radius: 1, count: 3,
+    hitAt: 0.25, desc: '아홉 꼬리의 수호 구미호를 불러 몬스터 셋과 그 주위를 휘감는다' },
+  cl_snake: { promo: 7, cls: 'celestial', req: 27, name: '홍무기', kind: 'spell', fx: '37', dmg: 30, cd: 1.8, range: 7, count: 3, slow: 2,
+    desc: '붉은 뱀을 풀어 몬스터 셋을 물고 느리게 한다' },
+  cl_intrep: { promo: 8, cls: 'celestial', req: 30, name: '깨달음', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '깨달음을 얻어 잠시 공격력이 크게 오른다' },
+  cl_defense: { promo: 8, cls: 'celestial', req: 30, name: '완전방어', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 6,
+    desc: '완전한 방어로 잠시 받는 피해를 절반으로 줄인다' },
+  cl_reindeer: { promo: 9, cls: 'celestial', req: 33, name: '강림술\'신록', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 하늘의 신록이 강림해 화면의 모든 몬스터를 짓밟는다' },
+  cl_ult: { cls: 'celestial', name: '전의상실', kind: 'ult', fx: '144', hpCost: 0.15,
+    desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터의 전의를 꺾는 일격을 가한다' },
+
+  // 도깨비 (바람의나라 연 Job_9): its own skill list (Skills_Player 2091xxxx 일반, 2092xxxx 승급), each with the
+  // effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_dokkaebi_skills.json). 1차~3차 are its
+  // 비급 books' (귀명·귀제·귀황), 4차~6차 by 연's numbering (귀성·신각·귀극); 연 has no 7차~9차 for the 도깨비, so
+  // those take its remaining 일반 techniques (금은보화로구나, 귀체, 권선징악, 도깨비의 격노). 평탄화, 일격필살'괴력난신
+  // and 도깨비폭풍 are particle effects in 연, which this renderer does not draw: they show the 도깨비's own
+  // 금나와라 swing, 천벌 club and 쥐불놀이 wheel instead. The fx here is only the old fallback.
+  dk_repel: { cls: 'dokkaebi', req: 1, name: '퇴격', kind: 'cleave', fx: '20', dmg: 17, cd: 0.8, depth: 1, max: 4,
+    desc: '방망이를 휘둘러 앞쪽 몬스터 넷을 밀쳐 낸다' },
+  dk_paddle: { cls: 'dokkaebi', req: 1, name: '밭다리걸기', kind: 'cleave', fx: '19', dmg: 16, cd: 2.2, depth: 1, max: 2, stun: 1,
+    desc: '다리를 걸어 앞의 몬스터 둘을 넘어뜨린다(멈춤)' },
+  dk_wisp: { cls: 'dokkaebi', req: 1, name: '도깨비불\'염류', kind: 'spell', fx: '7', dmg: 16, cd: 1.6, range: 6, count: 2,
+    desc: '도깨비불을 날려 몬스터 둘을 태운다. 4·7단에 불이 하나씩 는다' },
+  dk_strength: { cls: 'dokkaebi', req: 6, name: '완력', kind: 'buff', buff: 'power', fx: '6', cd: 14, duration: 4, power: 0.5,
+    desc: '타고난 완력을 끌어올려 잠시 모든 피해가 늘어난다' },
+  dk_punish: { cls: 'dokkaebi', req: 6, name: '일격필살\'징벌', kind: 'strike', fx: '139', dmg: 40, cd: 3.4, range: 4, radius: 0, count: 1,
+    hitAt: 0.3, strongest: true, up: 'dk_super', desc: '가장 강한 몬스터(보스를 먼저)에게 징벌의 일격을 내리친다' },
+  dk_hat: { cls: 'dokkaebi', req: 12, name: '도깨비감투', kind: 'buff', buff: 'stealth', fx: '36', cd: 14, duration: 2.5,
+    desc: '도깨비감투를 써서 잠시 모습을 감춘다. 그동안 주는 피해가 커진다' },
+  // 1차 귀명
+  dk_roar: { promo: 1, cls: 'dokkaebi', req: 6, name: '괴성격', kind: 'cleave', fx: '20', dmg: 22, cd: 2.4, depth: 2, max: 6, stun: 0.5,
+    desc: '괴성과 함께 앞쪽을 크게 후려쳐 몬스터 여섯을 친다' },
+  dk_throw: { promo: 1, cls: 'dokkaebi', req: 6, name: '업어던지기', kind: 'strike', fx: '24', dmg: 26, cd: 2.8, range: 3, radius: 1, count: 1,
+    hitAt: 0.3, stun: 1, desc: '몬스터를 업어 메쳐 그 자리와 주위를 친다' },
+  // 2차 귀제
+  dk_whirl: { promo: 2, cls: 'dokkaebi', req: 10, name: '회전회오리', kind: 'nova', fx: '25', dmg: 22, cd: 2.8, radius: 1,
+    desc: '방망이를 들고 회오리처럼 돌아 둘러싼 몬스터를 친다' },
+  dk_wispexp: { promo: 2, cls: 'dokkaebi', req: 10, name: '도깨비불\'폭살', kind: 'strike', fx: '147', dmg: 20, cd: 2.8, range: 6, radius: 1, count: 2,
+    hitAt: 0.3, desc: '도깨비불을 터뜨려 몬스터 둘과 그 주위를 태운다' },
+  // 3차 귀황
+  dk_judgment: { promo: 3, cls: 'dokkaebi', req: 14, name: '일격필살\'천벌', kind: 'strike', fx: '139', dmg: 46, cd: 3.4, range: 5, radius: 1, count: 1,
+    hitAt: 0.35, strongest: true, desc: '하늘의 벌로 가장 강한 몬스터와 그 주위를 내리찍는다' },
+  dk_shock: { promo: 3, cls: 'dokkaebi', req: 14, name: '도깨비불\'뇌격', kind: 'spell', fx: '89', dmg: 18, cd: 2.4, range: 7, count: 3, stun: 0.6,
+    desc: '번개 도깨비불이 몬스터 셋을 치고 잠시 마비시킨다' },
+  dk_flatten: { promo: 3, cls: 'dokkaebi', req: 14, name: '평탄화', kind: 'screen', fx: '141', dmg: 14, cd: 6, stun: 0.5,
+    desc: '땅을 평평하게 내리쳐 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  // 4차 귀성
+  dk_fan: { promo: 4, cls: 'dokkaebi', req: 18, name: '도깨비부채', kind: 'line', fx: '22', dmg: 24, cd: 2.6, depth: 6,
+    desc: '도깨비부채를 부쳐 몬스터가 가장 많은 쪽 일렬 여섯 칸을 날려 버린다' },
+  dk_super: { promo: 4, cls: 'dokkaebi', req: 18, evolved: true, name: '일격필살\'괴력난신', kind: 'strike', fx: '139', dmg: 60, cd: 3.4, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '일격필살\'징벌 8단 + 4차 승급. 괴력으로 가장 강한 몬스터 둘과 그 주위를 부순다' },
+  // 5차 신각
+  dk_hamstring: { promo: 5, cls: 'dokkaebi', req: 21, name: '오금걸이', kind: 'strike', fx: '115', dmg: 28, cd: 3, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, slow: 3, desc: '오금을 걸어 몬스터 둘과 그 주위에 가시를 솟게 하고 둔화시킨다' },
+  dk_firebat: { promo: 5, cls: 'dokkaebi', req: 21, name: '쥐불놀이', kind: 'spell', fx: '148', dmg: 30, cd: 2.4, range: 7, count: 3,
+    desc: '도깨비의 궁극오의. 쥐불을 돌려 몬스터 셋에 불을 붙인다' },
+  dk_weight: { promo: 5, cls: 'dokkaebi', req: 21, name: '천근추', kind: 'nova', fx: '25', dmg: 30, cd: 3.4, radius: 2, stun: 1,
+    desc: '천 근의 무게로 내려앉아 둘레 두 칸의 몬스터를 짓누르고 멈춘다' },
+  // 6차 귀극
+  dk_storm: { promo: 6, cls: 'dokkaebi', req: 24, name: '도깨비폭풍', kind: 'nova', fx: '25', dmg: 36, cd: 3.4, radius: 2,
+    desc: '불타는 바퀴처럼 몰아치는 폭풍으로 둘레 두 칸의 몬스터를 휩쓴다' },
+  // 7차~9차: 연's other 도깨비 techniques
+  dk_goldhit: { promo: 7, cls: 'dokkaebi', req: 27, name: '금은보화로구나', kind: 'strike', fx: '147', dmg: 32, cd: 2.4, range: 6, radius: 1, count: 3,
+    hitAt: 0.3, desc: '방망이에서 쏟아진 금은보화가 몬스터 셋과 그 주위를 친다' },
+  dk_body: { promo: 7, cls: 'dokkaebi', req: 27, name: '귀체', kind: 'heal', fx: '125', heal: 30, cd: 12, shieldT: 3,
+    desc: '도깨비불을 몸에 받아들여 체력을 회복하고 잠시 보호막을 두른다' },
+  dk_nemesis: { promo: 8, cls: 'dokkaebi', req: 30, name: '권선징악', kind: 'strike', fx: '139', dmg: 52, cd: 2.8, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '악을 벌하는 일격이 가장 강한 몬스터 둘과 그 주위를 친다' },
+  dk_rage: { promo: 9, cls: 'dokkaebi', req: 33, name: '도깨비의 격노', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 격노한 도깨비의 방망이가 화면의 모든 몬스터를 내리찍는다' },
+  dk_ult: { cls: 'dokkaebi', name: '금나와라,뚝딱', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 도깨비방망이로 화면의 몬스터를 두들긴다' },
+
+  // 차사 (바람의나라 연 Job_10): its own skill list (Skills_Player 210xxxxx), each with the effect, icon and
+  // sound of that 연 record (fx k_<id>, tools/yeon_reaper_skills.json). 연 numbers the 차사's skills in one
+  // run; its 승급 tiers come from its sound names (SFX_Reaper_1st_ … 6th_): 1차 수라마검·역공, 2차 풍혼일섬 (with
+  // 흡기공·영혼걸음), 3차 무간업화·대영살·영검, 4차 분쇄섬·나선광륜, 5차 영기방출·영기부활, 6차 살극 (사자·사명자·
+  // 사저·천명사·월직·일직). 연 has no 7차~9차 for the 차사: those take its remaining 일반 techniques (영혼족쇄,
+  // 영기방벽, 개안, 저승문). 절섬, 나선광륜, 영기방출 and 저승문 are particle or broken-alpha effects in 연's
+  // bundle: they show the 차사's own 풍혼일섬 swing, 살극 rings, 영기 spirit and 대영살 burst. The fx here
+  // is only the old fallback.
+  rp_cut: { cls: 'reaper', req: 1, name: '절섬', kind: 'cleave', fx: '20', dmg: 18, cd: 0.75, depth: 1, max: 4,
+    desc: '백도로 앞쪽을 베어 몬스터 넷을 끊어 낸다' },
+  rp_flash: { cls: 'reaper', req: 1, name: '진섬\'연', kind: 'blink', fx: '52', dmg: 16, cd: 1.6, range: 5, count: 2,
+    desc: '번쩍이며 몬스터 등 뒤로 파고들어 두 번 벤다' },
+  rp_shot: { cls: 'reaper', req: 1, name: '영살', kind: 'spell', fx: '53', dmg: 18, cd: 1.8, range: 6, count: 2,
+    desc: '영혼의 화살로 몬스터 둘을 꿰뚫는다. 4·7단에 하나씩 는다' },
+  rp_walk: { cls: 'reaper', req: 6, name: '영혼걸음', kind: 'buff', buff: 'haste', fx: '7', cd: 14, duration: 4,
+    desc: '혼의 걸음으로 잠시 모든 기술이 빨리 돈다' },
+  rp_spiral: { cls: 'reaper', req: 6, name: '나선회륜', kind: 'nova', fx: '25', dmg: 24, cd: 2.4, radius: 1,
+    desc: '백도를 나선으로 돌려 둘러싼 몬스터를 벤다' },
+  rp_drain: { cls: 'reaper', req: 12, name: '흡기공', kind: 'heal', fx: '125', heal: 18, cd: 12,
+    desc: '혼의 기운을 빨아들여 이따금 체력을 회복한다' },
+  // 1차 사자
+  rp_asura: { promo: 1, cls: 'reaper', req: 6, name: '수라마검', kind: 'cleave', fx: '20', dmg: 22, cd: 2.2, depth: 2, max: 6,
+    up: 'rp_crush', desc: '수라의 검으로 앞쪽을 크게 베어 몬스터 여섯을 친다' },
+  rp_counter: { promo: 1, cls: 'reaper', req: 6, name: '역공', kind: 'nova', fx: '25', dmg: 18, cd: 3, radius: 1, stun: 0.5,
+    desc: '받아치는 혼의 기운으로 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  // 2차 사명자
+  rp_wind: { promo: 2, cls: 'reaper', req: 10, name: '풍혼일섬', kind: 'line', fx: '22', dmg: 22, cd: 2.4, depth: 5,
+    desc: '바람의 혼을 실은 일섬이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 벤다' },
+  // 3차 사저
+  rp_inferno: { promo: 3, cls: 'reaper', req: 14, name: '무간업화', kind: 'strike', fx: '148', dmg: 18, cd: 3.4, range: 6, radius: 2, count: 1,
+    hitAt: 0.35, ticks: 2, desc: '무간지옥의 업화를 대상 자리에 피워 그 주위를 거듭 태운다' },
+  rp_arrow: { promo: 3, cls: 'reaper', req: 14, name: '대영살', kind: 'strike', fx: '147', dmg: 26, cd: 3, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, desc: '큰 영혼의 화살이 몬스터 둘과 그 주위를 터뜨린다' },
+  rp_soulbuff: { promo: 3, cls: 'reaper', req: 14, name: '영검', kind: 'buff', buff: 'power', fx: '15', cd: 15, duration: 5, power: 0.6,
+    desc: '백도에 영혼을 깃들여 잠시 모든 피해가 크게 늘어난다' },
+  // 4차 천명사
+  rp_crush: { promo: 4, cls: 'reaper', req: 18, evolved: true, name: '분쇄섬', kind: 'cleave', fx: '140', dmg: 28, cd: 2.6, depth: 3, max: 9,
+    desc: '수라마검 8단 + 4차 승급. 앞쪽 넓은 범위의 몬스터 아홉을 부수듯 벤다' },
+  rp_madness: { promo: 4, cls: 'reaper', req: 18, name: '나선광륜', kind: 'nova', fx: '25', dmg: 26, cd: 3.2, radius: 2,
+    desc: '광기의 고리를 휘돌려 둘레 두 칸의 몬스터를 벤다' },
+  // 5차 월직
+  rp_burst: { promo: 5, cls: 'reaper', req: 21, name: '영기방출', kind: 'strike', fx: '115', dmg: 30, cd: 3, range: 6, radius: 1, count: 3,
+    hitAt: 0.3, curse: 3, desc: '차사의 궁극오의. 모은 영기를 풀어 몬스터 셋과 그 주위를 치고 약화시킨다' },
+  rp_resurrect: { promo: 5, cls: 'reaper', req: 21, name: '영기부활', kind: 'heal', fx: '125', heal: 28, cd: 13, shieldT: 3,
+    desc: '영기로 몸을 되살려 체력을 회복하고 잠시 보호막을 두른다' },
+  // 6차 일직
+  rp_deadly: { promo: 6, cls: 'reaper', req: 24, name: '살극', kind: 'strike', fx: '139', dmg: 48, cd: 3, range: 5, radius: 1, count: 2,
+    hitAt: 0.3, strongest: true, desc: '가장 강한 몬스터 둘(보스를 먼저)에게 죽음의 일격을 내리친다' },
+  // 7차~9차: 연's other 차사 techniques
+  rp_chain: { promo: 7, cls: 'reaper', req: 27, name: '영혼족쇄', kind: 'spell', fx: '115', dmg: 30, cd: 1.8, range: 7, count: 3, slow: 3,
+    desc: '영혼의 족쇄로 몬스터 셋을 묶어 피해를 주고 느리게 한다' },
+  rp_barrier: { promo: 7, cls: 'reaper', req: 27, name: '영기방벽', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 6,
+    desc: '영기의 방벽을 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  rp_eye: { promo: 8, cls: 'reaper', req: 30, name: '개안', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '저승의 눈을 떠 잠시 공격력이 크게 오른다' },
+  rp_gate: { promo: 9, cls: 'reaper', req: 33, name: '저승문', kind: 'screen', fx: '141', dmg: 60, cd: 9, slow: 2,
+    desc: '궁극기. 저승의 문을 열어 화면의 모든 몬스터를 끌어들여 친다' },
+  rp_ult: { cls: 'reaper', name: '차사강림', kind: 'ult', fx: '144', hpCost: 0.2,
+    desc: '체력 20%와 마력을 모두 써서, 저승차사의 힘으로 화면의 몬스터를 벤다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -481,6 +901,36 @@ export const BRANCHES = {
     { name: '마탄', note: '터뜨리고 쏟아붓는다', ids: ['a_aim', 'a_firewall', 'a_flame', 'a_bomb', 'a_freeze', 'a_storm', 'a_breakair', 'a_whirl', 'a_allwhirl', 'a_fetter', 'a_eagle'] },
     { name: '궁술', note: '화살을 강화하고 몸을 지킨다', ids: ['a_ice', 'a_coverfire', 'a_thunder', 'a_bloodsuck', 'a_shadow', 'a_weebo', 'a_bless'] },
   ],
+  lancer: [
+    { name: '창술', note: '일렬로 꿰찌른다', ids: ['l_moon', 'l_phantom', 'l_spiral', 'l_rush', 'l_firedragon', 'l_annihil', 'l_javelin', 'l_moonfull'] },
+    { name: '창격', note: '휘두르고 내리꽂는다', ids: ['l_halfmoon', 'l_meteor', 'l_rise', 'l_illusion', 'l_extinct', 'l_waves', 'l_burst', 'l_genesis', 'l_extinct2', 'l_formless', 'l_dragon', 'l_release', 'l_spirit'] },
+    { name: '기공', note: '기를 돌려 몸을 지킨다', ids: ['l_wind', 'l_innate', 'l_unity', 'l_guard', 'l_thunder', 'l_union', 'l_reflect'] },
+  ],
+  monk: [
+    { name: '권법', note: '파고들어 두들긴다', ids: ['mk_bung', 'mk_sudden', 'mk_smash', 'mk_body', 'mk_uppercut', 'mk_wolf', 'mk_combo', 'mk_kyokushin', 'mk_resonance'] },
+    { name: '점혈', note: '혈을 짚어 묶고 터뜨린다', ids: ['mk_pointblue', 'mk_pointlight', 'mk_pointburst', 'mk_buddha', 'mk_quake', 'mk_rupture', 'mk_advent', 'mk_point', 'mk_aventhit'] },
+    { name: '내공', note: '기를 돌려 몸을 지킨다', ids: ['mk_switch', 'mk_endure', 'mk_spirit', 'mk_diamond', 'mk_technique', 'mk_focus', 'mk_feint', 'mk_origin'] },
+  ],
+  magus: [
+    { name: '기공', note: '구슬과 광선으로 친다', ids: ['md_sphere', 'md_arrow', 'md_orbice', 'md_orblight', 'md_orbfire', 'md_cross', 'md_ray', 'md_exfrenzy', 'md_crossfrenzy', 'md_storm', 'md_stormfrenzy'] },
+    { name: '광폭', note: '광폭기로 휩쓴다', ids: ['md_spirit', 'md_frenzyexp', 'md_decay', 'md_wave', 'md_silence', 'md_bust', 'md_absorb', 'md_bloodbat', 'md_resonance', 'md_wavefrenzy'] },
+    { name: '금기', note: '결계와 기원으로 버틴다', ids: ['md_enhance', 'md_heal', 'md_amulet', 'md_recovery', 'md_boundary', 'md_yinyang', 'md_frenetic', 'md_manafill'] },
+  ],
+  celestial: [
+    { name: '천벌', note: '하늘의 불꽃과 번개를 떨어뜨린다', ids: ['cl_boom', 'cl_crow', 'cl_armor', 'cl_storm', 'cl_storm2', 'cl_bind', 'cl_thunder', 'cl_crowfire', 'cl_ego', 'cl_gumiho', 'cl_reindeer'] },
+    { name: '질주', note: '몬스터 사이로 뛰어든다', ids: ['cl_ago', 'cl_moment', 'cl_acumen', 'cl_brilliant', 'cl_slam', 'cl_claw', 'cl_tiger'] },
+    { name: '수호', note: '피를 빼앗고 몸을 지킨다', ids: ['cl_blood', 'cl_yeorae', 'cl_wall', 'cl_blood2', 'cl_bagua', 'cl_snake', 'cl_intrep', 'cl_defense'] },
+  ],
+  dokkaebi: [
+    { name: '일격', note: '강한 적을 내리찍는다', ids: ['dk_punish', 'dk_throw', 'dk_judgment', 'dk_super', 'dk_hamstring', 'dk_nemesis', 'dk_rage'] },
+    { name: '방망이', note: '휘두르고 휩쓴다', ids: ['dk_repel', 'dk_paddle', 'dk_roar', 'dk_whirl', 'dk_flatten', 'dk_fan', 'dk_weight', 'dk_storm', 'dk_goldhit'] },
+    { name: '도깨비불', note: '불을 날리고 몸을 감춘다', ids: ['dk_wisp', 'dk_strength', 'dk_hat', 'dk_wispexp', 'dk_shock', 'dk_firebat', 'dk_body'] },
+  ],
+  reaper: [
+    { name: '검술', note: '베고 파고든다', ids: ['rp_cut', 'rp_flash', 'rp_asura', 'rp_wind', 'rp_crush', 'rp_deadly', 'rp_spiral', 'rp_madness', 'rp_counter'] },
+    { name: '영혼', note: '혼을 쏘고 불태운다', ids: ['rp_shot', 'rp_inferno', 'rp_arrow', 'rp_burst', 'rp_chain', 'rp_gate'] },
+    { name: '저승', note: '기운을 빨고 몸을 지킨다', ids: ['rp_walk', 'rp_drain', 'rp_soulbuff', 'rp_resurrect', 'rp_barrier', 'rp_eye'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -498,8 +948,20 @@ const PRE = {
   a_inferno: 'a_tempest', a_chase: 'a_inferno', a_chain: 'a_chase', a_air: 'a_chain',
   a_fetter: 'a_whirl', a_eagle: 'a_fetter',
   a_bloodsuck: 'a_thunder', a_shadow: 'a_bloodsuck', a_weebo: 'a_shadow', a_bless: 'a_shadow',
+  l_extinct2: 'l_extinct', l_annihil: 'l_rush', l_dragon: 'l_annihil', l_javelin: 'l_dragon', l_formless: 'l_burst',
+  l_guard: 'l_unity', l_thunder: 'l_guard', l_union: 'l_guard', l_reflect: 'l_union', l_spirit: 'l_release',
+  mk_combo: 'mk_wolf', mk_kyokushin: 'mk_combo', mk_advent: 'mk_rupture', mk_point: 'mk_advent', mk_technique: 'mk_diamond',
+  mk_focus: 'mk_technique', mk_feint: 'mk_focus', mk_origin: 'mk_feint',
+  md_bloodbat: 'md_silence', md_crossfrenzy: 'md_ray', md_stormfrenzy: 'md_crossfrenzy', md_storm: 'md_stormfrenzy', md_resonance: 'md_bloodbat',
+  md_boundary: 'md_recovery', md_yinyang: 'md_boundary', md_frenetic: 'md_yinyang', md_manafill: 'md_frenetic',
+  cl_tiger: 'cl_claw', cl_crowfire: 'cl_storm2', cl_bagua: 'cl_blood2', cl_ego: 'cl_crowfire', cl_gumiho: 'cl_ego',
+  cl_snake: 'cl_bagua', cl_intrep: 'cl_snake', cl_defense: 'cl_intrep',
+  dk_hamstring: 'dk_judgment', dk_firebat: 'dk_shock', dk_weight: 'dk_fan', dk_storm: 'dk_weight', dk_goldhit: 'dk_storm',
+  dk_body: 'dk_firebat', dk_nemesis: 'dk_hamstring',
+  rp_burst: 'rp_arrow', rp_resurrect: 'rp_soulbuff', rp_deadly: 'rp_madness', rp_chain: 'rp_deadly', rp_barrier: 'rp_resurrect',
+  rp_eye: 'rp_barrier',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer', dk_nemesis: 'dk_rage', rp_chain: 'rp_gate' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -557,8 +1019,8 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
-// The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for the 궁사's tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'] };
+// The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'], dokkaebi: ['귀명', '귀제', '귀황', '귀성', '신각', '귀극'], reaper: ['사자', '사명자', '사저', '천명사', '월직', '일직'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {

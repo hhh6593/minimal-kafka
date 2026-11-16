@@ -171,7 +171,7 @@ export const CRAFT_GYEOK = {
 // (방어 약화 = 저주) with it.
 export const DRAGON_CORE = { warrior: ['w_frenzy'], rogue: ['r_heaven'], mage: ['m_sammae'], poet: ['p_baekho', 'p_baekho2'] };
 export function dragonGyeok(cls, step) {
-  const head = { warrior: '용마', rogue: '용천', mage: '용랑', poet: '용겸', archer: '용섬' }[cls] || '용';
+  const head = { warrior: '용마', rogue: '용천', mage: '용랑', poet: '용겸', archer: '용섬', lancer: '용무', monk: '용비', magus: '용화', celestial: '용주', dokkaebi: '용린', reaper: '용라' }[cls] || '용';
   const num = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'][step];
   return { name: `${head}제${num}격`, on: 'hit', chance: 0.04 + 0.02 * step, cd: 3, dmg: 1 + 0.6 * step,
     fx: step >= 7 ? 'g_pet_dragon' : 'g_hell_weapon', st: cls === 'mage' || cls === 'poet' ? ['curse', 4] : null,
