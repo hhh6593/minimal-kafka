@@ -376,13 +376,15 @@ function setup() {
   W.hero.squad = W.squads[0];
   mkCommanders(W);
   mkTroops(W);
+  // The escort's camps are set by its road (and the troops' posts by the camps), before anyone stands.
+  if (W.mode === 'escort') resetEscort(W);
+  heroTo(...W.teams[0].spawn);
   for (const b of W.bodies) {
     placeBody(W, b, b.home || W.teams[b.team].spawn);
     (b.team === 1 ? G.enemies : G.party).push(b);
   }
   // The enemy's gate can be struck by the hero's spells like any foe.
   if (W.gate && W.gate.team === 1) G.enemies.push(W.gate);
-  if (W.mode === 'escort') resetEscort(W);
   W.alive = [0, 1].map(t => W.bodies.filter(b => b.team === t));
   orders(W, 0, true);
   orders(W, 1, true);
@@ -418,7 +420,7 @@ function layout(W) {
     W.teams[1 - W.attacker].spawn = d.inside;
     const g = d.gate;
     W.gate = {
-      war: true, gate: true, team: 1 - W.attacker, name: '현무 성문', hp: W.refHp * 26, maxHp: W.refHp * 26, x0: g.x0, x1: g.x1, y0: g.y0, y1: g.y1,
+      war: true, gate: true, team: 1 - W.attacker, name: '현무 성문', hp: W.refHp * 18, maxHp: W.refHp * 18, x0: g.x0, x1: g.x1, y0: g.y0, y1: g.y1,
       tx: Math.round((g.x0 + g.x1) / 2), ty: g.y1, m: { h: 90 }, scale: 1, stats: blankStats(), hitBy: new Map(), flash: 0, prop: null,
     };
     W.gate.x = W.gate.tx * TILE + TILE / 2; W.gate.y = (g.y1 + 1) * TILE - 6;
@@ -614,7 +616,7 @@ export const War = {
   open: (x, y) => { const G = A.G(); return open(G.war, x, y, 0); },
   down: e => kill(A.G().war, e, A.G().war.hero),
   credit: (e, dmg) => heroHit(e, dmg),
-  /** 전장 보정 for the hero's own blows: past about six fighters' blows a second (more for a
+  /** 전장 보정 for the hero's own blows: past about four fighters' blows a second (more for a
    * 딜러, and growing with the levels gained in the war) they are scaled down, so the war is the
    * guilds' and not one hero's, whatever its gear. */
   scale: dmg => {
@@ -626,7 +628,7 @@ export const War = {
     while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
     const span = Math.max(3, Math.min(8, G.t - win[0][0]));
     const rate = W.rawSum / span;
-    const target = W.U * 6 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
+    const target = W.U * 4 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
     return rate > target ? dmg * target / rate : dmg;
   },
   heroDown: () => heroDown(),
@@ -687,8 +689,10 @@ function update(dt) {
   W.ghosts = W.ghosts.filter(g => !g.b.dead ? false : G.t < g.until);
   W.feed = W.feed.filter(f => G.t - f.t < 6);
   // Budgets for a field of fifty: numbers (each is several glyph pictures) and effects.
-  if (G.texts.length > 40) G.texts.splice(0, G.texts.length - 40);
-  if (G.fxs.length > 60) G.fxs.splice(0, G.fxs.length - 60);
+  if (G.texts.length > 30) G.texts.splice(0, G.texts.length - 30);
+  if (G.fxs.length > 45) G.fxs.splice(0, G.fxs.length - 45);
+  if (window.__dbgWar && window.__dbgWar.notext) G.texts.length = 0;
+  if (window.__dbgWar && window.__dbgWar.nofx) G.fxs.length = 0;
   checkEnd(W);
 }
 
@@ -1099,7 +1103,7 @@ function act(W, b, t) {
   if (kit.range > 1) {
     const d = id && SK[id];
     const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
-    if (onScreen(b) || onScreen(t)) {
+    if ((onScreen(b) || onScreen(t)) && G.shots.length < 14) {
       A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#ffe680' : '#ff8a20', size: 3, speed: 460,
         onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, { scale: 0.7 }); } } });
     } else A.later(0.25, () => { if (!W.over) hit(W, b, t, n); });
@@ -1141,7 +1145,7 @@ function onScreen(b) {
   const G = A.G(), p = G.player;
   return Math.abs(b.x - p.x) < A.VW() / 2 + 60 && Math.abs(b.y - p.y) < A.VH() / 2 + 80;
 }
-function fxOk() { return A.fxBudget('war', 18); }
+function fxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('war', 12); }
 function castFx(W, b, id, at, scale) {
   if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !fxOk()) return;
   const fx = SK[id].fx;
@@ -1435,7 +1439,7 @@ function neediest() {
 /** The hero's 기원 in a war also mends the allies close by (a healer's more). */
 function heroHeal(n, fx) {
   const G = A.G(), W = G.war, p = G.player;
-  const k = (W.role === 'healer' ? 1.6 * W.roleK : 0.6) * n / p.maxHp;
+  const k = Math.min(W.role === 'healer' ? 0.14 * W.roleK : 0.05, (W.role === 'healer' ? 1.6 * W.roleK : 0.6) * n / p.maxHp);
   for (const m of G.party) {
     if (m.dead || d2(m, W.hero) > 4) continue;
     healBody(W, W.hero, m, m.maxHp * k);
@@ -1959,11 +1963,13 @@ function drawGround() {
 function drawBody(b) {
   const G = A.G(), W = G.war, ctx = A.ctx;
   if (b.gate || !onScreen(b) || (window.__dbgWar && window.__dbgWar.nobody)) return;
-  if (b.wprop) return drawWarProp(W, b);
+  const dbg = window.__dbgWar || {};
+  if (b.wprop) return dbg.noprop ? null : drawWarProp(W, b);
   const alpha = b.hidden > G.t ? 0.4 : 1;
   const pose = b.poseT > 0 ? b.pose : b.moving ? 'walk' : 'idle';
   let top = 50;
-  if (b.cls) {
+  if (dbg.noframe) top = 50;
+  else if (b.cls) {
     drawFighter(b, b.x, b.y, pose, alpha) || A.drawYhero2(b.cls, b.gear, b, b.x, b.y, pose, alpha) || A.drawYhero(b.cls.id, b.gear ? b.gear.armor : 0, b, b.x, b.y, pose, alpha);
     if (b.flash > 0) { /* a struck fighter shows it in its bar */ }
     top = 50;
@@ -1975,14 +1981,24 @@ function drawBody(b) {
       top = Math.min(110, (yu.u.foot[1] - 8) * b.scale);
     }
   }
+  if (dbg.nooverlay) return;
   // Bar and team marker (연's ▼, green for us, red for them) in one kept picture by step of
   // health; the name under the feet.
-  const plate = plateFor(b.team, Math.ceil(Math.max(0, b.hp / b.maxHp) * 12), b.shield > G.t, !!b.cmdr);
-  if (plate) ctx.drawImage(plate, Math.round(b.x - plate.width / 2), Math.round(b.y - top - plate.height + 4));
+  // The ▼ from one shared picture per side, the bar in plain rectangles.
+  const mk = markerPic(b.team), bw = b.cmdr ? 44 : 24, k = Math.max(0, b.hp / b.maxHp);
+  const bx = Math.round(b.x - bw / 2), by = Math.round(b.y - top - 2);
+  if (mk) { const s = b.cmdr ? 1.4 : 1; ctx.drawImage(mk, Math.round(b.x - mk.width * s / 2), by - Math.round(mk.height * s) - 1, Math.round(mk.width * s), Math.round(mk.height * s)); }
+  ctx.fillStyle = '#000';
+  ctx.fillRect(bx - 1, by, bw + 2, 4);
+  ctx.fillStyle = b.team === 0 ? '#3ad04a' : '#e8402a';
+  ctx.fillRect(bx, by + 1, Math.round(bw * k), 2);
+  if (b.shield > G.t) { ctx.fillStyle = '#9ad8ff'; ctx.fillRect(bx, by + 3, bw, 1); }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
   const nameCol = b.cmdr ? '#ffd040' : b.leader ? (b.team === 0 ? '#d8ff7a' : '#ffb07a') : b.team === 0 ? '#9ff08a' : '#ff9a8a';
-  if (!b.troop || d2(b, W.hero) < 4) {
+  // Level of detail: names near the hero (and the leaders' and 진영대장's) only.
+  const dh = d2(b, W.hero);
+  if (b.troop ? dh < 4 : (dh < 8 || b.leader || b.cmdr)) {
     // The name, outlined once into a small picture and kept (four fillTexts a name a frame added up).
     const key = b.name + nameCol;
     let lab = labels.get(key);
@@ -2000,18 +2016,91 @@ function drawBody(b) {
       g.fillStyle = nameCol;
       g.fillText(b.name, w / 2, 9);
       if (labels.size > 400) labels.clear();
-      labels.set(key, lab);
+      keep(labels, key, lab);
     }
     ctx.drawImage(lab, Math.round(b.x - lab.width / 2), Math.round(b.y + 9 - 9));
   }
   if (b.carry) {
     const im = A.images['prop/war_cart3.png'];
-    A.outline('보급', b.x, b.y - top - 18, '#ffd27a');
+    drawLabel('보급', b.x, b.y - top - 18, '#ffd27a');
   }
-  if (b.bubble && G.t - b.bubble.t < 1.4) A.drawBubble(b.bubble.text, b.x, b.y - top - 14, G.t - b.bubble.t);
-  if (b.stun > 0) A.outline('기절', b.x, b.y - top - 18, '#ffe070');
+  if (b.bubble && dh < 8 && G.t - b.bubble.t < 1.4) A.drawBubble(b.bubble.text, b.x, b.y - top - 14, G.t - b.bubble.t);
+  // Held: 연's own stun icon over the head (a word over every held fighter of a crowd was a wall of text).
+  if (b.stun > 0.3) {
+    const im = A.images['hud/st_icon_stun.png'];
+    if (im && im.width) ctx.drawImage(im, Math.round(b.x - 5), Math.round(b.y - top - 26), 10, 10);
+  }
 }
 
+/**
+ * Keeps a composited picture, and swaps it for an ImageBitmap once one is made: a bitmap stays on
+ * the GPU, while a plain canvas drawn into the field is uploaded again at every draw — with fifty
+ * fighters that upload was most of a frame.
+ */
+function keep(map, key, c) {
+  map.set(key, c);
+  if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (map.get(key) === c) map.set(key, bm); }).catch(() => {});
+}
+/** A body's frame kept cropped to what is drawn (most of a cell is empty): { pic, ox, oy }. */
+function keepFrame(key, c) {
+  const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (d[(y * c.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const e = { pic: c, ox: 0, oy: 0 };
+  if (x1 >= x0) {
+    const t = document.createElement('canvas');
+    t.width = x1 - x0 + 1;
+    t.height = y1 - y0 + 1;
+    t.getContext('2d').drawImage(c, -x0, -y0);
+    e.pic = t;
+    e.ox = x0;
+    e.oy = y0;
+  }
+  if (frames.size > 900) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
+  frames.set(key, e);
+  if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src).then(bm => { if (e.pic === src) e.pic = bm; }).catch(() => {}); }
+  return e;
+}
+const markers = [null, null];
+function markerPic(team) {
+  if (markers[team]) return markers[team];
+  const im = img('ui_event_red_arrow');
+  if (!im) return null;
+  const c = document.createElement('canvas');
+  c.width = 9;
+  c.height = 13;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.drawImage(team === 0 ? A.tinted(im, 'hue-rotate(115deg) saturate(1.3) brightness(1.15)') : im, 0, 0, 9, 13);
+  markers[team] = c;
+  if (window.createImageBitmap) createImageBitmap(c).then(bm => { markers[team] = bm; }).catch(() => {});
+  return c;
+}
+/** Outlined words kept as pictures (four fillTexts a word a frame added up over a field). */
+function drawLabel(text, x, y, color, font = '8px G7') {
+  const key = text + color + font;
+  let lab = labels.get(key);
+  if (!lab) {
+    lab = document.createElement('canvas');
+    const g = lab.getContext('2d');
+    g.font = font;
+    const w = Math.ceil(g.measureText(text).width) + 4, h = parseInt(font.match(/(\d+)px/)[1], 10) + 4;
+    lab.width = w;
+    lab.height = h;
+    g.font = font;
+    g.textAlign = 'center';
+    g.fillStyle = '#000';
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) g.fillText(text, w / 2 + dx, h - 3 + dy);
+    g.fillStyle = color;
+    g.fillText(text, w / 2, h - 3);
+    if (labels.size > 400) labels.clear();
+    keep(labels, key, lab);
+    lab = labels.get(key);
+  }
+  A.ctx.drawImage(lab, Math.round(x - lab.width / 2), Math.round(y - lab.height + 3));
+}
 const plates = new Map();
 function plateFor(team, step, shield, big) {
   const key = team + '|' + step + '|' + shield + '|' + big;
@@ -2029,7 +2118,7 @@ function plateFor(team, step, shield, big) {
   g.fillStyle = team === 0 ? '#3ad04a' : '#e8402a';
   g.fillRect(1, mh + 2, Math.round(bw * step / 12), 2);
   if (shield) { g.fillStyle = '#9ad8ff'; g.fillRect(1, mh + 4, bw, 1); }
-  plates.set(key, c);
+  keep(plates, key, c);
   return c;
 }
 
@@ -2053,12 +2142,11 @@ function drawUnit(yu, b, row, f, mirror, alpha) {
     if (mirror) { g.translate(cw * s, 0); g.scale(-1, 1); }
     const cols = u.cols || 1e9;
     g.drawImage(im, (f % cols) * cw, (row + Math.floor(f / cols)) * ch, cw, ch, 0, 0, cw * s, ch * s);
-    if (frames.size > 900) frames.delete(frames.keys().next().value);
-    frames.set(key, c);
+    c = keepFrame(key, c);
   }
   const ctx = A.ctx;
   ctx.globalAlpha = alpha;
-  ctx.drawImage(c, Math.round(b.x - (mirror ? cw - fx : fx) * s), Math.round(b.y - fy * s));
+  ctx.drawImage(c.pic, Math.round(b.x - (mirror ? cw - fx : fx) * s) + c.ox, Math.round(b.y - fy * s) + c.oy);
   ctx.globalAlpha = 1;
 }
 
@@ -2109,8 +2197,7 @@ function drawFighter(b, x, y, pose, alpha) {
       const sh = sheets[kind];
       if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
     }
-    if (frames.size > 700) frames.delete(frames.keys().next().value);
-    frames.set(k, c);
+    c = keepFrame(k, c);
   }
   const ctx = A.ctx;
   if (!shadowPic) {
@@ -2124,7 +2211,7 @@ function drawFighter(b, x, y, pose, alpha) {
     g.fill();
   }
   ctx.globalAlpha = alpha;
-  ctx.drawImage(c, Math.round(x) - (mirror ? cw - fx : fx), Math.round(y) - fy);
+  ctx.drawImage(c.pic, Math.round(x) - (mirror ? cw - fx : fx) + c.ox, Math.round(y) - fy + c.oy);
   ctx.globalAlpha = 1;
   return true;
 }
@@ -2163,10 +2250,9 @@ function drawWarProp(W, b) {
   const prop = (name, x, y, k = 1, alpha = 1) => {
     const im = A.images[`prop/${name}.png`];
     if (!im || !im.width) return false;
-    ctx.save();
     ctx.globalAlpha = alpha;
     ctx.drawImage(im, Math.round(x - im.width * k / 2), Math.round(y - im.height * k), Math.round(im.width * k), Math.round(im.height * k));
-    ctx.restore();
+    ctx.globalAlpha = 1;
     return true;
   };
   if (b.wprop === 'flag') {
@@ -2177,12 +2263,12 @@ function drawWarProp(W, b) {
     }
     ctx.font = 'bold 12px G11';
     ctx.textAlign = 'center';
-    A.outline(`${f.name} 거점`, b.x, b.y + 12, f.owner === 0 ? '#9ff08a' : f.owner === 1 ? '#ff9a8a' : '#efe3c2');
+    drawLabel(`${f.name} 거점`, b.x, b.y + 12, f.owner === 0 ? '#9ff08a' : f.owner === 1 ? '#ff9a8a' : '#efe3c2', 'bold 12px G11');
   } else if (b.wprop === 'cart') {
     prop('war_cart', b.x, b.y, 1);
     ctx.font = 'bold 10px G9';
     ctx.textAlign = 'center';
-    A.outline('주작 불씨 수레', b.x, b.y + 12, '#ffd27a');
+    drawLabel('주작 불씨 수레', b.x, b.y + 12, '#ffd27a', '10px G9');
     if (W.cart.moving && A.M().fx.k_m_sammae && Math.random() < 0.05 && fxOk()) A.addFx('k_m_sammae', b.x, b.y - 30, { scale: 0.4 });
   } else if (b.wprop === 'gate') {
     prop('war_door', b.x, b.y - 6, 1);
@@ -2190,23 +2276,23 @@ function drawWarProp(W, b) {
     A.bar(b.x - 40, b.y - 132, 80, 4, g.hp / g.maxHp, g.team === 0 ? '#3ad04a' : '#e8402a');
     ctx.font = 'bold 10px G9';
     ctx.textAlign = 'center';
-    A.outline(`현무 성문 ${Math.ceil(g.hp / g.maxHp * 100)}%`, b.x, b.y - 136, '#efe3c2');
+    drawLabel(`현무 성문 ${Math.ceil(g.hp / g.maxHp * 100)}%`, b.x, b.y - 136, '#efe3c2', '10px G9');
     if (g.flash > 0) g.flash -= 0.016;
   } else if (b.wprop === 'crate') {
     prop('war_cart3', b.x, b.y, 0.45) || prop('field_barrel', b.x, b.y, 0.5);
     ctx.font = '8px G7';
     ctx.textAlign = 'center';
-    A.outline('보급', b.x, b.y + 8, '#ffd27a');
+    drawLabel('보급', b.x, b.y + 8, '#ffd27a');
   } else if (b.wprop === 'post') {
     prop('war_totem', b.x, b.y, 0.55);
     ctx.font = '8px G7';
     ctx.textAlign = 'center';
-    A.outline('정찰', b.x, b.y + 8, '#9ad8ff');
+    drawLabel('정찰', b.x, b.y + 8, '#9ad8ff');
   } else if (b.wprop === 'ghost') {
     const g = b.g, f = g.b;
     if (f.hero) return;
     const a = 0.35 + 0.15 * Math.sin(G.t * 3);
-    if (f.cls) A.drawYhero2(f.cls, f.gear, f, g.x, g.y - 4, 'dead', a);
+    if (f.cls) drawFighter(f, g.x, g.y - 4, 'dead', a) || A.drawYhero2(f.cls, f.gear, f, g.x, g.y - 4, 'dead', a);
     else {
       const yu = f.unit && A.yunit({ id: f.unit });
       if (yu && yu.u.anims.dead) { const d = yu.u.anims.dead; A.drawYunit(yu, f, g.x, g.y, f.scale, a, d.row, d.n - 1, false); }
@@ -2378,11 +2464,30 @@ function drawCountdown(W) {
   ctx.restore();
 }
 
+/** Screen text with a dark edge, kept as a picture per wording (the HUD's lines change seldom). */
+const hudPics = new Map();
 function hudText(t, x, y, color) {
-  const ctx = A.ctx;
-  ctx.fillStyle = '#000';
-  ctx.fillText(t, x + 1, y + 1);
-  ctx.fillText(t, x - 1, y);
-  ctx.fillStyle = color;
-  ctx.fillText(t, x, y);
+  const ctx = A.ctx, font = ctx.font, key = t + '|' + color + '|' + font;
+  let e = hudPics.get(key);
+  if (!e) {
+    const c = document.createElement('canvas'), g = c.getContext('2d');
+    g.font = font;
+    const m = g.measureText(t), size = parseInt((font.match(/(\d+)px/) || [0, 12])[1], 10);
+    c.width = Math.ceil(m.width) + 4;
+    c.height = Math.ceil(size * 1.4) + 3;
+    g.font = font;
+    g.textBaseline = 'alphabetic';
+    const base = Math.ceil(size * 1.1) + 1;
+    g.fillStyle = '#000';
+    g.fillText(t, 3, base + 1);
+    g.fillText(t, 1, base);
+    g.fillStyle = color;
+    g.fillText(t, 2, base);
+    e = { c, base, w: c.width };
+    if (hudPics.size > 300) hudPics.clear();
+    hudPics.set(key, e);
+    if (window.createImageBitmap) createImageBitmap(c).then(bm => { e.c = bm; }).catch(() => {});
+  }
+  const al = ctx.textAlign, x0 = al === 'center' ? x - e.w / 2 : al === 'right' ? x - e.w + 2 : x - 2;
+  ctx.drawImage(e.c, Math.round(x0), Math.round(y - e.base));
 }

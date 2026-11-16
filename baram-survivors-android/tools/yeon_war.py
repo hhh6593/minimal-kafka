@@ -2,7 +2,7 @@
 """The 사신수 길드대항전's battlefields, from 바람의나라 연's own maps (decrypted Maps_* bundles):
 연's 사신수 공성전 castles (kow_zodiac_*_siege) and the 길림 쟁탈 field (kow_jilin_pk_castle).
 
-    yeon_war.py DEC_DIR OUT_DIR [--preview]
+    yeon_war.py DEC_DIR OUT_DIR [--preview] [--assets]
 
 DEC_DIR holds the decrypted Maps_*.unity3d. Writes OUT_DIR/ywar/<war>_<cx>_<cy>.png (1024-pixel
 chunks of the crop, every tile layer, at the map's own scale: one 연 tile is 32 pixels, as the
@@ -13,6 +13,15 @@ town is drawn) and OUT_DIR/ywar/index.json:
 walk is the map's own movables on the game's 48-pixel tiles (a tile is open when 연's 32-pixel
 tile under its middle is). With --preview also OUT_DIR/ywar_preview/<war>.png: the crop at a
 third, with the 48-pixel grid every 5 tiles, for placing the objectives.
+
+Also (OUT_DIR is the GEAR_DIR the build reads):
+  - the war's props from MapObjects.unity3d: OUT_DIR/prop_y/war_<name>.png + index.json entries
+    (the gate's red doors, the 주작 수레 — its body is drawn in the additive pass, kept alone —
+    the totem post, braziers, a row of the rock ring as a wall);
+  - each side's helmeted guards from Units.unity3d (연's 평양성 / 동부여성 경비병 and 경비대장):
+    OUT_DIR/yunit/war_*.png + index.json entries, through tools/yeon_units.py.
+The UI art (the ▼ marker, the flags, 勝/敗, the ink blots, the medallions) comes with
+tools/yeon_hud.py's UI_SPRITES.
 """
 import json
 import os
@@ -32,8 +41,80 @@ WARS = {
 }
 
 
+PROPS = {'gate': ('1070', 'wall'), 'door': ('1054', 'wall'), 'wall': ('1034', 'wall'), 'brazier': ('1052', 'torch'),
+         'totem': ('0058_totem_l', 'statue'), 'altar': ('1092', 'statue'), 'lock': ('0212_a', 'wall'), 'seal': ('0228', 'decal'),
+         'stonewall': ('20004', 'wall'), 'lantern': ('1053', 'torch')}
+CARTS = {'cart': '0146', 'cart2': '0147', 'cart3': '0145'}
+UNITS = {'war_g1': ('Monster_0515', '평양성 경비병(검)'), 'war_g2': ('Monster_0517', '평양성 경비병(창)'),
+         'war_g3': ('Monster_0518', '동부여성 경비병(검)'), 'war_g4': ('Monster_0520', '동부여성 경비병(창)'),
+         'war_cap1': ('Monster_0516', '평양성 경비대장'), 'war_cap2': ('Monster_0519', '동부여성 경비대장')}
+
+
+def props(dec, out):
+    import numpy as np
+    import UnityPy
+    import yeon_skills as K
+    pdir = os.path.join(out, 'prop_y')
+    os.makedirs(pdir, exist_ok=True)
+    ip = os.path.join(pdir, 'index.json')
+    idx = json.load(open(ip)) if os.path.isfile(ip) else {'props': {}}
+    env = UnityPy.load(os.path.join(dec, 'MapObjects.unity3d'))
+    found = {}
+    for k, v in env.container.items():
+        found[k.rsplit('/', 1)[-1]] = v
+    def put(name, im, ox, oy, box, kind, obj):
+        im.save(os.path.join(pdir, 'war_' + name + '.png'))
+        idx['props']['war_' + name] = {'size': list(im.size), 'terrain': 'war', 'kind': kind, 'foot': [ox - box[0], oy - box[1]], 'src': 'object_' + obj}
+    for name, (obj, kind) in PROPS.items():
+        frames, _, ox, oy, _ = K.render(found['object_' + obj + '.prefab'].read())
+        al = frames[0][0]
+        box = al.getbbox()
+        im = al.crop(box)
+        if name == 'wall':
+            # Its black top band made clear (the build skips a fully opaque square as a floor piece).
+            a = np.asarray(im).copy()
+            a[:, :, 3] = np.where(a[:, :, :3].max(2) < 12, 0, 255)
+            im = Image.fromarray(a)
+        put(name, im, ox, oy, box, kind, obj)
+        if name == 'stonewall':
+            top = im.crop((0, 0, im.width, 26))
+            top = top.crop(top.getbbox())
+            top.save(os.path.join(pdir, 'war_rocks.png'))
+            idx['props']['war_rocks'] = {'size': list(top.size), 'terrain': 'war', 'kind': 'wall', 'foot': [top.width // 2, top.height - 2], 'src': 'object_' + obj}
+    for name, obj in CARTS.items():
+        frames, _, ox, oy, _ = K.render(found['object_' + obj + '.prefab'].read())
+        ad = np.clip(frames[0][1], 0, 255)
+        im = Image.fromarray(np.dstack([ad, np.where(ad.max(2) > 3, 255, 0)]).astype(np.uint8), 'RGBA')
+        box = im.getbbox()
+        put(name, im.crop(box), ox, oy, box, 'wood', obj)
+    json.dump(idx, open(ip, 'w'), indent=1)
+
+
+def units(dec, out):
+    import subprocess
+    import tempfile
+    udir = os.path.join(out, 'yunit')
+    os.makedirs(udir, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        match = os.path.join(tmp, 'match.json')
+        json.dump({k: {'prefab': p, 'name': n, 'yeon': n, 'tier': 0} for k, (p, n) in UNITS.items()}, open(match, 'w'), ensure_ascii=False)
+        subprocess.run([sys.executable, '-I', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'yeon_units.py'),
+                        os.path.join(dec, 'Units.unity3d'), match, tmp], check=True, stdout=subprocess.DEVNULL)
+        got = json.load(open(os.path.join(tmp, 'index.json')))
+        ip = os.path.join(udir, 'index.json')
+        idx = json.load(open(ip)) if os.path.isfile(ip) else {}
+        for k, u in got.items():
+            os.replace(os.path.join(tmp, k + '.png'), os.path.join(udir, k + '.png'))
+            u.update({'tier': 0, 'name': UNITS[k][1], 'yeon': UNITS[k][1]})
+            idx[k] = u
+        json.dump(idx, open(ip, 'w'), ensure_ascii=False)
+
+
 def main():
     dec, out = sys.argv[1], sys.argv[2]
+    if '--assets' in sys.argv:
+        props(dec, out)
+        units(dec, out)
     preview = '--preview' in sys.argv
     d = os.path.join(out, 'ywar')
     os.makedirs(d, exist_ok=True)
