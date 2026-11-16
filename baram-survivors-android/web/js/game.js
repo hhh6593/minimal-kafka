@@ -1,6 +1,6 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
-  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
+  CHAMPIONS_AT, FX, ELEMENTS, PROMOS, PROMO_NAMES, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
@@ -415,7 +415,7 @@ function buildSelect() {
     b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
       <em>필살기 ${ultLook(c.id).name}</em>
-      <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급` : ''}</small>`;
+      <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급${(PROMO_NAMES[c.id] || [])[promoOf(c.id) - 1] ? ` (${PROMO_NAMES[c.id][promoOf(c.id) - 1]})` : ''}` : ''}</small>`;
     b.onclick = () => {
       chosenClass = c;
       enterTown(c);
@@ -1539,6 +1539,7 @@ $('#close-tree').onclick = () => { $('#tree').hidden = true; };
 
 /** A class's figure in the gear it has found, for the menus. */
 function heroPicture(cls) {
+  if (M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].portrait) return `assets/yhero2/${M.yhero2[cls.id].portrait}`;
   if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
   return portrait(dressed(cls, savedGear(cls)));
 }
@@ -3406,7 +3407,8 @@ function cast(skill, st) {
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
     audio.play('skill_' + skill.id, def.kind, skill.lv);
-    const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior');
+    const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior')
+      || (G.cls.id === 'archer' && !['buff', 'heal'].includes(def.kind));
     strikePose(melee ? 'attack' : 'magic');
   }
 }
@@ -3444,6 +3446,7 @@ const ULT_PATH = {
   rogue: [[0, 'r_ult'], [4, 'r_heaven'], [6, 'r_shuriken'], [7, 'r_kill'], [9, 'r_gale']],
   mage: [[0, 'm_ult'], [4, 'm_fire3'], [6, 'm_twin'], [7, 'm_inferno'], [9, 'm_kalpa']],
   poet: [[0, 'p_ult'], [4, 'p_phoenix'], [6, 'p_burst'], [7, 'p_bagua'], [9, 'p_taiji']],
+  archer: [[0, 'a_ult'], [4, 'a_allwhirl'], [5, 'a_inferno'], [9, 'a_blood5']],
 };
 function ultLook(cls) {
   const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
@@ -3481,7 +3484,7 @@ function syncUltMode() {
 /** Seconds until the 필살기 may be thrown again (at least 25 between two, whatever the mana). */
 const ULT_REST = 25;
 // Each class's 필살기 against a boss: a single-target technique of its own (from 연's skills).
-const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe' };
+const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim' };
 function ultWait() {
   return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
 }
@@ -3506,7 +3509,7 @@ function castUlt() {
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   const shownName = ultShown(G.cls.id).name;
   G.bubble = { text: `${shownName}!`, t: G.t };
-  strikePose(G.cls.id === 'warrior' || G.cls.id === 'rogue' ? 'attack' : 'magic');
+  strikePose(G.cls.id === 'warrior' || G.cls.id === 'rogue' || G.cls.id === 'archer' ? 'attack' : 'magic');
   say(`${shownName}!`);
   audio.play('skill_' + def.id, 'ult');
   G.shake = 0.5;
@@ -4149,6 +4152,7 @@ const PARTY = {
   mage: { names: ['홍염', '백야', '흑풍'], role: '화염주와 마비로 무리를 친다' },
   warrior: { names: ['철우', '백호', '무쇠'], role: '가까이 온 적을 베어 막는다' },
   rogue: { names: ['그림자', '바람', '야월'], role: '적 뒤로 파고들어 벤다' },
+  archer: { names: ['매유진', '솔개', '화살비'], role: '멀리서 화살로 보스와 무리를 쏜다' },
 };
 
 function joinParty(cls) {
@@ -4261,9 +4265,10 @@ function memberAnchor(m) {
     if (cls === 'warrior') at = ax ? [foe.tx + ax, foe.ty] : [foe.tx, foe.ty + ay];
     else if (cls === 'rogue') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
     else if (cls === 'mage') at = ax ? [foe.tx + ax * 3, foe.ty + 2 * side] : [foe.tx + 2 * side, foe.ty + ay * 3];
+    else if (cls === 'archer') at = ax ? [foe.tx + ax * 4, foe.ty - 2 * side] : [foe.tx - 2 * side, foe.ty + ay * 4];
     else at = [p.tx + ax * 3, p.ty + ay * 3 + (ax ? side : 0)];
   }
-  if (cls === 'poet' || cls === 'mage') {
+  if (cls === 'poet' || cls === 'mage' || cls === 'archer') {
     // Casters keep their distance: a monster within two tiles pushes the spot further off.
     for (let i = 0; i < 3; i++) {
       const close = nearestEnemies(1, 2, { tx: at[0], ty: at[1] })[0];
@@ -4409,7 +4414,7 @@ function drawShots() {
 // ground, light when a spell is cast.
 
 /** The glow of a class's flying spells: [halo, core]. */
-const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'] };
+const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'], archer: ['#9adf6a', '#f0ffe0'] };
 
 /** The effect picture of a spell at its 단: a second name for the same frames, 6% larger a step. */
 function grownFx(id, lv) {
@@ -4774,6 +4779,44 @@ function partyAct(m) {
           audio.play('skill_w_tiger', 'spell');
           partySay(m, '백호참');
         }
+      }
+      break;
+    }
+    case 'archer': {
+      // 궁사: ranged damage from four tiles off — 활쏘기 at the nearest, 마탄 on a crowd, and on the
+      // boss 조준 활쏘기 now and then; 위위비보 away when hurt.
+      const t = boss || near(1)[0];
+      if (!t) break;
+      face(t);
+      if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
+        m.cd.e = 14;
+        addFx(SKILLS.a_weebo.fx, m.x, m.y - 20, { scale: 0.8 });
+        audio.play('skill_a_weebo', 'buff');
+        partySay(m, '위위비보');
+        healMember(m, m.maxHp * 0.15);
+      }
+      if (boss && m.cd.d <= 0) {
+        m.cd.d = 10;
+        fxOn(SKILLS.a_aim.fx, t);
+        later(0.25, () => hurtEnemy(t, 45 * pw));
+        audio.play('skill_a_aim', 'spell');
+        partySay(m, '조준 활쏘기');
+        if (Math.random() < 0.5) partyTalk(m, ['급소 조준!', '보스 집중 사격!']);
+        pose('attack');
+      } else if (m.cd.b <= 0 && around(t.tx, t.ty, 1).length >= 3) {
+        m.cd.b = 7;
+        fxOn(SKILLS.a_bomb.fx, t);
+        later(0.3, () => { for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 14 * pw); });
+        audio.play('skill_a_bomb', 'strike');
+        partySay(m, '마탄');
+        pose('attack');
+      } else if (m.cd.a <= 0) {
+        m.cd.a = 1.1;
+        fxOn(SKILLS.a_shot.fx, t);
+        hurtEnemy(t, 10 * pw);
+        audio.play('skill_a_shot', 'spell');
+        if (Math.random() < 0.2) partySay(m, '활쏘기');
+        pose('attack');
       }
       break;
     }
@@ -6401,7 +6444,7 @@ function gauge(sel, k, text) {
 // The gear slots as placed on the old panel: two on the left, the helmet above the figure,
 // two at its feet, three darker ones down the right.
 const SLOT_AT = [[117, 160], [35, 164], [35, 208], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
-const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12] };
+const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12], archer: [14, 12, 28] };
 const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
 
 /** The side panel and the map tab, kept in step with the hunt. */

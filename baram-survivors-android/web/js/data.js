@@ -24,6 +24,9 @@ export const CLASSES = [
     desc: '원거리 공격 주술사. 신수마법으로 적을 태우고 마비시킨다.' },
   { id: 'poet', name: '도사', hero: '1004', hp: 100, mp: 120, speed: 68, armor: 0, start: 'p_orb', ult: 'p_ult',
     revive: true, desc: '회복과 보조의 달인. 몬스터를 불러내고, 한 번은 스스로 부활한다.' },
+  // 바람의나라 연's 궁사 (Job_6): its figure, bows, skills and sounds come only from 연's resources.
+  { id: 'archer', name: '궁사', hero: '1002', hp: 120, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
+    desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -377,6 +380,75 @@ export const SKILLS = {
     desc: '하늘의 이치를 담은 마법진을 펼쳐 주위의 몬스터를 공격한다' },
   p_daejijin: { promo: 7, cls: 'poet', req: 27, name: '대지진', kind: 'screen', fx: '134', dmg: 34, cd: 7,
     desc: '거대한 지진을 일으켜 화면의 몬스터 모두에게 피해를 준다' },
+
+  // 궁사 (바람의나라 연 Job_6): its own skill list (Skills_Player 2061xxxx 일반, 2062xxxx 승급), each with
+  // the effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_archer_skills.json). 연's
+  // 1차~6차 tiers are its own (명궁·현궁·진탄·심안·신궁·천궁); 연 has no 7차~9차 for the 궁사, so those
+  // take its remaining 일반 techniques (연폭화살, 독수리소환, 신궁합일 ...). The fx here is only the
+  // old effect a build without 연's resources falls back to.
+  a_shot: { cls: 'archer', req: 1, name: '활쏘기', kind: 'spell', fx: '53', dmg: 15, cd: 0.75, range: 6, count: 1,
+    desc: '바라보는 쪽 가까운 몬스터에게 화살을 쏜다. 단이 오르면 더 멀리, 4·7단에 화살이 하나씩 는다' },
+  a_aim: { cls: 'archer', req: 1, name: '조준 활쏘기', kind: 'spell', fx: '55', dmg: 32, cd: 2.4, range: 8, count: 1,
+    desc: '잠시 집중한 뒤 멀리 있는 몬스터에게 강한 화살을 쏜다' },
+  a_spiral: { cls: 'archer', req: 1, name: '나선화살', kind: 'line', fx: '22', dmg: 18, cd: 1.8, depth: 6,
+    desc: '나선으로 도는 화살이 앞쪽 일렬 여섯 칸의 몬스터를 꿰뚫는다' },
+  a_ice: { cls: 'archer', req: 6, name: '얼음바르기', kind: 'buff', buff: 'power', fx: '68', cd: 14, duration: 4, power: 0.5,
+    desc: '화살 강화. 화살에 얼음을 발라 잠시 모든 피해가 늘어난다' },
+  a_firewall: { cls: 'archer', req: 6, name: '화염장벽', kind: 'strike', fx: '92', dmg: 14, cd: 3, range: 6, radius: 1, count: 1,
+    hitAt: 0.3, curse: 2, desc: '대상의 자리에 불화살을 쏘아 화염 장벽을 세운다. 대상과 그 주위를 태운다' },
+  a_flame: { cls: 'archer', req: 12, name: '염시투사', kind: 'cleave', fx: '148', dmg: 20, cd: 2.8, depth: 2, max: 6,
+    desc: '앞쪽 넓은 범위에 불화살을 연달아 퍼부어 몬스터를 밀쳐 낸다' },
+  // 1차 명궁
+  a_bomb: { promo: 1, cls: 'archer', req: 6, name: '마탄', kind: 'strike', fx: '147', dmg: 22, cd: 2.6, range: 7, radius: 1, count: 1,
+    hitAt: 0.3, desc: '특별한 화살을 쏘아 대상과 그 주위를 터뜨린다' },
+  a_freeze: { promo: 1, cls: 'archer', req: 6, name: '급냉화살', kind: 'strike', fx: '68', dmg: 14, cd: 3.2, range: 6, radius: 1, count: 2,
+    hitAt: 0.3, stun: 1.2, desc: '빙결 화살로 몬스터 둘과 그 주위를 잠시 얼린다' },
+  a_coverfire: { promo: 1, cls: 'archer', req: 6, name: '화염시', kind: 'buff', buff: 'haste', fx: '7', cd: 15, duration: 4,
+    desc: '화살 강화. 화살에 화염의 힘을 담아 잠시 모든 기술이 빨리 돈다' },
+  // 2차 현궁
+  a_storm: { promo: 2, cls: 'archer', req: 10, name: '폭류마탄시', kind: 'strike', fx: '148', dmg: 16, cd: 3, range: 7, radius: 2, count: 1,
+    hitAt: 0.4, up: 'a_allwhirl', desc: '하늘로 쏘아 올린 화살이 대상과 그 주위에 비처럼 쏟아진다' },
+  a_silence: { promo: 2, cls: 'archer', req: 10, name: '시즉무성', kind: 'line', fx: '55', dmg: 18, cd: 2.6, depth: 7, stun: 1,
+    desc: '빠른 화살이 앞쪽 일렬 일곱 칸을 가로질러 몬스터를 침묵시킨다(잠시 멈춤)' },
+  // 3차 진탄
+  a_breakair: { promo: 3, cls: 'archer', req: 14, name: '대기파열', kind: 'strike', fx: '24', dmg: 20, cd: 3, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, curse: 3, shape: 'plus', desc: '대기를 찢는 화살로 대상과 그 상하좌우를 약화시키고 피해를 준다' },
+  a_tempest: { promo: 3, cls: 'archer', req: 14, name: '폭풍시', kind: 'spell', fx: '89', dmg: 14, cd: 1.8, range: 7, count: 3,
+    desc: '화살 강화. 폭풍의 힘을 담은 화살이 몬스터 셋을 추가로 타격한다' },
+  // 4차 심안
+  a_thunder: { promo: 4, cls: 'archer', req: 18, name: '천기충전', kind: 'buff', buff: 'haste', fx: '89', cd: 16, duration: 4,
+    desc: '천기를 모아 잠시 모든 기술의 재사용 대기 시간이 빨리 지난다' },
+  a_whirl: { promo: 4, cls: 'archer', req: 18, name: '선풍화우', kind: 'strike', fx: '24', dmg: 26, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.35, desc: '돌풍과 꽃잎 속에 화살이 휘몰아쳐 대상과 그 주위를 친다' },
+  a_allwhirl: { promo: 4, cls: 'archer', req: 18, evolved: true, name: '폭풍화우', kind: 'screen', fx: '24', dmg: 16, cd: 4.5,
+    desc: '폭류마탄시 8단 + 4차 승급. 꽃잎 폭풍 속 화살이 화면의 모든 몬스터에게 쏟아진다' },
+  // 5차 신궁
+  a_inferno: { promo: 5, cls: 'archer', req: 21, name: '염화마탄시', kind: 'line', fx: '148', dmg: 34, cd: 3.2, depth: 8,
+    desc: '궁사의 궁극오의. 잠력과 심력을 터뜨려 앞쪽 일렬 여덟 칸에 화염 화살을 쏜다' },
+  a_fetter: { promo: 5, cls: 'archer', req: 21, name: '족쇄화살', kind: 'strike', fx: '115', dmg: 20, cd: 3.2, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, slow: 3, desc: '적 주변에 족쇄를 쏘아 피해를 주고 둔화시킨다' },
+  a_bloodsuck: { promo: 5, cls: 'archer', req: 21, name: '혈기흡수', kind: 'heal', fx: '125', heal: 24, cd: 13, shieldT: 3,
+    desc: '적의 기운을 흡수해 체력을 회복하고 잠시 보호막을 두른다' },
+  // 6차 천궁
+  a_chase: { promo: 6, cls: 'archer', req: 24, name: '추격', kind: 'line', fx: '144', dmg: 30, cd: 3, depth: 6, dash: true,
+    desc: '앞으로 빠르게 달려 나가며 지나는 일렬 여섯 칸의 몬스터에게 화살을 퍼붓는다' },
+  // 7차~9차: 연's other 궁사 techniques
+  a_chain: { promo: 7, cls: 'archer', req: 27, name: '연폭화살', kind: 'spell', fx: '147', dmg: 30, cd: 2, range: 7, count: 4,
+    desc: '탄성이 강한 화살이 몬스터 사이를 튕기며 넷을 터뜨린다' },
+  a_shadow: { promo: 7, cls: 'archer', req: 27, name: '그림자방패', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '대신 맞아 주는 그림자 분신을 불러 잠시 받는 피해를 절반으로 줄인다' },
+  a_eagle: { promo: 8, cls: 'archer', req: 30, name: '독수리소환', kind: 'spell', fx: '52', dmg: 30, cd: 2.2, range: 7, count: 3, stun: 0.5,
+    desc: '동반자 독수리를 불러 몬스터 셋을 덮친다' },
+  a_weebo: { promo: 8, cls: 'archer', req: 30, name: '위위비보', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '깃털처럼 가볍게 물러나며 잠시 무적이 된다' },
+  a_bless: { promo: 8, cls: 'archer', req: 30, name: '신궁합일', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '활에 혼을 불어넣어 잠시 공격력이 크게 오른다' },
+  a_air: { promo: 9, cls: 'archer', req: 33, name: '허공람시', kind: 'spell', fx: '55', dmg: 34, cd: 1.4, range: 8, count: 3,
+    desc: '미리 장전한 화살을 조준 없이 연달아 쏘아 몬스터 셋을 꿰뚫는다' },
+  a_blood5: { promo: 9, cls: 'archer', req: 33, name: '투혈오식', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 피를 태운 다섯 번째 화살이 화면의 모든 몬스터를 꿰뚫는다' },
+  a_ult: { cls: 'archer', name: '일환탄시', kind: 'ult', fx: '144', hpCost: 0.15,
+    desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터에게 강력한 일격을 가한다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -404,6 +476,11 @@ export const BRANCHES = {
     { name: '천벌', note: '하늘의 벌로 친다', ids: ['p_orb', 'p_quake', 'p_judge', 'p_burst', 'p_flash', 'p_thunderbomb'] },
     { name: '진법', note: '진을 펼쳐 지키고 누른다', ids: ['p_barrier', 'p_aegis', 'p_wave', 'p_wargod', 'p_bagua', 'p_dragongod', 'p_bind', 'p_taiji'] },
   ],
+  archer: [
+    { name: '사격', note: '멀리서 꿰뚫는다', ids: ['a_shot', 'a_spiral', 'a_silence', 'a_tempest', 'a_inferno', 'a_chase', 'a_chain', 'a_air', 'a_blood5'] },
+    { name: '마탄', note: '터뜨리고 쏟아붓는다', ids: ['a_aim', 'a_firewall', 'a_flame', 'a_bomb', 'a_freeze', 'a_storm', 'a_breakair', 'a_whirl', 'a_allwhirl', 'a_fetter', 'a_eagle'] },
+    { name: '궁술', note: '화살을 강화하고 몸을 지킨다', ids: ['a_ice', 'a_coverfire', 'a_thunder', 'a_bloodsuck', 'a_shadow', 'a_weebo', 'a_bless'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -418,8 +495,11 @@ const PRE = {
   p_realm: 'p_spirit', p_warmth: 'p_realm', p_skyspirit: 'p_warmth',
   p_judge: 'p_orb', p_burst: 'p_judge', p_flash: 'p_burst', p_thunderbomb: 'p_flash',
   p_wargod: 'p_aegis', p_bagua: 'p_wave', p_dragongod: 'p_wargod', p_bind: 'p_wave',
+  a_inferno: 'a_tempest', a_chase: 'a_inferno', a_chain: 'a_chase', a_air: 'a_chain',
+  a_fetter: 'a_whirl', a_eagle: 'a_fetter',
+  a_bloodsuck: 'a_thunder', a_shadow: 'a_bloodsuck', a_weebo: 'a_shadow', a_bless: 'a_shadow',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -476,7 +556,9 @@ export const YEON_FX = {
 export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
-export const PROMOS = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet'].map(c => [c, PROMO_AT.map(at => ({ at }))]));
+export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
+// The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for the 궁사's tiers; 7차~9차 keep the number.
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {

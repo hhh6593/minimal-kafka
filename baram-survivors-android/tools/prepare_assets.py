@@ -651,6 +651,9 @@ def main():
             for kind, variants in c["layers"].items():
                 for v, meta in variants.items():
                     shutil.copyfile(os.path.join(h2, meta["file"]), os.path.join(out, "yhero2", meta["file"]))
+            # A class no wardrobe sheet dresses (the 궁사) has its card picture made from its layers.
+            if c.get("portrait") and os.path.isfile(os.path.join(h2, c["portrait"])):
+                shutil.copyfile(os.path.join(h2, c["portrait"]), os.path.join(out, "yhero2", c["portrait"]))
             manifest["yhero2"][cls_id] = c
 
     # 바람의나라 연's own item icons for the pieces (GEAR_DIR/yitemicon/<class>/<kind>_<key>.png +
