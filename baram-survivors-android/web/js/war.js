@@ -433,8 +433,9 @@ function mkFighter(W, team, role, squad) {
   const classes = A.CLASSES.filter(c => rolesFor(c).includes(role));
   const cls = pick(classes.length ? classes : A.CLASSES);
   const lv = Math.round(rnd(18, 42));
-  // A guild's look: three outfits per class and side, so the composited frames are shared.
-  const pool = (W.looks = W.looks || {})[team + cls.id] = W.looks[team + cls.id] || [0, 1, 2].map(() => randGear(cls, rnd(18, 44)));
+  // Two outfits per class, worn on both sides (the ▼ over the head tells the sides apart): with
+  // eleven classes, three a side made 66 looks whose frames never stopped being composited.
+  const pool = (W.looks = W.looks || {})[cls.id] = W.looks[cls.id] || [0, 1].map(() => randGear(cls, rnd(18, 44)));
   const gear = pick(pool);
   // 전장 보정: a fighter's own strength (level and gear) counts, but pulled toward the field's.
   const own = Math.sqrt(lv / 30) * (0.85 + 0.3 * Math.random());
@@ -2058,11 +2059,21 @@ function keep(map, key, c) {
 }
 /** A body's frame kept cropped to what is drawn (most of a cell is empty): { pic, ox, oy }. */
 function keepFrame(key, c) {
-  const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
-  for (let y = 0; y < c.height; y++)
-    for (let x = 0; x < c.width; x++)
-      if (d[(y * c.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+  const d = new Uint32Array(g.getImageData(0, 0, W, H).data.buffer);
+  // The drawn box: rows from the top and bottom, then columns only within those rows.
+  const AM = 0xff000000; // alpha, little-endian
+  let y0 = 0, y1 = H - 1, x0 = W, x1 = -1;
+  const rowEmpty = y => { for (let i = y * W, e = i + W; i < e; i++) if (d[i] & AM) return false; return true; };
+  while (y0 < H && rowEmpty(y0)) y0++;
+  while (y1 > y0 && rowEmpty(y1)) y1--;
+  if (y0 < H) {
+    for (let y = y0; y <= y1; y++) {
+      const r = y * W;
+      for (let x = 0; x < x0; x++) if (d[r + x] & AM) { x0 = x; break; }
+      for (let x = W - 1; x > x1; x--) if (d[r + x] & AM) { x1 = x; break; }
+    }
+  }
   const e = { pic: c, ox: 0, oy: 0 };
   if (x1 >= x0) {
     const t = document.createElement('canvas');
@@ -2073,7 +2084,7 @@ function keepFrame(key, c) {
     e.ox = x0;
     e.oy = y0;
   }
-  if (frames.size > 900) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
+  if (frames.size > 2400) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
   frames.set(key, e);
   if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src).then(bm => { if (e.pic === src) e.pic = bm; }).catch(() => {}); }
   return e;

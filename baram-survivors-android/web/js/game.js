@@ -83,7 +83,7 @@ async function boot() {
   const paths = [
     ...Object.keys(M.fx).map(id => `fx/${id}.png`),
     // Hit sparks and the level-up burst are never in a spell slot: no icon of their own.
-    ...Object.keys(M.fx).filter(id => !id.startsWith('new_') && !id.startsWith('h_')).map(id => `icon/${id}.png`),
+    ...Object.keys(M.fx).filter(id => !id.startsWith('new_') && !id.startsWith('h_') && !id.startsWith('g_')).map(id => `icon/${id}.png`),
     ...M.heroes.map(h => `hero/${h.id}.png`),
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
@@ -6555,16 +6555,30 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   ctx.ellipse(Math.round(x), Math.round(y - 1), 10, 3.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = alpha;
+  // The layers composited once per frame and kept: six draws from big sheets each frame (연's
+  // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
+  const key = cls.id + JSON.stringify(want) + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~');
+  let pic = heroFrames.get(key);
+  if (!pic) {
+    const c = document.createElement('canvas');
+    c.width = cw;
+    c.height = ch;
+    const g = c.getContext('2d');
+    for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
+      const sh = sheets[kind];
+      if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
+    }
+    if (heroFrames.size > 300) heroFrames.delete(heroFrames.keys().next().value);
+    heroFrames.set(key, pic = c);
+    if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (heroFrames.get(key) === c) heroFrames.set(key, bm); }).catch(() => {});
+  }
   ctx.translate(Math.round(x), Math.round(y));
   if (mirror) ctx.scale(-1, 1);
-  for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
-    const sh = sheets[kind];
-    if (!sh) continue;
-    ctx.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, -fx, -fy, cw, ch);
-  }
+  ctx.drawImage(pic, -fx, -fy);
   ctx.restore();
   return true;
 }
+const heroFrames = new Map();
 
 /** Draws a hero from 연's sheet; false when there is none for the class. */
 function drawYhero(clsId, armor, b, x, y, pose, alpha) {
