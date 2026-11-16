@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """바람의나라 연's own skill effects and icons, from its decrypted Skills bundle.
 
-    yeon_skills.py SKILLS_BUNDLE MAPPING_JSON OUT_DIR [ICON_OUT_DIR]
+    yeon_skills.py SKILLS_BUNDLE[,FXS_BUNDLE] MAPPING_JSON OUT_DIR [ICON_OUT_DIR]
 
 MAPPING_JSON: {ourSkillId: {"prefab": "Skill_Effect_0162", "icon": "skill_fighter_110401"}} ("add_own": true
 when the prefab's own materials are additive, see render())
@@ -317,7 +317,8 @@ def main():
     if icon_out:
         os.makedirs(icon_out, exist_ok=True)
     m = json.load(open(mapping))
-    env = UnityPy.load(bundle)
+    # SKILLS_BUNDLE may name more bundles, comma-separated (FXs.unity3d holds what some prefabs use).
+    env = UnityPy.load(*bundle.split(','))
     cont = {k.rsplit('/', 1)[-1].rsplit('.', 1)[0].lower(): v for k, v in env.container.items()}
     index = {}
     for sid, spec in m.items():

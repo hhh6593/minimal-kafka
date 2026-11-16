@@ -33,6 +33,9 @@ export const CLASSES = [
   // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
   { id: 'monk', name: '격투가', hero: '1001', hp: 175, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
     desc: '맨주먹의 근접 격수. 파고들어 두들기고, 혈을 짚어 묶고, 땅을 갈라 터뜨린다.' },
+  // 바람의나라 연's 마도사 (Job_11): 단봉, figure, skills and sounds only from 연's resources.
+  { id: 'magus', name: '마도사', hero: '1003', hp: 105, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
+    desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -594,6 +597,79 @@ export const SKILLS = {
     desc: '궁극기. 강림한 권신이 화면의 모든 몬스터를 다시 내려친다' },
   mk_ult: { cls: 'monk', name: '필살권무', kind: 'ult', fx: '144', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 화면의 몬스터에게 쉴 새 없는 권무를 퍼붓는다' },
+
+  // 마도사 (바람의나라 연 Job_11): its own skill list (Skills_Player 230xxxxx), each with the effect, icon
+  // and sound of that 연 record (fx k_<id>, tools/yeon_magus_skills.json). 연 numbers the 마도사's
+  // skills in one run; those after its 승급의 힘 (23001600) are taken three a tier, 1차~4차
+  // (마학사·마현선·마광사·마진선), 혈마광폭열파 at 5차 (마선사); its 광폭 forms of the 일반 orbs and beams
+  // (광폭십자광선, 광폭신장, 광폭파장) fill 5차~6차 (마천선), and 7차~9차 take its remaining 일반 techniques.
+  md_sphere: { cls: 'magus', req: 1, name: '마력구회격', kind: 'spell', fx: '31', dmg: 11, cd: 1.1, range: 7, count: 2,
+    desc: '마력의 구슬을 날려 가까운 몬스터 둘을 따로따로 친다. 4·7단에 구슬이 하나씩 는다' },
+  md_arrow: { cls: 'magus', req: 1, name: '마력화살', kind: 'spell', fx: '53', dmg: 18, cd: 1.8, range: 7, count: 2,
+    desc: '마력의 화살 둘이 몬스터를 꿰뚫는다' },
+  md_orbice: { cls: 'magus', req: 1, name: '기공구슬\'수', kind: 'strike', fx: '68', dmg: 10, cd: 2.6, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, slow: 2, desc: '물의 기공구슬이 몬스터 둘과 그 주위를 얼려 느리게 한다. 4·7단에 하나씩 는다' },
+  md_orblight: { cls: 'magus', req: 6, name: '기공구슬\'뇌', kind: 'spell', fx: '89', dmg: 16, cd: 2.4, range: 7, count: 3, stun: 0.6,
+    desc: '번개의 기공구슬이 몬스터 셋을 이어 치며 잠시 마비시킨다' },
+  md_orbfire: { cls: 'magus', req: 6, name: '기공구슬\'화', kind: 'strike', fx: '147', dmg: 14, cd: 3, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, desc: '불의 기공구슬이 몬스터 둘과 그 주위를 터뜨린다. 4·7단에 하나씩 는다' },
+  md_enhance: { cls: 'magus', req: 12, name: '마법강화', kind: 'buff', buff: 'power', fx: '15', cd: 14, duration: 4, power: 0.5,
+    desc: '마법을 강화해 잠시 모든 피해가 늘어난다' },
+  md_heal: { cls: 'magus', req: 12, name: '금기의기원', kind: 'heal', fx: '125', heal: 18, cd: 12,
+    desc: '금기된 기원으로 이따금 체력을 회복한다' },
+  // 1차 마학사
+  md_spirit: { promo: 1, cls: 'magus', req: 6, name: '마령소환', kind: 'line', fx: '144', dmg: 20, cd: 2.4, depth: 6,
+    desc: '마령을 불러 몬스터가 가장 많은 쪽 일렬 여섯 칸을 휩쓴다' },
+  md_amulet: { promo: 1, cls: 'magus', req: 6, name: '광폭보호부', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '광폭의 보호부를 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  md_frenzyexp: { promo: 1, cls: 'magus', req: 6, name: '광폭기폭사', kind: 'nova', fx: '25', dmg: 20, cd: 3, radius: 1,
+    desc: '광폭기를 터뜨려 둘러싼 몬스터를 밀쳐 낸다' },
+  // 2차 마현선
+  md_cross: { promo: 2, cls: 'magus', req: 10, name: '기공십자광선', kind: 'strike', fx: '24', dmg: 22, cd: 3, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, shape: 'plus', up: 'md_exfrenzy', desc: '십자로 뻗는 기공광선이 대상과 그 상하좌우를 꿰뚫는다' },
+  md_decay: { promo: 2, cls: 'magus', req: 10, name: '광폭부패', kind: 'spell', fx: '115', dmg: 16, cd: 2.6, range: 7, count: 3, curse: 3,
+    desc: '몬스터 셋을 썩게 하여 피해를 주고 약화시킨다' },
+  md_recovery: { promo: 2, cls: 'magus', req: 10, name: '광폭즉축기', kind: 'heal', fx: '125', heal: 22, cd: 13, shieldT: 2,
+    desc: '광폭기를 거두어 체력을 회복하고 잠시 보호막을 두른다' },
+  // 3차 마광사
+  md_wave: { promo: 3, cls: 'magus', req: 14, name: '마력파장', kind: 'nova', fx: '25', dmg: 22, cd: 3.2, radius: 2,
+    desc: '마력의 물결이 둘레 두 칸의 몬스터를 친다' },
+  md_silence: { promo: 3, cls: 'magus', req: 14, name: '광폭침묵염파', kind: 'strike', fx: '148', dmg: 24, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.4, stun: 1, desc: '침묵의 불길이 대상과 그 주위를 태우고 잠시 멈춘다' },
+  md_bust: { promo: 3, cls: 'magus', req: 14, name: '광폭기대방출', kind: 'strike', fx: '147', dmg: 30, cd: 2.8, range: 7, radius: 0, count: 2,
+    hitAt: 0.25, desc: '광폭기를 한꺼번에 내리꽂아 몬스터 둘에게 큰 피해를 준다' },
+  // 4차 마진선
+  md_ray: { promo: 4, cls: 'magus', req: 18, name: '광폭기조사', kind: 'line', fx: '22', dmg: 26, cd: 2.6, depth: 7,
+    desc: '광폭기의 빛줄기가 몬스터가 가장 많은 쪽 일렬 일곱 칸을 꿰뚫는다' },
+  md_absorb: { promo: 4, cls: 'magus', req: 18, name: '광폭체마', kind: 'spell', fx: '49', dmg: 20, cd: 2.8, range: 6, count: 1,
+    drain: 0.3, weakest: true, desc: '몬스터의 체력과 마력을 빨아들여 체력을 회복한다' },
+  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '기공십자광선 8단 + 4차 승급. 하늘을 멸하는 광폭기가 화면의 모든 몬스터에게 떨어진다' },
+  // 5차 마선사
+  md_bloodbat: { promo: 5, cls: 'magus', req: 21, name: '혈마광폭열파', kind: 'line', fx: '144', dmg: 32, cd: 3, depth: 7,
+    curse: 3, desc: '마도사의 궁극오의. 피의 박쥐떼가 일렬 일곱 칸을 휩쓸며 약화시킨다' },
+  md_crossfrenzy: { promo: 5, cls: 'magus', req: 21, name: '광폭십자광선', kind: 'strike', fx: '24', dmg: 28, cd: 3.2, range: 7, radius: 2, count: 1,
+    hitAt: 0.3, shape: 'plus', desc: '광폭기를 실은 십자광선이 대상과 그 상하좌우를 불사른다' },
+  // 6차 마천선
+  md_stormfrenzy: { promo: 6, cls: 'magus', req: 24, name: '광폭신장', kind: 'strike', fx: '89', dmg: 30, cd: 2.8, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '광폭의 신장이 몬스터 셋과 그 주위를 내리친다' },
+  // 7차~9차: 연's other 마도사 techniques
+  md_storm: { promo: 7, cls: 'magus', req: 27, name: '기공신장', kind: 'strike', fx: '89', dmg: 32, cd: 2.2, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '기공의 신장이 몬스터 셋과 그 주위를 친다' },
+  md_boundary: { promo: 7, cls: 'magus', req: 27, name: '질서결계', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '질서의 결계를 쳐 잠시 어떤 공격도 받지 않는다(무적)' },
+  md_yinyang: { promo: 8, cls: 'magus', req: 30, name: '오행구슬', kind: 'heal', fx: '125', heal: 30, cd: 12, shieldT: 3,
+    desc: '오행의 구슬이 체력을 회복하고 잠시 보호막을 두른다' },
+  md_resonance: { promo: 8, cls: 'magus', req: 30, name: '마도공명', kind: 'spell', fx: '98', dmg: 30, cd: 1.8, range: 8, count: 3, curse: 3,
+    desc: '마도의 공명으로 몬스터 셋에게 피해를 주고 약화시킨다' },
+  md_frenetic: { promo: 8, cls: 'magus', req: 30, name: '광폭화', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '광폭해져 잠시 공격력이 크게 오른다' },
+  md_manafill: { promo: 9, cls: 'magus', req: 33, name: '마력증폭', kind: 'buff', buff: 'haste', fx: '7', cd: 16, duration: 5,
+    desc: '마력을 증폭해 잠시 모든 기술이 빨리 돈다' },
+  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 광폭의 파장이 화면의 모든 몬스터를 덮친다' },
+  md_ult: { cls: 'magus', name: '광폭구회격', kind: 'ult', fx: '144', hpCost: 0.1,
+    desc: '체력 10%와 마력을 모두 써서, 화면의 몬스터에게 광폭의 구슬을 퍼붓는다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -636,6 +712,11 @@ export const BRANCHES = {
     { name: '점혈', note: '혈을 짚어 묶고 터뜨린다', ids: ['mk_pointblue', 'mk_pointlight', 'mk_pointburst', 'mk_buddha', 'mk_quake', 'mk_rupture', 'mk_advent', 'mk_point', 'mk_aventhit'] },
     { name: '내공', note: '기를 돌려 몸을 지킨다', ids: ['mk_switch', 'mk_endure', 'mk_spirit', 'mk_diamond', 'mk_technique', 'mk_focus', 'mk_feint', 'mk_origin'] },
   ],
+  magus: [
+    { name: '기공', note: '구슬과 광선으로 친다', ids: ['md_sphere', 'md_arrow', 'md_orbice', 'md_orblight', 'md_orbfire', 'md_cross', 'md_ray', 'md_exfrenzy', 'md_crossfrenzy', 'md_storm', 'md_stormfrenzy'] },
+    { name: '광폭', note: '광폭기로 휩쓴다', ids: ['md_spirit', 'md_frenzyexp', 'md_decay', 'md_wave', 'md_silence', 'md_bust', 'md_absorb', 'md_bloodbat', 'md_resonance', 'md_wavefrenzy'] },
+    { name: '금기', note: '결계와 기원으로 버틴다', ids: ['md_enhance', 'md_heal', 'md_amulet', 'md_recovery', 'md_boundary', 'md_yinyang', 'md_frenetic', 'md_manafill'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -657,8 +738,10 @@ const PRE = {
   l_guard: 'l_unity', l_thunder: 'l_guard', l_union: 'l_guard', l_reflect: 'l_union', l_spirit: 'l_release',
   mk_combo: 'mk_wolf', mk_kyokushin: 'mk_combo', mk_advent: 'mk_rupture', mk_point: 'mk_advent', mk_technique: 'mk_diamond',
   mk_focus: 'mk_technique', mk_feint: 'mk_focus', mk_origin: 'mk_feint',
+  md_bloodbat: 'md_silence', md_crossfrenzy: 'md_ray', md_stormfrenzy: 'md_crossfrenzy', md_storm: 'md_stormfrenzy', md_resonance: 'md_bloodbat',
+  md_boundary: 'md_recovery', md_yinyang: 'md_boundary', md_frenetic: 'md_yinyang', md_manafill: 'md_frenetic',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -717,7 +800,7 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
 // The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'] };
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {

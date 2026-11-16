@@ -80,6 +80,19 @@ JOBS = {
         'helmet_pool': [63022, 63029, 63030],
         'cape_craft': {'cr_steel_cape': 66000},
     },
+    # 마도사 (Job_11): the warrior's clips; 현복 (331xxx); 단봉 (330xxx, weapon_0001: its frames are
+    # picked in code, read here from the pictures, see wand_table), 용화제N단봉, 용화 helmets, 마선사의망토.
+    'magus': {
+        'anims': dict(Y.ANIMS),
+        'weapon': 'wand', 'weapon_file': 'weapon_0001.png',
+        'armor_pool': [(3, 331001), (5, 331005), (8, 331008), (10, 331010), (12, 331014), (99, 331013)],
+        'dragon': [330030, 330036, 330041, 330052, 330053, 330077, 330088, 330100, 330101, 330102],
+        'weapon_pool': [330001, 330002, 330003, 330004, 330005, 330006, 330007, 330008, 330009, 330011, 330012,
+                        330014, 330016, 330017, 330019, 330021, 330023, 330025, 330026, 330027, 330029],
+        'dragon_helmet': 333025,
+        'helmet_pool': [333031, 333032, 333035, 333036],
+        'cape_craft': {'cr_steel_cape': 344001},
+    },
 }
 
 
@@ -138,6 +151,8 @@ def main():
             if J['weapon'] == 'template':
                 fr, bk = (f.get(n) for n in J['weapon_files'])
                 return {'E': fr, 'B': bk} if fr and bk else {}
+            if J['weapon'] == 'wand':
+                return {'E': f.get(J['weapon_file'])}
             return {}
         if kind == 'cape':
             e = next((t for n, t in f.items() if n.endswith('_e.png') and 'cape' in n), None) \
@@ -325,6 +340,33 @@ def main():
         # Held: the shimmering spears run their six frames as the hero walks.
         return d * k + (fi % k)
 
+    wand_cache = {}
+
+    def wand_table(t):
+        """A 단봉 sheet's frames by use, read from the pictures: the sweeps are the frames far larger than
+        the rest, in three runs (down, side, up); the frame before each run is the wand held that way."""
+        if t in wand_cache:
+            return wand_cache[t]
+        idx = sorted(int(i) for (tt, i) in bytex if tt == t and i.isdigit())
+        area = {}
+        for i in idx:
+            b = pic(bytex[(t, str(i))]).getbbox()
+            area[i] = (b[2] - b[0]) * (b[3] - b[1]) if b else 0
+        small = sorted(a for a in area.values() if a)[:max(1, len(idx) // 2)]
+        med = small[len(small) // 2] if small else 1
+        runs, cur = [], []
+        for i in idx:
+            if area[i] > 2.5 * med:
+                cur.append(i)
+            elif cur:
+                runs.append(cur)
+                cur = []
+        if cur:
+            runs.append(cur)
+        runs = [r for r in runs if r[0] - 1 in area and area[r[0] - 1] <= 2.5 * med]
+        wand_cache[t] = [(r[0] - 1, r) for r in runs[:3]] if len(runs) >= 3 else None
+        return wand_cache[t]
+
     def layer_of(kind, variant, st, key, fi):
         out_l, orders = [], []
         root = st[0]['pos']
@@ -338,6 +380,22 @@ def main():
             if alt is not None:
                 out_l.append(place(WEAPON_POS, alt, alt, root))
                 orders.append(16 if kind == 'weapon' else -4)
+            return out_l, orders
+        if kind == 'weapon' and J['weapon'] == 'wand':
+            # The Weapon slot as the clip keys it (its place and order), the 단봉's own frame in it.
+            k, s = slot(st, 'Weapon')
+            tmpl = template(s)
+            tab = wand_table(tx.get('E')) if tx.get('E') else None
+            if tmpl is None or not tab:
+                return out_l, orders
+            d = {'down': 0, 'side': 1, 'up': 2}[key.rsplit('_', 1)[1]]
+            held, sweep = tab[d]
+            n = int(tmpl.m_Name.rsplit('_', 1)[1])
+            f = held if not key.startswith('atk_') or n == 0 else sweep[0] if fi == 1 else sweep[-1]
+            alt = bytex.get((tx['E'], str(f)))
+            if alt is not None:
+                out_l.append(place(s['pos'], alt, alt, root))
+                orders.append(s['order'])
             return out_l, orders
         if kind == 'cape':
             k, s = slot(st, 'Cape')
@@ -383,6 +441,17 @@ def main():
             orders.append(s['order'])
         return out_l, orders
 
+    if J['weapon'] == 'wand':
+        # A 단봉 whose sheet cannot be read (no three sweeps) gives way to the nearest readable one.
+        good = [v for v in wpool if wand_table(variants[('weapon', v)][0].get('E'))]
+        bad = {v for (k, v), val in variants.items() if k == 'weapon' and not wand_table(val[0].get('E'))}
+        for key, v in list(m['weapon'].items()):
+            if v in bad:
+                i = wpool.index(v) if v in wpool else len(wpool) - 1
+                m['weapon'][key] = min(good, key=lambda g: abs(wpool.index(g) - i))
+        for v in bad:
+            variants.pop(('weapon', v))
+        print('unreadable wands', sorted(bad))
     lv = [('back', 'base'), ('body', 'base'), ('head', 'base')] + sorted(variants)
     if J['weapon'] in ('spear', 'template'):
         lv += [('wback', v) for (k, v) in sorted(variants) if k == 'weapon']

@@ -129,6 +129,15 @@ MAP = {
         'mk_buddha': 'SFX_Fighter_4th_03_2', 'mk_combo': 'SFX_Fighter_5th_1', 'mk_technique': 'SFX_Fighter_5th_3', 'mk_advent': 'SFX_Fighter_4th_03_2',
         'mk_kyokushin': 'SFX_Fighter_6th_1', 'mk_focus': 'fx_skill_fightspirit', 'mk_feint': 'fx_skill_fightspirit', 'mk_point': 'fx_skill_deathfist',
         'mk_origin': 'fx_skill_fightspirit', 'mk_aventhit': 'SFX_Fighter_6th_1', 'mk_ult': 'SFX_Fighter_5th_1',
+        # 마도사 (Job_11): each skill's own SFX_Warlock_* clip (광폭보호부 has none: its 광폭오행구슬's).
+        'md_sphere': 'SFX_Warlock_MagicSphere', 'md_arrow': 'SFX_Warlock_MagicArrow', 'md_orbice': 'SFX_Warlock_OrbIce', 'md_orblight': 'SFX_Warlock_OrbLight',
+        'md_orbfire': 'SFX_Warlock_OrbFire', 'md_enhance': 'SFX_Warlock_MagicEnhance', 'md_heal': 'SFX_Warlock_Heal', 'md_spirit': 'SFX_Warlock_SpiritRush',
+        'md_amulet': 'SFX_Warlock_FrenzyOrbYinyang', 'md_frenzyexp': 'SFX_Warlock_FrenzyExplosion', 'md_cross': 'SFX_Warlock_CrossBeam', 'md_decay': 'SFX_Warlock_Decay',
+        'md_recovery': 'SFX_Warlock_FrenzyRecovery', 'md_wave': 'SFX_Warlock_Wave', 'md_silence': 'SFX_Warlock_SilenceFlame', 'md_bust': 'SFX_Warlock_FrenzyBust',
+        'md_ray': 'SFX_Warlock_FrenzyRay', 'md_absorb': 'SFX_Warlock_FrenzyAbsorb', 'md_exfrenzy': 'SFX_Warlock_ExFrenzy', 'md_bloodbat': 'SFX_Warlock_BloodBat',
+        'md_crossfrenzy': 'SFX_Warlock_FrenzyCrossBeam', 'md_stormfrenzy': 'SFX_Warlock_FrenzyStorm', 'md_storm': 'SFX_Warlock_Storm', 'md_boundary': 'SFX_Warlock_BoundaryBreak',
+        'md_yinyang': 'SFX_Warlock_OrbYinyang', 'md_resonance': 'SFX_Warlock_Resonance', 'md_frenetic': 'SFX_Warlock_Frenetic', 'md_manafill': 'SFX_Warlock_ManaFill',
+        'md_wavefrenzy': 'SFX_Warlock_FrenzyWave', 'md_ult': 'SFX_Warlock_FrenzyMagicSphere',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are
