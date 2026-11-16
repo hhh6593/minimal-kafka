@@ -96,6 +96,8 @@ async function boot() {
     ...(M.floor || []).map(k => `floor/${k}.png`),
     ...Object.keys(M.prop || {}).map(k => `prop/${k}.png`),
     ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
+    ...(M.hud && M.hud.font_gold ? ['hud/font_gold.png'] : []),
+    ...(M.hud && M.hud.ui ? M.hud.ui.map(k => `hud/${k}.png`) : []),
   ];
   let done = 0;
   const bar = $('#load-bar');
@@ -2572,9 +2574,32 @@ function hurtEnemy(e, dmg, push = null) {
     G.texts.push({ x: e.x + rand(-5, 5), y: e.y - e.m.h * e.scale - 10 - e.numN * 10, text: String(Math.round(dmg)), t: 0, num: true,
       crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
+  // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
+  // 주술사's heavy blow; a crit stops the world for a blink. Budgeted, not on a whole crowd.
+  const mark = G.cls.id === 'mage' ? ((crit || dmg >= e.maxHp * 0.35) && 'h_hit_fire')
+    : G.cls.id === 'poet' ? null : 'h_hit_tiger';
+  if (mark && M.fx[mark] && G.t - (e.markT || -9) > 0.3 && fxBudget('hit', 10)) {
+    e.markT = G.t;
+    fxOn(mark, e, { scale: mark === 'h_hit_fire' ? 0.38 : crit ? 0.6 : 0.45 });
+  }
+  if (crit && !G.stage.raid && G.t - (G.hitstopAt || -9) > 0.4) {
+    G.hitstop = 0.03;
+    G.hitstopAt = G.t;
+    G.shake = Math.max(G.shake, 0.08);
+  }
   if (e.hp <= 0) killEnemy(e);
   else audio.play('hit');
   return dmg;
+}
+
+/** At most n of a kind of small flourish alive at once (each lives about 0.6 s). */
+function fxBudget(kind, n) {
+  const b = (G.fxBudget = G.fxBudget || {});
+  const live = (b[kind] || []).filter(t => t > G.t);
+  if (live.length >= n) { b[kind] = live; return false; }
+  live.push(G.t + 0.6);
+  b[kind] = live;
+  return true;
 }
 
 /** The very rare special of this ground or raid: a little likelier from the strong ones. */
@@ -2635,7 +2660,17 @@ function killEnemy(e) {
   if (e.kind === 'boss') st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
   G.enemies.splice(at, 1);
   occ.delete(key(e.tx, e.ty));
-  G.dying.push({ e, t: 0 });
+  // The body is thrown a little away from the hero as it falls.
+  const kp = G.player, kl = Math.hypot(e.x - kp.x, e.y - kp.y) || 1;
+  const dy = { e, t: 0, kx: (e.x - kp.x) / kl, ky: (e.y - kp.y) / kl };
+  // 연's kill burst on the fallen, a few at a time.
+  if (M.fx.h_kill && fxBudget('kill', 6)) {
+    dy.popped = true;
+    fxOn('h_kill', e, { scale: e.kind ? 0.8 : 0.55 });
+  }
+  G.dying.push(dy);
+  // 몰이: a kill stirs the shy ones nearby, so the pack gathers on the hero.
+  for (const o of G.enemies) if (!o.provoked && Math.abs(o.tx - e.tx) + Math.abs(o.ty - e.ty) <= 3) o.provoked = true;
   audio.play('kill');
   const p = G.player;
   // A kill gives a little mana, but not the kills of a 필살기 itself (a screen of them refilled it
@@ -4757,6 +4792,7 @@ function updatePickups(dt) {
       else if (d.kind === 'coin') {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         G.gold += n;
+        if (G.texts.length < 70) G.texts.push({ x: p.x + rand(-6, 6), y: p.y - 40, text: String(n), t: 0, gold: true });
         note(`${n}전을 주웠습니다.`);
         lootFeed(`${n}전 획득`);
         audio.play('pickup');
@@ -5509,8 +5545,12 @@ function digitSheet(color) {
   }
   return c;
 }
-function drawDigits(text, x, y, color, k) {
-  const f = M.hud.font_damage, sheet = digitSheet(color);
+function goldFont() {
+  const im = images['hud/font_gold.png'];
+  return M.hud && M.hud.font_gold && im && im.width ? im : null;
+}
+function drawDigits(text, x, y, color, k, font = 'font_damage') {
+  const f = M.hud[font], sheet = font === 'font_gold' ? goldFont() : digitSheet(color);
   const glyphs = [...text].map(ch => f.glyphs[ch]).filter(Boolean);
   const w = glyphs.reduce((a, g) => a + g[4], 0) * k;
   let cx = x - w / 2;
@@ -5773,8 +5813,10 @@ function render(now) {
   const p = G.player;
   let camX = Math.round(p.x - VW / 2), camY = Math.round(p.y - 30 - VH / 2);
   if (G.shake > 0) {
-    camX += Math.round(rand(-2, 2));
-    camY += Math.round(rand(-2, 2));
+    // Harder blows shake harder.
+    const a = Math.min(5, 1 + G.shake * 12);
+    camX += Math.round(rand(-a, a));
+    camY += Math.round(rand(-a, a));
   }
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
   ctx.fillStyle = G.ground;
@@ -5849,11 +5891,14 @@ function render(now) {
     }
   }
   for (const d of G.dying) {
+    // Thrown back over the first quarter second.
+    const kb = 14 * Math.min(1, d.t / 0.25) * (2 - Math.min(1, d.t / 0.25));
+    const ox = (d.kx || 0) * kb, oy = (d.ky || 0) * kb * 0.6 - Math.sin(Math.min(1, d.t / 0.25) * Math.PI) * 4;
     // 연's own death, where the monster has one: its dead row, then a fade.
     const yd = !d.e.beast && yunit(d.e.m), dead = yd && yd.u.anims.dead;
     if (dead) {
       const f = Math.min(dead.n - 1, Math.floor(d.t * 1000 / dead.ms));
-      drawYunit(yd, d.e, d.e.x, d.e.y, d.e.scale, Math.max(0, 1 - Math.max(0, d.t - 0.7) / 0.5), dead.row, f, (d.e.mdx || 0) > 0);
+      drawYunit(yd, d.e, d.e.x + ox, d.e.y + oy, d.e.scale, Math.max(0, 1 - Math.max(0, d.t - 0.7) / 0.5), dead.row, f, (d.e.mdx || 0) > 0);
       continue;
     }
     // The body falls on its side, darkens and fades, as slain monsters did.
@@ -5861,9 +5906,9 @@ function render(now) {
     const w = im.width * e.scale, h = im.height * e.scale;
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - Math.max(0, d.t - 0.6) / 0.6);
-    ctx.translate(Math.round(e.x), Math.round(e.y));
+    ctx.translate(Math.round(e.x + ox), Math.round(e.y + oy));
     ctx.rotate((Math.PI / 2) * k * e.face);
-    if (d.t > 0.12 && d.t < 0.9) {
+    if (!d.popped && d.t > 0.12 && d.t < 0.9) {
       // 연 marks the fallen: a small red DEAD over the body.
       ctx.save();
       ctx.rotate(-(Math.PI / 2) * k * e.face);
@@ -5908,11 +5953,14 @@ function render(now) {
       ctx.fillRect(x + w - 1, y, 1, 12);
       ctx.fillStyle = '#fff';
       ctx.fillText(t.text, Math.round(t.x), y + 9);
+    } else if (t.gold && goldFont()) {
+      drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, 0.32, 'font_gold');
     } else if (t.num && dmgFont()) {
       // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
       // to a third larger and settle in a tenth of a second, a crit bigger still.
-      const base = t.crit ? 0.8 : t.color === '#ffb43a' ? 0.66 : 0.56;
-      drawDigits(t.text, Math.round(t.x), Math.round(t.y), t.color, base * (t.t < 0.1 ? 1.3 - t.t * 3 : 1));
+      const base = t.crit ? 1.0 : t.color === '#ffb43a' ? 0.66 : 0.56;
+      const pop = t.crit ? (t.t < 0.12 ? 1.6 - t.t * 5 : 1) : (t.t < 0.1 ? 1.3 - t.t * 3 : 1);
+      drawDigits(t.text, Math.round(t.x), Math.round(t.y), t.color, base * pop);
     } else if (t.num) {
       // A number pops in and settles; a crit larger.
       const base = t.crit ? 1.45 : t.color === '#ffb43a' ? 1.1 : 0.9;
@@ -5977,11 +6025,21 @@ function render(now) {
     ctx.translate(canvas.width - 70 * (canvas.width / 860), 64 * (canvas.width / 860));
     ctx.scale(sc, sc);
     ctx.textAlign = 'center';
-    ctx.font = 'bold 18px G11';
     ctx.globalAlpha = Math.min(1, (3 - (G.t - c.t)) * 2);
-    outline(`${c.n}`, 0, 0, c.n >= 100 ? '#ff7a3a' : '#ffe070');
-    ctx.font = '10px G9';
-    outline('연속 처치', 0, 13, '#f0e0c0');
+    const base = images['hud/ui_Img_KillCombo_Base.png'], kill = images['hud/ui_Img_Kill.png'];
+    if (base && base.width && kill && kill.width && goldFont()) {
+      // 연's kill streak: an ink brush stroke, its 殺 mark, the count in its gold digits.
+      ctx.drawImage(tinted(base, 'brightness(0.12)'), -78, -24, 128, 29);
+      ctx.drawImage(c.n >= 100 ? tinted(kill, 'sepia(1) saturate(6) hue-rotate(-30deg)') : kill, -78, -28, 30, 30);
+      drawDigits(String(c.n), 6, 3, null, 0.72, 'font_gold');
+      ctx.font = '10px G9';
+      outline('연속 처치', -6, 15, '#f0e0c0');
+    } else {
+      ctx.font = 'bold 18px G11';
+      outline(`${c.n}`, 0, 0, c.n >= 100 ? '#ff7a3a' : '#ffe070');
+      ctx.font = '10px G9';
+      outline('연속 처치', 0, 13, '#f0e0c0');
+    }
     ctx.restore();
   }
   drawSkillBar();
