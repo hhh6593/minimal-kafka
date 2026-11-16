@@ -182,7 +182,7 @@ export const CRAFTS = [
   // walking figure wears the nearest old look. A piece with `from` is made out of another at
   // ★5, which goes into the making (구곡검 → 마곡검, 진일신검 → 극'진일신검, 파천갑 → 멸아갑).
   { id: 'cr_maryeong_armor', kind: 'armor', name: { warrior: '고대마령갑주', rogue: '고대마령갑주', mage: '고대마령의복', poet: '고대마령의복', archer: '고대마령갑주', lancer: '고대마령갑주', monk: '고대마령갑주', magus: '고대마령의복', celestial: '고대마령의복', dokkaebi: '고대마령갑주', reaper: '고대마령갑주' },
-    look: { warrior: '황혼의갑주', rogue: '흑영협객도복', mage: '남자제사장의상', poet: '도포', archer: '감시자궁포', lancer: '감시자남자경갑', monk: '감시자남자대련복', magus: '상급마도현복', celestial: '감시자천의', dokkaebi: '감시자귀의', reaper: '철고급흑의' }, pow: 10, opt: 'regen', mats: { soul: 12, scroll: 1 }, gold: 5000,
+    look: { warrior: '황혼의갑주', rogue: '흑영협객도복', mage: '남자제사장의상', poet: '도포', archer: '파수꾼궁포', lancer: '감시자남자경갑', monk: '혈귀혼남자대련복', magus: '금고급현복', celestial: '파수꾼천의', dokkaebi: '혈귀혼귀의', reaper: '해태 흑의' }, pow: 10, opt: 'regen', mats: { soul: 12, scroll: 1 }, gold: 5000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_maryeong_shield', kind: 'shield', name: '고대마령의방패', look: '주술방패', pow: 10, opt: 'guard',
     mats: { soul: 10, scroll: 1 }, gold: 5000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
@@ -190,7 +190,7 @@ export const CRAFTS = [
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 11, opt: 'power', mats: { gold: 12, scroll: 1 }, gold: 6000,
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_gold_armor', kind: 'armor', name: { warrior: '금린천화갑', rogue: '금린천화갑', mage: '금린천추갑', poet: '금린천추갑', archer: '금린천화갑', lancer: '금린천화갑', monk: '금린천화갑', magus: '금린천추갑', celestial: '금린천추갑', dokkaebi: '금린천화갑', reaper: '금린천화갑' },
-    look: { warrior: '곤룡포', rogue: '곤룡포', mage: '남자신관복', poet: '남자신관복', archer: '은궁포', lancer: '은남자경갑', monk: '은남자대련복', magus: '은현복', celestial: '은천의', dokkaebi: '은귀의', reaper: '은흑의' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
+    look: { warrior: '곤룡포', rogue: '곤룡포', mage: '남자신관복', poet: '남자신관복', archer: '혈귀혼궁포', lancer: '지박귀남자경갑', monk: '지박귀남자대련복', magus: '은현복', celestial: '금고급천의', dokkaebi: '지박귀귀의', reaper: '사저의복' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_shield', kind: 'shield', name: '금린방패', look: '여신의방패', pow: 11, opt: 'guard',
     mats: { gold: 10, scroll: 1 }, gold: 6000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
@@ -198,7 +198,7 @@ export const CRAFTS = [
     look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 12, opt: 'haste', mats: { steel: 14, scroll: 1 }, gold: 8000,
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_steel_armor', kind: 'armor', name: { warrior: '태염무신장갑', rogue: '태염무신장갑', mage: '태광천신의복', poet: '태광천신의복', archer: '태염무신장갑', lancer: '태염무신장갑', monk: '태염무신장갑', magus: '태광천신의복', celestial: '태광천신의복', dokkaebi: '태염무신장갑', reaper: '태염무신장갑' },
-    look: { warrior: '궁중무사갑주', rogue: '궁중무사갑주', mage: '여자성광법의', poet: '남자성광법의', archer: '숲의권속궁포', lancer: '숲의권속남자경갑', monk: '숲의권속남자대련복', magus: '중급마도현복', celestial: '숲의권속천의', dokkaebi: '숲의권속귀의', reaper: '숲의권속흑의' }, pow: 12, opt: 'mana', mats: { steel: 14, scroll: 1 }, gold: 8000,
+    look: { warrior: '궁중무사갑주', rogue: '궁중무사갑주', mage: '여자성광법의', poet: '남자성광법의', archer: '숲의군주궁포', lancer: '금고급남자경갑', monk: '숲의군주남자대련복', magus: '상급마도현복', celestial: '숲의군주천의', dokkaebi: '숲의군주귀의', reaper: '지박귀흑의' }, pow: 12, opt: 'mana', mats: { steel: 14, scroll: 1 }, gold: 8000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_steel_shield', kind: 'shield', name: '무신귀면방', look: '거울방패', pow: 12, opt: 'boss',
     mats: { steel: 12, scroll: 1 }, gold: 8000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
@@ -236,7 +236,7 @@ export const CRAFTS = [
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
     mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
   { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑', pic: 'name', picTop: "진'현무불괴갑",
-    look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주', lancer: '감시자남자경갑', monk: '감시자남자대련복', magus: '상급마도현복', celestial: '감시자천의', dokkaebi: '감시자귀의', reaper: '철고급흑의' }, pow: 14, opt: 'life',
+    look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주', lancer: '감시자남자경갑', monk: '혈귀혼남자대련복', magus: '금고급현복', celestial: '파수꾼천의', dokkaebi: '혈귀혼귀의', reaper: '해태 흑의' }, pow: 14, opt: 'life',
     mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
 for (const c of CRAFTS) {

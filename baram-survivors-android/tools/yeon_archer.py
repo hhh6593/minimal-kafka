@@ -11,13 +11,15 @@ its item icons go to YITEMICON_DIR/archer/ and YITEMICON_DIR/index.json.
 
 How 연 draws a 궁사: the same Avatar_0001 rig and clips as every class, except the attack, which
 is its own bow-draw clip (Avatar_0001_A_Atk_<dir>): a body of its own (Avatar_A_0001), the
-armour's "_A" sheet (each 연 armour folder carries one: avatar_0001_a / item_803338_a), the
-bow in the Weapon slot (Archer_Guide_Weapon_<n> -> the bow's Item_bow_E_<n>; frame 10 is the
-arrow on the string, in Weapon_back) and the quiver in the Sheild slot (Quiver_0001_<n>). Out
-of the attack the bow is held as any weapon (Item_0001_E_<n> -> Item_bow_E_<n>) and the quiver
-rides on the back like a cape (its 56 cape_E frames, by the body frame - 21, in the Cape slot's
-place and order). Item sheets are found by the item's folder in the bundle's container
-(assets/patchresources/items/item_<id>/...), since their textures share names.
+armour's "_A" sheet (each 연 armour folder carries one: avatar_0001_a / item_803338_a) and the
+quiver in the Sheild slot (Quiver_0001_<n>); out of the attack the quiver rides on the back like
+a cape (its 56 cape_E frames, by the body frame - 21, in the Cape slot's place and order).
+The bow is laid by its own prefab and clips (tools/yeon_itemclip.py): held in the hand at the
+Sprite's origin (not at the avatar's Weapon slot, where a sword's hilt goes: laid there, a bow
+floats beside an empty fist), drawn with the arrow on the string (Item_bow_E_10/11, Weapon_back,
+the "wback" layer). The hair is 연's high ponytail (HAIR_TEX). Item sheets are found by the
+item's folder in the bundle's container (assets/patchresources/items/item_<id>/...), since their
+textures share names.
 
 Variants: armour a<id>, bow <id>, quiver q<folder>, helmet and cape <id>; our tiers map to them
 by name (연's own 궁포 and bows by the same name), else by the piece's power.
@@ -34,12 +36,13 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import yeon_avatar as Y  # noqa: E402
 import yeon_gear as YG  # noqa: E402
+import yeon_itemclip as YI  # noqa: E402
 
 CLS = 'archer'
 ANIMS = dict(Y.ANIMS, atk_down='Avatar_0001_A_Atk_Down', atk_up='Avatar_0001_A_Atk_Up', atk_side='Avatar_0001_A_Atk_Side')
 LAYERS = {
     'back': ['Hair_b'], 'body': ['Sprite'], 'armor': ['Skin'], 'head': ['Head', 'Hair'],
-    'helmet': ['Hat', 'Hat_color'], 'shield': ['Sheild'], 'weapon': ['Weapon', 'Weapon_color', 'Weapon_back'],
+    'helmet': ['Hat', 'Hat_color'], 'shield': ['Sheild'], 'weapon': ['Weapon'], 'wback': ['Weapon_back'],
     'cape': ['Cape'],
 }
 # 연's 궁포 by power (for the pieces without a 궁포 of their name), weakest first.
@@ -51,20 +54,26 @@ HELMET_TIERS = {0: 2001, 1: 2005, 2: 2006, 3: 2007, 4: 2008, 5: 2014, 6: 223014}
 HELMET_POOL = [223003, 223005, 223013, 223011]
 CAPE_TIERS = {0: 85002, 1: 4055, 2: 504001, 3: 504007, 4: 504021, 5: 803626}
 CAPE_CRAFT = {'cr_gold_cape': 504021, 'cr_steel_cape': 234000}
-HAIR_TEX = -7544038107747158637
+HAIR_TEX = 550552418588347666  # 연's high ponytail
 CAPE_OFFSET = 21
 
 
 def main():
     units, items, cat_path, gear_path, out, icon_out = sys.argv[1:7]
     htex = int(sys.argv[7]) if len(sys.argv) > 7 else HAIR_TEX
-    remap = {'0': '2', '2': '0'}
+    # 연's hair sheets (Hair_0000_<n>, one texture a style) hold the front hair down, side, up
+    # (0-2), the hair behind the head down and side (3-4: a braid, a tail; empty for short
+    # styles), then the same again for other poses; the avatar's stand-ins count the front hair
+    # up, side, down (and 3, the spear's thrust upward) and the hair behind side, down.
+    remap = {'0': '2', '2': '0', '3': '2'}
+    remap_b = {'1': '3', '0': '4'}
     catalog = json.load(open(cat_path))
     g = json.load(open(gear_path))[CLS]
     names_of = {c['id']: c['name'] for c in catalog if c['id'] and c['name']}
     env = UnityPy.load(units, items)
     parts, clips = Y.build(env)
     crc = {v['name']: k for k, v in parts.items()}
+    IC = YI.ItemClips(env)
 
     # Item folders: item id -> {file: texture path id}.
     folders = {}
@@ -79,7 +88,10 @@ def main():
         if kind == 'armor':
             return f.get('avatar_0001.png'), next((t for n, t in f.items() if n.endswith('_a.png') and '_a_b' not in n), None)
         if kind == 'weapon':
-            return f.get('item_bow_e.png'), None
+            # Laid by the bow's own clips: worn when they show it held and drawn.
+            if f.get('item_bow_e.png') and all(IC.at(iid, ANIMS[k], 0) for k in ('idle_down', 'atk_down', 'atk_side')):
+                return f.get('item_bow_e.png'), None
+            return None, None
         if kind == 'shield':
             return f.get('item_quiver_ex_e.png'), None
         if kind == 'cape':
@@ -256,11 +268,21 @@ def main():
         except Exception:
             return None
 
-    def layer_of(kind, variant, st):
+    def layer_of(kind, variant, st, key, t):
         out_l, orders = [], []
         root = st[0]['pos']
         bk, bi = body_frame(st)
         e_tex, a_tex = (variants[(kind, variant)][:2]) if (kind, variant) in variants else (None, None)
+        if kind in ('weapon', 'wback'):
+            # The bow's own parts at this moment of the avatar's clip: the bow (Weapon) in the
+            # weapon layer, the arrow on the string (Weapon_back) in wback.
+            if (kind, variant) not in variants:
+                return out_l, orders
+            for name, sp, pos, order in IC.at(variants[(kind, variant)][2], ANIMS[key], t):
+                if (name in YI.MAIN_PARTS) == (kind == 'weapon'):
+                    out_l.append(place({'pos': pos}, sp, sp, root))
+                    orders.append(order)
+            return out_l, orders
         if kind == 'shield':
             k, s = slot(st, 'Sheild')
             t = template(s)
@@ -302,35 +324,42 @@ def main():
             if kind == 'body':
                 alt = None
             elif kind in ('back', 'head') and name in ('Hair_b', 'Hair'):
-                alt = bytex.get((htex, 'Hair_' + remap.get(idx, idx))) if name == 'Hair' else bytex.get((htex, 'Hair_b_' + idx))
+                alt = bytex.get((htex, 'Hair_' + remap.get(idx, idx))) if name == 'Hair' else bytex.get((htex, 'Hair_' + remap_b.get(idx, '-')))
                 if alt is None:
                     continue
             elif kind == 'armor':
                 alt = bytex.get(((a_tex if '_A_' in n else e_tex), idx))
                 if alt is None:
                     continue
-            elif kind in ('helmet', 'weapon'):
+            elif kind == 'helmet':
                 alt = bytex.get((e_tex, idx))
                 if alt is None:
                     continue
-            # A bow keeps its own pivot (its grip): the sword template it stands in for has the
-            # same 64-pixel rect but a pivot at the blade's hilt, which would throw the bow off.
-            geo = alt if kind == 'weapon' and alt is not None else tmpl
-            out_l.append(place(s, geo, alt, root if k != 0 else None))
+            out_l.append(place(s, tmpl, alt, root if k != 0 else None))
             orders.append(s['order'])
         return out_l, orders
 
     lv = [('back', 'base'), ('body', 'base'), ('head', 'base')] + sorted(variants)
+    lv += [('wback', v) for (k, v) in sorted(variants) if k == 'weapon']
+    for (k, v), val in list(variants.items()):
+        if k == 'weapon':
+            variants[('wback', v)] = val
     drawn, z = {}, {}
     for key, (fr, ms) in anim_frames.items():
         z[key] = []
         for fi, (t, st) in enumerate(fr):
-            orders = {}
+            orders, votes = {}, {}
             for kind, variant in lv:
-                pics, os_ = layer_of(kind, variant, st)
+                pics, os_ = layer_of(kind, variant, st, key, t)
                 drawn[(kind, variant, key, fi)] = pics
                 if os_:
                     orders[kind] = min(os_ + [orders.get(kind, 1e9)])
+                    votes.setdefault(kind, []).append(min(os_))
+            # One order per frame for every bow: their clips mostly agree; where one differs (a
+            # bow drawn behind the body), the most of them decide.
+            for kind in ('weapon', 'wback'):
+                if kind in votes:
+                    orders[kind] = max(set(votes[kind]), key=lambda o: (votes[kind].count(o), -o))
             # A kind no variant draws in this frame still gets its place from its slot.
             for kind in ('shield', 'cape', 'weapon', 'helmet', 'armor'):
                 if kind not in orders:
@@ -370,7 +399,8 @@ def main():
     # The class card's picture: the front idle frame in the first armour and bow.
     row = rows.index('idle_down')
     portrait = Image.new('RGBA', (cw, ch))
-    want = {'back': 'base', 'body': 'base', 'head': 'base', 'armor': m['armor']['t0'], 'weapon': m['weapon']['t0']}
+    want = {'back': 'base', 'body': 'base', 'head': 'base', 'armor': m['armor']['t0'], 'weapon': m['weapon']['t0'],
+            'wback': m['weapon']['t0']}
     for kind in z['idle_down'][0]:
         v = want.get(kind)
         if v and v in layers.get(kind, {}):

@@ -164,6 +164,37 @@ def frames(clip, parts):
     return out, stop
 
 
+def state_at(clip, parts, t):
+    """{crc: {'sprite', 'pos', 'order', 'active'}} of the clip at time t (held past its end), as
+    frames() reads each key time; for an item's clip played beside the avatar's."""
+    cb = clip.m_ClipBindingConstant
+    mapping = cb.pptrCurveMapping
+    curve = 0
+    plan = []
+    for b in cb.genericBindings:
+        n = TRANSFORM_CURVES.get(b.attribute, 1) if (b.typeID == 4 and not b.isPPtrCurve) else 1
+        plan.append((b, list(range(curve, curve + n))))
+        curve += n
+    keys = streamed_keys(clip, curve)
+    st = {k: {'sprite': None, 'pos': list(v['pos']), 'order': v['order'], 'active': v['active']} for k, v in parts.items()}
+    for b, cs in plan:
+        s = st.get(b.path)
+        if s is None or any(c not in keys for c in cs):
+            continue
+        vals = [value_at(keys[c], t) for c in cs]
+        if b.isPPtrCurve:
+            if b.typeID == 212:
+                i = int(round(vals[0]))
+                s['sprite'] = mapping[i] if 0 <= i < len(mapping) else None
+        elif b.typeID == 4 and b.attribute == 1:
+            s['pos'] = [vals[0], vals[1]]
+        elif b.typeID == 1:
+            s['active'] = vals[0] > 0.5
+        elif b.typeID == 114:
+            s['order'] = vals[0]
+    return st
+
+
 def render(state, swap, cache):
     """Image layers of one frame: [(img, x, y)] with (x, y) where the image's top-left goes,
     in pixels with y down, origin at the avatar's feet."""

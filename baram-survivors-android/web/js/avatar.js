@@ -25,37 +25,37 @@ export const GEAR = {
     shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
   // 궁사: 바람의나라 연's own 궁포 and bows (worn as 연 draws them, tools/yeon_archer.py). The shield
   // 궁사 carries a quiver on its back in 연 (drawn with the bow), not a shield: it has no shield slot.
-  archer: { head: '56', armor: ['초록색궁포', '파란색궁포', '구리궁포', '숲의권속궁포', '은궁포', '감시자궁포'],
+  archer: { head: '56', armor: ['초록색궁포', '가죽고급궁포', '청동고급궁포', '숲의군주궁포', '혈귀혼궁포', '파수꾼궁포'],
     weapon: ['목궁', '청동궁', '철태궁', '녹각궁', '대명궁', '진아광궁', '파천비궁'],
     shield: [] },
   // 무사: 연's own 경갑 and spears (tools/yeon_job.py). 연 gives the 무사 no shield beside its
   // spear: it has no shield slot (its armour carries the defence a shield would).
-  lancer: { head: '17', armor: ['초록색남자경갑', '파란색남자경갑', '구리남자경갑', '숲의권속남자경갑', '은남자경갑', '감시자남자경갑'],
+  lancer: { head: '17', armor: ['파란색남자경갑', '철고급남자경갑', '은남자경갑', '금고급남자경갑', '지박귀남자경갑', '감시자남자경갑'],
     weapon: ['나무창', '청동창', '철창', '은장철창', '흑영창', '진아광창', '파천비창'],
     shield: [] },
   // 격투가: 연's own 대련복 and 권갑 (tools/yeon_job.py), drawn on its own F_ body. 연 gives the
   // 격투가 no shield either: it has no shield slot (its armour carries the defence a shield would).
-  monk: { head: '17', armor: ['초록색남자대련복', '파란색남자대련복', '구리남자대련복', '숲의권속남자대련복', '은남자대련복', '감시자남자대련복'],
+  monk: { head: '17', armor: ['가죽남자대련복', '구리남자대련복', '청동남자대련복', '숲의군주남자대련복', '지박귀남자대련복', '혈귀혼남자대련복'],
     weapon: ['가람권갑', '너울권갑', '라온조갑', '새나권갑', '비조권갑', '경원권갑', '파천권갑'],
     shield: [] },
   // 마도사: 연's own 현복 and 단봉 (tools/yeon_job.py). 연 gives the 마도사 no shield: the slot keeps
   // the old shields' names and stats and is not drawn.
-  magus: { head: '20', armor: ['초록색현복', '파란색현복', '초급마도현복', '중급마도현복', '은현복', '상급마도현복'],
+  magus: { head: '20', armor: ['초급마도현복', '하급마도현복', '중급마도현복', '상급마도현복', '은현복', '금고급현복'],
     weapon: ['하급떡갈나무단봉', '청동단봉', '강철단봉', '은단봉', '혼령단봉', '진아광단봉', '파천비단봉'],
     shield: [] },
   // 천인: 연's own 천의 and 호리병·포 (tools/yeon_job.py), held behind it and thrown in its own frames.
   // 연 gives the 천인 no shield: it has no shield slot (its armour carries the defence a shield would).
-  celestial: { head: '19', armor: ['초록색천의', '파란색천의', '구리천의', '숲의권속천의', '은천의', '감시자천의'],
+  celestial: { head: '19', armor: ['보라색천의', '보라색고급천의', '은천의', '숲의군주천의', '금고급천의', '파수꾼천의'],
     weapon: ['나무호리병', '청동호리병', '강철호리병', '금호리병', '호표호리병', '아광포', '파천비포'],
     shield: [] },
   // 도깨비: 연's own 귀의 and 방망이·퇴 (tools/yeon_job.py), laid by the item's own prefab. 연 gives the
   // 도깨비 no shield: it has no shield slot (its armour carries the defence a shield would).
-  dokkaebi: { head: '17', armor: ['초록색귀의', '파란색귀의', '구리귀의', '숲의권속귀의', '은귀의', '감시자귀의'],
+  dokkaebi: { head: '17', armor: ['구리귀의', '구리고급귀의', '청동고급귀의', '숲의군주귀의', '지박귀귀의', '혈귀혼귀의'],
     weapon: ['나무방망이', '청동방망이', '강철방망이', '금방망이', '흑단방망이', '아광퇴', '파천퇴'],
     shield: [] },
   // 차사: 연's own 흑의 and 백도·명도 (tools/yeon_job.py). 연 gives the 차사 no shield: the slot keeps
   // the old shields' names and stats and is not drawn.
-  reaper: { head: '56', armor: ['초록색흑의', '파란색흑의', '구리흑의', '숲의권속흑의', '은흑의', '철고급흑의'],
+  reaper: { head: '56', armor: ['감시자흑의', '파수꾼흑의', '혈귀혼흑의', '지박귀흑의', '사저의복', '해태 흑의'],
     weapon: ['나무백도', '청동백도', '강철백도', '금백도', '흑해백도', '진아광백도', '파천비명도'],
     shield: [] },
 };
