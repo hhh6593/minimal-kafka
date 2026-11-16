@@ -40,6 +40,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
 cp -r "$HERE/web" "$OUT/assets/www"
 python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN $SKILLFX $MODERN $GEAR
+python3 -I "$HERE/tools/webp_fx.py" "$OUT/assets/www/assets"
 cp -r "$HERE/res" "$OUT/res"
 
 # Each build gets a higher version code (minutes since 2026-01-01) so Android installs it as an

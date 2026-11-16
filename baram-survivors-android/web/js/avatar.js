@@ -24,40 +24,40 @@ export const GEAR = {
     weapon: ['흑단부채', '대붓', '백운장', '하늘개비', '자월초롱'],
     shield: ['신선비급', '호리병', '연등', '여신의방패', '백룡현갑'] },
   // 궁사: 바람의나라 연's own 궁포 and bows (worn as 연 draws them, tools/yeon_archer.py). The shield
-  // slot holds what a 궁사 carries on its back in 연, the quiver; it keeps the old shields' names.
+  // 궁사 carries a quiver on its back in 연 (drawn with the bow), not a shield: it has no shield slot.
   archer: { head: '56', armor: ['초록색궁포', '파란색궁포', '구리궁포', '숲의권속궁포', '은궁포', '감시자궁포'],
     weapon: ['목궁', '청동궁', '철태궁', '녹각궁', '대명궁', '진아광궁', '파천비궁'],
-    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+    shield: [] },
   // 무사: 연's own 경갑 and spears (tools/yeon_job.py). 연 gives the 무사 no shield beside its
-  // spear: the slot keeps the old shields' names and stats and is not drawn.
+  // spear: it has no shield slot (its armour carries the defence a shield would).
   lancer: { head: '17', armor: ['초록색남자경갑', '파란색남자경갑', '구리남자경갑', '숲의권속남자경갑', '은남자경갑', '감시자남자경갑'],
     weapon: ['나무창', '청동창', '철창', '은장철창', '흑영창', '진아광창', '파천비창'],
-    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+    shield: [] },
   // 격투가: 연's own 대련복 and 권갑 (tools/yeon_job.py), drawn on its own F_ body. 연 gives the
-  // 격투가 no shield either: the slot keeps the old shields' names and stats and is not drawn.
+  // 격투가 no shield either: it has no shield slot (its armour carries the defence a shield would).
   monk: { head: '17', armor: ['초록색남자대련복', '파란색남자대련복', '구리남자대련복', '숲의권속남자대련복', '은남자대련복', '감시자남자대련복'],
     weapon: ['가람권갑', '너울권갑', '라온조갑', '새나권갑', '비조권갑', '경원권갑', '파천권갑'],
-    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+    shield: [] },
   // 마도사: 연's own 현복 and 단봉 (tools/yeon_job.py). 연 gives the 마도사 no shield: the slot keeps
   // the old shields' names and stats and is not drawn.
   magus: { head: '20', armor: ['초록색현복', '파란색현복', '초급마도현복', '중급마도현복', '은현복', '상급마도현복'],
     weapon: ['하급떡갈나무단봉', '청동단봉', '강철단봉', '은단봉', '혼령단봉', '진아광단봉', '파천비단봉'],
-    shield: ['주술방패', '거울방패', '정화의방패'] },
+    shield: [] },
   // 천인: 연's own 천의 and 호리병·포 (tools/yeon_job.py), held behind it and thrown in its own frames.
-  // 연 gives the 천인 no shield: the slot keeps the old shields' names and stats and is not drawn.
+  // 연 gives the 천인 no shield: it has no shield slot (its armour carries the defence a shield would).
   celestial: { head: '19', armor: ['초록색천의', '파란색천의', '구리천의', '숲의권속천의', '은천의', '감시자천의'],
     weapon: ['나무호리병', '청동호리병', '강철호리병', '금호리병', '호표호리병', '아광포', '파천비포'],
-    shield: ['신선비급', '호리병', '연등', '여신의방패'] },
+    shield: [] },
   // 도깨비: 연's own 귀의 and 방망이·퇴 (tools/yeon_job.py), laid by the item's own prefab. 연 gives the
-  // 도깨비 no shield: the slot keeps the old shields' names and stats and is not drawn.
+  // 도깨비 no shield: it has no shield slot (its armour carries the defence a shield would).
   dokkaebi: { head: '17', armor: ['초록색귀의', '파란색귀의', '구리귀의', '숲의권속귀의', '은귀의', '감시자귀의'],
     weapon: ['나무방망이', '청동방망이', '강철방망이', '금방망이', '흑단방망이', '아광퇴', '파천퇴'],
-    shield: ['나무방패', '사각방패', '철방패', '천성대방패'] },
+    shield: [] },
   // 차사: 연's own 흑의 and 백도·명도 (tools/yeon_job.py). 연 gives the 차사 no shield: the slot keeps
   // the old shields' names and stats and is not drawn.
   reaper: { head: '56', armor: ['초록색흑의', '파란색흑의', '구리흑의', '숲의권속흑의', '은흑의', '철고급흑의'],
     weapon: ['나무백도', '청동백도', '강철백도', '금백도', '흑해백도', '진아광백도', '파천비명도'],
-    shield: ['보라방패', '월광방패', '일광방패'] },
+    shield: [] },
 };
 // 투구 and 망토: 바람의나라 연's own lines, weakest first (their worn sheets and icons come from
 // 연's resources, tools/yeon_gear.py). Helmets end in the class's 제사 dragon helmet; the capes
@@ -111,10 +111,15 @@ export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검'
 export const CRAFT_POWER = 10;
 for (const [cls, name] of Object.entries(CRAFT_GEAR)) if (!GEAR[cls].weapon.includes(name)) GEAR[cls].weapon.push(name);
 
-/** A raid's three pieces for a class: [kind, name]. */
+/** Whether a class carries a shield: 연's 궁사, 무사, 격투가, 마도사, 천인, 도깨비 and 차사 do not. */
+// (Read from the lines as written, before raids and crafts add pieces to them.)
+const SHIELDED = Object.fromEntries(Object.keys(GEAR).map(c => [c, GEAR[c].shield.length > 0]));
+export const hasShield = cls => !!SHIELDED[cls];
+
+/** A raid's pieces for a class: [kind, name] (its shield only for a class that carries one). */
 export function raidSet(id, cls) {
   const r = RAID_GEAR[id];
-  return [['weapon', r.weapon[cls]], ['armor', r.armor], ['shield', r.shield]];
+  return [['weapon', r.weapon[cls]], ['armor', r.armor], ['shield', r.shield]].filter(([k]) => k !== 'shield' || SHIELDED[cls]);
 }
 
 // Every raid piece has a place in each class's line, after the hunting grounds' own.

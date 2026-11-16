@@ -154,6 +154,7 @@ function injectUi() {
   #war-board .wb-card b { display: block; font-size: 14px; color: #ffd27a; }
   #war-board .wb-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 8px 0 4px; }
   #war-board .wb-role { min-width: 110px; }
+  #war-board .wb-actions { position: sticky; bottom: -10px; margin: 6px -12px -10px; padding: 6px 0 8px; background: rgba(8,6,4,0.96); border-top: 1px solid #5a4630; } /* 출전 always on screen */
   #war-board .wb-role.on, #war-board .wb-side.on { border-color: #ffd040; color: #ffd040; }
   #war-board .wb-info { max-width: 820px; margin: 0 auto; color: #e8dcc0; font: 12px G11, sans-serif; line-height: 1.5; }
   #war-board .wb-load { max-width: 820px; margin: 6px auto; border: 1px solid #5a4630; padding: 6px 8px; color: #e8dcc0; font: 12px G11, sans-serif; }
@@ -245,7 +246,7 @@ export function openBoard() {
     <div class="wb-row">${roleBtns}</div>
     <div class="wb-info"><b>${ROLES[pickRole].name}</b> — ${ROLES[pickRole].desc}<br>역할 보너스: ${ROLES[pickRole].bonus}</div>
     ${loadoutHtml(cls, pickRole)}
-    <div class="wb-row"><button class="btn" id="wb-back">마을로</button><button class="btn" id="wb-go">출전</button></div>`;
+    <div class="wb-row wb-actions"><button class="btn" id="wb-back">마을로</button><button class="btn" id="wb-go">출전</button></div>`;
   box.querySelectorAll('[data-war]').forEach(b => { b.onclick = () => { pickWar = b.dataset.war; openBoard(); }; });
   box.querySelectorAll('[data-role]').forEach(b => { b.onclick = () => { pickRole = b.dataset.role; openBoard(); }; });
   box.querySelectorAll('[data-side]').forEach(b => { b.onclick = () => { pickSide = b.dataset.side; openBoard(); }; });

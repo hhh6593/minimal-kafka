@@ -63,8 +63,8 @@ export function specialBase(sp, cls) {
     return lookTier(cls, sp.kind, look);
   }
   if (sp.raid) {
-    const name = raidSet(sp.src, cls).find(([k]) => k === sp.kind)[1];
-    return GEAR[cls][sp.kind].indexOf(name);
+    const piece = raidSet(sp.src, cls).find(([k]) => k === sp.kind);
+    return piece ? GEAR[cls][sp.kind].indexOf(piece[1]) : -1; // a raid's shield, for a class with none
   }
   // Its own look where the boss has one in this class's line (a fox's 칠지도, a skull's 참마도).
   const sg = SOURCE_GYEOK[sp.src];

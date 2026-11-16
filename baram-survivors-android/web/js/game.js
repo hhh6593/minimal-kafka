@@ -13,7 +13,7 @@ import {
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
-  RAID_GEAR, plainTiers, plainList, gearPower, raidSet, CRAFT_GEAR, CRAFT_POWER,
+  RAID_GEAR, plainTiers, plainList, gearPower, raidSet, CRAFT_GEAR, CRAFT_POWER, hasShield,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -60,12 +60,15 @@ function saveJson(key, v) {
   } catch (e) { /* private mode: records just are not kept */ }
 }
 
+let fxWebp = null;
 function loadImage(path) {
   return new Promise(resolve => {
     const im = new Image();
     im.onload = () => resolve(im);
     im.onerror = () => resolve(null);
-    im.src = 'assets/' + path;
+    // An effect the build shrank to WebP (tools/webp_fx.py) keeps its .png key.
+    const webp = path.startsWith('fx/') && fxWebp && fxWebp.has(path.slice(3, -4));
+    im.src = 'assets/' + (webp ? path.slice(0, -4) + '.webp' : path);
     images[path] = im;
   });
 }
@@ -74,6 +77,7 @@ const monsterById = {};
 
 async function boot() {
   M = await (await fetch('assets/manifest.json')).json();
+  fxWebp = new Set(M.fxWebp || []);
   // The pixel fonts, before anything is written on the canvas with them.
   await Promise.all(['12px G11', 'bold 12px G11', '10px G9', '8px G7'].map(f => document.fonts.load(f).catch(() => {})));
   audio = new Audio(M.audio);
@@ -506,7 +510,7 @@ function buildStages() {
     // 대항전 (war.js): the guild wars from the raid list too.
     const wb = document.createElement('button');
     wb.className = 'raid';
-    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_icon_castle_war') ? '<img src="assets/hud/ui_icon_castle_war.png" alt="">' : ''}<div><b>사신수 길드대항전</b><span>청룡·백호·주작·현무 — 25 대 25 길드전</span><span>역할을 골라 출전</span></div>`;
+    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_img_sinsu_4') ? '<img src="assets/hud/ui_img_sinsu_4.png" alt="">' : ''}<div><b>사신수 길드대항전</b><span>청룡·백호·주작·현무 — 25 대 25 길드전</span><span>역할을 골라 출전</span></div>`;
     wb.onclick = () => War.openBoard();
     map.append(wb);
     raidInfo(pickedStage);
@@ -639,16 +643,15 @@ function raidOpen(r) {
 
 /** The raid's card: its boss, and the party that will gather, from each class's best. */
 function raidInfo(r) {
-  const party = CLASSES.filter(c => c !== chosenClass).map(c => {
-    const rec = best[c.id];
-    return `${c.name} ${rec ? `Lv ${rec.lvl}` : '기록 없음'}`;
-  });
+  // Only the classes already raised (a row of "기록 없음" said nothing).
+  const party = CLASSES.filter(c => c !== chosenClass && best[c.id]).map(c => `${c.name} Lv ${best[c.id].lvl}`);
+  if (!party.length) party.push('아직 키운 다른 직업 없음');
   const rec = best[chosenClass.id], start = raidStart(rec);
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · 8분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 함께: ${party.join(' · ')}</div>
-    <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${120 * r.level}전 · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>
+    <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${won(120 * r.level)} · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>
     <div class="party" style="color:${combatPower(chosenClass) >= raidPower(r) ? '#1e6a10' : '#9a1800'}">권장 전투력 ${raidPower(r).toLocaleString()} · 내 전투력 ${combatPower(chosenClass).toLocaleString()}</div>
     <div class="party">${raidSet(r.id, chosenClass.id).map(([k, n]) => {
       const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
@@ -859,7 +862,7 @@ function combatPower(cls) {
   const g = savedGear(cls), c = cls.id;
   const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 || g[k] === undefined ? 0 : gearPower(c, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
-  const gear = pw('weapon') * 3 + pw('armor') * 2 + pw('shield') + pw('helmet') + pw('cape');
+  const gear = pw('weapon') * 3 + pw('armor') * 2 + (hasShield(c) ? pw('shield') : pw('armor') / 2) + pw('helmet') + pw('cape');
   const set = cardSet(), rec = best[c];
   return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) * (1 + PROMO_BONUS.dmg * promoOf(c)) + set.hp * 20);
 }
@@ -870,6 +873,7 @@ function raidPower(r) {
 /** Stats from the gear worn: weapons hit harder, armor gives health, shields guard. */
 function applyGear() {
   const p = G.player, g = p.gear, c = G.cls.id;
+  if (!hasShield(c)) { g.shield = -1; delete g.shieldSp; } // an old save's shield on a class that carries none
   // A special worn counts a rank above its look, and adds its option.
   // Each star above ★1 adds half a rank.
   const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(G.cls, 'sp:' + g[k + 'Sp']) - 1)
@@ -886,7 +890,7 @@ function applyGear() {
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + Math.max(0, pow('shield') + 1) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
+  p.armor = G.cls.armor + (hasShield(G.cls.id) ? Math.max(0, pow('shield') + 1) : Math.max(0, Math.floor(pow('armor') / 2) + 1)) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
   p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo);
   // 격: what the worn pieces loose by themselves (gyeok.js), and the statuses the shields ward off.
   const gy = [];
@@ -1246,6 +1250,7 @@ function powerWith(cls, kind, tier, sp = null) {
 
 /** The pieces of a kind the bag holds, as [tier, special id or null]. */
 function bagPieces(cls, kind) {
+  if (kind === 'shield' && !hasShield(cls.id)) return [];
   const b = bag(cls);
   const out = b.filter(x => x.startsWith(kind + ':')).map(x => [+x.split(':')[1], null]);
   if (kind === 'shield' || kind === 'helmet' || kind === 'cape') out.unshift([-1, null]);
@@ -1271,7 +1276,7 @@ function markCompare(btn, cls, kind, tier, sp, now, top) {
   const d = powerWith(cls, kind, tier, sp) - now;
   const em = document.createElement('em');
   em.className = 'cmp ' + (btn.classList.contains('on') ? 'worn' : d > 0 ? 'up' : d < 0 ? 'down' : 'same');
-  em.textContent = btn.classList.contains('on') ? '착용 중' : d > 0 ? `▲${d.toLocaleString()}` : d < 0 ? `▼${(-d).toLocaleString()}` : '같음';
+  em.textContent = btn.classList.contains('on') ? (tier < 0 && !sp ? '비어 있음' : '착용 중') : d > 0 ? `▲${d.toLocaleString()}` : d < 0 ? `▼${(-d).toLocaleString()}` : '같음';
   btn.append(em);
   if (top && !btn.classList.contains('on')) btn.classList.add('best');
 }
@@ -1312,6 +1317,7 @@ function buildEquip() {
     box.append(row);
   }
   for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패'], ['helmet', '투구'], ['cape', '망토']]) {
+    if (kind === 'shield' && !hasShield(cls.id)) continue; // 연's 궁사, 무사 ... carry none
     // 투구·망토 rows only once one is owned.
     if ((kind === 'helmet' || kind === 'cape') && !(GEAR[cls.id][kind] || []).length
       && !b.some(x => x.startsWith('sp:') && SPECIAL[x.slice(3)] && SPECIAL[x.slice(3)].kind === kind)) continue;
@@ -1329,7 +1335,7 @@ function buildEquip() {
       btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
       const icon = pieceIcon(cls, kind, t);
       const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '없음' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '벗기' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
       if (dragon) {
         const dg = dragonGyeok(cls.id, starOf(cls, `weapon:${t}`));
         const sm = document.createElement('small');
@@ -1366,7 +1372,7 @@ function buildEquip() {
   const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
   const ex = k => (g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
-    + ` · 방어 +${Math.max(0, pw('shield') + 1) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
+    + ` · 방어 +${(hasShield(cls.id) ? Math.max(0, pw('shield') + 1) : Math.max(0, Math.floor(pw('armor') / 2) + 1)) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '');
   // The 격 worn, each with its rule (gyeok.js), and the statuses warded.
   const gys = wornGyeok(cls, g);
@@ -1401,8 +1407,9 @@ function codexItems(cls) {
   }
   for (const sp of SPECIALS) {
     if (sp.craft && sp.craft.only && !sp.craft.only.includes(cls.id)) continue;
+    if (sp.kind === 'shield' && !hasShield(cls.id)) continue;
     const t = specialBase(sp, cls.id);
-    const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${sp.craft.gold}전`
+    const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${won(sp.craft.gold)}`
       : sp.srcName;
     out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
       icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || gearIcon(cls.id, sp.kind, t),
@@ -1479,7 +1486,7 @@ function openCraft(sink = null) {
   if (!sink) box.innerHTML = '';
   $('#trade-title').textContent = '대장장이 · 강화·조합';
   const mats = progress.mats || {};
-  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전 · `
+  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)} · `
     + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
   let icon = null;
   const row = (name, desc, label, can, act) => {
@@ -1487,7 +1494,7 @@ function openCraft(sink = null) {
       sink.push({ sec, name, desc, label, can, icon, meta, act: () => {
         act();
         saveJson('bs_progress', progress);
-        if ($('#town-gold')) $('#town-gold').textContent = `${progress.gold || 0}전`;
+        if ($('#town-gold')) $('#town-gold').textContent = `${won(progress.gold || 0)}`;
         if (G) applyGear();
         refreshAvatars();
         openForge();
@@ -1508,7 +1515,7 @@ function openCraft(sink = null) {
     btn.onclick = () => {
       act();
       saveJson('bs_progress', progress);
-      if ($('#town-gold')) $('#town-gold').textContent = `${progress.gold || 0}전`;
+      if ($('#town-gold')) $('#town-gold').textContent = `${won(progress.gold || 0)}`;
       if (G) applyGear();
       refreshAvatars();
       openCraft();
@@ -1533,7 +1540,7 @@ function openCraft(sink = null) {
   icon = picture(dragonName(cls.id, 1));
   meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) / 2}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
-    + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${rc.gold}전`,
+    + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(rc.gold)}`,
     has ? '가짐' : '조합', ok, () => {
       progress.gold -= rc.gold;
       for (const [id, n] of Object.entries(rc.mats)) mats[id] -= n;
@@ -1562,6 +1569,7 @@ function openCraft(sink = null) {
   const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
   for (const c of CRAFTS) {
     if (c.only && !c.only.includes(cls.id)) continue;
+    if (c.kind === 'shield' && !hasShield(cls.id)) continue;
     const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
     if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
     if (c.sinsu && c === CRAFTS.find(x => x.sinsu && (!x.only || x.only.includes(cls.id)))) head('조합 · 사신수 지존 장비 (성물 4종 → 신수의 격)');
@@ -1571,7 +1579,7 @@ function openCraft(sink = null) {
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
     icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1)) || pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id);
     meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text, got };
-    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${c.gold}전 · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}`,
+    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${won(c.gold)} · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}`,
       got ? '가짐' : '조합', !got && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
         for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
@@ -1633,7 +1641,7 @@ function openCraft(sink = null) {
       icon = pieceIcon(cls, csp ? csp.kind : kind, csp ? specialBase(csp, cls.id) : +t, csp && csp.id);
       const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
       meta = star < top ? { mats: sc.mats, gold: sc.gold, gyeok: dragon ? dragonGyeok(cls.id, star + 1) : null } : null;
-      row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${sc.gold}전`
+      row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${won(sc.gold)}`
         + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
         star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
           progress.gold -= sc.gold;
@@ -1659,7 +1667,7 @@ function openCraft(sink = null) {
     if (!copies && star === 1) continue;
     any = true;
     const can = star < STAR_MAX && copies >= cost.copies && (progress.gold || 0) >= cost.gold;
-    row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: 사본 ${copies}/${cost.copies} + ${cost.gold}전 · 별마다 반 등급`,
+    row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: 사본 ${copies}/${cost.copies} + ${won(cost.gold)} · 별마다 반 등급`,
       star >= STAR_MAX ? '최고' : '강화', can, () => {
         progress.gold -= cost.gold;
         progress.copies[cls.id][key] -= cost.copies;
@@ -1693,7 +1701,7 @@ function openForge() {
   const tabs = FORGE_TABS.map(([n]) => n).filter(n => list.some(e => forgeTabOf(e.sec) === n));
   if (!tabs.includes(forgeTab)) forgeTab = tabs[0];
   $('#forge-title').textContent = `조합 · ${cls.name}`;
-  $('#forge-gold').textContent = `${(progress.gold || 0).toLocaleString()}전 · 레이드주화 ${progress.coins || 0}`;
+  $('#forge-gold').textContent = `${won(progress.gold || 0)} · 레이드주화 ${progress.coins || 0}`;
   const tb = $('#forge-tabs');
   tb.innerHTML = '';
   for (const t of tabs) {
@@ -1731,7 +1739,7 @@ function openForge() {
       + (m.opt ? `<div class="fd-opt">옵션: ${m.opt}</div>` : '')
       + (m.base ? `<div class="fd-mat">재료 장비: ${m.base}</div>` : '')
       + (m.mats ? Object.entries(m.mats).map(([id, n]) => `<div class="fd-mat ${(mats[id] || 0) >= n ? 'ok' : 'no'}"><span>${MATS[id].name} ${mats[id] || 0}/${n}</span><small>${where(id)}</small></div>`).join('') : '')
-      + (m.gold ? `<div class="fd-mat ${(progress.gold || 0) >= m.gold ? 'ok' : 'no'}"><span>${m.gold.toLocaleString()}전</span></div>` : '')
+      + (m.gold ? `<div class="fd-mat ${(progress.gold || 0) >= m.gold ? 'ok' : 'no'}"><span>${won(m.gold)}</span></div>` : '')
       + (!m.mats ? `<div class="fd-desc">${pick.desc}</div>` : '');
     const bt = document.createElement('button');
     bt.className = 'btn fd-go';
@@ -3038,7 +3046,7 @@ function fxBudget(kind, n) {
 function rollSpecial(e) {
   const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.0003;
   if (Math.random() >= chance) return;
-  const mine = SPECIALS.filter(s => s.src === G.stage.id);
+  const mine = SPECIALS.filter(s => s.src === G.stage.id && (s.kind !== 'shield' || hasShield(G.cls.id)));
   if (!mine.length) return;
   const sp = mine[Math.floor(Math.random() * mine.length)];
   G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id } });
@@ -3075,8 +3083,9 @@ function killEnemy(e) {
   c.pop = G.t;
   c.best = Math.max(c.best, c.n);
   if (COMBO_AT.includes(c.n)) {
-    // The closing sweep counts on, but the 정복 banner stays up.
-    if (!(G.sweepUntil && G.t < G.sweepUntil + 3)) banner(`연속 처치 ${c.n}!`);
+    // The mark is shown by the 殺 strip itself (a bigger pop): a banner across the field as well
+    // only covered the numbers over the hero.
+    c.mark = G.t;
     // 연's kill-streak voice, one step louder at each mark.
     audio.play('combo', null, COMBO_AT.indexOf(c.n) + 1);
     G.flash = G.t;
@@ -3153,7 +3162,7 @@ function dropGear(e, dx = 0) {
   // 투구 and 망토 drop too (a little rarer than the weapon, armour and shield), from their own lines.
   const line = GEAR[G.cls.id];
   const kinds = ['weapon', 'armor', 'shield', 'weapon', 'armor', 'shield', 'helmet', 'cape']
-    .filter(k => (line[k] || []).length && plainList(G.cls.id, k).length);
+    .filter(k => (line[k] || []).length && plainList(G.cls.id, k).length && (k !== 'shield' || hasShield(G.cls.id)));
   const kind = kinds[Math.floor(Math.random() * kinds.length)];
   // Hunting grounds never drop a raid's or a crafted piece.
   const list = plainList(G.cls.id, kind), top = list.length - 1;
@@ -4165,7 +4174,7 @@ function enterTown(cls) {
   T.folk = townFolk('market');
   showScreen('town');
   audio.bgm('town');
-  $('#town-gold').textContent = `${progress.gold || 0}전`;
+  $('#town-gold').textContent = `${won(progress.gold || 0)}`;
   $('#town-name').textContent = `국내성 · ${cls.name}`;
 }
 
@@ -4495,7 +4504,7 @@ function openQuests() {
   const box = $('#trade-rows'), s = qstats();
   box.innerHTML = '';
   $('#trade-title').textContent = '관원 · 의뢰';
-  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전`;
+  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)}`;
   const done = progress.quests = progress.quests || {};
   const row = (name, desc, label, can, act) => {
     const r = document.createElement('div');
@@ -4505,7 +4514,7 @@ function openQuests() {
     b.className = 'btn';
     b.textContent = label;
     b.disabled = !can;
-    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').textContent = `${progress.gold}전`; openQuests(); };
+    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').textContent = `${won(progress.gold)}`; openQuests(); };
     r.append(b);
     box.append(r);
   };
@@ -4514,7 +4523,7 @@ function openQuests() {
   const daily = dailyQuests();
   for (const q of daily) {
     const have = Math.min(q.need, dailyHave(q)), got = progress.daily.claimed.includes(q.id);
-    row(q.text, `${have}/${q.need} · ${q.gold}전`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    row(q.text, `${have}/${q.need} · ${won(q.gold)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
       progress.daily.claimed.push(q.id);
       progress.gold = (progress.gold || 0) + q.gold;
     });
@@ -4522,7 +4531,7 @@ function openQuests() {
   head('의뢰 · 칭호');
   for (const q of QUESTS) {
     const have = Math.min(q.need, q.have(s)), got = done[q.id];
-    row(`${q.text}`, `${have}/${q.need} · ${q.gold}전 · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    row(`${q.text}`, `${have}/${q.need} · ${won(q.gold)} · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
       done[q.id] = true;
       progress.gold = (progress.gold || 0) + q.gold;
     });
@@ -4554,20 +4563,20 @@ function openTrade(who) {
   const cls = chosenClass, box = $('#trade-rows');
   box.innerHTML = '';
   $('#trade-title').textContent = who === 'inn' ? '주모 · 단련' : '상인 · 장비';
-  $('#trade-gold').textContent = `가진 돈 ${progress.gold || 0}전`;
+  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)}`;
   const row = (name, desc, cost, done, buy) => {
     const r = document.createElement('div');
     r.className = 'trade-row';
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
     const b = document.createElement('button');
     b.className = 'btn';
-    b.textContent = done ? '다 배움' : `${cost}전`;
+    b.textContent = done ? '다 배움' : `${won(cost)}`;
     b.disabled = done || (progress.gold || 0) < cost;
     b.onclick = () => {
       progress.gold -= cost;
       buy();
       saveJson('bs_progress', progress);
-      $('#town-gold').textContent = `${progress.gold}전`;
+      $('#town-gold').textContent = `${won(progress.gold)}`;
       openTrade(who);
     };
     r.append(b);
@@ -4585,6 +4594,7 @@ function openTrade(who) {
     // The first piece of each kind the bag lacks, priced by its tier.
     const b = bag(cls);
     for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+      if (kind === 'shield' && !hasShield(cls.id)) continue;
       const tier = (GEAR[cls.id][kind] || []).findIndex((_, i) => !b.includes(`${kind}:${i}`));
       if (tier < 0) continue;
       row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' }[kind]} · ${tier + 1}단계`,
@@ -5626,8 +5636,8 @@ function updatePickups(dt) {
         const n = 5 + Math.floor(Math.random() * 10 * (1 + G.level));
         G.gold += n;
         if (G.texts.length < 70) G.texts.push({ x: p.x + rand(-6, 6), y: p.y - 40, text: String(n), t: 0, gold: true });
-        note(`${n}전을 주웠습니다.`);
-        lootFeed(`${n}전 획득`);
+        note(`${won(n)}을 주웠습니다.`);
+        lootFeed(`${won(n)} 획득`);
         audio.play('pickup');
       } else if (d.kind === 'chest') {
         G.gold += 100 * (1 + G.level);
@@ -6044,7 +6054,7 @@ function showResults(title) {
   $('#over-title').textContent = title;
   $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}`
     + (G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : '') + '<br>'
-    + `쓰러뜨린 몬스터 ${G.kills}마리 · ${G.gold}전<br>`
+    + `쓰러뜨린 몬스터 ${G.kills}마리 · ${won(G.gold)}<br>`
     + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
     + (G.gained && G.gained.length ? `<br><b class="promo">얻은 장비: ${G.gained.join(', ')}</b>` : '')
     + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '');
@@ -6442,6 +6452,9 @@ function goldFont() {
   return M.hud && M.hud.font_gold && im && im.width ? im : null;
 }
 /** Life (green) or mana (blue) given back, in 연's digits over the one healed, as its clips show them. */
+/** Money as 연 writes it: 1,500전. */
+function won(n) { return Math.round(+n || 0).toLocaleString('ko-KR') + '전'; }
+
 function healText(b, n, up = 64, mana = false) {
   if (M.hud && M.hud.font_dmgk_g && dmgkFont()) {
     if (G.texts.length > 90) G.texts.shift();
@@ -7008,7 +7021,8 @@ function render(now) {
   // 연속 처치: the count at the top right while a streak runs.
   const c = G.combo;
   if (c.n >= 10 && G.t - c.t < 3) {
-    const pop = Math.max(0, 1 - (G.t - c.pop) / 0.15), sc = (1 + 0.25 * pop) * (canvas.width / 860);
+    const pop = Math.max(0, 1 - (G.t - c.pop) / 0.15), mark = Math.max(0, 1 - (G.t - (c.mark || -9)) / 0.6);
+    const sc = (1 + 0.25 * pop + 0.6 * mark * mark) * (canvas.width / 860);
     ctx.save();
     ctx.translate(canvas.width - 70 * (canvas.width / 860), 64 * (canvas.width / 860));
     ctx.scale(sc, sc);
@@ -7898,6 +7912,7 @@ window.__gearTest = () => {
   let n = 0;
   for (const sp of Object.values(SPECIAL)) {
     if (sp.cls && sp.cls !== c) continue;
+    if (sp.kind === 'shield' && !hasShield(c)) continue;
     n++;
     check(`special ${sp.id} ${specialName(sp, c)}`, sp.kind, specialBase(sp, c), sp.id);
   }
