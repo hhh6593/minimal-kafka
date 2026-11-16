@@ -3475,6 +3475,10 @@ function cast(skill, st) {
             if (def.curse) o.curse = def.curse;
             hurtEnemy(o, st.dmg);
           }
+          // A field that stays (the 천인's 선풍 whirlpools): it strikes again where it fell, at half weight.
+          for (let k = 1; k <= (def.ticks || 0); k++) {
+            later(k * 0.45, () => { for (const o of around(tx, ty, st.radius)) hurtEnemy(o, st.dmg * 0.5); });
+          }
         });
       });
       break;
@@ -3645,6 +3649,7 @@ function cast(skill, st) {
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
+    if (def.darken) G.darkUntil = G.t + def.darken;
     audio.play('skill_' + skill.id, def.kind, skill.lv);
     const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior')
       || (WEAPON_POSE.has(G.cls.id) && !['buff', 'heal'].includes(def.kind));
@@ -3689,6 +3694,7 @@ const ULT_PATH = {
   lancer: [[0, 'l_ult'], [4, 'l_genesis'], [6, 'l_annihil'], [9, 'l_moonfull']],
   monk: [[0, 'mk_ult'], [4, 'mk_buddha'], [5, 'mk_combo'], [9, 'mk_aventhit']],
   magus: [[0, 'md_ult'], [4, 'md_exfrenzy'], [5, 'md_bloodbat'], [9, 'md_wavefrenzy']],
+  celestial: [[0, 'cl_ult'], [4, 'cl_thunder'], [5, 'cl_tiger'], [9, 'cl_reindeer']],
 };
 function ultLook(cls) {
   const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
@@ -3727,10 +3733,10 @@ function syncUltMode() {
 const ULT_REST = 25;
 // Each class's 필살기 against a boss: a single-target technique of its own (from 연's skills).
 // The close-in classes: they leap to the foe (돌진, the 필살기's boss blows) and lure before a chain.
-const MELEE = new Set(['warrior', 'rogue', 'lancer', 'monk']);
+const MELEE = new Set(['warrior', 'rogue', 'lancer', 'monk', 'celestial']);
 // Classes whose every damaging technique is their weapon's own attack clip (연's bow draw, spear thrust).
 const WEAPON_POSE = new Set(['archer', 'lancer', 'monk']);
-const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim', lancer: 'l_meteor', monk: 'mk_sudden', magus: 'md_arrow' };
+const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim', lancer: 'l_meteor', monk: 'mk_sudden', magus: 'md_arrow', celestial: 'cl_moment' };
 function ultWait() {
   return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
 }
@@ -3758,6 +3764,7 @@ function castUlt() {
   strikePose(MELEE.has(G.cls.id) || WEAPON_POSE.has(G.cls.id) ? 'attack' : 'magic');
   say(`${shownName}!`);
   audio.play('skill_' + def.id, 'ult');
+  if (def.darken) G.darkUntil = G.t + def.darken;
   G.shake = 0.5;
   // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
   if (ultMode(G.cls.id) === 'hunt') {
@@ -4404,6 +4411,7 @@ const PARTY = {
   lancer: { names: ['창랑', '월하', '유성'], role: '창으로 앞을 막고 꿰찌른다' },
   monk: { names: ['철권', '비연', '권풍'], role: '맨주먹으로 파고들어 두들긴다' },
   magus: { names: ['나형', '흑마', '현월'], role: '멀리서 기공구슬로 얼리고 마비시킨다' },
+  celestial: { names: ['천랑', '재천', '삼족오'], role: '번개와 불꽃을 떨구고 적 사이로 뛰어든다' },
 };
 
 function joinParty(cls) {
@@ -4514,7 +4522,7 @@ function memberAnchor(m) {
     let ax = Math.sign(p.tx - foe.tx), ay = Math.sign(p.ty - foe.ty);
     if (!ax && !ay) ax = 1;
     if (cls === 'warrior' || cls === 'lancer') at = ax ? [foe.tx + ax, foe.ty] : [foe.tx, foe.ty + ay];
-    else if (cls === 'rogue' || cls === 'monk') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
+    else if (cls === 'rogue' || cls === 'monk' || cls === 'celestial') at = ax ? [foe.tx - ax, foe.ty] : [foe.tx, foe.ty - ay];
     else if (cls === 'mage' || cls === 'magus') at = ax ? [foe.tx + ax * 3, foe.ty + 2 * side] : [foe.tx + 2 * side, foe.ty + ay * 3];
     else if (cls === 'archer') at = ax ? [foe.tx + ax * 4, foe.ty - 2 * side] : [foe.tx - 2 * side, foe.ty + ay * 4];
     else at = [p.tx + ax * 3, p.ty + ay * 3 + (ax ? side : 0)];
@@ -4667,7 +4675,7 @@ function drawShots() {
 // ground, light when a spell is cast.
 
 /** The glow of a class's flying spells: [halo, core]. */
-const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'], archer: ['#9adf6a', '#f0ffe0'], lancer: ['#7fd0ff', '#eaf8ff'], monk: ['#ffb35a', '#fff1d8'], magus: ['#c27bff', '#f6e8ff'] };
+const CLASS_GLOW = { warrior: ['#6fb8ff', '#e8f4ff'], rogue: ['#c9b2ff', '#f4eeff'], mage: ['#ff8a3a', '#fff0c0'], poet: ['#ffd84a', '#fffbe0'], archer: ['#9adf6a', '#f0ffe0'], lancer: ['#7fd0ff', '#eaf8ff'], monk: ['#ffb35a', '#fff1d8'], magus: ['#c27bff', '#f6e8ff'], celestial: ['#ffe06a', '#fffbe8'] };
 
 /** The effect picture of a spell at its 단: a second name for the same frames, 6% larger a step. */
 function grownFx(id, lv) {
@@ -5145,6 +5153,44 @@ function partyAct(m) {
         hurtEnemy(t, 10 * pw);
         audio.play('skill_md_sphere', 'spell');
         if (Math.random() < 0.2) partySay(m, '마력구회격');
+        pose('magic');
+      }
+      break;
+    }
+    case 'celestial': {
+      // 천인: magic that dives — 염화 at the nearest from a little off, 찰나 behind the boss now and then,
+      // 빙글번쩍 when foes close round it; 철옹벽 when hurt.
+      const t = boss || near(1)[0];
+      if (!t) break;
+      face(t);
+      if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
+        m.cd.e = 16;
+        addFx(SKILLS.cl_wall.fx, m.x, m.y - 20, { scale: 0.8 });
+        audio.play('skill_cl_wall', 'buff');
+        partySay(m, '철옹벽');
+        healMember(m, m.maxHp * 0.15);
+      }
+      if (boss && m.cd.d <= 0) {
+        m.cd.d = 10;
+        fxOn(SKILLS.cl_moment.fx, t);
+        later(0.2, () => hurtEnemy(t, 45 * pw));
+        audio.play('skill_cl_moment', 'blink');
+        partySay(m, '찰나');
+        if (Math.random() < 0.5) partyTalk(m, ['파고든다!', '뒤를 잡았어요!']);
+        pose('attack');
+      } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
+        m.cd.b = 7;
+        addFx(SKILLS.cl_brilliant.fx, m.x, m.y - 20);
+        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        audio.play('skill_cl_brilliant', 'nova');
+        partySay(m, '빙글번쩍');
+        pose('magic');
+      } else if (m.cd.a <= 0) {
+        m.cd.a = 1.1;
+        fxOn(SKILLS.cl_boom.fx, t);
+        hurtEnemy(t, 10 * pw);
+        audio.play('skill_cl_boom', 'spell');
+        if (Math.random() < 0.2) partySay(m, '염화');
         pose('magic');
       }
       break;
@@ -6389,6 +6435,12 @@ function render(now) {
     for (const [x, y] of mk.tiles) ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
   }
 
+  // A 마도사's void (def.darken): the field goes dark round the bodies for a moment, as in 연.
+  if (G.darkUntil > G.t) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.9, (G.darkUntil - G.t) * 2.5)})`;
+    ctx.fillRect(camX, camY, VW, VH);
+  }
+
   // Bodies, back to front.
   const bodies = G.enemies.concat(G.allies, G.party, propsInView(camX, camY));
   bodies.push(p);
@@ -6850,7 +6902,7 @@ function gauge(sel, k, text) {
 // The gear slots as placed on the old panel: two on the left, the helmet above the figure,
 // two at its feet, three darker ones down the right.
 const SLOT_AT = [[117, 160], [35, 164], [35, 208], [80, 234], [156, 234], [203, 160, 1], [203, 196, 1], [203, 232, 1]];
-const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12], archer: [14, 12, 28], lancer: [26, 9, 18], monk: [24, 8, 22], magus: [8, 32, 12] };
+const BASE_STATS = { warrior: [30, 8, 14], rogue: [18, 10, 26], mage: [8, 30, 12], poet: [10, 26, 12], archer: [14, 12, 28], lancer: [26, 9, 18], monk: [24, 8, 22], magus: [8, 32, 12], celestial: [14, 24, 20] };
 const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사', '영웅', '전설'];
 
 /** The side panel and the map tab, kept in step with the hunt. */

@@ -21,7 +21,7 @@
  "l_burst": {"yid": "20720900", "name": "환영지폭", "prefab": "Skill_Effect_Lancer_3rd_03", "icon": "Skill_Icon_105301"},
  "l_unity": {"yid": "20721000", "name": "혼연체식", "prefab": "Skill_Effect_Lancer_4th_01", "icon": "Skill_Icon_106101"},
  "l_firedragon": {"yid": "20721100", "name": "화룡멸진", "prefab": "Skill_Effect_Lancer_4th_02_Down", "icon": "Skill_Icon_106201"},
- "l_genesis": {"yid": "20721200", "name": "천지개벽", "prefab": "Skill_Effect_Lancer_4th_03_3", "icon": "skill_icon_106301"},
+ "l_genesis": {"yid": "20721200", "name": "천지개벽", "prefab": "Skill_Effect_Lancer_4th_03_2", "icon": "skill_icon_106301"},
  "l_extinct2": {"yid": "20721300", "name": "극멸화참", "prefab": "Skill_Effect_Lancer_5th_01", "icon": "Skill_Icon_Lancer_5th_01", "add_own": true},
  "l_formless": {"yid": "20721400", "name": "무형지창", "prefab": "Skill_Effect_Lancer_5th_02", "icon": "Skill_Icon_Lancer_5th_02", "add_own": true},
  "l_guard": {"yid": "20721501", "name": "진기보호", "prefab": "Skill_Effect_Lancer_5th_03", "icon": "Skill_Icon_Lancer_5th_03"},

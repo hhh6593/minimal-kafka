@@ -93,6 +93,19 @@ JOBS = {
         'helmet_pool': [333031, 333032, 333035, 333036],
         'cape_craft': {'cr_steel_cape': 344001},
     },
+    # 천인 (Job_8): the warrior's clips; 천의 (261xxx); 호리병·포 (260xxx): the item's own prefab lays
+    # Weapon (22) and Weapon_back (-12) at the root, held from item_0001_i, striking from
+    # item_0001_atk_f/_b, each in thirds by direction. 용주제N도, 용주 helmets.
+    'celestial': {
+        'anims': dict(Y.ANIMS),
+        'weapon': 'gourd', 'weapon_files': ('item_0001_i.png', 'item_0001_atk_f.png', 'item_0001_atk_b.png'),
+        'armor_pool': [(3, 261000), (5, 261004), (8, 261007), (10, 261010), (12, 261013), (99, 261017)],
+        'dragon': [260029, 260035, 260040, 260051, 260052, 260075, 260086, 260089, 260091, 260092],
+        'weapon_pool': [260000, 260001, 260002, 260003, 260004, 260005, 260006, 260007, 260008, 260010, 260011,
+                        260013, 260015, 260016, 260018, 260020, 260022, 260024, 260025, 260026, 260028],
+        'dragon_helmet': 263024,
+        'helmet_pool': [263030, 263031, 263000],
+    },
 }
 
 
@@ -153,6 +166,11 @@ def main():
                 return {'E': fr, 'B': bk} if fr and bk else {}
             if J['weapon'] == 'wand':
                 return {'E': f.get(J['weapon_file'])}
+            if J['weapon'] == 'gourd':
+                i, fr, bk = (f.get(n) for n in J['weapon_files'])
+                if not (i and fr and bk) or tex_n.get(i, 0) % 3 or tex_n.get(fr, 0) % 3 or tex_n.get(fr) != tex_n.get(bk):
+                    return {}
+                return {'I': i, 'F': fr, 'B': bk}
             return {}
         if kind == 'cape':
             e = next((t for n, t in f.items() if n.endswith('_e.png') and 'cape' in n), None) \
@@ -381,6 +399,27 @@ def main():
                 out_l.append(place(WEAPON_POS, alt, alt, root))
                 orders.append(16 if kind == 'weapon' else -4)
             return out_l, orders
+        if kind in ('weapon', 'wback') and J['weapon'] == 'gourd':
+            # The item's own prefab: Weapon (sorting 22) and Weapon_back (-12) at the root, each sheet in
+            # thirds by direction (down, side, up). Held, the idle sheet behind; striking, the attack's.
+            if key == 'dead' or not tx:
+                return out_l, orders
+            d = {'down': 0, 'side': 1, 'up': 2}[key.rsplit('_', 1)[1]]
+            if key.startswith('atk_'):
+                t = tx['F' if kind == 'weapon' else 'B']
+                k, nf = tex_n[t] // 3, len(anim_frames[key][0])
+                f = d * k + round(fi * (k - 1) / max(1, nf - 1))
+            elif kind == 'wback':
+                t = tx['I']
+                k = tex_n[t] // 3
+                f = d * k + fi % k
+            else:
+                return out_l, orders
+            alt = bytex.get((t, str(f)))
+            if alt is not None:
+                out_l.append(place((0, 0), alt, alt, root))
+                orders.append(22 if kind == 'weapon' else -12)
+            return out_l, orders
         if kind == 'weapon' and J['weapon'] == 'wand':
             # The Weapon slot as the clip keys it (its place and order), the 단봉's own frame in it.
             k, s = slot(st, 'Weapon')
@@ -453,7 +492,7 @@ def main():
             variants.pop(('weapon', v))
         print('unreadable wands', sorted(bad))
     lv = [('back', 'base'), ('body', 'base'), ('head', 'base')] + sorted(variants)
-    if J['weapon'] in ('spear', 'template'):
+    if J['weapon'] in ('spear', 'template', 'gourd'):
         lv += [('wback', v) for (k, v) in sorted(variants) if k == 'weapon']
         for (k, v), val in list(variants.items()):
             if k == 'weapon':
@@ -476,9 +515,9 @@ def main():
                         if s and s['active']:
                             orders[kind] = s['order']
                             break
-            if J['weapon'] == 'spear':
-                orders.setdefault('weapon', 16)
-                orders.setdefault('wback', -4)
+            if J['weapon'] in ('spear', 'gourd'):
+                orders.setdefault('weapon', 16 if J['weapon'] == 'spear' else 22)
+                orders.setdefault('wback', -4 if J['weapon'] == 'spear' else -12)
             z[key].append([k for k, _ in sorted(orders.items(), key=lambda kv: (kv[1], KINDS.index(kv[0])))])
     allp = [p for v in drawn.values() for p in v]
     left = math.ceil(-min(x for _, x, _ in allp))

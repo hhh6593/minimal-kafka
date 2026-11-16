@@ -36,6 +36,9 @@ export const CLASSES = [
   // 바람의나라 연's 마도사 (Job_11): 단봉, figure, skills and sounds only from 연's resources.
   { id: 'magus', name: '마도사', hero: '1003', hp: 105, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
     desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
+  // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
+  { id: 'celestial', name: '천인', hero: '1003', hp: 130, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
+    desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
 ];
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
@@ -501,7 +504,7 @@ export const SKILLS = {
   l_firedragon: { promo: 4, cls: 'lancer', req: 18, evolved: true, name: '화룡멸진', kind: 'line', fx: '140', dmg: 26, cd: 2.4, depth: 7,
     desc: '나선창 8단 + 4차 승급. 불의 용이 몬스터가 가장 많은 쪽 일렬 일곱 칸을 태운다' },
   l_genesis: { promo: 4, cls: 'lancer', req: 18, name: '천지개벽', kind: 'screen', fx: '141', dmg: 18, cd: 6,
-    desc: '하늘과 땅을 가르는 창격으로 화면의 모든 몬스터를 친다' },
+    desc: '하늘에서 빛의 기둥이 쏟아져 화면의 모든 몬스터를 친다' },
   // 5차 신창
   l_extinct2: { promo: 5, cls: 'lancer', req: 21, name: '극멸화참', kind: 'nova', fx: '148', dmg: 34, cd: 3.2, radius: 2, curse: 3,
     desc: '무사의 궁극오의. 거대한 불꽃 고리로 둘레 두 칸의 몬스터를 태우고 약화시킨다' },
@@ -510,8 +513,8 @@ export const SKILLS = {
   l_guard: { promo: 5, cls: 'lancer', req: 21, name: '진기보호', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
     desc: '진기로 몸을 감싸 잠시 받는 피해를 절반으로 줄인다' },
   // 6차 창극
-  l_annihil: { promo: 6, cls: 'lancer', req: 24, name: '화룡사멸', kind: 'line', fx: '144', dmg: 34, cd: 3, depth: 7, dash: true,
-    desc: '화룡과 함께 바라보는 쪽으로 내달리며 일렬 일곱 칸의 몬스터를 불사른다' },
+  l_annihil: { promo: 6, cls: 'lancer', req: 24, name: '화룡사멸', kind: 'strike', fx: '139', dmg: 40, cd: 3, range: 7, radius: 1, count: 3,
+    hitAt: 0.35, strongest: true, desc: '하늘에서 화룡의 불기둥 셋을 가장 강한 몬스터들(보스를 먼저)과 그 주위에 내리꽂는다' },
   // 7차~9차: 연's other 무사 techniques
   l_dragon: { promo: 7, cls: 'lancer', req: 27, name: '맹룡승천', kind: 'strike', fx: '24', dmg: 34, cd: 2.4, range: 6, radius: 1, count: 3,
     hitAt: 0.25, stun: 0.6, desc: '용처럼 솟구치는 창격이 몬스터 셋과 그 주위를 띄워 친다' },
@@ -643,7 +646,7 @@ export const SKILLS = {
     desc: '광폭기의 빛줄기가 몬스터가 가장 많은 쪽 일렬 일곱 칸을 꿰뚫는다' },
   md_absorb: { promo: 4, cls: 'magus', req: 18, name: '광폭체마', kind: 'spell', fx: '49', dmg: 20, cd: 2.8, range: 6, count: 1,
     drain: 0.3, weakest: true, desc: '몬스터의 체력과 마력을 빨아들여 체력을 회복한다' },
-  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', fx: '141', dmg: 18, cd: 6, darken: 0.8,
     desc: '기공십자광선 8단 + 4차 승급. 하늘을 멸하는 광폭기가 화면의 모든 몬스터에게 떨어진다' },
   // 5차 마선사
   md_bloodbat: { promo: 5, cls: 'magus', req: 21, name: '혈마광폭열파', kind: 'line', fx: '144', dmg: 32, cd: 3, depth: 7,
@@ -666,10 +669,78 @@ export const SKILLS = {
     desc: '광폭해져 잠시 공격력이 크게 오른다' },
   md_manafill: { promo: 9, cls: 'magus', req: 33, name: '마력증폭', kind: 'buff', buff: 'haste', fx: '7', cd: 16, duration: 5,
     desc: '마력을 증폭해 잠시 모든 기술이 빨리 돈다' },
-  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', fx: '141', dmg: 60, cd: 9, darken: 0.8,
     desc: '궁극기. 광폭의 파장이 화면의 모든 몬스터를 덮친다' },
-  md_ult: { cls: 'magus', name: '광폭구회격', kind: 'ult', fx: '144', hpCost: 0.1,
+  md_ult: { cls: 'magus', name: '광폭구회격', kind: 'ult', fx: '144', hpCost: 0.1, darken: 0.8,
     desc: '체력 10%와 마력을 모두 써서, 화면의 몬스터에게 광폭의 구슬을 퍼붓는다' },
+
+  // 천인 (바람의나라 연 Job_8): its own skill list (Skills_Player 2081xxxx 일반, 2082xxxx 승급), each with the
+  // effect, icon and sound of that 연 record (fx k_<id>, tools/yeon_celestial_skills.json). A caster that
+  // dives: its magic falls on the field (spell, strike, screen) and its charges (비암격, 찰나, 예리함'극,
+  // 범아귀) carry it through the foes as blinks. 1차~6차 are 연's own (천랑·천무·천군·천위·재천·천신; the
+  // 1차~3차 by its 비급 books); 연 has no 7차~9차 for the 천인, so those take its remaining 일반 techniques
+  // (수호구미호, 홍무기, 깨달음, 완전방어, 강림술'신록). The fx here is only the old fallback.
+  cl_boom: { cls: 'celestial', req: 1, name: '염화', kind: 'spell', fx: '7', dmg: 12, cd: 1.1, range: 7, count: 2,
+    desc: '불꽃을 피워 가까운 몬스터 둘을 따로따로 태운다. 4·7단에 하나씩 는다' },
+  cl_crow: { cls: 'celestial', req: 1, name: '삼족오', kind: 'spell', fx: '52', dmg: 15, cd: 2, range: 7, count: 2,
+    desc: '세 발 까마귀를 날려 몬스터 둘을 쪼아 댄다' },
+  cl_ago: { cls: 'celestial', req: 1, name: '비암격', kind: 'blink', fx: '53', dmg: 16, cd: 2.2, range: 5, count: 2,
+    desc: '바위를 일으키며 몬스터에게 돌진해 두 번 친다' },
+  cl_armor: { cls: 'celestial', req: 6, name: '갑옷파괴', kind: 'strike', fx: '147', dmg: 18, cd: 2.6, range: 7, radius: 1, count: 2,
+    hitAt: 0.3, curse: 3, desc: '번개의 기둥이 몬스터 둘과 그 주위의 갑옷을 깨뜨린다(약화)' },
+  cl_moment: { cls: 'celestial', req: 6, name: '찰나', kind: 'blink', fx: '52', dmg: 20, cd: 1.8, range: 5, count: 1,
+    desc: '찰나에 몬스터 등 뒤로 파고들어 친다' },
+  cl_storm: { cls: 'celestial', req: 12, name: '불가살이선풍', kind: 'strike', fx: '24', dmg: 16, cd: 3.4, range: 7, radius: 2, count: 1,
+    hitAt: 0.35, ticks: 3, up: 'cl_thunder', desc: '불가살이가 일으킨 소용돌이가 대상 자리에 남아 그 주위를 거듭 휩쓴다' },
+  cl_blood: { cls: 'celestial', req: 12, name: '혈류강탈', kind: 'spell', fx: '49', dmg: 18, cd: 2.8, range: 6, count: 1,
+    drain: 0.3, weakest: true, desc: '몬스터의 피를 빼앗아 체력을 회복한다' },
+  // 1차 천랑
+  cl_acumen: { promo: 1, cls: 'celestial', req: 6, name: '예리함\'극', kind: 'blink', fx: '144', dmg: 14, cd: 1.8, range: 5, count: 3,
+    desc: '날카로운 기운을 두르고 몬스터 사이를 누비며 세 번 벤다' },
+  cl_yeorae: { promo: 1, cls: 'celestial', req: 6, name: '여래의장', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
+    desc: '여래의 장막을 둘러 잠시 받는 피해를 절반으로 줄인다' },
+  // 2차 천무
+  cl_wall: { promo: 2, cls: 'celestial', req: 10, name: '철옹벽', kind: 'buff', buff: 'guard', fx: '57', cd: 16, duration: 1.5,
+    desc: '쇠 항아리 같은 벽을 세워 잠시 어떤 공격도 받지 않는다(무적)' },
+  cl_brilliant: { promo: 2, cls: 'celestial', req: 10, name: '빙글번쩍', kind: 'nova', fx: '89', dmg: 20, cd: 3, radius: 1, stun: 0.5,
+    desc: '빙글 돌며 번쩍이는 번개로 둘러싼 몬스터를 치고 잠시 멈춘다' },
+  cl_blood2: { promo: 2, cls: 'celestial', req: 10, name: '혈류강탈\'극', kind: 'spell', fx: '49', dmg: 18, cd: 2.6, range: 6, count: 3,
+    drain: 0.15, desc: '몬스터 셋의 피를 한꺼번에 빼앗아 체력을 회복한다' },
+  // 3차 천군
+  cl_slam: { promo: 3, cls: 'celestial', req: 14, name: '지열각', kind: 'line', fx: '144', dmg: 24, cd: 2.6, depth: 5, dash: true, stun: 0.5,
+    desc: '땅을 가르며 바라보는 쪽 일렬 다섯 칸을 짓밟고 나아간다' },
+  cl_storm2: { promo: 3, cls: 'celestial', req: 14, name: '불가살이장군폭풍', kind: 'strike', fx: '24', dmg: 18, cd: 3.4, range: 7, radius: 2, count: 2,
+    hitAt: 0.35, ticks: 2, desc: '불가살이 장군의 폭풍이 몬스터 둘의 자리에 머물며 그 주위를 거듭 휩쓴다' },
+  cl_bind: { promo: 3, cls: 'celestial', req: 14, name: '영역속박', kind: 'screen', fx: '115', dmg: 10, cd: 6, stun: 1,
+    desc: '영역을 묶어 화면의 모든 몬스터를 치고 잠시 멈춘다' },
+  // 4차 천위
+  cl_claw: { promo: 4, cls: 'celestial', req: 18, name: '용조수', kind: 'blink', fx: '144', dmg: 24, cd: 2.4, range: 6, count: 3,
+    desc: '용의 발톱으로 몬스터 사이를 누비며 세 번 할퀸다' },
+  cl_thunder: { promo: 4, cls: 'celestial', req: 18, evolved: true, name: '뇌격룡', kind: 'screen', fx: '141', dmg: 18, cd: 6,
+    desc: '불가살이선풍 8단 + 4차 승급. 번개의 용이 화면의 모든 몬스터를 내리친다' },
+  // 5차 재천
+  cl_tiger: { promo: 5, cls: 'celestial', req: 21, name: '범아귀', kind: 'blink', fx: '144', dmg: 30, cd: 2.6, range: 6, count: 3,
+    desc: '천인의 궁극오의. 범의 아가리처럼 몬스터 사이로 뛰어들어 세 번 물어뜯는다' },
+  cl_crowfire: { promo: 5, cls: 'celestial', req: 21, name: '삼족오\'염화발출', kind: 'strike', fx: '148', dmg: 26, cd: 3, range: 7, radius: 1, count: 3,
+    hitAt: 0.3, desc: '삼족오가 불꽃을 뿜어 몬스터 셋과 그 주위를 태운다' },
+  cl_bagua: { promo: 5, cls: 'celestial', req: 21, name: '영혼방패\'팔괘진', kind: 'heal', fx: '125', heal: 24, cd: 13, shieldT: 3,
+    desc: '팔괘진의 영혼방패로 체력을 회복하고 잠시 보호막을 두른다' },
+  // 6차 천신
+  cl_ego: { promo: 6, cls: 'celestial', req: 24, name: '자아파괴', kind: 'strike', fx: '115', dmg: 34, cd: 3, range: 7, radius: 2, count: 2,
+    hitAt: 0.3, curse: 3, desc: '몬스터 둘과 그 주위의 자아를 부수어 큰 피해를 주고 약화시킨다' },
+  // 7차~9차: 연's other 천인 techniques
+  cl_gumiho: { promo: 7, cls: 'celestial', req: 27, name: '수호구미호', kind: 'strike', fx: '52', dmg: 32, cd: 2.4, range: 7, radius: 1, count: 3,
+    hitAt: 0.25, desc: '아홉 꼬리의 수호 구미호를 불러 몬스터 셋과 그 주위를 휘감는다' },
+  cl_snake: { promo: 7, cls: 'celestial', req: 27, name: '홍무기', kind: 'spell', fx: '37', dmg: 30, cd: 1.8, range: 7, count: 3, slow: 2,
+    desc: '붉은 뱀을 풀어 몬스터 셋을 물고 느리게 한다' },
+  cl_intrep: { promo: 8, cls: 'celestial', req: 30, name: '깨달음', kind: 'buff', buff: 'power', fx: '15', cd: 18, duration: 6, power: 1.2,
+    desc: '깨달음을 얻어 잠시 공격력이 크게 오른다' },
+  cl_defense: { promo: 8, cls: 'celestial', req: 30, name: '완전방어', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 6,
+    desc: '완전한 방어로 잠시 받는 피해를 절반으로 줄인다' },
+  cl_reindeer: { promo: 9, cls: 'celestial', req: 33, name: '강림술\'신록', kind: 'screen', fx: '141', dmg: 60, cd: 9,
+    desc: '궁극기. 하늘의 신록이 강림해 화면의 모든 몬스터를 짓밟는다' },
+  cl_ult: { cls: 'celestial', name: '전의상실', kind: 'ult', fx: '144', hpCost: 0.15,
+    desc: '체력 15%와 마력을 모두 써서, 화면의 몬스터의 전의를 꺾는 일격을 가한다' },
 };
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
@@ -717,6 +788,11 @@ export const BRANCHES = {
     { name: '광폭', note: '광폭기로 휩쓴다', ids: ['md_spirit', 'md_frenzyexp', 'md_decay', 'md_wave', 'md_silence', 'md_bust', 'md_absorb', 'md_bloodbat', 'md_resonance', 'md_wavefrenzy'] },
     { name: '금기', note: '결계와 기원으로 버틴다', ids: ['md_enhance', 'md_heal', 'md_amulet', 'md_recovery', 'md_boundary', 'md_yinyang', 'md_frenetic', 'md_manafill'] },
   ],
+  celestial: [
+    { name: '천벌', note: '하늘의 불꽃과 번개를 떨어뜨린다', ids: ['cl_boom', 'cl_crow', 'cl_armor', 'cl_storm', 'cl_storm2', 'cl_bind', 'cl_thunder', 'cl_crowfire', 'cl_ego', 'cl_gumiho', 'cl_reindeer'] },
+    { name: '질주', note: '몬스터 사이로 뛰어든다', ids: ['cl_ago', 'cl_moment', 'cl_acumen', 'cl_brilliant', 'cl_slam', 'cl_claw', 'cl_tiger'] },
+    { name: '수호', note: '피를 빼앗고 몸을 지킨다', ids: ['cl_blood', 'cl_yeorae', 'cl_wall', 'cl_blood2', 'cl_bagua', 'cl_snake', 'cl_intrep', 'cl_defense'] },
+  ],
 };
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
@@ -740,8 +816,10 @@ const PRE = {
   mk_focus: 'mk_technique', mk_feint: 'mk_focus', mk_origin: 'mk_feint',
   md_bloodbat: 'md_silence', md_crossfrenzy: 'md_ray', md_stormfrenzy: 'md_crossfrenzy', md_storm: 'md_stormfrenzy', md_resonance: 'md_bloodbat',
   md_boundary: 'md_recovery', md_yinyang: 'md_boundary', md_frenetic: 'md_yinyang', md_manafill: 'md_frenetic',
+  cl_tiger: 'cl_claw', cl_crowfire: 'cl_storm2', cl_bagua: 'cl_blood2', cl_ego: 'cl_crowfire', cl_gumiho: 'cl_ego',
+  cl_snake: 'cl_bagua', cl_intrep: 'cl_snake', cl_defense: 'cl_intrep',
 };
-const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy' };
+const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
@@ -800,7 +878,7 @@ export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 export const PROMO_AT = ['rat', 'deer', 'haunt', 'goblin', 'yogoe', 'royal', 'musin', 'kirin', 'tagye'];
 export const PROMOS = Object.fromEntries(CLASSES.map(c => c.id).map(c => [c, PROMO_AT.map(at => ({ at }))]));
 // The 승급 titles of 바람의나라 연 (Strings Job_<n>_1..6), shown for its jobs' tiers; 7차~9차 keep the number.
-export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'] };
+export const PROMO_NAMES = { archer: ['명궁', '현궁', '진탄', '심안', '신궁', '천궁'], lancer: ['창객', '창제', '창황', '창성', '신창', '창극'], monk: ['권사', '권호', '권왕', '권제', '권신', '권극'], magus: ['마학사', '마현선', '마광사', '마진선', '마선사', '마천선'], celestial: ['천랑', '천무', '천군', '천위', '재천', '천신'] };
 
 // Passive upgrades, named after the stats and spells of the game. item: icon (manifest items).
 export const PASSIVES = {

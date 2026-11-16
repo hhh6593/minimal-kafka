@@ -138,6 +138,14 @@ MAP = {
         'md_crossfrenzy': 'SFX_Warlock_FrenzyCrossBeam', 'md_stormfrenzy': 'SFX_Warlock_FrenzyStorm', 'md_storm': 'SFX_Warlock_Storm', 'md_boundary': 'SFX_Warlock_BoundaryBreak',
         'md_yinyang': 'SFX_Warlock_OrbYinyang', 'md_resonance': 'SFX_Warlock_Resonance', 'md_frenetic': 'SFX_Warlock_Frenetic', 'md_manafill': 'SFX_Warlock_ManaFill',
         'md_wavefrenzy': 'SFX_Warlock_FrenzyWave', 'md_ult': 'SFX_Warlock_FrenzyMagicSphere',
+        # 천인 (Job_8): each skill's own SFX_Celestial_* clip (삼족오, 여래의장 and 철옹벽 have none: their kin's).
+        'cl_boom': 'SFX_Celestial_Boom', 'cl_crow': 'SFX_Celestial_5th_CrowFire', 'cl_ago': 'SFX_Celestial_AgoDestruction_Alt', 'cl_armor': 'SFX_Celestial_AgoArmor_Alt',
+        'cl_moment': 'SFX_Celestial_Moment', 'cl_storm': 'SFX_Celestial_ImmortalityStorm', 'cl_blood': 'SFX_Celestial_BloodRobbery', 'cl_acumen': 'SFX_Celestial_1st_Acumen',
+        'cl_yeorae': 'SFX_Celestial_CompleteDefense_Hit', 'cl_wall': 'SFX_Celestial_Acumen', 'cl_brilliant': 'SFX_Celestial_2nd_Brilliant', 'cl_blood2': 'SFX_Celestial_2nd_BloodRobbery',
+        'cl_slam': 'SFX_Celestial_3rd_GroundSlam', 'cl_storm2': 'SFX_Celestial_3rd_ImmortalityStorm', 'cl_bind': 'SFX_Celestial_3rd_MindControl', 'cl_claw': 'SFX_Celestial_4th_DragonClaw_Alt',
+        'cl_thunder': 'SFX_Celestial_4th_ThunderDragon', 'cl_tiger': 'SFX_Celestial_5th_TigerMaw_Alt', 'cl_crowfire': 'SFX_Celestial_5th_CrowFire', 'cl_bagua': 'SFX_Celestial_5th_Bagua',
+        'cl_ego': 'SFX_Celestial_6th_1', 'cl_gumiho': 'SFX_Celestial_GuardianGumiho', 'cl_snake': 'SFX_Celestial_Snake', 'cl_intrep': 'SFX_Celestial_Intrepidity',
+        'cl_defense': 'SFX_Celestial_CompleteDefense_Cast', 'cl_reindeer': 'SFX_Celestial_Reindeer', 'cl_ult': 'SFX_Celestial_LossFormer',
     },
     # Audit (each spell's icon, effect and sound out of the same 연 skill record): the record's own
     # sound field first, then the PlaySound event in its effect's animation (the 3차 sounds are
