@@ -1699,7 +1699,7 @@ function update(dt) {
   G.dying = G.dying.filter(d => d.t < 1.2);
   for (const t of G.texts) {
     t.t += dt;
-    if (t.t < 0.15) t.y -= 40 * dt;
+    if (t.t < 0.15 && !t.sum) t.y -= 40 * dt;
   }
   G.texts = G.texts.filter(t => t.t < 1.1);
   if (G.bubble && G.t - G.bubble.t > 1.3) G.bubble = null;
@@ -2567,12 +2567,28 @@ function hurtEnemy(e, dmg, push = null) {
   // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
   // orange for a heavy blow, grey for a light one.
   if (crit || settings.numbers) {
-    e.numN = G.t - (e.numT || -9) < 0.6 ? Math.min(4, (e.numN || 0) + 1) : 0;
-    e.numT = G.t;
-    if (G.texts.length > 70) G.texts.shift();
-    const heavy = dmg >= e.maxHp * 0.35;
-    G.texts.push({ x: e.x + rand(-5, 5), y: e.y - e.m.h * e.scale - 10 - e.numN * 10, text: String(Math.round(dmg)), t: 0, num: true,
-      crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
+    // A burst of blows on one body (오중공격, a chain, a screen spell's ticks): the first two
+    // stand alone, then one gold sum counts on above them, popping at each blow.
+    const bu = e.burst && G.t - e.burst.at < 0.4 ? e.burst : (e.burst = { at: G.t, n: 0, sum: 0, txt: null });
+    bu.at = G.t;
+    bu.n++;
+    bu.sum += dmg;
+    if (bu.n >= 3 && settings.numbers) {
+      if (!bu.txt || !G.texts.includes(bu.txt)) {
+        bu.txt = { x: e.x, y: e.y - e.m.h * e.scale - 34, text: '', t: 0, num: true, sum: true, crit: false, color: '#ffb43a' };
+        G.texts.push(bu.txt);
+      }
+      bu.txt.text = String(Math.round(bu.sum));
+      bu.txt.t = 0;
+      bu.txt.x = e.x;
+    } else {
+      e.numN = G.t - (e.numT || -9) < 0.6 ? Math.min(3, (e.numN || 0) + 1) : 0;
+      e.numT = G.t;
+      if (G.texts.length > 70) G.texts.shift();
+      const heavy = dmg >= e.maxHp * 0.35;
+      G.texts.push({ x: e.x + rand(-3, 3), y: e.y - e.m.h * e.scale - 10 - e.numN * 7, text: String(Math.round(dmg)), t: 0, num: true,
+        crit, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
+    }
   }
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
   // 주술사's heavy blow; a crit stops the world for a blink. Budgeted, not on a whole crowd.
@@ -4957,6 +4973,13 @@ function nextChoice() {
   G.choosing = true;
   audio.play('levelup');
   addFx(FX.levelup, 0, -26, { follow: true });
+  // 자동 선택: the hunt goes on, as 연's auto hunting does; the pick is named in the feed.
+  if (settings.autoPick && !G.banishing) {
+    const o = bestCard(picks);
+    lootFeed(`자동 선택 · ${cardName(o)}`);
+    choose(o);
+    return;
+  }
   $('#lv-title').textContent = `레벨 ${G.player.lvl}`;
   const box = $('#choices');
   box.innerHTML = '';
@@ -4994,6 +5017,7 @@ function nextChoice() {
     t.innerHTML = `<b>${name}</b> <i>${tag}</i><span>${text}</span>`;
     b.append(t);
     b.onclick = () => choose(o);
+    b._card = o;
     b.dataset.id = o.id;
     box.append(b);
   }
@@ -5003,6 +5027,7 @@ function nextChoice() {
   $('#lv-reroll').disabled = !G.rerolls;
   $('#lv-skip').disabled = !G.skips;
   $('#lv-banish').disabled = !G.banishes;
+  $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
   $('#levelup').hidden = false;
 }
 
@@ -5026,6 +5051,51 @@ $('#lv-banish').onclick = () => {
   G.banishing = !G.banishing;
   $('#lv-banish').textContent = G.banishing ? '뺄 카드를 고르세요' : `빼기 ${G.banishes}`;
 };
+
+/** A card's name, for the feed. */
+function cardName(o) {
+  return o.type === 'skill' ? skillName(o.id, o.lv) : o.type === 'passive' ? PASSIVES[o.id].name : o.type === 'heal' ? '회복' : '전';
+}
+
+/**
+ * 자동 선택: what a sound player would take. The build grows deep before it grows wide —
+ * raising spells already held, above all one near 8단 whose 각성 the 승급 already allows —
+ * until three attacks are held; screen-wide and area spells come before single strikes, and
+ * higher 승급 spells before lower; the spells of the build last kept for this class weigh
+ * more; damage and cooldown passives lead the passives, life and armour when life runs low.
+ */
+const SUPPORT_KINDS = new Set(['buff', 'heal', 'blink']);
+const AREA_KINDS = new Set(['screen', 'nova', 'cleave', 'aura', 'line', 'spell4']);
+function cardScore(o) {
+  const p = G.player, low = p.hp < p.maxHp * 0.45;
+  const attacks = G.skills.filter(s => !SUPPORT_KINDS.has(SKILLS[s.id].kind)).length;
+  const kept = ((progress.builds || {})[G.cls.id] || { skills: [] }).skills.map(x => x[0]);
+  if (o.type === 'skill') {
+    const d = SKILLS[o.id], attack = !SUPPORT_KINDS.has(d.kind);
+    let v;
+    if (o.lv > 1) {
+      v = attack ? 10 : 6;
+      if (d.up && SKILLS[d.up] && promoOf(G.cls.id) >= SKILLS[d.up].promo) v += 5;
+      if (o.lv >= 6) v += 2;
+    } else {
+      v = attack ? (attacks < 3 ? 12 : 8) : d.kind === 'heal' ? (low ? 9 : 5) : d.kind === 'blink' ? 3 : 5;
+      v += (d.promo || 0) * 1.2;
+      if (o.mastered) v += 2;
+    }
+    if (attack && AREA_KINDS.has(d.kind)) v += 2;
+    if (kept.includes(o.id)) v += 3;
+    return v;
+  }
+  if (o.type === 'passive') {
+    const base = { power: 9, haste: 8, area: 6, life: 6, armor: 6, mana: 4, speed: 4, magnet: 2 }[o.id] || 3;
+    return base + (low && (o.id === 'life' || o.id === 'armor') ? 6 : 0) - (o.lv - 1) * 0.4;
+  }
+  if (o.type === 'heal') return low ? 15 : 1;
+  return 0.5;
+}
+function bestCard(picks) {
+  return picks.reduce((a, o) => (cardScore(o) > cardScore(a) ? o : a), picks[0]);
+}
 
 function choose(o) {
   if (!G.choosing) return; // a second tap on the same card
@@ -5887,7 +5957,10 @@ function render(now) {
       bar(b.x - 22, b.y + 3, 44, 3, b.hp / b.maxHp, '#d33');
       ctx.font = '10px G9';
       ctx.textAlign = 'center';
-      if (b.name) outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
+      // A champion's tag only near the hero or once struck: a pack of tags cluttered the crowd.
+      const tag = b.kind === 'boss' || b.kind === 'mini' || (b.shown && G.t - b.shown < 3)
+        || Math.abs(b.x - G.player.x) + Math.abs(b.y - G.player.y) < TILE * 5;
+      if (b.name && tag) outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
     }
   }
   for (const d of G.dying) {
@@ -5958,7 +6031,7 @@ function render(now) {
     } else if (t.num && dmgFont()) {
       // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
       // to a third larger and settle in a tenth of a second, a crit bigger still.
-      const base = t.crit ? 1.0 : t.color === '#ffb43a' ? 0.66 : 0.56;
+      const base = t.crit ? 1.0 : t.sum ? 0.8 : t.color === '#ffb43a' ? 0.66 : 0.56;
       const pop = t.crit ? (t.t < 0.12 ? 1.6 - t.t * 5 : 1) : (t.t < 0.1 ? 1.3 - t.t * 3 : 1);
       drawDigits(t.text, Math.round(t.x), Math.round(t.y), t.color, base * pop);
     } else if (t.num) {
@@ -6384,6 +6457,8 @@ function syncSettings() {
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
   $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
+  $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
+  $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
 
 // ---------------------------------------------------------------- backup
@@ -6484,6 +6559,23 @@ $('#opt-bubble').onclick = () => {
   saveJson('bs_settings', settings);
   syncSettings();
 };
+const toggleAuto = () => {
+  settings.autoPick = !settings.autoPick;
+  saveJson('bs_settings', settings);
+  syncSettings();
+  // Turned on at a level-up: this card is taken at once too.
+  if (settings.autoPick && G && G.choosing && !G.banishing) {
+    const b = [...document.querySelectorAll('#choices .choice')];
+    const picks = b.map(x => x._card).filter(Boolean);
+    if (picks.length) {
+      const o = bestCard(picks);
+      lootFeed(`자동 선택 · ${cardName(o)}`);
+      choose(o);
+    }
+  }
+};
+$('#opt-auto').onclick = toggleAuto;
+$('#lv-auto').onclick = toggleAuto;
 $('#opt-num').onclick = () => {
   settings.numbers = !settings.numbers;
   saveJson('bs_settings', settings);

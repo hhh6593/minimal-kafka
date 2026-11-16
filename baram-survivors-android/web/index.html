@@ -444,6 +444,9 @@
   body.yeon #chat { left: 8px; right: auto; bottom: 8px; width: min(44%, 380px); height: 50px; padding: 0 2px;
       color: #ffffff; background: none; border: 0; font: 10px/12.5px G9, monospace; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
   body.yeon #chat::after { display: none; }
+  /* Over the field, a line fades after a few seconds so the fight stays clear. */
+  body.yeon #chat p { animation: chatfade 7s forwards; }
+  @keyframes chatfade { 0%, 75% { opacity: 1; } 100% { opacity: 0.15; } }
   body.yeon #chat p.sys { color: #9ac8ff; }
   body.yeon #chat p.party { color: #9aff8a; }
   body.yeon #chat p.warn { color: #ff8a6a; }
@@ -524,7 +527,7 @@
   <div id="lv-box">
     <div class="caption" id="lv-title"></div>
     <div id="choices"></div>
-    <div class="row lv-keys"><button id="lv-reroll" class="btn"></button><button id="lv-skip" class="btn"></button><button id="lv-banish" class="btn"></button><button id="lv-tree" class="btn">기술 트리</button></div>
+    <div class="row lv-keys"><button id="lv-reroll" class="btn"></button><button id="lv-skip" class="btn"></button><button id="lv-banish" class="btn"></button><button id="lv-tree" class="btn">기술 트리</button><button id="lv-auto" class="btn"></button></div>
   </div>
 </div>
 
@@ -540,6 +543,7 @@
       <button id="opt-bubble" class="btn"></button>
       <button id="opt-tiles" class="btn"></button>
       <button id="opt-party" class="btn"></button>
+      <button id="opt-auto" class="btn"></button>
     </div>
   </div>
 </div>
