@@ -1395,11 +1395,12 @@ let codexCls = null, codexGrade = 'all', codexOwned = false;
 function codexItems(cls) {
   const b = bag(cls), out = [];
   for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+    if (kind === 'shield' && !hasShield(cls.id)) continue;
     GEAR[cls.id][kind].forEach((name, t) => {
       const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
       const rc = craft && craftRecipe(cls.id);
       out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name: craft ? `${dragonName(cls.id, 1)} ~ ${dragonName(cls.id, DRAGON_MAX)}` : name,
-        icon: (craft && picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1))) || gearIcon(cls.id, kind, t), pow: gearPower(cls.id, kind, t),
+        icon: (craft && picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1))) || pieceIcon(cls, kind, t), pow: gearPower(cls.id, kind, t),
         owned: b.includes(`${kind}:${t}`),
         from: craft ? `대장장이 조합: ${GEAR[cls.id].weapon[rc.base]} ★${rc.star} + 용의 비늘 ${rc.mats.scale} + 여의주 ${rc.mats.pearl}`
           : raid ? raid.name : tierSources(cls.id, kind, t) });
@@ -1412,7 +1413,7 @@ function codexItems(cls) {
     const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${won(sp.craft.gold)}`
       : sp.srcName;
     out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
-      icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || gearIcon(cls.id, sp.kind, t),
+      icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || pieceIcon(cls, sp.kind, t, sp.id),
       pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from,
       opt: [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : '', sp.ward ? `${STATUS[sp.ward].name} 막기` : ''].filter(Boolean).join(' · ') });
   }
@@ -1537,7 +1538,7 @@ function openCraft(sink = null) {
   const has = b.includes(`weapon:${dt}`);
   const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
     && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
-  icon = picture(dragonName(cls.id, 1));
+  icon = picture(dragonName(cls.id, 1)) || pieceIcon(cls, 'weapon', dragonTier(cls)); // 연's icon for classes without a dress-room picture
   meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) / 2}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(rc.gold)}`,
@@ -1601,7 +1602,7 @@ function openCraft(sink = null) {
     progress.dragonSinsu = progress.dragonSinsu || {};
     for (const [sid, sn] of Object.entries(SINSU)) {
       const now = progress.dragonSinsu[cls.id] === sid, need = { [sn.mat]: 4, essence: 5 };
-      icon = picture(dragonName(cls.id, DRAGON_MAX));
+      icon = picture(dragonName(cls.id, DRAGON_MAX)) || pieceIcon(cls, 'weapon', dragonTier(cls));
       meta = { mats: need, gold: 20000, gyeok: GYEOK[sn.gyeok], got: now };
       row(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(need)} + 20000전 · ${gyeokText(sn.gyeok)}`,
         now ? '새김' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
