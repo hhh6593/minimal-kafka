@@ -797,6 +797,16 @@ def main():
                 shutil.copyfile(os.path.join(ydir, n), os.path.join(out, "ytown", n))
         with open(os.path.join(ydir, "index.json"), encoding="utf-8") as f:
             manifest["ui"]["ytown"] = json.load(f)
+    # The 사신수 길드대항전's battlefields (GEAR_DIR/ywar/ from tools/yeon_war.py: 연's 사신수 공성전
+    # castles and the 길림 field, in 1024-pixel pieces, and their walk grids). Loaded when a war starts.
+    wdir = os.path.join(gear_src, "ywar") if gear_src else None
+    if wdir and os.path.isfile(os.path.join(wdir, "index.json")):
+        os.makedirs(os.path.join(out, "ywar"), exist_ok=True)
+        for n in os.listdir(wdir):
+            if n.endswith(".png"):
+                shutil.copyfile(os.path.join(wdir, n), os.path.join(out, "ywar", n))
+        with open(os.path.join(wdir, "index.json"), encoding="utf-8") as f:
+            manifest["ywar"] = json.load(f)
     tdir = os.path.join(gear_src, "ytitle") if gear_src else None
     if tdir and os.path.isfile(os.path.join(tdir, "title_bg.jpg")):
         shutil.copyfile(os.path.join(tdir, "title_bg.jpg"), os.path.join(out, "ui", "title_bg.jpg"))
