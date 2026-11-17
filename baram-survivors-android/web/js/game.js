@@ -2023,7 +2023,12 @@ function stats(skill) {
 
 /** The hero's damage multiplier right now. */
 function might() {
-  let k = (G.player.gearPower || 1) * (G.cls.dmgK || 1); // the class's own weight (data.js), from bot clears of 왕초보
+  // The class's own weight (data.js), from bot clears of 왕초보. A cut (a caster whose spells
+  // grow into a screen-wide sweep) comes in with the levels, full from Lv 35 (spells near 8단): from the first,
+  // 천인 at half its blows fell to the first crowds about Lv 13.
+  let ck = G.cls.dmgK || 1;
+  if (ck < 1) ck = 1 - (1 - ck) * Math.min(1, Math.max(0, G.player.lvl - 1) / 34);
+  let k = (G.player.gearPower || 1) * ck;
   if (G.buffs.g_power > G.t) k *= 1 + (G.buffs.g_powerK || 0);
   if (G.buffs.g_pierce > G.t) k *= 1 + (G.buffs.g_pierceK || 0);
   if (G.player.sts && heroStatusOn('despair')) k *= 0.8;
@@ -3007,9 +3012,10 @@ function moveEnemies(dt) {
         e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
         e.atkAt = G.t;
-        // One pressed in on another's tile gets in a lesser blow: the heap round the hero is a
-        // sight and a target, not three times the bites.
-        hurtPlayer(e.dmg * (occ.get(key(e.tx, e.ty)) === e ? 1 : 0.6), e);
+        // Only the tile's holder bites; the others pressed in on its tile lunge for show. The heap
+        // round the hero is a sight and a target, not three times the bites (at 0.6 a ring of
+        // heaps bit 2.2 times as hard and swarmed the casters, 천인 dying on 왕초보).
+        if (occ.get(key(e.tx, e.ty)) === e) hurtPlayer(e.dmg, e);
       }
       continue;
     }

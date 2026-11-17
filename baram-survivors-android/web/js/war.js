@@ -2451,8 +2451,9 @@ function raidScale(dmg) {
   const G = A.G(), W = G.war;
   if (!(dmg > 0)) return dmg;
   // 자리비움: a hero away from the controls (its spells still fire by themselves) barely scratches
-  // the boss, so the raid is the player's to win: the raiders alone run out of time.
-  if (afk()) dmg *= 0.15;
+  // the boss, so the raid is the player's to win: the raiders alone run out of time. At 0.15 an
+  // idle 전사 (tough, its swings landing whenever the boss walked up) still won 멧돼지왕 at 7:13.
+  if (afk()) dmg *= 0.05;
   const win = W.rawWin || (W.rawWin = []);
   win.push([G.t, dmg]);
   W.rawSum = (W.rawSum || 0) + dmg;

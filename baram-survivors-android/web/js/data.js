@@ -25,7 +25,7 @@ export const CLASSES = [
   { id: 'poet', name: '도사', hero: '1004', hp: 100, mp: 120, speed: 68, armor: 0, start: 'p_orb', ult: 'p_ult',
     revive: true, desc: '회복과 보조의 달인. 몬스터를 불러내고, 한 번은 스스로 부활한다.' },
   // 바람의나라 연's 궁사 (Job_6): its figure, bows, skills and sounds come only from 연's resources.
-  { id: 'archer', name: '궁사', hero: '1002', hp: 120, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
+  { id: 'archer', name: '궁사', hero: '1002', hp: 135, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
   // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
   { id: 'lancer', name: '무사', hero: '1001', hp: 160, dmgK: 1.25, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
@@ -37,7 +37,7 @@ export const CLASSES = [
   { id: 'magus', name: '마도사', hero: '1003', hp: 105, dmgK: 0.55, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
     desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
   // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
-  { id: 'celestial', name: '천인', hero: '1003', hp: 130, dmgK: 0.52, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
+  { id: 'celestial', name: '천인', hero: '1003', hp: 145, dmgK: 0.52, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
     desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
   // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
   { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, dmgK: 2.0, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
