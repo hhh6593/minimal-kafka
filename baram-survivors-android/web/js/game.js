@@ -987,6 +987,8 @@ function applyStatus(e, kind, sec, k = 1) {
   const cur = e.st[kind], live = cur && cur.until > G.t;
   e.st[kind] = { until: G.t + sec, k: Math.max(k, live ? cur.k : 0), n: kind === 'bleed' ? Math.min(10, (live ? cur.n : 0) + 1) : 1, tick: live ? cur.tick : G.t };
   if (STATUS[kind].icon) e.stIcon = kind;
+  // 연 names a status over the struck as it takes hold ("마비", "중독"): once, and a few at a time.
+  if (!live && !G.war && fxBudget('stword', 3)) floatText(e.x, e.y - e.m.h * (e.scale || 1) - 22, STATUS[kind].name, STATUS[kind].color || '#d8b8ff');
 }
 
 /** Damage over time and the end of statuses, every half second. */
