@@ -16,7 +16,7 @@
 //   buff    - a short spell on the hero: more damage, unseen, or untouchable
 
 export const CLASSES = [
-  { id: 'warrior', name: '전사', hero: '1001', hp: 180, dmgK: 1.45, mp: 60, speed: 66, armor: 3, start: 'w_slash', ult: 'w_ult',
+  { id: 'warrior', name: '전사', hero: '1001', hp: 180, dmgK: 1.6, mp: 60, speed: 66, armor: 3, start: 'w_slash', ult: 'w_ult',
     desc: '체력과 방어가 높은 격수. 연속 공격으로 가까운 적을 베어 낸다.' },
   { id: 'rogue', name: '도적', hero: '1002', hp: 130, dmgK: 1.1, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
     desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다.' },
@@ -37,10 +37,10 @@ export const CLASSES = [
   { id: 'magus', name: '마도사', hero: '1003', hp: 105, dmgK: 0.55, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
     desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
   // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
-  { id: 'celestial', name: '천인', hero: '1003', hp: 130, dmgK: 0.65, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
+  { id: 'celestial', name: '천인', hero: '1003', hp: 130, dmgK: 0.52, mp: 110, speed: 72, armor: 1, start: 'cl_boom', ult: 'cl_ult',
     desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
   // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
-  { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, dmgK: 1.7, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
+  { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, dmgK: 2.0, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
     desc: '방망이를 휘두르는 근접 장사. 후려치고 메치고, 일격필살로 강한 적을 내리찍는다.' },
   // 바람의나라 연's 차사 (Job_10): 백도, figure, skills and sounds only from 연's resources.
   { id: 'reaper', name: '차사', hero: '1002', hp: 180, dmgK: 1.45, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
