@@ -7097,7 +7097,11 @@ function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   if (mirror) ctx.scale(-1, 1);
   const cols = u.cols || 1e9, sx = (f % cols) * cw, sy = (row + Math.floor(f / cols)) * ch;
   ctx.drawImage(monsterTint ? tinted(im, monsterTint) : im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
-  if (b.flash > 0) ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
+  // The flash fades as it goes and never quite hides the monster: a blink of white, not a white shape.
+  if (b.flash > 0) {
+    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * 0.75;
+    ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
+  }
   ctx.restore();
 }
 
@@ -7137,7 +7141,10 @@ function drawMonster(b, x, y, s, alpha = 1) {
   for (const [ox, oy] of [[-o, 0], [o, 0], [0, -o], [0, o]]) ctx.drawImage(sil, -w / 2 + ox, -h / 2 + oy, w, h);
   ctx.globalAlpha = alpha;
   ctx.drawImage(img, -w / 2, -h / 2, w, h);
-  if (b.flash > 0) ctx.drawImage(white(img), -w / 2, -h / 2, w, h);
+  if (b.flash > 0) {
+    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * 0.75;
+    ctx.drawImage(white(img), -w / 2, -h / 2, w, h);
+  }
   ctx.restore();
 }
 
