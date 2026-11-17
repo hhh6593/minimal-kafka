@@ -37,6 +37,13 @@ EFFECTS = {
     'levelup': 'FX_LevelUp', 'levelup_force': 'Fx_Force_Levelup',
     'drop': 'Drop_Effect_01', 'drop_2': 'Drop_Light_Class2', 'drop_3': 'Drop_Light_Class3',
     'drop_4': 'Drop_Light_Class4', 'drop_5': 'Drop_Light_Class5', 'kill': 'Sinsu_War_Kill',
+    # The close-in fighters' blows (game.js MELEE_LOOK): white slash arcs and hit flashes out of 연's
+    # own melee skills — 전사's 북천 slash and body-check burst, the 도적's back-attack cross, the
+    # 무사's thrust, the 격투가's punch and uppercut, the 차사's wind slashes, a small break spark.
+    'ml_slash': 'Skill_Effect_Bookchun_Slash', 'ml_burst': 'Skill_Effect_Fighter_BodyCheck_Hit_Up',
+    'ml_cross': 'Skill_Effect_Thief_BackAttack_Hit', 'ml_thrust': 'Skill_Effect_Lancer_F_02_Hit',
+    'ml_punch': 'Skill_Effect_Monk_ConsecutivePunch', 'ml_upper': 'Skill_Effect_Monk_BurstUppercut_Hit',
+    'ml_wind': 'Skill_Effect_Reaper_WindSlash_Hit3_Left', 'ml_spark': 'Skill_Effect_0026_Break_Hit',
 }
 
 
@@ -91,6 +98,11 @@ def effects(envs, out):
             print(name, pf, 'nothing drawn')
             continue
         frames, fps, ox, oy, add = res
+        if name.startswith('ml_'):
+            # A blow's mark is quick: the near-empty fading tail is left off.
+            mass = [sum(f[0].getchannel('A').getdata()) for f in frames]
+            while len(frames) > 4 and mass[len(frames) - 1] < max(mass) * 0.06:
+                frames = frames[:-1]
         st = to_strip(frames, ox, oy, add)
         if not st:
             continue
@@ -128,10 +140,11 @@ def ui(env, out):
 def main():
     fxs, skills, out = sys.argv[1], sys.argv[2], sys.argv[3]
     os.makedirs(out, exist_ok=True)
-    fenv = UnityPy.load(fxs)
-    font(fenv, 'Damage_01', 'Damage_Fonts', '1234567890', out, 'font_damage')
-    font(fenv, 'font_num', 'font_num', '1234567890,', out, 'font_gold')
-    effects([UnityPy.load(skills), fenv], out)
+    # Loaded together: some skill prefabs (the 도적's back-attack hit) take textures from FXs.
+    env = UnityPy.load(fxs, skills)
+    font(env, 'Damage_01', 'Damage_Fonts', '1234567890', out, 'font_damage')
+    font(env, 'font_num', 'font_num', '1234567890,', out, 'font_gold')
+    effects([env], out)
     if len(sys.argv) > 4:
         # The sprites' textures live in the Atlas bundle beside it: load the two together.
         ext = sys.argv[4]

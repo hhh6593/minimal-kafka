@@ -704,9 +704,52 @@ for (const b of document.querySelectorAll('#map-tabs button')) {
 // on tiles, and is never blocked: being walled in by monsters was too harsh for this genre.
 
 const TILE = 48;
-const occ = new Map(); // "tx,ty" -> the body on that tile
+const occ = new Map(); // "tx,ty" -> the body holding that tile
 const key = (x, y) => x + ',' + y;
 const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+
+// 바람의나라 연's crowd: right round the hero monsters do not queue one to a tile but press in, a few
+// on a tile, overlapping. Away from the hero a tile still holds one (the field keeps its order and
+// its pathing); within two tiles of the hero a tile may take up to three (two on the outer ring),
+// each drawn a little off the tile's middle. The tile's first comer holds it in occ; the others
+// sharing it are in crowd. Whatever strikes a tile strikes everyone on it (bodiesAt).
+// Not in a war or a raid (war.js keeps its own one-to-a-tile order).
+const crowd = new Map(); // "tx,ty" -> the monsters sharing the tile with its holder
+const SHARE_NEAR = 3, SHARE_FAR = 2;
+
+/** Every body on a tile: its holder, then those sharing it (null when none). */
+function bodiesAt(x, y) {
+  const k = key(x, y), b = occ.get(k);
+  if (!b) return null;
+  const c = crowd.get(k);
+  return c ? [b, ...c] : [b];
+}
+
+/** A body leaves its tile: one sharing it takes it over. */
+function leave(b) {
+  const k = key(b.tx, b.ty), c = crowd.get(k);
+  if (occ.get(k) === b) {
+    if (c && c.length) {
+      occ.set(k, c.shift());
+      if (!c.length) crowd.delete(k);
+    } else occ.delete(k);
+  } else if (c) {
+    const i = c.indexOf(b);
+    if (i >= 0) c.splice(i, 1);
+    if (!c.length) crowd.delete(k);
+  }
+}
+
+/** May this monster press onto a taken tile beside the hero? */
+function canShare(b, nx, ny) {
+  if (!G || G.war || G.stage.raid || !b.m || b.ally || b.war || b.march || b.flee || b.kind === 'boss' || b.kind === 'mini') return false;
+  const p = G.player, d = Math.abs(nx - p.tx) + Math.abs(ny - p.ty);
+  if (d < 1 || d > 2 || (p.stepping && p.sfx === nx && p.sfy === ny)) return false;
+  const k = key(nx, ny), h = occ.get(k);
+  if (!h || !h.m || h.ally || h.war || h.kind === 'boss' || h.kind === 'mini') return false;
+  const c = crowd.get(k);
+  return !c || c.length + 1 < (d === 1 ? SHARE_NEAR : SHARE_FAR);
+}
 
 function place(b, tx, ty) {
   b.tx = b.fx = tx;
@@ -720,8 +763,32 @@ function place(b, tx, ty) {
 /** Pixel position of a body's feet, between its last tile and the next while it steps. */
 function locate(b) {
   const k = b.moving ? Math.min(1, b.mt / b.dur) : 1;
-  b.x = (b.fx + (b.tx - b.fx) * k) * TILE + TILE / 2;
-  b.y = (b.fy + (b.ty - b.fy) * k) * TILE + TILE - 6;
+  b.x = (b.fx + (b.tx - b.fx) * k) * TILE + TILE / 2 + (b.jx || 0);
+  b.y = (b.fy + (b.ty - b.fy) * k) * TILE + TILE - 6 + (b.jy || 0);
+}
+
+/**
+ * Where a monster stands on its tile: a little off the middle of its own (no rigid rows), and
+ * spread round the tile when others share it, leaning in to the hero, as 연's crowds heap on one.
+ */
+function jostle(b, dt) {
+  if (b.j0 === undefined) b.j0 = Math.random() * Math.PI * 2;
+  const k = key(b.tx, b.ty), c = crowd.get(k);
+  let tx = Math.cos(b.j0) * 5, ty = Math.sin(b.j0) * 3;
+  if (c) {
+    const n = c.length + 1, i = occ.get(k) === b ? 0 : c.indexOf(b) + 1;
+    const a = b.j0 + (i / n) * Math.PI * 2;
+    tx = Math.cos(a) * 15;
+    ty = Math.sin(a) * 9;
+  }
+  const p = G.player, dx = p.tx - b.tx, dy = p.ty - b.ty, d = Math.abs(dx) + Math.abs(dy);
+  if (d <= 2 && d > 0) {
+    tx += (dx / d) * 9;
+    ty += (dy / d) * 7;
+  }
+  const r = Math.min(1, dt * 7);
+  b.jx = (b.jx || 0) + (tx - (b.jx || 0)) * r;
+  b.jy = (b.jy || 0) + (ty - (b.jy || 0)) * r;
 }
 
 function free(tx, ty) {
@@ -740,9 +807,15 @@ function heroTile() {
 /** Starts a one-tile step; false when the tile is taken. */
 function step(b, dx, dy, dur) {
   const nx = b.tx + dx, ny = b.ty + dy;
-  if (!free(nx, ny)) return false;
-  occ.delete(key(b.tx, b.ty));
-  occ.set(key(nx, ny), b);
+  const open = free(nx, ny);
+  if (!open && !canShare(b, nx, ny)) return false;
+  leave(b);
+  if (open) occ.set(key(nx, ny), b);
+  else {
+    const k = key(nx, ny), c = crowd.get(k);
+    if (c) c.push(b);
+    else crowd.set(k, [b]);
+  }
   b.fx = b.tx;
   b.fy = b.ty;
   b.tx = nx;
@@ -764,6 +837,7 @@ function faceTo(e, tx, ty) {
 }
 
 function advance(b, dt) {
+  if (b.m && !b.ally && !b.war && G && !G.war) jostle(b, dt);
   if (b.moving) {
     b.mt += dt;
     b.phase += (dt / b.dur) * 2 * Math.PI;
@@ -785,6 +859,7 @@ function startRun(cls, stage) {
   const gear = savedGear(cls);
   const mons = stageMonsters(stage);
   occ.clear();
+  crowd.clear();
   G = {
     cls, stage, ...mons, level: stage.level !== undefined ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
@@ -2031,15 +2106,23 @@ function stepHero(dx, dy, dt) {
     p.moving = false;
     p.pushT = (p.pushT || 0) + dt;
     if (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr) return;
-    // Pushed long enough, the hero and the monster trade places: never two on one tile.
-    occ.delete(key(nx, ny));
+    // Pushed long enough, the hero and the monsters on the tile trade places (the whole heap of
+    // a crowded tile goes together): never the hero and a monster on one tile.
+    const k = key(nx, ny), heap = crowd.get(k) || [];
+    occ.delete(k);
+    crowd.delete(k);
     place(there, p.tx, p.ty);
+    if (heap.length) crowd.set(key(p.tx, p.ty), heap);
     // It slides across as the hero does, rather than jumping.
-    there.fx = nx;
-    there.fy = ny;
-    there.mt = 0;
-    there.dur = TILE / heroSpeed();
-    there.moving = true;
+    for (const b of [there, ...heap]) {
+      b.tx = p.tx;
+      b.ty = p.ty;
+      b.fx = nx;
+      b.fy = ny;
+      b.mt = 0;
+      b.dur = TILE / heroSpeed();
+      b.moving = true;
+    }
   }
   p.pushT = 0;
   p.sfx = p.tx;
@@ -2600,7 +2683,7 @@ function spawn(dt) {
       const e = G.enemies.find(x => !x.kind);
       if (!e) break;
       G.enemies.splice(G.enemies.indexOf(e), 1);
-      occ.delete(key(e.tx, e.ty));
+      leave(e);
     }
     // Near a wall the ring can be full of rock: try again next frame rather than lose the boss,
     // but not for ever: after half a minute the ground is simply conquered.
@@ -2865,7 +2948,7 @@ function moveEnemies(dt) {
       // boss too: they hunt the hero rather than wait somewhere off the map.
       const at = ringTile(e.kind === 'boss' || e.kind === 'mini');
       if (at) {
-        occ.delete(key(e.tx, e.ty));
+        leave(e);
         place(e, at[0], at[1]);
       }
       continue;
@@ -2924,7 +3007,9 @@ function moveEnemies(dt) {
         e.atk = TEMPERS[e.temper || 'normal'].atk;
         e.lunge = 0.15;
         e.atkAt = G.t;
-        hurtPlayer(e.dmg, e);
+        // One pressed in on another's tile gets in a lesser blow: the heap round the hero is a
+        // sight and a target, not three times the bites.
+        hurtPlayer(e.dmg * (occ.get(key(e.tx, e.ty)) === e ? 1 : 0.6), e);
       }
       continue;
     }
@@ -2954,7 +3039,7 @@ function moveEnemies(dt) {
     const at = G.enemies.indexOf(e);
     if (at < 0) continue;
     G.enemies.splice(at, 1);
-    occ.delete(key(e.tx, e.ty));
+    leave(e);
     if (e.flee) say('보물을 지닌 몬스터가 달아났습니다.');
   }
 }
@@ -3065,11 +3150,16 @@ function hurtEnemy(e, dmg, push = null) {
   }
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
   // 주술사's heavy blow; a crit stops the world for a blink. Budgeted, not on a whole crowd.
-  const mark = G.cls.id === 'mage' ? ((crit || dmg >= e.maxHp * 0.35) && 'h_hit_fire')
-    : G.cls.id === 'poet' ? null : 'h_hit_tiger';
-  if (mark && M.fx[mark] && G.t - (e.markT || -9) > 0.3 && fxBudget('hit', 10)) {
-    e.markT = G.t;
-    fxOn(mark, e, { scale: mark === 'h_hit_fire' ? 0.38 : crit ? 0.6 : 0.45 });
+  // A close-in fighter's blows carry its own 연 hit flash (meleeMark).
+  const look = !G.allyHitting && !G.procHitting && MELEE_LOOK[G.cls.id];
+  if (look && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2 && M.fx[look.hit]) meleeMark(e, look, crit);
+  else {
+    const mark = G.cls.id === 'mage' ? ((crit || dmg >= e.maxHp * 0.35) && 'h_hit_fire')
+      : G.cls.id === 'poet' ? null : 'h_hit_tiger';
+    if (mark && M.fx[mark] && G.t - (e.markT || -9) > 0.3 && fxBudget('hit', 10)) {
+      e.markT = G.t;
+      fxOn(mark, e, { scale: mark === 'h_hit_fire' ? 0.38 : crit ? 0.6 : 0.45 });
+    }
   }
   // The hero's own blow (not a party member's, a summon's, or a 격's own) may loose a 격.
   if (!G.allyHitting && !G.procHitting) gyeokProc('hit', e);
@@ -3107,6 +3197,46 @@ function allyStrike(e, dmg, shown) {
     G.allyHitting = false;
   }
   return dmg;
+}
+
+// ---------------------------------------------------------------- 근접 타격감 (바람의나라 연)
+// 연's close-in fighters throw white slash arcs over what they strike and a flash on each one
+// struck. Each class has its own pair out of 연's client (tools/yeon_hud.py, fx h_ml_*):
+//   slash — over the struck tile, turned along the blow (Bookchun_Slash, Thief_BackAttack_Hit,
+//           Lancer_F_02_Hit, Monk_ConsecutivePunch, Fighter_BodyCheck_Hit_Up, Reaper_WindSlash_Hit3)
+//   hit   — a small flash on each monster struck (Fighter_BodyCheck_Hit_Up, 0026_Break_Hit, ...)
+// Budgeted: a crowd of thirty struck at once shows a handful, not thirty.
+const MELEE_LOOK = {
+  warrior: { slash: 'h_ml_slash', ss: 0.95, hit: 'h_ml_burst', hs: 0.34, turn: true },
+  rogue: { slash: 'h_ml_cross', ss: 0.42, hit: 'h_ml_spark', hs: 0.8 },
+  lancer: { slash: 'h_ml_thrust', ss: 0.7, hit: 'h_ml_spark', hs: 0.8, turn: true },
+  monk: { slash: 'h_ml_punch', ss: 0.6, hit: 'h_ml_upper', hs: 0.75 },
+  dokkaebi: { slash: 'h_ml_burst', ss: 0.42, hit: 'h_ml_spark', hs: 0.8 },
+  reaper: { slash: 'h_ml_wind', ss: 0.3, hit: 'h_ml_slash', hs: 0.6, turn: true },
+};
+
+/** A blow's slash arc over a struck tile (dx, dy: the way the blow goes; h: which of a flurry). */
+function meleeSlash(tx, ty, dx, dy, h = 0) {
+  const look = MELEE_LOOK[G.cls.id];
+  if (!look || !M.fx[look.slash] || !fxBudget('slash', 6)) return;
+  const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2 - 4;
+  const along = Math.atan2(dy || 0, dx || 0.0001);
+  const rot = look.turn ? along + Math.PI / 2 + (h % 2 ? 0.7 : -0.5) : (h % 2 ? 0.5 : -0.3);
+  addFx(look.slash, x + rand(-5, 5), y + rand(-5, 3), { scale: look.ss * (h % 3 === 2 ? 1.15 : 1), rot });
+}
+
+/** The flash on one struck monster, and once in a while a slash arc over it too. */
+function meleeMark(e, look, crit) {
+  if (G.t - (e.markT || -9) > 0.25 && fxBudget('hit', crit ? 16 : 12)) {
+    e.markT = G.t;
+    fxOn(look.hit, e, { scale: look.hs * (crit ? 1.4 : 1), rot: rand(-0.5, 0.5) });
+  }
+  // Area blows (a 퇴격, a 반월참, an earthquake) show arcs on the struck as well, not only the flash.
+  if (G.t - (G.arcT || -9) > 0.06 && Math.random() < 0.35) {
+    G.arcT = G.t;
+    const p = G.player;
+    meleeSlash(e.tx, e.ty, Math.sign(e.tx - p.tx), Math.sign(e.ty - p.ty), Math.floor(Math.random() * 3));
+  }
 }
 
 /** At most n of a kind of small flourish alive at once (each lives about 0.6 s). */
@@ -3178,7 +3308,7 @@ function killEnemy(e) {
   st.stageKills[G.stage.id] = (st.stageKills[G.stage.id] || 0) + 1;
   if (e.kind === 'boss') st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
   G.enemies.splice(at, 1);
-  occ.delete(key(e.tx, e.ty));
+  leave(e);
   // The body is thrown a little away from the hero as it falls.
   const kp = G.player, kl = Math.hypot(e.x - kp.x, e.y - kp.y) || 1;
   const dy = { e, t: 0, kx: (e.x - kp.x) / kl, ky: (e.y - kp.y) / kl };
@@ -3350,8 +3480,8 @@ function nearestEnemies(n, range, from = G.player) {
 function onTiles(tiles) {
   const out = [];
   for (const [x, y] of tiles) {
-    const b = occ.get(key(x, y));
-    if (b && b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0) && !out.includes(b)) out.push(b);
+    const bs = bodiesAt(x, y);
+    if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0) && !out.includes(b)) out.push(b);
   }
   return out;
 }
@@ -3383,8 +3513,8 @@ function around(tx, ty, r) {
   const out = [];
   for (let x = tx - r; x <= tx + r; x++) {
     for (let y = ty - r; y <= ty + r; y++) {
-      const b = occ.get(key(x, y));
-      if (b && b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0)) out.push(b);
+      const bs = bodiesAt(x, y);
+      if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0)) out.push(b);
     }
   }
   return out;
@@ -3472,7 +3602,7 @@ function lure() {
     const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p))
       .sort((a, b) => Math.hypot(a[0] - e.tx, a[1] - e.ty) - Math.hypot(b[0] - e.tx, b[1] - e.ty))[0];
     if (!spot) continue;
-    occ.delete(key(e.tx, e.ty));
+    leave(e);
     e.fx = e.tx;
     e.fy = e.ty;
     e.tx = spot[0];
@@ -3596,10 +3726,20 @@ function cast(skill, st) {
       for (let h = 0; h < hits; h++) {
         later(h * 0.14, () => {
           for (const [dx, dy] of dirs) {
-            const b = occ.get(key(p.tx + dx, p.ty + dy));
-            if (!b || !b.m || b.ally) continue;
-            if (fxid) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
-            hurtEnemy(b, dmg, [dx, dy]);
+            // Everyone pressed onto the tile takes the blow; the picture once, on the holder.
+            const bs = bodiesAt(p.tx + dx, p.ty + dy);
+            if (!bs) continue;
+            bs.forEach((b, i) => {
+              if (!b.m || b.ally || b.hp <= 0) return;
+              if (fxid && !i) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
+              hurtEnemy(b, dmg, [dx, dy]);
+            });
+            meleeSlash(p.tx + dx, p.ty + dy, dx, dy, h);
+          }
+          // The swing sweeps on: the two tiles flanking the one struck ahead (diagonally beside the
+          // hero) take half the blow, so a heap pressed round the hero is cut, not one tile of it.
+          for (const [fx, fy] of [[ax + ay, ay + ax], [ax - ay, ay - ax]]) {
+            for (const b of bodiesAt(p.tx + fx, p.ty + fy) || []) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, dmg * 0.5, [ax, ay]);
           }
         });
       }
@@ -3632,7 +3772,9 @@ function cast(skill, st) {
           if (e.hp <= 0) return;
           fxOn(fxid, e);
           if (def.curse) e.curse = def.curse;
-          hurtEnemy(e, st.dmg);
+          // Those pressed onto the same tile are cut with it.
+          for (const b of bodiesAt(e.tx, e.ty) || [e]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, st.dmg, [fx0, fy0]);
+          meleeSlash(e.tx, e.ty, fx0, fy0, i);
         });
       }
       const others = around(e.tx, e.ty, 1).filter(o => o !== e && o.hp > 0).slice(0, Math.max(0, st.count - (def.count || 1)));
@@ -3663,7 +3805,7 @@ function cast(skill, st) {
           if (b && b.m && !b.ally && !(b.war && b.team === 0)) {
             any = true;
             fxOn(fxid, b);
-            hurtEnemy(b, st.dmg);
+            for (const o of bodiesAt(b.tx, b.ty)) if (o.m && !o.ally && o.hp > 0) hurtEnemy(o, st.dmg);
             if (!def.pierce) break; // 삼매진화 burns the whole row
           }
         }
@@ -3893,7 +4035,9 @@ function plainAttack(dt) {
     p.fdy = dx ? 0 : Math.sign(dy);
     if (p.fdx) p.face = p.fdx;
   }
-  hurtEnemy(t, 7 * (1 + 0.1 * G.passives.power));
+  // Everyone pressed onto that tile takes the swing.
+  for (const b of bodiesAt(t.tx, t.ty) || [t]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, 7 * (1 + 0.1 * G.passives.power), dx || dy ? [dx, dy] : null);
+  meleeSlash(t.tx, t.ty, dx, dy, 0);
   audio.play('hit');
   strikePose('attack');
 }
@@ -4169,7 +4313,7 @@ function updateAllies(dt) {
     const tgt = nearestEnemies(1, 8, a)[0] || G.player;
     for (const [dx, dy] of towards(a, tgt.tx, tgt.ty)) if (step(a, dx, dy, 0.28)) break;
   }
-  for (const a of G.allies) if (a.t >= a.life) occ.delete(key(a.tx, a.ty));
+  for (const a of G.allies) if (a.t >= a.life) leave(a);
   G.allies = G.allies.filter(a => a.t < a.life);
 }
 

@@ -18,7 +18,7 @@
 export const CLASSES = [
   { id: 'warrior', name: '전사', hero: '1001', hp: 180, dmgK: 1.6, mp: 60, speed: 66, armor: 3, start: 'w_slash', ult: 'w_ult',
     desc: '체력과 방어가 높은 격수. 연속 공격으로 가까운 적을 베어 낸다.' },
-  { id: 'rogue', name: '도적', hero: '1002', hp: 130, dmgK: 1.1, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
+  { id: 'rogue', name: '도적', hero: '1002', hp: 130, dmgK: 1.5, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
     desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다.' },
   { id: 'mage', name: '주술사', hero: '1003', hp: 110, mp: 120, speed: 68, armor: 1, start: 'm_fire', ult: 'm_ult',
     desc: '원거리 공격 주술사. 신수마법으로 적을 태우고 마비시킨다.' },
@@ -31,7 +31,7 @@ export const CLASSES = [
   { id: 'lancer', name: '무사', hero: '1001', hp: 160, dmgK: 1.25, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
     desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
   // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
-  { id: 'monk', name: '격투가', hero: '1001', hp: 210, dmgK: 1.9, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
+  { id: 'monk', name: '격투가', hero: '1001', hp: 210, dmgK: 2.1, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
     desc: '맨주먹의 근접 격수. 파고들어 두들기고, 혈을 짚어 묶고, 땅을 갈라 터뜨린다.' },
   // 바람의나라 연's 마도사 (Job_11): 단봉, figure, skills and sounds only from 연's resources.
   { id: 'magus', name: '마도사', hero: '1003', hp: 105, dmgK: 0.55, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
@@ -43,7 +43,7 @@ export const CLASSES = [
   { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, dmgK: 2.0, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
     desc: '방망이를 휘두르는 근접 장사. 후려치고 메치고, 일격필살로 강한 적을 내리찍는다.' },
   // 바람의나라 연's 차사 (Job_10): 백도, figure, skills and sounds only from 연's resources.
-  { id: 'reaper', name: '차사', hero: '1002', hp: 180, dmgK: 1.45, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
+  { id: 'reaper', name: '차사', hero: '1002', hp: 180, dmgK: 1.6, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
     desc: '저승의 백도를 든 근접 격수. 베고 파고들며, 영혼의 화살과 업화로 넓게 거둔다.' },
 ];
 
@@ -549,8 +549,8 @@ export const SKILLS = {
     desc: '곁의 몬스터를 주먹으로 친다. 단이 오르면 더 여러 번, 앞뒤 양옆까지 친다' },
   mk_sudden: { cls: 'monk', req: 1, name: '전광석화', kind: 'blink', fx: '52', dmg: 16, cd: 1.3, range: 4, count: 2,
     desc: '번개처럼 몬스터 등 뒤로 파고들며 두 번 친다' },
-  mk_smash: { cls: 'monk', req: 1, name: '비연격', kind: 'cleave', fx: '20', dmg: 20, cd: 1.8, depth: 1, max: 4,
-    desc: '제비처럼 날아올라 앞쪽 몬스터 넷을 걷어찬다' },
+  mk_smash: { cls: 'monk', req: 1, name: '비연격', kind: 'cleave', fx: '20', dmg: 20, cd: 1.8, depth: 1, max: 6,
+    desc: '제비처럼 날아올라 앞쪽 몬스터 여섯을 걷어찬다' },
   mk_body: { cls: 'monk', req: 6, name: '철산고', kind: 'line', fx: '144', dmg: 22, cd: 2.4, depth: 3, dash: true, stun: 0.5,
     desc: '어깨로 들이받으며 바라보는 쪽 일렬 세 칸을 밀고 나간다' },
   mk_quake: { cls: 'monk', req: 6, name: '천지파동', kind: 'nova', fx: '25', dmg: 24, cd: 2.6, radius: 1, stun: 0.5,
@@ -818,8 +818,8 @@ export const SKILLS = {
   // 영기방벽, 개안, 저승문). 절섬, 나선광륜, 영기방출 and 저승문 are particle or broken-alpha effects in 연's
   // bundle: they show the 차사's own 풍혼일섬 swing, 살극 rings, 영기 spirit and 대영살 burst. The fx here
   // is only the old fallback.
-  rp_cut: { cls: 'reaper', req: 1, name: '절섬', kind: 'cleave', fx: '20', dmg: 18, cd: 0.75, depth: 1, max: 4,
-    desc: '백도로 앞쪽을 베어 몬스터 넷을 끊어 낸다' },
+  rp_cut: { cls: 'reaper', req: 1, name: '절섬', kind: 'cleave', fx: '20', dmg: 18, cd: 0.75, depth: 1, max: 6,
+    desc: '백도로 앞쪽을 베어 몬스터 여섯을 끊어 낸다' },
   rp_flash: { cls: 'reaper', req: 1, name: '진섬\'연', kind: 'blink', fx: '52', dmg: 16, cd: 1.6, range: 5, count: 2,
     desc: '번쩍이며 몬스터 등 뒤로 파고들어 두 번 벤다' },
   rp_shot: { cls: 'reaper', req: 1, name: '영살', kind: 'spell', fx: '53', dmg: 18, cd: 1.8, range: 6, count: 2,
