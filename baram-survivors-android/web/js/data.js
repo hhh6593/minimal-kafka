@@ -418,7 +418,7 @@ export const SKILLS = {
     desc: '앞쪽 넓은 범위에 불화살을 연달아 퍼부어 몬스터를 밀쳐 낸다' },
   // 1차 명궁
   a_bomb: { promo: 1, cls: 'archer', req: 6, name: '마탄', kind: 'strike', fx: '147', dmg: 22, cd: 2.6, range: 7, radius: 1, count: 1,
-    hitAt: 0.3, desc: '특별한 화살을 쏘아 대상과 그 주위를 터뜨린다' },
+    hitAt: 0.265, desc: '특별한 화살을 쏘아 대상과 그 주위를 터뜨린다' },
   a_freeze: { promo: 1, cls: 'archer', req: 6, name: '급냉화살', kind: 'strike', fx: '68', dmg: 14, cd: 3.2, range: 6, radius: 1, count: 2,
     hitAt: 0.3, stun: 1.2, desc: '빙결 화살로 몬스터 둘과 그 주위를 잠시 얼린다' },
   a_coverfire: { promo: 1, cls: 'archer', req: 6, name: '화염시', kind: 'buff', buff: 'haste', fx: '7', cd: 15, duration: 4,
@@ -520,7 +520,7 @@ export const SKILLS = {
     desc: '진기로 몸을 감싸 잠시 받는 피해를 절반으로 줄인다' },
   // 6차 창극
   l_annihil: { promo: 6, cls: 'lancer', req: 24, name: '화룡사멸', kind: 'strike', fx: '139', dmg: 40, cd: 3, range: 7, radius: 1, count: 3,
-    hitAt: 0.35, strongest: true, desc: '하늘에서 화룡의 불기둥 셋을 가장 강한 몬스터들(보스를 먼저)과 그 주위에 내리꽂는다' },
+    hitAt: 0.525, strongest: true, desc: '하늘에서 화룡의 불기둥 셋을 가장 강한 몬스터들(보스를 먼저)과 그 주위에 내리꽂는다' },
   // 7차~9차: 연's other 무사 techniques
   l_dragon: { promo: 7, cls: 'lancer', req: 27, name: '맹룡승천', kind: 'strike', fx: '24', dmg: 34, cd: 2.4, range: 6, radius: 1, count: 3,
     hitAt: 0.25, stun: 0.6, desc: '용처럼 솟구치는 창격이 몬스터 셋과 그 주위를 띄워 친다' },
@@ -780,7 +780,7 @@ export const SKILLS = {
   dk_judgment: { promo: 3, cls: 'dokkaebi', req: 14, name: '일격필살\'천벌', kind: 'strike', fx: '139', dmg: 46, cd: 3.4, range: 5, radius: 1, count: 1,
     hitAt: 0.35, strongest: true, desc: '하늘의 벌로 가장 강한 몬스터와 그 주위를 내리찍는다' },
   dk_shock: { promo: 3, cls: 'dokkaebi', req: 14, name: '도깨비불\'뇌격', kind: 'spell', fx: '89', dmg: 18, cd: 2.4, range: 7, count: 3, stun: 0.6,
-    desc: '번개 도깨비불이 몬스터 셋을 치고 잠시 마비시킨다' },
+    hitAt: 0.48, desc: '번개 도깨비불이 몬스터 셋을 치고 잠시 마비시킨다' },
   dk_flatten: { promo: 3, cls: 'dokkaebi', req: 14, name: '평탄화', kind: 'screen', fx: '141', dmg: 14, cd: 6, stun: 0.5,
     desc: '땅을 평평하게 내리쳐 화면의 모든 몬스터를 치고 잠시 멈춘다' },
   // 4차 귀성

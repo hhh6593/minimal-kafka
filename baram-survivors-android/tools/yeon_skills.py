@@ -143,6 +143,16 @@ def sprite_img(sp, cache):
     ppu = s.m_PixelsToUnits or 100
     # Pivot in pixels from the sprite's bottom-left (Unity's m_Pivot is 0..1 of the rect).
     pv = (s.m_Pivot.x * s.m_Rect.width, s.m_Pivot.y * s.m_Rect.height)
+    # A sprite packed tight in its atlas reads out as only its drawn part (textureRect), which lies
+    # textureRectOffset into the sprite's rect: the pivot is measured from that part's corner
+    # (격풍권's first frame, a small puff 64 px in, otherwise fell in the frame's corner).
+    try:
+        tr, off = s.m_RD.textureRect, s.m_RD.textureRectOffset
+        if abs(im.width - tr.width) <= 1.5 and abs(im.height - tr.height) <= 1.5 and \
+                (im.width < s.m_Rect.width - 1.5 or im.height < s.m_Rect.height - 1.5):
+            pv = (pv[0] - off.x, pv[1] - off.y)
+    except AttributeError:
+        pass
     cache[sp.path_id] = (im, ppu, pv)
     return cache[sp.path_id]
 
@@ -295,7 +305,9 @@ def shade(mi, props, sprite, cache):
             x = src[..., idx]
             stp = f.get(f'_{ch}_Step')
             blur = f.get(f'_{ch}_Blur', f.get(f'_Blur_{ch}', 0.3))
-            if stp is not None and (f.get(f'_{key}Step', 0) > 0.5 or 'Dissolve_Slash' in sh):
+            # Explosion_Sub always steps (its _RStep/_GStep/_BStep switches stay off while the clip
+            # drives the steps from 0 to 1: 연폭화살's fire cloud bursts and burns away).
+            if stp is not None and (f.get(f'_{key}Step', 0) > 0.5 or 'Dissolve_Slash' in sh or 'Explosion_Sub' in sh):
                 x = smooth(stp, stp + max(0.02, blur), x)
             chans.append(x); cols.append(colr)
         if not chans:
@@ -1003,6 +1015,11 @@ def main():
                 res = combine(layers)
             if res:
                 frames, fps, ox, oy, add = res
+                # "frames": only the first N frames kept, for a clip that runs on empty after its
+                # picture has gone (화룡사멸, 도깨비불'뇌격: half a second of nothing; game.js's hitAt
+                # keeps the blow where it fell in the longer picture).
+                if spec.get('frames'):
+                    frames = frames[:int(spec['frames'])]
                 # "mixed": an additive effect kept as a painted one (see to_strip).
                 st = to_strip(frames, ox, oy, 'mixed' if add and spec.get('mixed') else add)
                 if add and spec.get('mixed'):

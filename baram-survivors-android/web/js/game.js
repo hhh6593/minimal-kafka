@@ -4082,7 +4082,8 @@ function cast(skill, st) {
         later(shoot(e), () => {
           if (e.hp <= 0) return;
           const life = fxOn(fxid, e);
-          later(life * 0.3, () => {
+          // (hitAt: where in its picture the blow falls, for one cut short of its empty end)
+          later(life * (def.hitAt || 0.3), () => {
             const dealt = smite(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
             if (def.drain && dealt) heal(dealt * def.drain, false, true);
           });
@@ -4350,6 +4351,7 @@ function cast(skill, st) {
     }
   }
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
+  if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
     if (def.darken) G.darkUntil = G.t + def.darken;
@@ -5642,25 +5644,121 @@ function drawYeonStatus() {
   ctx.restore();
 }
 
-/** 연's pickup list at the right: each find a line, the newest at the bottom, fading out. */
-function lootFeed(text) {
-  G.feed.push({ text, t: G.t });
-  if (G.feed.length > 6) G.feed.shift();
+/**
+ * 연's pickup list at the right, below where its minimap stands: each find a dark rounded line,
+ * its icon on a pale disc at the left ("57전 획득" with 연's 엽전), the newest at the bottom.
+ * A line fades in, stays and fades; the oldest go as more come. icon: an image or a function
+ * giving one (drawn as it is loaded).
+ */
+function lootFeed(text, icon = null) {
+  G.feed.push({ text, t: G.t, icon });
+  if (G.feed.length > 4) G.feed.shift();
 }
+function coinIcon() { return images['hud/ui_icon_gold2.png']; }
 function drawLootFeed() {
   G.feed = G.feed.filter(f => G.t - f.t < 4);
   if (!G.feed.length) return;
   const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
-  const x = canvas.width - 12 * d, y0 = 150 * d;
+  // Right of it the 상태창 tab; above it the 연속 처치 count.
+  const xr = canvas.width - 26 * d, y0 = 96 * d, h = 16 * d, gap = 19 * d;
   ctx.save();
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.font = `${Math.round(10 * d)}px G9`;
   G.feed.forEach((f, i) => {
-    ctx.globalAlpha = Math.min(1, (4 - (G.t - f.t)) * 1.5);
-    const y = y0 + i * 15 * d, w = ctx.measureText(f.text).width + 12 * d;
-    ctx.fillStyle = 'rgba(10,8,6,0.5)';
-    ctx.fillRect(x - w, y - 11 * d, w + 4 * d, 14 * d);
-    outline(f.text, x, y, '#f4e6c4');
+    const age = G.t - f.t;
+    ctx.globalAlpha = Math.max(0, Math.min(1, age / 0.18, (4 - age) * 1.5));
+    const ic = typeof f.icon === 'function' ? f.icon() : f.icon;
+    const hasIc = ic && ic.width;
+    const tw = ctx.measureText(f.text).width;
+    const w = tw + (hasIc ? h + 6 * d : 8 * d) + 8 * d;
+    const x = xr - w + Math.max(0, 1 - age / 0.18) * 8 * d, y = y0 + i * gap;
+    ctx.fillStyle = 'rgba(16,12,8,0.62)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
+    ctx.fill();
+    let tx = x + 8 * d;
+    if (hasIc) {
+      const r = h / 2 - d;
+      ctx.fillStyle = 'rgba(242,234,214,0.92)';
+      ctx.beginPath();
+      ctx.arc(x + h / 2, y + h / 2, r, 0, Math.PI * 2);
+      ctx.fill();
+      const s = r * 1.7, k = Math.min(s / ic.width, s / ic.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(ic, x + h / 2 - ic.width * k / 2, y + h / 2 - ic.height * k / 2, ic.width * k, ic.height * k);
+      tx = x + h + 4 * d;
+    }
+    outline(f.text, tx, y + h - 4 * d, '#ffffff');
+  });
+  ctx.restore();
+}
+
+/**
+ * 연's 전투 정보 at the left, under health and mana: a small dark window with its brown title,
+ * the hero's experience as a bar with its numbers, and the last few things the fight did
+ * ("[백호의희원]을(를) 외웠습니다.", "체력이 …회복되었습니다.", "경험치가 …올랐습니다.") as 연 lists them.
+ * key: lines of a kind that come close together are added into one (amount n, words from text(n)).
+ */
+function battleInfo(key, n, text) {
+  const L = G.binfo || (G.binfo = []), last = L[L.length - 1];
+  if (last && last.key === key && G.t - last.t < 1.5 && n !== null) {
+    last.n += n;
+    last.t = G.t;
+    last.text = text(last.n);
+    return;
+  }
+  L.push({ key, n, t: G.t, text: text(n) });
+  if (L.length > 3) L.shift();
+}
+function drawBattleInfo() {
+  if (!document.body.classList.contains('yeon') || G.war || settings.battleInfo === false) return;
+  const p = G.player, cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const x = 6 * d, y = 50 * d, w = 124 * d, th = 14 * d, lh = 10.5 * d, MAXROWS = 4;
+  ctx.save();
+  ctx.font = `${Math.round(8.5 * d)}px G9`;
+  // The last lines, wrapped at word breaks as 연 wraps them, the newest kept when they are many.
+  const rows = [];
+  for (const l of (G.binfo || []).filter(l => G.t - l.t < 9).reverse()) {
+    const out = [];
+    let cur = '';
+    for (const word of l.text.split(' ')) {
+      const t = cur ? cur + ' ' + word : word;
+      if (cur && ctx.measureText(t).width > w - 8 * d) { out.push(cur); cur = word; } else cur = t;
+    }
+    if (cur) out.push(cur);
+    if (rows.length + out.length > MAXROWS) break;
+    rows.unshift(...out.map(text => ({ text, a: Math.min(1, (9 - (G.t - l.t)) * 0.8) })));
+  }
+  const h = th + 23 * d + rows.length * lh + 3 * d;
+  ctx.fillStyle = 'rgba(14,10,8,0.5)';
+  ctx.fillRect(x, y, w, h);
+  // The title: 연's dark brown plate with a gilt edge.
+  ctx.fillStyle = 'rgba(58,30,16,0.92)';
+  ctx.fillRect(x, y, w, th);
+  ctx.strokeStyle = 'rgba(201,162,74,0.9)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(x + d / 2, y + d / 2, w - d, th - d);
+  ctx.textAlign = 'center';
+  ctx.font = `bold ${Math.round(9.5 * d)}px G11`;
+  outline('전투 정보', x + w / 2, y + th - 3.5 * d, '#f6ead0');
+  // Experience: its numbers over an orange bar with the share in it.
+  const k = Math.min(1, p.xp / p.next);
+  ctx.font = `${Math.round(8.5 * d)}px G9`;
+  outline(`${shownNum(Math.floor(p.xp))}/${shownNum(Math.floor(p.next))}`, x + w / 2, y + th + 10 * d, '#ffffff');
+  const bx = x + 8 * d, by = y + th + 13 * d, bw = w - 16 * d, bh = 8 * d;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(bx - d, by - d, bw + 2 * d, bh + 2 * d);
+  ctx.fillStyle = '#3a1c0c';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = 'rgb(236,112,20)';
+  ctx.fillRect(bx, by, bw * k, bh);
+  ctx.font = `${Math.round(7.5 * d)}px G9`;
+  outline(`${(k * 100).toFixed(2)}%`, x + w / 2, by + bh - 1.5 * d, '#ffffff');
+  ctx.textAlign = 'left';
+  ctx.font = `${Math.round(8.5 * d)}px G9`;
+  rows.forEach((r, i) => {
+    ctx.globalAlpha = r.a;
+    outline(r.text, x + 4 * d, by + bh + 11 * d + i * lh, '#efe6d6');
   });
   ctx.restore();
 }
@@ -6209,7 +6307,7 @@ function updatePickups(dt) {
         progress.mats[d.mat] = (progress.mats[d.mat] || 0) + 1;
         (G.gained = G.gained || []).push(MATS[d.mat].name);
         note(`${MATS[d.mat].name} +1`);
-        lootFeed(`${MATS[d.mat].name} 획득`);
+        lootFeed(`${MATS[d.mat].name} 획득`, () => matImage(d.mat));
         audio.play('pickup');
       }
       else if (d.kind === 'heal') heal(30, true);
@@ -6218,7 +6316,7 @@ function updatePickups(dt) {
         G.gold += n;
         if (G.texts.length < 70) G.texts.push({ x: p.x + rand(-6, 6), y: p.y - 40, text: String(n), t: 0, gold: true });
         note(`${won(n)}을 주웠습니다.`);
-        lootFeed(`${won(n)} 획득`);
+        lootFeed(`${won(n)} 획득`, coinIcon);
         audio.play('pickup');
       } else if (d.kind === 'chest') {
         G.gold += 100 * (1 + G.level);
@@ -6242,6 +6340,7 @@ function heal(n, sound, quiet = false) {
   if (n <= 0) return;
   p.hp += n;
   healText(p, n);
+  battleInfo('heal', n, v => `체력이 ${shownNum(v)} 회복되었습니다.`);
   if (!quiet) addFx(FX.heal, 0, -26, { follow: true });
   if (sound) audio.play('heal');
 }
@@ -6252,6 +6351,8 @@ function gainXp(v) {
   v *= 1.7;
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
+  const got = v * pactReward(), of = p.next;
+  battleInfo('xp', got, k => `경험치가 ${shownNum(Math.round(k))}(${(k / of * 100).toFixed(2)}%) 올랐습니다.`);
   while (p.xp >= p.next) {
     p.xp -= p.next;
     p.lvl++;
@@ -7708,6 +7809,7 @@ function render(now) {
   drawYeonStatus();
   drawChain();
   drawLootFeed();
+  drawBattleInfo();
   if (G.war) War.hud();
   drawJoystick();
 }
@@ -8092,6 +8194,7 @@ function syncSettings() {
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
   $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
   $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
+  $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
 
@@ -8187,6 +8290,11 @@ $('#opt-tiles').onclick = () => {
     p.x = p.tx * TILE + TILE / 2;
     p.y = p.ty * TILE + TILE - 6;
   }
+};
+$('#opt-info').onclick = () => {
+  settings.battleInfo = settings.battleInfo === false;
+  saveJson('bs_settings', settings);
+  syncSettings();
 };
 $('#opt-bubble').onclick = () => {
   settings.bubbles = !settings.bubbles;

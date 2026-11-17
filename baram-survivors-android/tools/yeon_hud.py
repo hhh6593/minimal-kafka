@@ -122,7 +122,9 @@ UI_SPRITES = ['Img_KillCombo_Base', 'Img_Kill', 'Img_KillLog', 'Icon_KillLog', '
               'attack_result_win', 'attack_result_lose', 'tag_blue_team', 'tag_red_team', 'vs', 'icon_target',
               'icon_castle_war', 'attack_arrow_blue', 'attack_arrow_red',
               # the ink countdown and the result: 연's brush blots, the spotlight, reward medallions.
-              'bg_brush_05', 'ink_nine', 'Muhan_regult_ink_2', 'light02', 'Light', 'icon_medal01', 'Icon_Medal_Gold_01', 'ink_ff_04', 'ink_ff_06']
+              'bg_brush_05', 'ink_nine', 'Muhan_regult_ink_2', 'light02', 'Light', 'icon_medal01', 'Icon_Medal_Gold_01', 'ink_ff_04', 'ink_ff_06',
+              # the hunt's "N전 획득" pickup lines at the right: 연's coin (엽전) icon.
+              'icon_gold2']
 
 
 def ui(env, out):
