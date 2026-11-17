@@ -6916,6 +6916,13 @@ function render(now) {
     for (const [x, y] of mk.tiles) ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
   }
 
+  // A boss gathering its 광역기: the whole floor flashes red under the bodies, as 연's boss rooms do.
+  if (G.blast && G.t < G.blast.at) {
+    const k = 1 - (G.blast.at - G.t) / 1.6;
+    ctx.fillStyle = `rgba(210, 30, 25, ${(0.22 + 0.2 * k) * (0.75 + 0.25 * Math.sin(G.t * 18))})`;
+    ctx.fillRect(camX, camY, VW, VH);
+  }
+
   // A 마도사's void (def.darken): the field goes dark round the bodies for a moment, as in 연.
   if (G.darkUntil > G.t) {
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.9, (G.darkUntil - G.t) * 2.5)})`;
