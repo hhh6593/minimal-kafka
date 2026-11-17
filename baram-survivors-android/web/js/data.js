@@ -1154,9 +1154,9 @@ export const STAGES = [
 // leader (with followers) at 1:30 and 3:10; a pack of champions every minute.
 export const BOSS_AT = 4 * 60;
 
-// 레이드: 키운 직업이 모두 모여 거대한 보스 하나를 친다. 고른 직업으로 들어가고, 나머지 직업은 각자의
-// 최고 기록과 장비만큼 강한 동료로 처음부터 함께한다. 보스는 1:30에 나오며, 바닥에 붉게 예고한 칸을
-// 내리친다(한 칸씩 걸어 피한다). 체력 2/3, 1/3에서 더 사나워지고, 8분 안에 못 잡으면 실패.
+// 레이드: 공격대 25명(탱커·힐러·딜러·서포터, 내 다른 직업들도 그 안에)이 거대한 보스 하나를 친다
+// (war.js의 공대). 보스는 0:15에 나오며, 바닥에 붉게 예고한 칸을 내리친다(한 칸씩 걸어 피한다).
+// 체력 70%, 40%에서 더 사나워지고, 7분에 광폭화, 8분 안에 못 잡으면 실패. 보상 등급은 역할별 기여로.
 // open: 이 사냥터를 (아무 직업으로든) 정복하면 열린다. 보스 이름은 이 게임에서 붙인 것이다.
 export const RAIDS = [
   // A ladder, the low rungs open from the middle grounds: level sets the monsters, the boss's
