@@ -366,7 +366,9 @@ function setup() {
       W.squads.push(sq);
       W.teams[team].squads.push(sq);
       const plan = ['tank', 'healer', 'dps', 'dps', 'support'];
-      if (team === 0 && s === 0) plan.splice(plan.indexOf(role), 1);
+      // The hero fights in the second squad, the guild's main body (the first keeps the home
+      // 거점 or the 진영대장, a post with little fighting).
+      if (team === 0 && s === 1) plan.splice(plan.indexOf(role), 1);
       for (const r of plan) {
         const f = mkFighter(W, team, r, sq);
         sq.members.push(f);
@@ -376,8 +378,8 @@ function setup() {
     }
     W.teams[team].troops = [];
   }
-  W.squads[0].members.push(W.hero);
-  W.hero.squad = W.squads[0];
+  W.squads[1].members.push(W.hero);
+  W.hero.squad = W.squads[1];
   mkCommanders(W);
   mkTroops(W);
   // The escort's camps are set by its road (and the troops' posts by the camps), before anyone stands.
@@ -1348,7 +1350,8 @@ function healBody(W, src, m, n) {
 function credit(b, what, n) {
   if (!b || !b.stats || !(n > 0)) return;
   if (b.hero) {
-    if (CAPPED.has(what)) n = heroCap(what, n);
+    // In a war the hero's objectives (crates, circles, the cart) count as they come.
+    if (A.G().war.raid ? CAPPED.has(what) : CAPPED.has(what) && what !== 'obj') n = heroCap(what, n);
     if (afk()) n *= AFK_K;
   }
   b.stats[what] += n;
@@ -1362,8 +1365,8 @@ function credit(b, what, n) {
  * (staying in the fight and alive, the red floor stepped off, the blasts cut, the role's work)
  * decides between S and B, and the AI's best are real rivals.
  */
-const CAPPED = new Set(['dmg', 'boss', 'heal', 'taken', 'obj']);
-const CAP_OVER = 1.4, CAP_SHARE = 0.25, CAP_WIN = 15;
+const CAPPED = new Set(['dmg', 'boss', 'heal', 'taken', 'obj', 'assists']);
+const CAP_OVER = 1.3, CAP_SHARE = 0.25, CAP_WIN = 15;
 function heroCap(what, n) {
   const G = A.G(), W = G.war;
   if (W.t < 20) return n;
@@ -1382,7 +1385,8 @@ function heroCap(what, n) {
   win.q.push([G.t, n]);
   win.sum += n;
   while (win.q.length && G.t - win.q[0][0] > CAP_WIN) win.sum -= win.q.shift()[1];
-  const span = Math.max(5, Math.min(CAP_WIN, G.t - win.q[0][0]));
+  // Over the whole window, so a single big blow is not taken for a rate.
+  const span = CAP_WIN;
   const target = CAP_OVER * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]);
   const rate = win.sum / span;
   if (!(target > 0) || rate <= target) return n;
@@ -2036,7 +2040,7 @@ function showResult(W) {
   const tierLine = W.raid
     ? `레이드주화 ${10 * G.level + (G.stage.gwoe ? 30 : 0)} × 등급 (S 1.5 · A 1.25 · B 1 · C 0.7)${won ? '' : ' × 실패 0.3'} · 전 ${won ? 60 : 30}×${G.level}×등급`
     : `참여 2 + ${won ? '승리 3 + ' : ''}등급 보너스 ${{ S: 4, A: 3, B: 2, C: 1 }[r.tier]}`;
-  box.innerHTML = `<div class="wr-title" style="${hud('ui_ink_nine') ? `background-image:url(${hud('ui_ink_nine')})` : ''}">${won ? '승리' : '패배'}</div>
+  box.innerHTML = `<div class="wr-title" style="${hud('ui_ink_nine') ? `background-image:url(${hud('ui_ink_nine')})` : ''}">${W.raid ? (won ? '레이드 성공' : '레이드 실패') : won ? '승리' : '패배'}</div>
     <div class="wr-stage" style="${hud('ui_light02') ? `background-image:url(${hud('ui_light02')})` : ''}">
       <img class="wr-hero" src="${heroShot(G) || A.heroPicture(G.cls)}" alt="">
       ${art ? `<img class="wr-flag" src="${hud(won ? 'ui_attack_result_win' : 'ui_attack_result_lose')}" alt="">` : ''}</div>
@@ -2211,6 +2215,7 @@ function updateRaid(dt) {
     if (e.kind === 'boss') W.boss = e;
   }
   if (W.boss) W.teams[1].spawn = [W.boss.tx, W.boss.ty];
+  if (G.cleared && !W.killT) W.killT = G.t;
   for (const b of W.bodies) if (!b.dead) W.alive[0].push(b);
   if (!h.dead) W.alive[0].push(h);
   dangerMap(W, G);
@@ -2565,7 +2570,7 @@ function raidBossHp() {
   const G = A.G(), W = G.war;
   return W.U * RAID_BOSS_U;
 }
-const RAID_BOSS_U = 17000;
+const RAID_BOSS_U = 18500;
 
 /** The raid's end (game.js showResults): the tier, the coins and gold by it, the spotlight. */
 function raidEnd(win, title) {
@@ -2573,7 +2578,7 @@ function raidEnd(win, title) {
   if (!W || W.result) return W && W.result;
   W.over = true;
   W.win = win ? 0 : 1;
-  W.why = win ? `${W.teams[1].name} 처치 · ${clock(G.t)}` : W.wiped ? '공격대 전멸' : '시간 초과';
+  W.why = win ? `${W.teams[1].name} 처치 · ${clock(W.killT || G.t)}` : W.wiped ? '공격대 전멸' : '시간 초과';
   const rows = board(W);
   const rank = rows.findIndex(x => x.b === W.hero);
   const { tier, k } = tierOf(W, rows);
@@ -2720,7 +2725,8 @@ function drawBody(b) {
   // The ▼ from one shared picture per side, the bar in plain rectangles.
   const mk = markerPic(b.team), bw = b.cmdr ? 44 : 24, k = Math.max(0, b.hp / b.maxHp);
   const bx = Math.round(b.x - bw / 2), by = Math.round(b.y - top - 2);
-  if (mk) { const s = b.cmdr ? 1.4 : 1; ctx.drawImage(mk, Math.round(b.x - mk.width * s / 2), by - Math.round(mk.height * s) - 1, Math.round(mk.width * s), Math.round(mk.height * s)); }
+  // A raid has no sides to tell apart: no ▼ over its raiders.
+  if (mk && !W.raid) { const s = b.cmdr ? 1.4 : 1; ctx.drawImage(mk, Math.round(b.x - mk.width * s / 2), by - Math.round(mk.height * s) - 1, Math.round(mk.width * s), Math.round(mk.height * s)); }
   ctx.fillStyle = '#000';
   ctx.fillRect(bx - 1, by, bw + 2, 4);
   ctx.fillStyle = b.team === 0 ? '#3ad04a' : '#e8402a';
