@@ -25,7 +25,7 @@ export const CLASSES = [
   { id: 'poet', name: '도사', hero: '1004', hp: 100, mp: 120, speed: 68, armor: 0, start: 'p_orb', ult: 'p_ult',
     revive: true, desc: '회복과 보조의 달인. 몬스터를 불러내고, 한 번은 스스로 부활한다.' },
   // 바람의나라 연's 궁사 (Job_6): its figure, bows, skills and sounds come only from 연's resources.
-  { id: 'archer', name: '궁사', hero: '1002', hp: 135, mp: 100, speed: 74, armor: 1, start: 'a_shot', ult: 'a_ult',
+  { id: 'archer', name: '궁사', hero: '1002', hp: 155, mp: 100, speed: 74, armor: 2, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
   // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
   { id: 'lancer', name: '무사', hero: '1001', hp: 160, dmgK: 1.25, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
