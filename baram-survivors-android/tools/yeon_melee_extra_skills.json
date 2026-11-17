@@ -1,0 +1,10 @@
+{
+ "w_ult": {"name": "건곤대나이", "prefab": "Skill_Effect_0005_a"},
+ "w_talm": {"name": "탈명사식'염", "prefab": "Skill_Effect_Warrior_5th_02"},
+ "w_flash": {"name": "섬광일섬", "prefab": "Skill_Effect_Warrior_5th_01"},
+ "w_blackdragon": {"name": "흑룡광참", "prefab": "Skill_Effect_Warrior_5th_03"},
+ "w_myriad": {"name": "만검귀종", "prefab": "Skill_Effect_Warrior_4th_03_2"},
+ "r_ult": {"name": "필살검무", "prefab": "Skill_Effect_0202"},
+ "r_gale": {"name": "질풍난무", "prefab": "Skill_Effect_Thief_4th_03_1"},
+ "r_shadowstar": {"name": "그림자표창", "prefab": "Skill_Effect_Thief_5th_03"}
+}

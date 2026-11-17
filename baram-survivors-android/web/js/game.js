@@ -2209,6 +2209,10 @@ function update(dt) {
   for (const f of G.fxs) f.t += dt;
   G.fxs = G.fxs.filter(f => f.t < f.life);
   for (const d of G.dying) d.t += dt;
+  if (G.shocks) {
+    for (const s of G.shocks) s.t += dt;
+    G.shocks = G.shocks.filter(s => s.t < 0.3);
+  }
   G.dying = G.dying.filter(d => d.t < 1.2);
   for (const t of G.texts) {
     t.t += dt;
@@ -3088,6 +3092,14 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (p.hp <= 0) die();
 }
 
+/** At most 14 bodies newly flashing white in any tenth of a second. */
+function flashRoom() {
+  const f = (G.flashes = (G.flashes || []).filter(t => t > G.t));
+  if (f.length >= 14) return false;
+  f.push(G.t + 0.1);
+  return true;
+}
+
 function hurtEnemy(e, dmg, push = null) {
   e.provoked = true;
   if (e.hp <= 0) return 0;
@@ -3101,6 +3113,7 @@ function hurtEnemy(e, dmg, push = null) {
   // A struck monster jerks back a little, away from the blow: each hit of a 오중공격 shows.
   const p = G.player;
   e.kickAt = G.t;
+  e.kickBig = false;
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
   dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
@@ -3124,7 +3137,9 @@ function hurtEnemy(e, dmg, push = null) {
   const RW = G.war && G.war.raid;
   if (RW) dmg = War.raidScale(dmg);
   e.hp -= dmg;
-  e.flash = 0.12;
+  // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
+  // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
+  if (e.flash > 0 || flashRoom()) e.flash = 0.12;
   e.shown = G.t;
   if (e.war) War.credit(e, dmg); // 대항전: the hero's contribution
   if (RW) War.raidCredit(e, dmg, e.hp <= 0);
@@ -3221,6 +3236,110 @@ const MELEE_LOOK = {
   reaper: { slash: 'h_ml_wind', ss: 0.3, hit: 'h_ml_slash', hs: 0.6, turn: true },
 };
 
+// How large (game pixels across, a tile is 48) a close-in technique's own 연 picture is drawn, by
+// the way it strikes: in 연's hunts a 진섬 or a 퇴격 covers two to four tiles, past the hero's height.
+const MELEE_SIZE = { slash: 104, blink: 128, spell: 112, strike: 144, line: 116, cleave: 142, nova: 188 };
+
+/** The picture id drawn larger for a close-in technique (a second name for the same frames). */
+function meleeBig(id, kind, lv) {
+  const f = id && M.fx[id], want = MELEE_SIZE[kind];
+  if (!f || !want) return id;
+  const k = f.k || 1, now = Math.max(f.w, f.h) * k;
+  // Growing a little with the 단 still, as every spell does.
+  const mult = Math.max(1, Math.min(3.2, (want * (1 + 0.04 * ((lv || 1) - 1))) / now));
+  if (mult < 1.05) return id;
+  const big = `${id}#${kind}`;
+  if (!M.fx[big]) M.fx[big] = { ...f, src: f.src || id, k: k * mult };
+  return big;
+}
+
+/**
+ * The weight of a close-in technique landing (1 a blow, 2 a heavy one, 3 a burst round the
+ * hero), as 연 plays it: the screen shakes, and the world stops for a blink on the heavier ones
+ * (not more than twice a second, nor in a raid or a war where the party's blows never stop).
+ */
+function meleeImpact(power) {
+  if (!MELEE_LOOK[G.cls.id] || G.stage.raid || G.war) return;
+  G.shake = Math.max(G.shake, 0.06 + 0.06 * power);
+  if (power >= 2 && G.t - (G.hitstopAt || -9) > 0.5) {
+    G.hitstop = 0.025 + 0.02 * power;
+    G.hitstopAt = G.t;
+  }
+}
+
+/**
+ * A heavy technique throws a plain monster it did not kill back, away from where the blow came
+ * from (ox, oy), and it springs back onto its tile: the heap round the hero bursts open for a
+ * moment and closes again. Only seen: the tile it holds stays, so the heap is still there to cut
+ * (moved off a tile, the next blows fell on air and the hunt slowed by a third).
+ */
+function fling(e, ox, oy) {
+  if (!e || e.hp <= 0 || e.kind || e.war || e.ally || G.stage.raid || G.war || !MELEE_LOOK[G.cls.id]) return;
+  let dx = e.tx - ox, dy = e.ty - oy;
+  if (!dx && !dy) dx = G.player.face || 1;
+  const d = Math.hypot(dx, dy);
+  e.kickAt = G.t;
+  e.kdx = dx / d;
+  e.kdy = dy / d;
+  e.kickBig = true;
+}
+
+/** A ring of force on the ground (code-drawn, as 연's slams shake the earth), in tiles. */
+function shock(x, y, r, color = '255,236,200') {
+  if (!fxBudget('shock', 4)) return;
+  (G.shocks = G.shocks || []).push({ x, y, r, t: 0, color });
+}
+/** A thrust's wake: a white streak along the row it goes through (len tiles), gone in a blink. */
+function streak(x, y, dx, dy, len) {
+  if (!fxBudget('streak', 3)) return;
+  (G.shocks = G.shocks || []).push({ x, y, dx, dy, len: Math.max(2, len || 3), t: 0, streak: true });
+}
+function drawShocks() {
+  if (!G.shocks || !G.shocks.length) return;
+  ctx.save();
+  for (const s of G.shocks) {
+    if (s.streak) {
+      // Tapered: wide at the far end where the blow lands, thin back at the hero.
+      const k = Math.min(1, s.t / 0.2), L = s.len * TILE, w = 9 * (1 - k);
+      if (w <= 0.3) continue;
+      const nx = -s.dy, ny = s.dx, x1 = s.x + s.dx * L * (0.3 + 0.7 * Math.min(1, s.t / 0.06)), y1 = s.y + s.dy * L * (0.3 + 0.7 * Math.min(1, s.t / 0.06));
+      ctx.globalAlpha = 0.85 * (1 - k);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(s.x + s.dx * L * k * 0.6, s.y + s.dy * L * k * 0.6);
+      ctx.lineTo(x1 + nx * w, y1 + ny * w);
+      ctx.lineTo(x1 + s.dx * 10, y1 + s.dy * 10);
+      ctx.lineTo(x1 - nx * w, y1 - ny * w);
+      ctx.closePath();
+      ctx.fill();
+      continue;
+    }
+    const k = Math.min(1, s.t / 0.28), rr = s.r * TILE * (0.35 + 0.65 * Math.sqrt(k));
+    ctx.globalAlpha = 0.75 * (1 - k);
+    ctx.strokeStyle = `rgb(${s.color})`;
+    ctx.lineWidth = 6 * (1 - k) + 1;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y, rr, rr * 0.55, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The hero went from (x0, y0) to where it stands in one move (a dash, 비영승보, 진섬): three
+ * fading copies of it along the way, and it is seen to slide the last of it, not pop.
+ */
+function dashFrom(x0, y0) {
+  const p = G.player, dx = x0 - p.x, dy = y0 - p.y;
+  if (Math.hypot(dx, dy) < TILE * 0.8) return;
+  G.ghosts = (G.ghosts || []).filter(g => G.t - g.t < 0.3);
+  for (let i = 0; i < 3; i++) {
+    const k = (i + 1) / 4;
+    G.ghosts.push({ x: p.x + dx * (1 - k), y: p.y + dy * (1 - k), t: G.t - i * 0.04 });
+  }
+  p.slide = { dx, dy, t: G.t };
+}
+
 /** A blow's slash arc over a struck tile (dx, dy: the way the blow goes; h: which of a flurry). */
 function meleeSlash(tx, ty, dx, dy, h = 0) {
   const look = MELEE_LOOK[G.cls.id];
@@ -3233,12 +3352,16 @@ function meleeSlash(tx, ty, dx, dy, h = 0) {
 
 /** The flash on one struck monster, and once in a while a slash arc over it too. */
 function meleeMark(e, look, crit) {
+  // A technique that draws its own picture on each one struck (a 진섬, a 유성창) shows that, not
+  // the class's flash too: each technique looks its own, not one shared slash for everything.
+  const own = G.t - (G.ownPicAt || -9) < 0.6;
+  if (own && !crit) return;
   if (G.t - (e.markT || -9) > 0.25 && fxBudget('hit', crit ? 16 : 12)) {
     e.markT = G.t;
     fxOn(look.hit, e, { scale: look.hs * (crit ? 1.4 : 1), rot: rand(-0.5, 0.5) });
   }
   // Area blows (a 퇴격, a 반월참, an earthquake) show arcs on the struck as well, not only the flash.
-  if (G.t - (G.arcT || -9) > 0.06 && Math.random() < 0.35) {
+  if (!own && G.t - (G.areaAt || -9) > 0.5 && G.t - (G.arcT || -9) > 0.06 && Math.random() < 0.35) {
     G.arcT = G.t;
     const p = G.player;
     meleeSlash(e.tx, e.ty, Math.sign(e.tx - p.tx), Math.sign(e.ty - p.ty), Math.floor(Math.random() * 3));
@@ -3317,7 +3440,7 @@ function killEnemy(e) {
   leave(e);
   // The body is thrown a little away from the hero as it falls.
   const kp = G.player, kl = Math.hypot(e.x - kp.x, e.y - kp.y) || 1;
-  const dy = { e, t: 0, kx: (e.x - kp.x) / kl, ky: (e.y - kp.y) / kl };
+  const dy = { e, t: 0, kx: (e.x - kp.x) / kl, ky: (e.y - kp.y) / kl, fly: !e.kind && !!MELEE_LOOK[G.cls.id] && !G.war && !G.allyHitting && kl < TILE * 4 };
   // 연's kill burst on the fallen, a few at a time.
   if (M.fx.h_kill && fxBudget('kill', 6)) {
     dy.popped = true;
@@ -3670,9 +3793,18 @@ function cast(skill, st) {
   const fxBase = def.yeon ? def.fx : def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + skill.id] ? 'new_' + skill.id
     : def.fxs ? def.fxs[Math.min(skill.lv, def.fxs.length) - 1] : M.fx['s_' + skill.id] ? 's_' + skill.id : def.fx;
   // A spell grows with its 단, as a survivors weapon does: its picture 6% larger a step.
-  const fxid = grownFx(fxBase, skill.lv);
+  const fxReach = grownFx(fxBase, skill.lv);
+  // A close-in fighter's techniques are drawn as 연 draws them, two to four tiles across and
+  // larger than the hero; what they strike stays what the spell's own picture reached (fxReach).
+  // (Not the shared 금강퇴 every class learns: one big kick on all six looked alike.)
+  const fxid = MELEE_LOOK[G.cls.id] && def.cls === G.cls.id && !G.war ? meleeBig(fxReach, def.kind, skill.lv) : fxReach;
   classFlourish(def, skill, st);
   const p = G.player;
+  if (MELEE_LOOK[G.cls.id] && def.dmg) {
+    // Its own picture on each one struck: the class's flash and slash arcs keep out of its way.
+    if (['strike', 'line', 'spell', 'blink'].includes(def.kind)) G.ownPicAt = G.t;
+    else if (def.kind !== 'slash') G.areaAt = G.t;
+  }
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
   // (in a raid the boss is the fight; a warrior's 백호참 or 동귀어진 should not cut the air).
   if (['cleave', 'line', 'slash', 'blink'].includes(def.kind) && !p.stepping) {
@@ -3712,11 +3844,13 @@ function cast(skill, st) {
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
         if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && !occ.has(key(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1)))) {
           addFx(fxid, p.x, p.y - 26, { scale: 0.6 });
+          const x0 = p.x, y0 = p.y;
           p.tx += fx0 * (k - 1);
           p.ty += fy0 * (k - 1);
           p.x = p.tx * TILE + TILE / 2;
           p.y = p.ty * TILE + TILE - 6;
           p.stepping = false;
+          dashFrom(x0, y0);
           near = [[fx0, fy0]];
         }
       }
@@ -3724,6 +3858,9 @@ function cast(skill, st) {
       // The blow goes the way the hero faces when a monster is there, else to the one beside;
       // the hero's own facing is left alone, so walking stays the player's.
       const [ax, ay] = near.find(([dx, dy]) => dx === fx0 && dy === fy0) || near[0];
+      p.lungeAt = G.t;
+      p.ldx = ax;
+      p.ldy = ay;
       const dirs = [[ax, ay]];
       if (lv >= 3) dirs.push([-ax, -ay]);
       if (lv >= 5) dirs.push([ay, ax], [-ay, -ax]);
@@ -3742,6 +3879,8 @@ function cast(skill, st) {
             });
             meleeSlash(p.tx + dx, p.ty + dy, dx, dy, h);
           }
+          // A flurry's last blow lands heavier (as 연's 쇄혼비무 ends on a big cut).
+          if (h === hits - 1 && def.fx) meleeImpact(hits >= 4 ? 2 : 1);
           // The swing sweeps on: the two tiles flanking the one struck ahead (diagonally beside the
           // hero) take half the blow, so a heap pressed round the hero is cut, not one tile of it.
           for (const [fx, fy] of [[ax + ay, ay + ax], [ax - ay, ay - ax]]) {
@@ -3766,10 +3905,12 @@ function cast(skill, st) {
       const bx = e.tx + fx0, by = e.ty + fy0;
       if (ahead[0] && !occ.has(key(bx, by))) {
         addFx(fxid, p.x, p.y - 26, { scale: 0.7 });
+        const x0 = p.x, y0 = p.y;
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
         heroTile();
         p.stepping = false;
+        dashFrom(x0, y0);
       }
       // Its own blows (def.count) on the one it lands by; the targets the 단 add go to others
       // beside it, not again on the same (on a lone boss that tripled the blow).
@@ -3781,6 +3922,7 @@ function cast(skill, st) {
           // Those pressed onto the same tile are cut with it.
           for (const b of bodiesAt(e.tx, e.ty) || [e]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, st.dmg, [fx0, fy0]);
           meleeSlash(e.tx, e.ty, fx0, fy0, i);
+          if (i === (def.count || 1) - 1) meleeImpact(2);
         });
       }
       const others = around(e.tx, e.ty, 1).filter(o => o !== e && o.hp > 0).slice(0, Math.max(0, st.count - (def.count || 1)));
@@ -3832,11 +3974,17 @@ function cast(skill, st) {
         later(i * 0.12 + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
           const hit = def.shape === 'plus' ? onTiles(plusTiles(tx, ty, Math.max(1, st.radius))) : around(tx, ty, st.radius);
+          if (MELEE_LOOK[G.cls.id] && !i) {
+            // A slam: the ground rings out under it and the screen jolts.
+            shock(tx * TILE + TILE / 2, ty * TILE + TILE - 6, Math.max(1.2, (st.radius || 0) + 0.8));
+            meleeImpact(2);
+          }
           for (const o of hit) {
             if (def.slow) o.slow = def.slow;
             if (def.stun) { o.stun = def.stun; cutBlast(o); }
             if (def.curse) o.curse = def.curse;
             hurtEnemy(o, st.dmg);
+            if (o !== e) fling(o, tx, ty);
           }
           // A field that stays (the 천인's 선풍 whirlpools): it strikes again where it fell, at half weight.
           for (let k = 1; k <= (def.ticks || 0); k++) {
@@ -3863,16 +4011,18 @@ function cast(skill, st) {
       const mid = (depth + 1) / 2;
       addFx(fxid, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25) });
       // As far as the picture is seen to reach round its middle, too.
-      const reach = seenReach(fxid, Math.min(1.6, 0.7 + depth * 0.25));
+      const reach = seenReach(fxReach, Math.min(1.6, 0.7 + depth * 0.25));
       if (reach > depth) {
         const cx = p.tx + Math.round(dx * mid), cy = p.ty + Math.round(dy * mid);
         for (const e of around(cx, cy, reach)) if (!hit.includes(e)) hit.push(e);
       }
       later(0.12, () => {
         G.shake = Math.max(G.shake, 0.1);
+        if (def.cls !== 'all') meleeImpact(2);
         for (const e of hit.slice(0, def.max || 99)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
+          fling(e, p.tx, p.ty);
         }
       });
       break;
@@ -3893,8 +4043,18 @@ function cast(skill, st) {
       if (!best) return retry(0.25);
       const [dx, dy, hit] = best;
       hit.forEach((e, i) => fxOn(fxid, e, { delay: i * 0.05 }));
-      later(0.1, () => { for (const e of hit) hurtEnemy(e, st.dmg, [dx, dy]); });
+      const lx = p.tx, ly = p.ty;
+      later(0.1, () => {
+        meleeImpact(2);
+        for (const e of hit) {
+          hurtEnemy(e, st.dmg, [dx, dy]);
+          // A thrust drives them on along it; one that went through throws them aside.
+          if (def.dash) fling(e, e.tx - dy, e.ty - dx); else fling(e, lx, ly);
+        }
+      });
+      if (MELEE_LOOK[G.cls.id]) streak(p.x, p.y - 22, dx, dy, def.depth);
       if (def.dash) {
+        const x0 = p.x, y0 = p.y;
         // Through the row to the farthest open tile along it.
         for (let k = def.depth + 1; k >= 1; k--) {
           const tx = p.tx + dx * k, ty = p.ty + dy * k;
@@ -3906,6 +4066,7 @@ function cast(skill, st) {
           p.stepping = false;
           break;
         }
+        dashFrom(x0, y0);
       }
       break;
     }
@@ -3942,11 +4103,14 @@ function cast(skill, st) {
       }
       // It strikes as far as its picture is seen to spread, if that is past its own reach.
       const novaScale = nf && nf.cls === 'yeon' ? 1 : nf && nf.add ? 2.2 : 1.4;
-      const reach = Math.max(st.radius || 0, nf && nf.cls === 'yeon' ? seenReach(fxid, novaScale) : 0);
+      const reach = Math.max(st.radius || 0, nf && nf.cls === 'yeon' ? seenReach(fxReach, novaScale) : 0);
+      if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, Math.max(1.5, reach + 0.5));
       later(0.1, () => {
+        meleeImpact(3);
         for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hurtEnemy(e, st.dmg);
+          fling(e, p.tx, p.ty);
         }
       });
       break;
@@ -4044,6 +4208,9 @@ function plainAttack(dt) {
   // Everyone pressed onto that tile takes the swing.
   for (const b of bodiesAt(t.tx, t.ty) || [t]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, 7 * (1 + 0.1 * G.passives.power), dx || dy ? [dx, dy] : null);
   meleeSlash(t.tx, t.ty, dx, dy, 0);
+  p.lungeAt = G.t;
+  p.ldx = Math.sign(dx);
+  p.ldy = Math.sign(dy);
   audio.play('hit');
   strikePose('attack');
 }
@@ -4159,9 +4326,11 @@ function castUlt() {
         const spot = DIRS.map(([dx, dy]) => [target.tx + dx, target.ty + dy]).filter(([x, y]) => free(x, y))
           .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
         if (spot) {
+          const x0 = p.x, y0 = p.y;
           p.x = spot[0] * TILE + TILE / 2;
           p.y = spot[1] * TILE + TILE - 6;
           heroTile();
+          dashFrom(x0, y0);
           p.inv = Math.max(p.inv, 1.2);
         }
       }
@@ -5247,9 +5416,11 @@ function classFlourish(def, skill, st) {
         G.dashAt = G.t;
         // Landing in the crowd, the hero is untouchable for a moment (it chose the fight, not the blows).
         p.inv = Math.max(p.inv, 0.5);
+        const x0 = p.x, y0 = p.y;
         p.x = spot[0] * TILE + TILE / 2;
         p.y = spot[1] * TILE + TILE - 6;
         heroTile();
+        dashFrom(x0, y0);
         const dx = near.tx - p.tx, dy = near.ty - p.ty;
         if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
       }
@@ -7122,7 +7293,11 @@ function render(now) {
     }
     const s = b.scale;
     // A monster leans in as it strikes.
-    const kick = b.kickAt !== undefined && G.t - b.kickAt < 0.1 ? 4 : 0;
+    // A close-in fighter's blows knock harder: further, and easing back (연's struck jolt).
+    const kt = b.kickAt !== undefined ? G.t - b.kickAt : 9, hard = MELEE_LOOK[G.cls.id] && !G.war;
+    // Flung by a heavy technique: out half a tile at once, back over a quarter second.
+    const kick = hard && b.kickBig ? (kt < 0.26 ? 22 * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
+      : hard ? (kt < 0.16 ? 8 * (1 - kt / 0.16) : 0) : kt < 0.1 ? 4 : 0;
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
     // The treasure-bearer in gold, from a tinted copy made once.
@@ -7156,8 +7331,10 @@ function render(now) {
   }
   for (const d of G.dying) {
     // Thrown back over the first quarter second.
-    const kb = 14 * Math.min(1, d.t / 0.25) * (2 - Math.min(1, d.t / 0.25));
-    const ox = (d.kx || 0) * kb, oy = (d.ky || 0) * kb * 0.6 - Math.sin(Math.min(1, d.t / 0.25) * Math.PI) * 4;
+    // A close-in fighter's kill is flung: further, up in an arc, as 연's struck fly off the blade.
+    const far = d.fly ? 34 : 14, up = d.fly ? 16 : 4, fk = Math.min(1, d.t / (d.fly ? 0.3 : 0.25));
+    const kb = far * fk * (2 - fk);
+    const ox = (d.kx || 0) * kb, oy = (d.ky || 0) * kb * 0.6 - Math.sin(fk * Math.PI) * up;
     // 연's own death, where the monster has one: its dead row, then a fade.
     const yd = !d.e.beast && yunit(d.e.m), dead = yd && yd.u.anims.dead;
     if (dead) {
@@ -7194,6 +7371,7 @@ function render(now) {
 
   ctx.globalAlpha = 1;
 
+  drawShocks();
   // Spell effects over everything, at their own size.
   for (const f of G.fxs) {
     if (f.t < 0) continue;
@@ -7380,8 +7558,28 @@ function drawHero(now, hidden) {
   }
   // 연's own figure for the class, in the outfit of the armour worn.
   const yPose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
-  if (drawYhero2(G.cls, p.gear, p, p.x, p.y, yPose, hidden ? 0.35 : 1)) return;
-  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, p.y, yPose, hidden ? 0.35 : 1)) return;
+  // After a dash: fading copies along the way, and the last of the way slid, not popped.
+  // A swing leans the hero into the one it strikes.
+  let hx = p.x, hy = p.y;
+  if (G.ghosts && G.ghosts.length) {
+    G.ghosts = G.ghosts.filter(g => G.t - g.t < 0.3);
+    for (const g of G.ghosts) {
+      const a = Math.max(0, 0.45 * (1 - (G.t - g.t) / 0.3));
+      if (a > 0.02) drawYhero2(G.cls, p.gear, p, g.x, g.y, 'attack', a) || drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, g.x, g.y, 'attack', a);
+    }
+  }
+  if (p.slide && G.t - p.slide.t < 0.09) {
+    const k = 1 - (G.t - p.slide.t) / 0.09;
+    hx += p.slide.dx * 0.35 * k * k;
+    hy += p.slide.dy * 0.35 * k * k;
+  }
+  if (p.lungeAt !== undefined && G.t - p.lungeAt < 0.16) {
+    const k = Math.sin((G.t - p.lungeAt) / 0.16 * Math.PI);
+    hx += (p.ldx || 0) * 9 * k;
+    hy += (p.ldy || 0) * 6 * k;
+  }
+  if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.35 : 1)) return;
+  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.35 : 1)) return;
   // Struck, the hero does not flicker: the client showed a blow only in the health bar.
   if (!p.av) {
     drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);

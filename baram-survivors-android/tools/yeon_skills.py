@@ -318,10 +318,12 @@ def main():
     if icon_out:
         os.makedirs(icon_out, exist_ok=True)
     m = json.load(open(mapping))
+    # Several mapping tables (one a class) render into the same OUT_DIR: what is already there stays.
+    ipath = os.path.join(out, 'index.json')
     # SKILLS_BUNDLE may name more bundles, comma-separated (FXs.unity3d holds what some prefabs use).
     env = UnityPy.load(*bundle.split(','))
     cont = {k.rsplit('/', 1)[-1].rsplit('.', 1)[0].lower(): v for k, v in env.container.items()}
-    index = {}
+    index = json.load(open(ipath, encoding='utf-8')) if os.path.isfile(ipath) else {}
     for sid, spec in m.items():
         pf = spec.get('prefab')
         if pf and pf.lower() in cont:
@@ -347,7 +349,7 @@ def main():
                 im.convert('RGBA').save(os.path.join(icon_out, sid + '.png'))
             except Exception as e:
                 print(sid, 'icon failed', e)
-    json.dump(index, open(os.path.join(out, 'index.json'), 'w'), ensure_ascii=False, indent=1)
+    json.dump(index, open(ipath, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 
 if __name__ == '__main__':
