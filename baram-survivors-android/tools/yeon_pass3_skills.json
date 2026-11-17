@@ -107,7 +107,8 @@
   "anchor": [
    0.5,
    0.94
-  ]
+  ],
+  "frames": 15
  },
  "x_dk_shock_shot": {
   "prefab": "Skill_Effect_Dokkaebi_WispSkill_Cast",
@@ -199,17 +200,20 @@
  "l_annihil": {
   "prefab": "Skill_Effect_Lancer_6th_01_Down",
   "add_own": true,
-  "keep_reach": true
+  "keep_reach": true,
+  "frames": 16
  },
  "v_l_annihil_u": {
   "prefab": "Skill_Effect_Lancer_6th_01_Up",
   "add_own": true,
-  "keep_reach": true
+  "keep_reach": true,
+  "frames": 16
  },
  "v_l_annihil_l": {
   "prefab": "Skill_Effect_Lancer_6th_01_Left",
   "add_own": true,
-  "keep_reach": true
+  "keep_reach": true,
+  "frames": 16
  },
  "l_rise": {
   "prefab": "Skill_Effect_Lancer_F_05_Down",
@@ -452,5 +456,31 @@
  "p_ult": {
   "prefab": "Skill_Effect_Sharman_420701",
   "keep_reach": true
+ },
+ "a_bomb": {
+  "prefab": "Skill_Effect_Archer_BombArrow_Skill",
+  "keep_reach": true,
+  "scale": 3.0,
+  "frames": 17,
+  "with": [
+   {
+    "prefab": "Skill_Effect_Archer_BombArrow_Hit",
+    "at": 0.0
+   }
+  ]
+ },
+ "p_aegis": {
+  "prefab": "Skill_Effect_Shaman_6th_01_buff_B",
+  "mixed": true
+ },
+ "p_reflect": {
+  "prefab": "Skill_Effect_Shaman_6th_01_buff_A",
+  "mixed": true
+ },
+ "w_bless": {
+  "prefab": "Skill_Effect_Warrior_Impregnability_Buff"
+ },
+ "r_shadowclone": {
+  "prefab": "Skill_Effect_Thief_3rd_02_Spawn"
  }
 }
