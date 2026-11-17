@@ -1,7 +1,12 @@
 {
  "dk_storm": {
   "prefab": "Skill_Effect_Dokkaebi_DokkaebiStorm_Skill",
-  "keep_reach": true
+  "keep_reach": true,
+  "mixed": true,
+  "anchor": [
+   0.525,
+   0.7
+  ]
  },
  "mk_bung": {
   "prefab": "Skill_Effect_Monk_Bunggwon",
@@ -35,7 +40,9 @@
  },
  "dk_flatten": {
   "prefab": "Skill_Effect_Dokkaebi_Equalizer_Skill",
-  "keep_reach": true
+  "keep_reach": true,
+  "scale": 1.5,
+  "alpha_gain": 0.8
  },
  "a_chain": {
   "prefab": "Skill_Effect_Archer_Chainblast_Uber_Hit",
@@ -96,7 +103,11 @@
  },
  "dk_shock": {
   "prefab": "Skill_Effect_Dokkaebi_WispElectricShock_Hit",
-  "keep_reach": true
+  "keep_reach": true,
+  "anchor": [
+   0.5,
+   0.94
+  ]
  },
  "x_dk_shock_shot": {
   "prefab": "Skill_Effect_Dokkaebi_WispSkill_Cast",
@@ -226,11 +237,6 @@
  },
  "l_ult": {
   "prefab": "Skill_Effect_Lancer_F_04_Down",
-  "add_own": true,
-  "keep_reach": true
- },
- "v_l_ult_u": {
-  "prefab": "Skill_Effect_Lancer_F_04_Up",
   "add_own": true,
   "keep_reach": true
  },
@@ -409,7 +415,25 @@
  },
  "md_bust": {
   "prefab": "Skill_Effect_Warlock_Frenzy_Explosion",
-  "keep_reach": true
+  "keep_reach": true,
+  "at": 0.2,
+  "tint": [
+   0.83,
+   0.62,
+   0.9
+  ],
+  "scale": 0.5,
+  "with": [
+   {
+    "prefab": "Skill_Effect_Warlock_Frenzy_Bust_Hit",
+    "at": 0.0,
+    "tint": [
+     0.85,
+     0.7,
+     1.0
+    ]
+   }
+  ]
  },
  "p_life": {
   "prefab": "Skill_Effect_Sharman_Heal_White",

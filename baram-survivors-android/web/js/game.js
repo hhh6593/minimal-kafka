@@ -4157,7 +4157,11 @@ function cast(skill, st) {
       // The picture stands in the middle of the triangle.
       const mid = (depth + 1) / 2;
       const [cf, cflip] = dirFx(fxid, skill.id, dx, dy);
-      addFx(cf, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25), flip: cflip });
+      // 연's own picture for the way it goes (_Down, _Up, _Left) has the caster at its pivot and
+      // reaches out over the triangle itself (만경창파's spears, 괴성격's swing): it stands at the
+      // hero, at its own size. (Set in the triangle's middle and grown, it went off the screen.)
+      if (M.fx['k_v_' + skill.id + '_l'] && M.fx[cf] && M.fx[cf].ax !== undefined) addFx(cf, p.x, p.y - 20, { flip: cflip });
+      else addFx(cf, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25), flip: cflip });
       // As far as the picture is seen to reach round its middle, too.
       const reach = seenReach(fxReach, Math.min(1.6, 0.7 + depth * 0.25));
       if (reach > depth) {
@@ -4201,7 +4205,14 @@ function cast(skill, st) {
         addFx(b, p.x, p.y - 18, { rot: Math.atan2(dy, dx) + Math.PI / 2, anchor: 'bottom' });
       } else {
         const [lf, lflip] = dirFx(fxid, skill.id, dx, dy);
-        addFx(lf, p.x + dx * TILE * 0.5, p.y - 20 + dy * TILE * 0.5,
+        // 연's own picture for the way it goes (its _Down, _Up, _Left) already reaches out along
+        // the row from the caster at its pivot (마령소환's spirit, 혈마광폭열파's bats): it stands
+        // at the hero. Sent on to the row's end as well, it went off the screen.
+        const lfx = M.fx[lf], kk = lfx && (lfx.k || 1);
+        const along = lfx && M.fx['k_v_' + skill.id + '_l'] && lfx.ax !== undefined
+          ? (dy > 0 ? lfx.h - lfx.ay : dy < 0 ? lfx.ay : lfx.ax) * kk : 0;
+        if (along >= len * 0.5) addFx(lf, p.x, p.y - 20, { flip: lflip });
+        else addFx(lf, p.x + dx * TILE * 0.5, p.y - 20 + dy * TILE * 0.5,
           { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip });
       }
       later(0.04, () => meleeImpact(2));

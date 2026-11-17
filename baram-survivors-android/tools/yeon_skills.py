@@ -347,6 +347,17 @@ def shade(mi, props, sprite, cache):
         src = sprite
     if src is None:
         return None
+    if 'Meteo_Move' in sh and ('_MoveX' in f or '_MoveY' in f):
+        # The picture slid across its quad by (_MoveX, _MoveY) parts of it, what leaves the quad
+        # unseen: 평탄화's totems rise out of the ground as _MoveY goes from 1 to 0.
+        hh, ww = src.shape[:2]
+        dy, dx = int(round(f.get('_MoveY', 0) * hh)), int(round(-f.get('_MoveX', 0) * ww))
+        out = np.zeros_like(src)
+        ys0, ys1 = max(0, -dy), min(hh, hh - dy)
+        xs0, xs1 = max(0, -dx), min(ww, ww - dx)
+        if ys1 > ys0 and xs1 > xs0:
+            out[ys0 + dy:ys1 + dy, xs0 + dx:xs1 + dx] = src[ys0:ys1, xs0:xs1]
+        src = out
     if on_quad and src[..., 3].mean() > 0.9:
         # An opaque square (a fire or a glow the shader cuts round with masks we do not have): faded
         # out towards its edges, so it is a soft light and not a rectangle.
@@ -720,12 +731,18 @@ def render(go, add_own=False, alpha_only=False, add_all=False):
                 elif rr is not None and b.attribute in COLOR_ATTR and getattr(b, 'customType', 0) != 22:
                     rr.setdefault('anim_color', {})[COLOR_ATTR[b.attribute]] = kv
                 elif rr is not None and getattr(b, 'customType', 0) == 22:
-                    names = list(rr['mi']['floats']) + list(rr['mi']['colors'])
-                    for nm in names:
+                    # A material property's binding: the low 28 bits are its name's crc32, the top four
+                    # say what of it (8 a float; 4, 5, 6, 7 a colour's r, g, b, a). (Matching the whole
+                    # crc plus an offset found a property only when its crc's top bits happened to fit,
+                    # and put colour components in the wrong place: 도깨비폭풍 came out pink.)
+                    nib = b.attribute >> 28
+                    for nm in list(rr['mi']['floats']) + list(rr['mi']['colors']):
                         h = zlib.crc32(nm.encode()) & 0xffffffff
-                        d = (b.attribute - h) & 0xffffffff
-                        if d % 0x10000000 == 0 and d >> 28 < 4:
-                            rr['props'].setdefault(nm, {})[d >> 28] = kv
+                        if (h ^ b.attribute) & 0x0fffffff == 0:
+                            if nm in rr['mi']['colors'] and 4 <= nib <= 7:
+                                rr['props'].setdefault(nm, {})[nib - 4] = kv
+                            elif nm in rr['mi']['floats'] and nib == 8:
+                                rr['props'].setdefault(nm, {})[0] = kv
                             break
             ci += n
     fps = min(20, max(8, MAX_FRAMES / max(length, 0.05)))
@@ -882,12 +899,50 @@ def render(go, add_own=False, alpha_only=False, add_all=False):
     return frames, fps, OX, OY, any(r['add'] for r in rends)
 
 
+def combine(layers, fps=20.0):
+    """Several renders [(render() result, start seconds, tint)] played together on one canvas, the
+    later ones drawn over the earlier: one render() result at `fps`."""
+    end = max(at + len(r[0]) / r[1] for r, at, _ in layers)
+    nfr = max(1, min(30, int(round(end * fps))))
+    add = any(r[4] for r, _, _ in layers)
+    frames = []
+    for k in range(nfr):
+        t = k / fps
+        al = np.zeros((H_CANVAS, W_CANVAS, 4), np.float32)
+        ad = np.zeros((H_CANVAS, W_CANVAS, 3), np.float32)
+        for r, at, tint in layers:
+            i = int((t - at) * r[1] + 1e-6)
+            if not 0 <= i < len(r[0]):
+                continue
+            a_img, a_add = r[0][i]
+            src = np.asarray(a_img).astype(np.float32) / 255
+            tk = np.array(tint[:3], np.float32) if tint else np.ones(3, np.float32)
+            sa = src[..., 3:4]
+            al[..., :3] = al[..., :3] * (1 - sa) + src[..., :3] * tk * sa
+            al[..., 3:4] = al[..., 3:4] * (1 - sa) + sa
+            ad += a_add.astype(np.float32) / 255 * tk
+        rgb = np.where(al[..., 3:4] > 1e-4, al[..., :3] / np.maximum(al[..., 3:4], 1e-4), 0)
+        frames.append((Image.fromarray((np.clip(np.dstack([rgb, al[..., 3:4]]), 0, 1) * 255).astype(np.uint8), 'RGBA'),
+                       (np.clip(ad, 0, 1) * 255).astype(np.uint8)))
+    return frames, fps, layers[0][0][2], layers[0][0][3], add
+
+
 def to_strip(frames, ox, oy, add):
     """Crops every frame to the union of what is drawn and lays them side by side.
     Additive effects are flattened onto black (the game adds them); the rest keep alpha."""
     outs = []
     for al, ad in frames:
-        if add:
+        if add == 'mixed':
+            # Mostly painted, lit by a few additive sparks (도깨비폭풍's tornado and its thunder): kept
+            # as a painted picture, the light laid over it as cover as strong as it is bright, so it
+            # is not washed out into light on a bright ground.
+            a0 = np.asarray(al).astype(float) / 255
+            lit = ad.astype(float) / 255
+            pre = a0[..., :3] * a0[..., 3:4] + lit
+            a = np.clip(np.maximum(a0[..., 3:4], lit.max(2, keepdims=True)), 0, 1)
+            rgb = np.where(a > 1e-3, pre / np.maximum(a, 1e-3), 0)
+            outs.append(Image.fromarray((np.clip(np.dstack([rgb, a]), 0, 1) * 255).astype(np.uint8), 'RGBA'))
+        elif add:
             base = np.asarray(al.convert('RGB')).astype(float) * (np.asarray(al)[:, :, 3:4] / 255)
             rgb = np.clip(base + ad, 0, 255).astype(np.uint8)
             m = rgb.max(2)
@@ -905,7 +960,7 @@ def to_strip(frames, ox, oy, add):
     strip = Image.new('RGBA', (cw * len(outs), ch))
     for i, o in enumerate(outs):
         strip.paste(o.crop(box), (i * cw, 0))
-    if add:
+    if add and add != 'mixed':
         strip = Image.fromarray(np.asarray(strip)[:, :, :3]).convert('RGB')
     return strip, (cw, ch), (ox - box[0], oy - box[1])
 
@@ -931,9 +986,27 @@ def main():
             except Exception as e:
                 import traceback; traceback.print_exc(); print(sid, pf, 'render failed', e)
                 res = None
+            if res and (spec.get('with') or spec.get('tint')):
+                # "with": more of 연's prefabs played in the same picture ({"prefab", "at": seconds}),
+                # as the client plays them together (광폭기대방출: the purple shaft, then the disc).
+                # "tint": an [r, g, b] the layer is multiplied by (the client colours some white
+                # pictures at run time, e.g. its 광폭 effects purple).
+                layers = [(res, spec.get('at', 0.0), spec.get('tint'))]
+                for w in spec.get('with', []):
+                    try:
+                        r2 = render(cont[w['prefab'].lower()].read(), bool(w.get('add_own')), bool(w.get('alpha_only')), bool(w.get('add_all')))
+                    except Exception as e:
+                        print(sid, w['prefab'], 'render failed', e)
+                        r2 = None
+                    if r2:
+                        layers.append((r2, w.get('at', 0.0), w.get('tint')))
+                res = combine(layers)
             if res:
                 frames, fps, ox, oy, add = res
-                st = to_strip(frames, ox, oy, add)
+                # "mixed": an additive effect kept as a painted one (see to_strip).
+                st = to_strip(frames, ox, oy, 'mixed' if add and spec.get('mixed') else add)
+                if add and spec.get('mixed'):
+                    add = False
                 if st:
                     strip, cell, anchor = st
                     # "alpha_gain": an effect whose sprites the client fades in with particles we do not
@@ -946,16 +1019,23 @@ def main():
                     strip.save(os.path.join(out, sid + '.png'), optimize=True)
                     e = {'cell': list(cell), 'n': len(frames), 'ms': round(1000 / fps), 'add': add,
                          'anchor': [int(anchor[0]), int(anchor[1])], 'prefab': pf}
+                    # "anchor": [x, y] as parts of the cell, where the target's feet are, for a prefab
+                    # whose origin the client puts elsewhere (도깨비불'뇌격's bolt hangs from the wisp
+                    # above; it strikes the ground at the picture's foot).
+                    if spec.get('anchor'):
+                        e['anchor'] = [int(round(spec['anchor'][0] * cell[0])), int(round(spec['anchor'][1] * cell[1]))]
                     # "scale": drawn that many times smaller than stored (a column of fire 967 high).
                     if spec.get('scale'):
                         e['scale'] = spec['scale']
                     # "keep_reach": a picture redrawn for a spell keeps what the old one reached
-                    # (game.js seenReach): [old width, old height] as parts of the new one's.
+                    # (game.js seenReach): [old width, old height] as parts of the new one's. Drawn
+                    # again, the reach stays the same in pixels however the picture's size changes.
                     old = index.get(sid)
                     if spec.get('keep_reach') and old:
                         o_s, n_s = old.get('scale', 1), e.get('scale', 1)
-                        e['reach'] = old.get('reach') or [round(old['cell'][0] / o_s / (cell[0] / n_s), 4),
-                                                          round(old['cell'][1] / o_s / (cell[1] / n_s), 4)]
+                        o_r = old.get('reach') or [1, 1]
+                        e['reach'] = [round(o_r[0] * old['cell'][0] / o_s / (cell[0] / n_s), 4),
+                                      round(o_r[1] * old['cell'][1] / o_s / (cell[1] / n_s), 4)]
                     index[sid] = e
                     print(sid, pf, cell, len(frames), 'add' if add else 'alpha')
         ic = spec.get('icon')
