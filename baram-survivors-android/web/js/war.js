@@ -2116,7 +2116,7 @@ function warState() {
 // difference between beating the boss's rage and not; what it counts for in the contribution is
 // capped apart, see heroCap). hurtLo/Hi: the boss's blows on
 // a raider (see raidHurt). cut: how often a raider with a hold cuts the boss's blast.
-const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroK: 22.0, hurtLo: 1.3, hurtHi: 1.35, cut: 0.25 };
+const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroK: 24.0, hurtLo: 1.3, hurtHi: 1.35, cut: 0.25 };
 // Red-floor tiles by a number key (tiles of a raid can lie a little outside the arena).
 const dk = (x, y) => (x + 1000) * 10000 + (y + 1000);
 
@@ -2579,7 +2579,7 @@ function raidBossHp() {
   const G = A.G(), W = G.war;
   return W.U * RAID_BOSS_U;
 }
-const RAID_BOSS_U = 21500; // with the hero's larger share (heroK): the raiders alone no longer finish an easy raid in time
+const RAID_BOSS_U = 23500; // with the hero's larger share (heroK): the raiders alone no longer finish an easy raid in time (at 21500 they did at 7:19 now and then)
 
 /** The raid's end (game.js showResults): the tier, the coins and gold by it, the spotlight. */
 function raidEnd(win, title) {
