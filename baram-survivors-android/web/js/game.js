@@ -1022,7 +1022,7 @@ function dotHit(e, d, color) {
   if (e.war) d = War.scale(d);
   e.hp -= d;
   e.shown = G.t;
-  if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: shownNum(d), t: 0, num: true, dot: true, crit: false, color });
+  if (settings.numbers && G.texts.length < 70) G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 4, text: hitNum(d), t: 0, num: true, dot: true, crit: false, color });
   if (e.hp <= 0) killEnemy(e);
 }
 
@@ -3045,7 +3045,16 @@ function hurtEnemy(e, dmg, push = null) {
     e.numT = G.t;
     if (G.texts.length > 90) G.texts.shift();
     const heavy = dmg >= e.maxHp * 0.35;
-    G.texts.push({ x: e.x + rand(-2, 2), y: e.y - e.m.h * e.scale - 8 - e.numN * 14, text: shownNum(dmg), t: 0, num: true,
+    // As 연 shows them, a handful of big numbers at a time, not a wall: past 16 on the field a
+    // blow's number takes the place of the smallest showing, or is not shown.
+    const nums = G.texts.filter(t => t.num && !t.heal && !t.mana && t.t < 0.9);
+    let show = true;
+    if (nums.length >= 16) {
+      const low = nums.reduce((a, t) => ((t.v || 0) < (a.v || 0) ? t : a), nums[0]);
+      if (!crit && (low.v || 0) >= dmg) show = false;
+      else G.texts.splice(G.texts.indexOf(low), 1);
+    }
+    if (show) G.texts.push({ x: e.x + rand(-2, 2), y: e.y - e.m.h * e.scale - 8 - e.numN * 17, text: hitNum(dmg), t: 0, num: true, v: dmg,
       crit, heavy, ally: !!G.allyHitting, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
@@ -3084,7 +3093,7 @@ function allyStrike(e, dmg, shown) {
     e.allyNumT = G.t;
     e.numN = G.t - (e.numT || -9) < 0.7 ? ((e.numN || 0) + 1) % 8 : 0;
     e.numT = G.t;
-    G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 8 - e.numN * 14, text: shownNum(dmg), t: 0, num: true, ally: true, color: '#d8d8d8' });
+    G.texts.push({ x: e.x + rand(-6, 6), y: e.y - e.m.h * e.scale - 8 - e.numN * 17, text: hitNum(dmg), t: 0, num: true, ally: true, color: '#d8d8d8' });
   }
   if (e.hp <= 0) {
     G.allyHitting = true;
@@ -6556,11 +6565,16 @@ function korNum(n) {
   const jo = Math.floor(n / 1e12), eok = Math.floor(n / 1e8) % 10000, man = Math.floor(n / 1e4) % 10000;
   if (jo) return `${jo}조${eok ? eok + '억' : ''}`;
   if (eok) return `${eok}억${man ? man + '만' : ''}`;
-  if (man) return `${man}만${n % 10000 >= 1000 ? '' : ''}`;
+  if (man) return `${man}만`;
   return String(n);
 }
 function shownNum(n) {
   return korNum(n * NUM_SCALE);
+}
+/** A blow's number as 연 floats it: below 1억 the whole of it ("5413만7807"), from 1억 down to 만. */
+function hitNum(n) {
+  const v = Math.max(0, Math.round(n * NUM_SCALE)), rem = v % 10000;
+  return v >= 1e4 && v < 1e8 && rem ? `${Math.floor(v / 1e4)}만${rem}` : korNum(v);
 }
 
 function drawDigits(text, x, y, color, k, font = 'font_damage') {
@@ -6832,6 +6846,30 @@ function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1,
   ctx.restore();
 }
 
+/** 연's white target frame (Atlas Frame_Select) over the monster the hero's blows go to: the nearest. */
+function drawTargetFrame() {
+  const im = images['hud/ui_frame_select.png'];
+  if (!im || !im.width || !G || G.over || G.war) return;
+  const p = G.player;
+  if (!(G.t - (G.tfT || -9) < 0.25 && G.tf && G.enemies.includes(G.tf) && !G.tf.dying)) {
+    let best = null, bd = 49;
+    for (const e of G.enemies) {
+      if (e.dying) continue;
+      const d = (e.tx - p.tx) ** 2 + (e.ty - p.ty) ** 2;
+      if (d < bd) { bd = d; best = e; }
+    }
+    G.tf = best;
+    G.tfT = G.t;
+  }
+  const e = G.tf;
+  if (!e) return;
+  const h = Math.min(90, (e.m.h || 32) * (e.scale || 1)), sz = Math.max(26, Math.min(70, h * 0.9));
+  ctx.save();
+  ctx.globalAlpha = 0.55 + 0.15 * Math.sin(G.t * 6);
+  ctx.drawImage(im, Math.round(e.x - sz / 2), Math.round(e.y - h / 2 - sz / 2), Math.round(sz), Math.round(sz));
+  ctx.restore();
+}
+
 function render(now) {
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -6988,6 +7026,7 @@ function render(now) {
     ctx.restore();
   }
 
+  drawTargetFrame();
   drawShots();
 
   ctx.globalAlpha = 1;
