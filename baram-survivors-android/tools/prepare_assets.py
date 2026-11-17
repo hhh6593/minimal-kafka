@@ -450,6 +450,9 @@ def main():
             manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
                                    "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
                                    "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+            # A spell whose picture was redrawn larger keeps the old picture's reach (seenReach in game.js).
+            if k.get("reach"):
+                manifest["fx"][fid]["reach"] = k["reach"]
 
     # 연's 격 and status effects (GEAR_DIR/ygyeok/: strips rendered by tools/yeon_skills.py from
     # the 격·debuff prefabs, two assembled from their own atlases in play order, + index.json):

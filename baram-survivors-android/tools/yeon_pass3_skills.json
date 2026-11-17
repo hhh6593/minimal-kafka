@@ -1,0 +1,432 @@
+{
+ "dk_storm": {
+  "prefab": "Skill_Effect_Dokkaebi_DokkaebiStorm_Skill",
+  "keep_reach": true
+ },
+ "mk_bung": {
+  "prefab": "Skill_Effect_Monk_Bunggwon",
+  "keep_reach": true
+ },
+ "dk_paddle": {
+  "prefab": "Skill_Effect_Dokkaebi_Supernatural_Hit",
+  "keep_reach": true,
+  "scale": 2.0
+ },
+ "w_fly": {
+  "prefab": "Skill_Effect_42801",
+  "keep_reach": true
+ },
+ "rp_madness": {
+  "prefab": "Skill_Effect_Reaper_MadnessSpiral_Cast",
+  "keep_reach": true
+ },
+ "rp_gate": {
+  "prefab": "Skill_Effect_Reaper_HellGate_Cast",
+  "keep_reach": true
+ },
+ "p_baekho": {
+  "prefab": "Skill_Effect_Sharman_30109",
+  "keep_reach": true
+ },
+ "cl_crowfire": {
+  "prefab": "Skill_Effect_Celestial_CrowFire_Creation",
+  "keep_reach": true,
+  "scale": 1.6
+ },
+ "dk_flatten": {
+  "prefab": "Skill_Effect_Dokkaebi_Equalizer_Skill",
+  "keep_reach": true
+ },
+ "a_chain": {
+  "prefab": "Skill_Effect_Archer_Chainblast_Uber_Hit",
+  "keep_reach": true
+ },
+ "x_a_chain_shot": {
+  "prefab": "Skill_Effect_Archer_Chainblast_Uber_Shoot",
+  "keep_reach": true
+ },
+ "x_a_chase_hit": {
+  "prefab": "Skill_Effect_Archer_6th_01_Hit",
+  "keep_reach": true
+ },
+ "x_rp_shot_cast": {
+  "prefab": "Skill_Effect_Reaper_SoulShot_Cast",
+  "keep_reach": true
+ },
+ "x_rp_arrow_cast": {
+  "prefab": "Skill_Effect_Reaper_SoulArrow_Cast",
+  "keep_reach": true
+ },
+ "l_javelin": {
+  "prefab": "Skill_Effect_Lancer_IntangibleJavelin_Hit",
+  "keep_reach": true
+ },
+ "x_l_javelin_shot": {
+  "prefab": "Skill_Effect_Lancer_F_02",
+  "keep_reach": true
+ },
+ "x_l_meteor_shot": {
+  "prefab": "Skill_Effect_Lancer_F_02_T2",
+  "keep_reach": true
+ },
+ "x_mk_uppercut_cast": {
+  "prefab": "Skill_Effect_Monk_BurstUppercut",
+  "keep_reach": true
+ },
+ "x_mk_rupture_cast": {
+  "prefab": "Skill_Effect_Monk_GroundExplosion",
+  "keep_reach": true,
+  "scale": 1.5
+ },
+ "x_mk_rupture_hit": {
+  "prefab": "Skill_Effect_Monk_GroundExplosionHit_B",
+  "keep_reach": true
+ },
+ "x_rp_counter_cast": {
+  "prefab": "Skill_Effect_Reaper_Counter_Cast",
+  "keep_reach": true
+ },
+ "rp_burst": {
+  "prefab": "Skill_Effect_Reaper_SoulBurst_Hit",
+  "keep_reach": true
+ },
+ "x_rp_burst_cast": {
+  "prefab": "Skill_Effect_Reaper_SoulBurst_Cast",
+  "keep_reach": true
+ },
+ "dk_shock": {
+  "prefab": "Skill_Effect_Dokkaebi_WispElectricShock_Hit",
+  "keep_reach": true
+ },
+ "x_dk_shock_shot": {
+  "prefab": "Skill_Effect_Dokkaebi_WispSkill_Cast",
+  "keep_reach": true
+ },
+ "x_dk_firebat_cast": {
+  "prefab": "Skill_Effect_Dokkaebi_FireBat_Cast",
+  "keep_reach": true
+ },
+ "x_p_bonghwang_hit": {
+  "prefab": "Skill_Effect_Shaman_5th_03_Hit",
+  "keep_reach": true
+ },
+ "l_moon": {
+  "prefab": "Skill_Effect_Lancer_F_01_Down",
+  "keep_reach": true
+ },
+ "v_l_moon_u": {
+  "prefab": "Skill_Effect_Lancer_F_01_Up",
+  "keep_reach": true
+ },
+ "v_l_moon_l": {
+  "prefab": "Skill_Effect_Lancer_F_01_Left",
+  "keep_reach": true
+ },
+ "l_moonfull": {
+  "prefab": "Skill_Effect_Lancer_F_01_Down_Super",
+  "keep_reach": true
+ },
+ "v_l_moonfull_u": {
+  "prefab": "Skill_Effect_Lancer_F_01_Up_Super",
+  "keep_reach": true
+ },
+ "v_l_moonfull_l": {
+  "prefab": "Skill_Effect_Lancer_F_01_Left_Super",
+  "keep_reach": true
+ },
+ "l_spiral": {
+  "prefab": "Skill_Effect_Lancer_1st_01_Down",
+  "keep_reach": true
+ },
+ "v_l_spiral_u": {
+  "prefab": "Skill_Effect_Lancer_1st_01_Up",
+  "keep_reach": true
+ },
+ "v_l_spiral_l": {
+  "prefab": "Skill_Effect_Lancer_1st_01_Left",
+  "keep_reach": true
+ },
+ "l_illusion": {
+  "prefab": "Skill_Effect_Lancer_1st_02_Down",
+  "keep_reach": true
+ },
+ "v_l_illusion_u": {
+  "prefab": "Skill_Effect_Lancer_1st_02_Up",
+  "keep_reach": true
+ },
+ "v_l_illusion_l": {
+  "prefab": "Skill_Effect_Lancer_1st_02_Left",
+  "keep_reach": true
+ },
+ "l_waves": {
+  "prefab": "Skill_Effect_Lancer_3rd_01_Down",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_waves_u": {
+  "prefab": "Skill_Effect_Lancer_3rd_01_Up",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_waves_l": {
+  "prefab": "Skill_Effect_Lancer_3rd_01_Left",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "l_firedragon": {
+  "prefab": "Skill_Effect_Lancer_4th_02_Down",
+  "keep_reach": true
+ },
+ "v_l_firedragon_u": {
+  "prefab": "Skill_Effect_Lancer_4th_02_Up",
+  "keep_reach": true
+ },
+ "v_l_firedragon_l": {
+  "prefab": "Skill_Effect_Lancer_4th_02_Left",
+  "keep_reach": true
+ },
+ "l_annihil": {
+  "prefab": "Skill_Effect_Lancer_6th_01_Down",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_annihil_u": {
+  "prefab": "Skill_Effect_Lancer_6th_01_Up",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_annihil_l": {
+  "prefab": "Skill_Effect_Lancer_6th_01_Left",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "l_rise": {
+  "prefab": "Skill_Effect_Lancer_F_05_Down",
+  "keep_reach": true
+ },
+ "v_l_rise_u": {
+  "prefab": "Skill_Effect_Lancer_F_05_Up",
+  "keep_reach": true
+ },
+ "v_l_rise_l": {
+  "prefab": "Skill_Effect_Lancer_F_05_Left",
+  "keep_reach": true
+ },
+ "l_dragon": {
+  "prefab": "Skill_Effect_Lancer_F_06_Down",
+  "keep_reach": true
+ },
+ "v_l_dragon_u": {
+  "prefab": "Skill_Effect_Lancer_F_06_Up",
+  "keep_reach": true
+ },
+ "v_l_dragon_l": {
+  "prefab": "Skill_Effect_Lancer_F_06_Left",
+  "keep_reach": true
+ },
+ "l_ult": {
+  "prefab": "Skill_Effect_Lancer_F_04_Down",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_ult_u": {
+  "prefab": "Skill_Effect_Lancer_F_04_Up",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "v_l_ult_l": {
+  "prefab": "Skill_Effect_Lancer_F_04_Left",
+  "add_own": true,
+  "keep_reach": true
+ },
+ "mk_resonance": {
+  "prefab": "Skill_Effect_Monk_5th_02_Down",
+  "keep_reach": true
+ },
+ "v_mk_resonance_u": {
+  "prefab": "Skill_Effect_Monk_5th_02_Up",
+  "keep_reach": true
+ },
+ "v_mk_resonance_l": {
+  "prefab": "Skill_Effect_Monk_5th_02_Left",
+  "keep_reach": true
+ },
+ "md_spirit": {
+  "prefab": "Skill_Effect_Warlock_Spirit_Rush_Down",
+  "keep_reach": true
+ },
+ "v_md_spirit_u": {
+  "prefab": "Skill_Effect_Warlock_Spirit_Rush_Up",
+  "keep_reach": true
+ },
+ "v_md_spirit_l": {
+  "prefab": "Skill_Effect_Warlock_Spirit_Rush_Left",
+  "keep_reach": true
+ },
+ "md_bloodbat": {
+  "prefab": "Skill_Effect_Warlock_Blood_Bat_Cast_Down",
+  "keep_reach": true
+ },
+ "v_md_bloodbat_u": {
+  "prefab": "Skill_Effect_Warlock_Blood_Bat_Cast_Up",
+  "keep_reach": true
+ },
+ "v_md_bloodbat_l": {
+  "prefab": "Skill_Effect_Warlock_Blood_Bat_Cast_Left",
+  "keep_reach": true
+ },
+ "md_boundary": {
+  "prefab": "Skill_Effect_Warlock_Boundary_Break_Cast_Down",
+  "keep_reach": true
+ },
+ "v_md_boundary_u": {
+  "prefab": "Skill_Effect_Warlock_Boundary_Break_Cast_Up",
+  "keep_reach": true
+ },
+ "v_md_boundary_l": {
+  "prefab": "Skill_Effect_Warlock_Boundary_Break_Cast_Left",
+  "keep_reach": true
+ },
+ "cl_ago": {
+  "prefab": "Skill_Effect_Celestial_AgoDestruction_Alteration_Down",
+  "keep_reach": true
+ },
+ "v_cl_ago_u": {
+  "prefab": "Skill_Effect_Celestial_AgoDestruction_Alteration_Up",
+  "keep_reach": true
+ },
+ "v_cl_ago_l": {
+  "prefab": "Skill_Effect_Celestial_AgoDestruction_Alteration_Left",
+  "keep_reach": true
+ },
+ "cl_tiger": {
+  "prefab": "Skill_Effect_Celestial_TigerMaw_Alteration_Down",
+  "keep_reach": true
+ },
+ "v_cl_tiger_u": {
+  "prefab": "Skill_Effect_Celestial_TigerMaw_Alteration_Up",
+  "keep_reach": true
+ },
+ "v_cl_tiger_l": {
+  "prefab": "Skill_Effect_Celestial_TigerMaw_Alteration_Left",
+  "keep_reach": true
+ },
+ "cl_acumen": {
+  "prefab": "Skill_Effect_Celestial_1st_Acumen_Reinforce_Cast_Down",
+  "keep_reach": true
+ },
+ "v_cl_acumen_u": {
+  "prefab": "Skill_Effect_Celestial_1st_Acumen_Reinforce_Cast_Up",
+  "keep_reach": true
+ },
+ "v_cl_acumen_l": {
+  "prefab": "Skill_Effect_Celestial_1st_Acumen_Reinforce_Cast_Left",
+  "keep_reach": true
+ },
+ "dk_roar": {
+  "prefab": "Skill_Effect_Dokkaebi_RepellingReinForce_Cast_Down",
+  "keep_reach": true
+ },
+ "v_dk_roar_u": {
+  "prefab": "Skill_Effect_Dokkaebi_RepellingReinForce_Cast_Up",
+  "keep_reach": true
+ },
+ "v_dk_roar_l": {
+  "prefab": "Skill_Effect_Dokkaebi_RepellingReinForce_Cast_Left",
+  "keep_reach": true
+ },
+ "dk_super": {
+  "prefab": "Skill_Effect_Dokkaebi_Judgment_Cast_Down",
+  "keep_reach": true
+ },
+ "v_dk_super_u": {
+  "prefab": "Skill_Effect_Dokkaebi_Judgment_Cast_Up",
+  "keep_reach": true
+ },
+ "v_dk_super_l": {
+  "prefab": "Skill_Effect_Dokkaebi_Judgment_Cast_Left",
+  "keep_reach": true
+ },
+ "rp_flash": {
+  "prefab": "Skill_Effect_Reaper_Flash_Cast_Down",
+  "keep_reach": true
+ },
+ "v_rp_flash_u": {
+  "prefab": "Skill_Effect_Reaper_Flash_Cast_Up",
+  "keep_reach": true
+ },
+ "v_rp_flash_l": {
+  "prefab": "Skill_Effect_Reaper_Flash_Cast_Left",
+  "keep_reach": true
+ },
+ "rp_asura": {
+  "prefab": "Skill_Effect_Reaper_AsuraBalde_Cast_Down",
+  "keep_reach": true
+ },
+ "v_rp_asura_u": {
+  "prefab": "Skill_Effect_Reaper_AsuraBalde_Cast_Up",
+  "keep_reach": true
+ },
+ "v_rp_asura_l": {
+  "prefab": "Skill_Effect_Reaper_AsuraBalde_Cast_Left",
+  "keep_reach": true
+ },
+ "rp_wind": {
+  "prefab": "Skill_Effect_Reaper_WindSlash_Hit3_Down",
+  "keep_reach": true
+ },
+ "v_rp_wind_u": {
+  "prefab": "Skill_Effect_Reaper_WindSlash_Hit3_Up",
+  "keep_reach": true
+ },
+ "v_rp_wind_l": {
+  "prefab": "Skill_Effect_Reaper_WindSlash_Hit3_Left",
+  "keep_reach": true
+ },
+ "rp_inferno": {
+  "prefab": "Skill_Effect_Reaper_InfernoBlaze_Skill_Down",
+  "keep_reach": true
+ },
+ "v_rp_inferno_u": {
+  "prefab": "Skill_Effect_Reaper_InfernoBlaze_Skill_Up",
+  "keep_reach": true
+ },
+ "v_rp_inferno_l": {
+  "prefab": "Skill_Effect_Reaper_InfernoBlaze_Skill_Left",
+  "keep_reach": true
+ },
+ "rp_cut": {
+  "prefab": "Skill_Effect_Reaper_Cutoff_Cast_Down",
+  "keep_reach": true
+ },
+ "v_rp_cut_u": {
+  "prefab": "Skill_Effect_Reaper_Cutoff_Cast_Up",
+  "keep_reach": true
+ },
+ "v_rp_cut_l": {
+  "prefab": "Skill_Effect_Reaper_Cutoff_Cast_Left",
+  "keep_reach": true
+ },
+ "md_bust": {
+  "prefab": "Skill_Effect_Warlock_Frenzy_Explosion",
+  "keep_reach": true
+ },
+ "p_life": {
+  "prefab": "Skill_Effect_Sharman_Heal_White",
+  "add_all": true,
+  "keep_reach": true
+ },
+ "m_sun": {
+  "prefab": "Skill_Effect_Sharman_Heal_Yellow",
+  "add_all": true,
+  "keep_reach": true
+ },
+ "x_hero_foot": {
+  "prefab": "Player_Foot",
+  "keep_reach": true
+ },
+ "p_ult": {
+  "prefab": "Skill_Effect_Sharman_420701",
+  "keep_reach": true
+ }
+}

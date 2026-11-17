@@ -2637,6 +2637,42 @@ function endlessSpawn(dt) {
   }
 }
 
+// 바람의나라 연's monsters show a red "!" over their heads when they first turn on the hero, and now
+// and then one shouts as it comes. Only a few at a time (a crowd of "!" hides the crowd): one a
+// quarter second, four up at once; a shout every twelve seconds at most. Not in raids or wars.
+const SPAWN_SHOUTS = ['크르르…', '침입자다!', '어딜 감히!', '꼼짝 마라!', '가만두지 않겠다!', '여기서 끝이다!'];
+function noticeHero(e, p) {
+  if (e.noticed || e.ally || e.war || G.stage.raid || G.war || e.march || e.flee) return;
+  if (Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > 7) return;
+  e.noticed = true;
+  if (G.t - (G.alertLast || -9) < 0.25 || G.enemies.filter(o => o.alertAt && G.t - o.alertAt < 0.9).length >= 4) return;
+  G.alertLast = G.t;
+  e.alertAt = G.t;
+  if (G.t - (G.shoutLast || -20) > 12 && Math.random() < 0.3 && !e.bubble) {
+    G.shoutLast = G.t;
+    e.bubble = { text: e.kind === 'boss' || e.kind === 'mini' ? '감히 여기까지 오다니!' : SPAWN_SHOUTS[Math.floor(Math.random() * SPAWN_SHOUTS.length)], t: G.t + 0.3 };
+  }
+}
+
+/** The red "!" over a monster that has just seen the hero: it pops in, bobs, and fades. */
+function drawAlert(x, y, age) {
+  if (age < 0 || age > 0.9 || !settings.bubbles) return;
+  const pop = Math.min(1, age / 0.1), s = 0.7 + 0.3 * pop + (age < 0.18 ? 0.25 * Math.sin(age / 0.18 * Math.PI) : 0);
+  ctx.save();
+  ctx.globalAlpha = age < 0.7 ? 1 : (0.9 - age) / 0.2;
+  ctx.translate(Math.round(x), Math.round(y - 4 * Math.sin(Math.min(1, age / 0.3) * Math.PI)));
+  ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath(); ctx.arc(0, -9, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e8262a';
+  ctx.beginPath(); ctx.arc(0, -9, 7.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(3, 0); ctx.lineTo(0, 5); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(-1.5, -14.5, 3, 7);
+  ctx.fillRect(-1.5, -5.5, 3, 2.5);
+  ctx.restore();
+}
+
 function spawn(dt) {
   if (G.war && !G.war.raid) return; // 대항전 (war.js): the guilds are the field
   if (G.endless) {
@@ -2929,6 +2965,7 @@ function moveEnemies(dt) {
       else e.stun = Math.min(e.stun, e.stunFree - 4 - G.t);
     }
     if (e.stun <= 0) e.stunned = false;
+    noticeHero(e, p);
     if (e.moving || e.stun > 0) continue;
     if (e.march || e.flee) {
       // Event monsters: the drive walks on in its line; the treasure runs from the hero.
@@ -3269,6 +3306,23 @@ function meleeBig(id, kind, lv) {
   return MELEE_SIZE[kind] ? bigFx(id, MELEE_SIZE[kind] * (1 + 0.04 * ((lv || 1) - 1)), kind) : id;
 }
 
+/**
+ * 연 draws many techniques the way they go: its _Down picture (fx k_<id>), an _Up one and a _Left
+ * one (k_v_<id>_u, k_v_<id>_l; the right is the left turned over). The picture for the spell's
+ * picture `fxid` (k_<id>, grown or drawn larger: the same for the other way) going (dx, dy):
+ * [id, flip]. Up and down win a diagonal only when they are the longer way.
+ */
+function dirFx(fxid, sid, dx, dy) {
+  if (!fxid || (!dx && !dy)) return [fxid, false];
+  const way = Math.abs(dx) > Math.abs(dy) ? 'l' : dy < 0 ? 'u' : null;
+  const v = way && `k_v_${sid}_${way}`, f = M.fx[fxid], base = M.fx['k_' + sid];
+  if (!v || !M.fx[v] || !f || !base) return [fxid, false];
+  const mult = (f.k || 1) / (base.k || 1);
+  const id = Math.abs(mult - 1) > 0.01 ? `${v}#x${mult.toFixed(3)}` : v;
+  if (!M.fx[id]) M.fx[id] = { ...M.fx[v], src: v, k: (M.fx[v].k || 1) * mult };
+  return [id, way === 'l' && dx > 0];
+}
+
 // 바람의나라 연 draws a caster's spells larger than ours were (its 혈마광폭열파 stands nine heroes tall,
 // 기공십자광선 twelve; ours were half to three quarters of that): a 주술사, 도사, 궁사, 마도사 or 천인
 // spell of its own class is drawn about one and a half times its old size, at least [0] and at
@@ -3290,7 +3344,7 @@ function casterBig(id, kind, lv) {
  * screen's height), not a rain of small copies; where 연 has it in stages (뇌격룡's dragon
  * gathering, rising and striking: fx k_x_<id>_1, _2), each in turn.
  */
-function screenFx(id, sid, frac = 0.9) {
+function screenFx(id, sid, frac = 0.9, flip = false) {
   if (!M.fx[id]) return;
   const want = Math.min(VW, VH) * frac;
   const stages = [`k_x_${sid}_1`, `k_x_${sid}_2`].filter(s => M.fx[s]);
@@ -3298,7 +3352,7 @@ function screenFx(id, sid, frac = 0.9) {
   for (const s of [...stages, id]) {
     const b = bigFx(s, want, 'scr' + Math.round(frac * 100), M.fx[s].cls === 'yeon' ? 5 : 2.4);
     // Centred on the hero, not hung from its own pivot (that put a screen-high picture under it).
-    later(at, () => addFx(b, 0, -24, { follow: true, anchor: 'mid' }));
+    later(at, () => addFx(b, 0, -24, { follow: true, anchor: 'mid', flip: flip && s === id }));
     at += durs(s).reduce((a, d) => a + d, 0) * 0.7;
   }
 }
@@ -3841,7 +3895,10 @@ function drawChain() {
 function seenReach(fxid, scale = 1) {
   const f = M.fx[fxid];
   if (!f) return 0;
-  return (Math.min(f.w, f.h * 1.6) * (f.k || 1) * scale) / 2 / TILE * 0.85;
+  // A picture redrawn from 연's own (a whole tornado where a small one stood) keeps the reach of
+  // the one it replaced: reach = [its width, its height] as parts of this one's (balance unchanged).
+  const r = f.reach || [1, 1];
+  return (Math.min(f.w * r[0], f.h * r[1] * 1.6) * (f.k || 1) * scale) / 2 / TILE * 0.85;
 }
 
 function cast(skill, st) {
@@ -3869,8 +3926,12 @@ function cast(skill, st) {
   };
   // 연's Cast → Shot → Hit, where it has the pieces: the call over the hero (독수리소환's eagle,
   // 삼족오), then the shot flying to each one (기공구슬's orbs) before the hit lands on it.
+  // A row or a burst round the hero may have its own small hit on each one struck (추격, 천지파열).
   const castPic = 'k_x_' + skill.id + '_cast', shotPic = 'k_x_' + skill.id + '_shot';
-  if (M.fx[castPic] && ['spell', 'strike'].includes(def.kind)) addFx(castPic, 0, -30, { follow: true, scale: 1.3 });
+  const hitPic = M.fx['k_x_' + skill.id + '_hit'] ? 'k_x_' + skill.id + '_hit' : null;
+  if (M.fx[castPic] && ['spell', 'strike', 'nova', 'line'].includes(def.kind)) addFx(castPic, 0, -30, { follow: true, scale: 1.3 });
+  let hitN = 0;
+  const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: 1.1 }); };
   const shoot = e => {
     if (!M.fx[shotPic] || !e) return 0;
     const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
@@ -3983,8 +4044,10 @@ function cast(skill, st) {
       const e = ahead[0] || DIRS.map(([dx, dy]) => occ.get(key(p.tx + dx, p.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
       if (!e) return retry(0.25);
       const bx = e.tx + fx0, by = e.ty + fy0;
+      // 연's picture for the way it goes (up, down, left; right the left turned over).
+      const [bf, bflip] = dirFx(fxid, skill.id, fx0, fy0);
       if (ahead[0] && !occ.has(key(bx, by))) {
-        addFx(fxid, p.x, p.y - 26, { scale: 0.7 });
+        addFx(bf, p.x, p.y - 26, { scale: 0.7, flip: bflip });
         const x0 = p.x, y0 = p.y;
         p.x = bx * TILE + TILE / 2;
         p.y = by * TILE + TILE - 6;
@@ -3997,7 +4060,7 @@ function cast(skill, st) {
       for (let i = 0; i < (def.count || 1); i++) {
         later(i * 0.12, () => {
           if (e.hp <= 0) return;
-          fxOn(fxid, e);
+          fxOn(bf, e, { flip: bflip });
           if (def.curse) e.curse = def.curse;
           // Those pressed onto the same tile are cut with it.
           for (const b of bodiesAt(e.tx, e.ty) || [e]) if (b.m && !b.ally && b.hp > 0) smite(b, st.dmg, [fx0, fy0]);
@@ -4006,7 +4069,7 @@ function cast(skill, st) {
         });
       }
       const others = around(e.tx, e.ty, 1).filter(o => o !== e && o.hp > 0).slice(0, Math.max(0, st.count - (def.count || 1)));
-      others.forEach((o, i) => later(0.1 + i * 0.1, () => { if (o.hp > 0) { fxOn(fxid, o); smite(o, st.dmg); } }));
+      others.forEach((o, i) => later(0.1 + i * 0.1, () => { if (o.hp > 0) { fxOn(bf, o, { flip: bflip }); smite(o, st.dmg); } }));
       break;
     }
     case 'spell': {
@@ -4053,7 +4116,8 @@ function cast(skill, st) {
       if (!targets.length) return retry(0.3);
       targets.forEach((e, i) => {
         const tx = e.tx, ty = e.ty, fl = shoot(e);
-        const life = fxOn(fxid, e, { delay: i * 0.12 + fl });
+        const [sf, sflip] = dirFx(fxid, skill.id, tx - p.tx, ty - p.ty);
+        const life = fxOn(sf, e, { delay: i * 0.12 + fl, flip: sflip });
         later(i * 0.12 + fl + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
           const hit = def.shape === 'plus' ? onTiles(plusTiles(tx, ty, Math.max(1, st.radius))) : around(tx, ty, st.radius);
@@ -4092,7 +4156,8 @@ function cast(skill, st) {
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
       // The picture stands in the middle of the triangle.
       const mid = (depth + 1) / 2;
-      addFx(fxid, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25) });
+      const [cf, cflip] = dirFx(fxid, skill.id, dx, dy);
+      addFx(cf, p.x + dx * mid * TILE, p.y - 20 + dy * mid * TILE, { scale: Math.min(1.6, 0.7 + depth * 0.25), flip: cflip });
       // As far as the picture is seen to reach round its middle, too.
       const reach = seenReach(fxReach, Math.min(1.6, 0.7 + depth * 0.25));
       if (reach > depth) {
@@ -4135,13 +4200,15 @@ function cast(skill, st) {
         const b = bigFx('k_x_' + skill.id + '_beam', len, 'beam' + def.depth, 4);
         addFx(b, p.x, p.y - 18, { rot: Math.atan2(dy, dx) + Math.PI / 2, anchor: 'bottom' });
       } else {
-        addFx(fxid, p.x + dx * TILE * 0.5, p.y - 20 + dy * TILE * 0.5,
-          { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: dx < 0 });
+        const [lf, lflip] = dirFx(fxid, skill.id, dx, dy);
+        addFx(lf, p.x + dx * TILE * 0.5, p.y - 20 + dy * TILE * 0.5,
+          { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip });
       }
       later(0.04, () => meleeImpact(2));
       for (const e of hit) {
         const d = Math.max(Math.abs(e.tx - lx), Math.abs(e.ty - ly));
         later(0.04 + (beam ? 0.06 : dur * Math.min(1, d / def.depth)), () => {
+          hitOn(e);
           smite(e, st.dmg, [dx, dy]);
           // A thrust drives them on along it; one that went through throws them aside.
           if (def.dash) fling(e, e.tx - dy, e.ty - dx); else fling(e, lx, ly);
@@ -4171,7 +4238,8 @@ function cast(skill, st) {
       if (!all.length) return retry(0.5);
       // As 바람의나라 연 draws its great spells: one picture, most of the screen high, over the hero
       // (it rained in fourteen small copies before), and a small spark on each one struck.
-      screenFx(fxReach, skill.id);
+      const [scf, scflip] = dirFx(fxReach, skill.id, p.fdx, p.fdy);
+      screenFx(scf, skill.id, 0.9, scflip);
       later(0.35, () => {
         G.shake = Math.max(G.shake, 0.25);
         for (const e of all) {
@@ -4203,6 +4271,7 @@ function cast(skill, st) {
         meleeImpact(3);
         for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
+          hitOn(e);
           smite(e, st.dmg);
           fling(e, p.tx, p.ty);
         }
@@ -4264,7 +4333,8 @@ function cast(skill, st) {
       G.buffs[def.buff] = G.t + st.duration;
       if (def.buff === 'power') G.buffs.powerK = def.power;
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
-      addFx(fxid, 0, -26, { follow: true });
+      const [uf, uflip] = dirFx(fxid, skill.id, p.fdx, p.fdy);
+      addFx(uf, 0, -26, { follow: true, flip: uflip });
       break;
     }
   }
@@ -4398,7 +4468,10 @@ function castUlt() {
   // The 필살기 fills the screen, as 연's great spells do: one picture as high as the screen over the
   // hero (it was a hand across, in ten small copies), and the screen goes white for a blink and
   // the world stops a frame or two (not in a raid or a war, where the party's blows go on).
-  if (ultMode(G.cls.id) === 'hunt') screenFx(grownFx(def.fx, 8), def.id, 1);
+  if (ultMode(G.cls.id) === 'hunt') {
+    const [uf, uflip] = dirFx(grownFx(def.fx, 8), def.id, p.fdx, p.fdy);
+    screenFx(uf, def.id, 1, uflip);
+  }
   if (!G.stage.raid && !G.war) {
     G.whiteAt = G.t;
     G.hitstop = Math.max(G.hitstop || 0, 0.035);
@@ -7555,7 +7628,8 @@ function render(now) {
     drawEmote(m, m.x, m.y - (m.av ? m.av.top : 50) - (m.bubble ? 36 : 10));
   }
   for (const e of G.enemies) {
-    if (e.bubble && G.t - e.bubble.t < 1.6) drawBubble(e.bubble.text, e.x, e.y - e.m.h * e.scale - 16, G.t - e.bubble.t);
+    if (e.bubble && G.t - e.bubble.t < 1.6 && G.t >= e.bubble.t) drawBubble(e.bubble.text, e.x, e.y - e.m.h * e.scale - 16, G.t - e.bubble.t);
+    else if (e.alertAt !== undefined) drawAlert(e.x, e.y - e.m.h * e.scale - 6, G.t - e.alertAt);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7666,6 +7740,8 @@ function drawHero(now, hidden) {
     else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
     return;
   }
+  // 연's ring at the player's own feet (FXs player_foot), turning under the hero all the while.
+  if (M.fx.k_x_hero_foot && !hidden) drawFx('k_x_hero_foot', p.x, p.y + 2, now, 1.3, 0, 'bottom', true);
   // 연's own figure for the class, in the outfit of the armour worn.
   const yPose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
   // After a dash: fading copies along the way, and the last of the way slid, not popped.
