@@ -2024,10 +2024,12 @@ function stats(skill) {
 /** The hero's damage multiplier right now. */
 function might() {
   // The class's own weight (data.js), from bot clears of 왕초보. A cut (a caster whose spells
-  // grow into a screen-wide sweep) comes in with the levels, full from Lv 35 (spells near 8단): from the first,
-  // 천인 at half its blows fell to the first crowds about Lv 13.
+  // grow into a screen-wide sweep) comes in with the levels, from Lv 15 to full at Lv 40 (spells
+  // near 8단): from the first, 천인 at half its blows fell to the first crowds about Lv 13; coming
+  // in from Lv 1 it was already three quarters by the 왕초보 crowd of 200-300 (Lv 17-24, before the
+  // boss), where a 천인 still on single-target 염화·삼족오 fell in three runs of five.
   let ck = G.cls.dmgK || 1;
-  if (ck < 1) ck = 1 - (1 - ck) * Math.min(1, Math.max(0, G.player.lvl - 1) / 34);
+  if (ck < 1) ck = 1 - (1 - ck) * Math.min(1, Math.max(0, G.player.lvl - 15) / 25);
   let k = (G.player.gearPower || 1) * ck;
   if (G.buffs.g_power > G.t) k *= 1 + (G.buffs.g_powerK || 0);
   if (G.buffs.g_pierce > G.t) k *= 1 + (G.buffs.g_pierceK || 0);
@@ -3147,8 +3149,7 @@ function hurtEnemy(e, dmg, push = null) {
   // orange for a heavy blow, grey for a light one.
   if (crit || settings.numbers) {
     // 연's way: every blow its own line, the lines of a quick burst stacked in a column over
-    // the struck (up to eight), in its orange (a 치명타 red-gold and larger); a companion's
-    // blows smaller.
+    // the struck (up to eight), white (a 치명타 orange and larger); a companion's blows smaller.
     e.numN = G.t - (e.numT || -9) < 0.7 ? ((e.numN || 0) + 1) % 8 : 0;
     e.numT = G.t;
     if (G.texts.length > 90) G.texts.shift();
@@ -3174,7 +3175,14 @@ function hurtEnemy(e, dmg, push = null) {
   // A close-in fighter's blows carry its own 연 hit flash (meleeMark).
   const look = !G.allyHitting && !G.procHitting && MELEE_LOOK[G.cls.id];
   if (look && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2 && M.fx[look.hit]) meleeMark(e, look, crit);
-  else {
+  else if (G.spark && !G.allyHitting && !G.procHitting) {
+    // A caster's spell: 연's small spark of its element (fire, lightning, an arrow's, a claw's)
+    // on each one struck, a little larger on a crit. Budgeted, not on a whole crowd.
+    if (M.fx[G.spark] && G.t - (e.markT || -9) > 0.25 && fxBudget('hit', 12)) {
+      e.markT = G.t;
+      fxOn(G.spark, e, { scale: (SPARK_SCALE[G.spark] || 0.5) * (crit ? 1.35 : 1), rot: rand(-0.3, 0.3) });
+    }
+  } else {
     const mark = G.cls.id === 'mage' ? ((crit || dmg >= e.maxHp * 0.35) && 'h_hit_fire')
       : G.cls.id === 'poet' ? null : 'h_hit_tiger';
     if (mark && M.fx[mark] && G.t - (e.markT || -9) > 0.3 && fxBudget('hit', 10)) {
@@ -3240,18 +3248,69 @@ const MELEE_LOOK = {
 // the way it strikes: in 연's hunts a 진섬 or a 퇴격 covers two to four tiles, past the hero's height.
 const MELEE_SIZE = { slash: 104, blink: 128, spell: 112, strike: 144, line: 116, cleave: 142, nova: 188 };
 
-/** The picture id drawn larger for a close-in technique (a second name for the same frames). */
-function meleeBig(id, kind, lv) {
-  const f = id && M.fx[id], want = MELEE_SIZE[kind];
+/**
+ * A picture drawn larger: a second name for the same frames, `want` game pixels on its longer
+ * side (never smaller than it is, at most `cap` times). What a spell strikes is still measured
+ * on the picture it was given (fxReach in cast()), so only the look grows.
+ */
+function bigFx(id, want, tag, cap = 3.2) {
+  const f = id && M.fx[id];
   if (!f || !want) return id;
   const k = f.k || 1, now = Math.max(f.w, f.h) * k;
-  // Growing a little with the 단 still, as every spell does.
-  const mult = Math.max(1, Math.min(3.2, (want * (1 + 0.04 * ((lv || 1) - 1))) / now));
+  const mult = Math.max(1, Math.min(cap, want / now));
   if (mult < 1.05) return id;
-  const big = `${id}#${kind}`;
+  const big = `${id}#${tag}`;
   if (!M.fx[big]) M.fx[big] = { ...f, src: f.src || id, k: k * mult };
   return big;
 }
+
+/** The picture id drawn larger for a close-in technique (growing a little with the 단 still). */
+function meleeBig(id, kind, lv) {
+  return MELEE_SIZE[kind] ? bigFx(id, MELEE_SIZE[kind] * (1 + 0.04 * ((lv || 1) - 1)), kind) : id;
+}
+
+// 바람의나라 연 draws a caster's spells larger than ours were (its 혈마광폭열파 stands nine heroes tall,
+// 기공십자광선 twelve; ours were half to three quarters of that): a 주술사, 도사, 궁사, 마도사 or 천인
+// spell of its own class is drawn about one and a half times its old size, at least [0] and at
+// most [1] game pixels by the way it strikes (one on each of a few struck stays under a crowd's
+// width), a little larger a 단. What it strikes stays what the old picture reached.
+const CASTER_SIZE = { spell: [104, 200], spell4: [104, 190], strike: [140, 320], cleave: [170, 330], blink: [130, 260],
+  nova: [170, 560], heal: [124, 200], buff: [124, 200], line: [130, 440] };
+function casterBig(id, kind, lv) {
+  const f = id && M.fx[id], r = CASTER_SIZE[kind];
+  if (!f || !r) return id;
+  const now = Math.max(f.w, f.h) * (f.k || 1);
+  const want = Math.min(r[1], Math.max(r[0], now * 1.45)) * (1 + 0.03 * ((lv || 1) - 1));
+  // An old 72-pixel picture blown up past twice its size is a blur, not a spell.
+  return bigFx(id, want, 'c' + kind, f.cls === 'yeon' ? 3.2 : 2.2);
+}
+
+/**
+ * A screen-wide spell or a 필살기 as 연 plays it: one picture, large over the hero (most of the
+ * screen's height), not a rain of small copies; where 연 has it in stages (뇌격룡's dragon
+ * gathering, rising and striking: fx k_x_<id>_1, _2), each in turn.
+ */
+function screenFx(id, sid, frac = 0.9) {
+  if (!M.fx[id]) return;
+  const want = Math.min(VW, VH) * frac;
+  const stages = [`k_x_${sid}_1`, `k_x_${sid}_2`].filter(s => M.fx[s]);
+  let at = 0;
+  for (const s of [...stages, id]) {
+    const b = bigFx(s, want, 'scr' + Math.round(frac * 100), M.fx[s].cls === 'yeon' ? 5 : 2.4);
+    // Centred on the hero, not hung from its own pivot (that put a screen-high picture under it).
+    later(at, () => addFx(b, 0, -24, { follow: true, anchor: 'mid' }));
+    at += durs(s).reduce((a, d) => a + d, 0) * 0.7;
+  }
+}
+
+/** Which of 연's small hit sparks (fx h_hit_*) a caster's spell leaves on each one it strikes. */
+function sparkOf(id, def) {
+  if (def.elem === 'thunder' || /thunder|light|judge|flash|noejeon|storm|ray|cross|brilliant|jiroe|burst|gwang/.test(id)) return 'h_hit_light';
+  if (def.elem === 'fire' || /fire|flame|inferno|boom|sammae|desert|kalpa|jiok|bomb|hell|crowfire|m_ult/.test(id)) return 'h_hit_fire';
+  return { archer: 'h_hit_attack', celestial: 'h_hit_tiger', magus: 'h_hit_light', mage: 'h_hit_6', poet: 'h_hit_6' }[def.cls] || null;
+}
+// How large each spark is drawn (its picture's own size differs).
+const SPARK_SCALE = { h_hit_6: 0.8, h_hit_attack: 0.42, h_hit_fire: 0.5, h_hit_light: 0.5, h_hit_tiger: 0.55 };
 
 /**
  * The weight of a close-in technique landing (1 a blow, 2 a heavy one, 3 a burst round the
@@ -3797,12 +3856,33 @@ function cast(skill, st) {
   // A close-in fighter's techniques are drawn as 연 draws them, two to four tiles across and
   // larger than the hero; what they strike stays what the spell's own picture reached (fxReach).
   // (Not the shared 금강퇴 every class learns: one big kick on all six looked alike.)
-  const fxid = MELEE_LOOK[G.cls.id] && def.cls === G.cls.id && !G.war ? meleeBig(fxReach, def.kind, skill.lv) : fxReach;
+  // A caster's spells too, one and a half times what they were (casterBig).
+  const fxid = def.cls !== G.cls.id || G.war ? fxReach
+    : MELEE_LOOK[G.cls.id] ? meleeBig(fxReach, def.kind, skill.lv) : casterBig(fxReach, def.kind, skill.lv);
+  // A caster's blow leaves 연's small hit spark of its element on each one struck.
+  const spark = MELEE_LOOK[G.cls.id] ? null : sparkOf(skill.id, def);
+  const smite = (o, d, push) => {
+    G.spark = spark;
+    const r = hurtEnemy(o, d, push);
+    G.spark = null;
+    return r;
+  };
+  // 연's Cast → Shot → Hit, where it has the pieces: the call over the hero (독수리소환's eagle,
+  // 삼족오), then the shot flying to each one (기공구슬's orbs) before the hit lands on it.
+  const castPic = 'k_x_' + skill.id + '_cast', shotPic = 'k_x_' + skill.id + '_shot';
+  if (M.fx[castPic] && ['spell', 'strike'].includes(def.kind)) addFx(castPic, 0, -30, { follow: true, scale: 1.3 });
+  const shoot = e => {
+    if (!M.fx[shotPic] || !e) return 0;
+    const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
+    addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot: Math.atan2(dy, dx) + Math.PI / 2, scale: 1.3 });
+    return fl;
+  };
   classFlourish(def, skill, st);
   const p = G.player;
   if (MELEE_LOOK[G.cls.id] && def.dmg) {
     // Its own picture on each one struck: the class's flash and slash arcs keep out of its way.
-    if (['strike', 'line', 'spell', 'blink'].includes(def.kind)) G.ownPicAt = G.t;
+    // (A row's one travelling picture leaves the class's flash on each it passes.)
+    if (['strike', 'spell', 'blink'].includes(def.kind)) G.ownPicAt = G.t;
     else if (def.kind !== 'slash') G.areaAt = G.t;
   }
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
@@ -3832,7 +3912,7 @@ function cast(skill, st) {
       const under = occ.get(key(p.tx, p.ty));
       if (under && under.m && !under.ally) {
         if (fxid) fxOn(fxid, under);
-        hurtEnemy(under, st.dmg);
+        smite(under, st.dmg);
       }
       const foeAt = (dx, dy) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); };
       const fx0 = p.fdx || 0, fy0 = fx0 ? 0 : p.fdy || 1;
@@ -3875,7 +3955,7 @@ function cast(skill, st) {
             bs.forEach((b, i) => {
               if (!b.m || b.ally || b.hp <= 0) return;
               if (fxid && !i) fxOn(fxid, b, { rot: (h % 2) * 0.6 });
-              hurtEnemy(b, dmg, [dx, dy]);
+              smite(b, dmg, [dx, dy]);
             });
             meleeSlash(p.tx + dx, p.ty + dy, dx, dy, h);
           }
@@ -3884,7 +3964,7 @@ function cast(skill, st) {
           // The swing sweeps on: the two tiles flanking the one struck ahead (diagonally beside the
           // hero) take half the blow, so a heap pressed round the hero is cut, not one tile of it.
           for (const [fx, fy] of [[ax + ay, ay + ax], [ax - ay, ay - ax]]) {
-            for (const b of bodiesAt(p.tx + fx, p.ty + fy) || []) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, dmg * 0.5, [ax, ay]);
+            for (const b of bodiesAt(p.tx + fx, p.ty + fy) || []) if (b.m && !b.ally && b.hp > 0) smite(b, dmg * 0.5, [ax, ay]);
           }
         });
       }
@@ -3920,13 +4000,13 @@ function cast(skill, st) {
           fxOn(fxid, e);
           if (def.curse) e.curse = def.curse;
           // Those pressed onto the same tile are cut with it.
-          for (const b of bodiesAt(e.tx, e.ty) || [e]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, st.dmg, [fx0, fy0]);
+          for (const b of bodiesAt(e.tx, e.ty) || [e]) if (b.m && !b.ally && b.hp > 0) smite(b, st.dmg, [fx0, fy0]);
           meleeSlash(e.tx, e.ty, fx0, fy0, i);
           if (i === (def.count || 1) - 1) meleeImpact(2);
         });
       }
       const others = around(e.tx, e.ty, 1).filter(o => o !== e && o.hp > 0).slice(0, Math.max(0, st.count - (def.count || 1)));
-      others.forEach((o, i) => later(0.1 + i * 0.1, () => { if (o.hp > 0) { fxOn(fxid, o); hurtEnemy(o, st.dmg); } }));
+      others.forEach((o, i) => later(0.1 + i * 0.1, () => { if (o.hp > 0) { fxOn(fxid, o); smite(o, st.dmg); } }));
       break;
     }
     case 'spell': {
@@ -3936,10 +4016,13 @@ function cast(skill, st) {
       if (!targets.length) return retry(0.25);
       targets.forEach((e, i) => later(i * 0.08, () => {
         if (e.hp <= 0) return;
-        const life = fxOn(fxid, e);
-        later(life * 0.3, () => {
-          const dealt = hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
-          if (def.drain && dealt) heal(dealt * def.drain, false, true);
+        later(shoot(e), () => {
+          if (e.hp <= 0) return;
+          const life = fxOn(fxid, e);
+          later(life * 0.3, () => {
+            const dealt = smite(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
+            if (def.drain && dealt) heal(dealt * def.drain, false, true);
+          });
         });
       }));
       break;
@@ -3953,7 +4036,7 @@ function cast(skill, st) {
           if (b && b.m && !b.ally && !(b.war && b.team === 0)) {
             any = true;
             fxOn(fxid, b);
-            for (const o of bodiesAt(b.tx, b.ty)) if (o.m && !o.ally && o.hp > 0) hurtEnemy(o, st.dmg);
+            for (const o of bodiesAt(b.tx, b.ty)) if (o.m && !o.ally && o.hp > 0) smite(o, st.dmg);
             if (!def.pierce) break; // 삼매진화 burns the whole row
           }
         }
@@ -3969,9 +4052,9 @@ function cast(skill, st) {
         .sort(def.strongest ? (a, b) => b.maxHp - a.maxHp : () => Math.random() - 0.5).slice(0, st.count);
       if (!targets.length) return retry(0.3);
       targets.forEach((e, i) => {
-        const tx = e.tx, ty = e.ty;
-        const life = fxOn(fxid, e, { delay: i * 0.12 });
-        later(i * 0.12 + life * (def.hitAt || 0.3), () => {
+        const tx = e.tx, ty = e.ty, fl = shoot(e);
+        const life = fxOn(fxid, e, { delay: i * 0.12 + fl });
+        later(i * 0.12 + fl + life * (def.hitAt || 0.3), () => {
           G.shake = Math.max(G.shake, 0.08);
           const hit = def.shape === 'plus' ? onTiles(plusTiles(tx, ty, Math.max(1, st.radius))) : around(tx, ty, st.radius);
           if (MELEE_LOOK[G.cls.id] && !i) {
@@ -3983,12 +4066,12 @@ function cast(skill, st) {
             if (def.slow) o.slow = def.slow;
             if (def.stun) { o.stun = def.stun; cutBlast(o); }
             if (def.curse) o.curse = def.curse;
-            hurtEnemy(o, st.dmg);
+            smite(o, st.dmg);
             if (o !== e) fling(o, tx, ty);
           }
           // A field that stays (the 천인's 선풍 whirlpools): it strikes again where it fell, at half weight.
           for (let k = 1; k <= (def.ticks || 0); k++) {
-            later(k * 0.45, () => { for (const o of around(tx, ty, st.radius)) hurtEnemy(o, st.dmg * 0.5); });
+            later(k * 0.45, () => { for (const o of around(tx, ty, st.radius)) smite(o, st.dmg * 0.5); });
           }
         });
       });
@@ -4021,7 +4104,7 @@ function cast(skill, st) {
         if (def.cls !== 'all') meleeImpact(2);
         for (const e of hit.slice(0, def.max || 99)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
-          hurtEnemy(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
+          smite(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
           fling(e, p.tx, p.ty);
         }
       });
@@ -4042,16 +4125,28 @@ function cast(skill, st) {
       }
       if (!best) return retry(0.25);
       const [dx, dy, hit] = best;
-      hit.forEach((e, i) => fxOn(fxid, e, { delay: i * 0.05 }));
-      const lx = p.tx, ly = p.ty;
-      later(0.1, () => {
-        meleeImpact(2);
-        for (const e of hit) {
-          hurtEnemy(e, st.dmg, [dx, dy]);
+      // 연 sends one arrow, beam or cut along the row and a small hit on each it passes (not a
+      // copy of the spell on every one in it): the spell's picture goes from the hero to the
+      // row's end, and each in the row is struck as it reaches it (the class's flash or the
+      // spell's spark on it). A beam (광폭기조사) stands along the row at once instead.
+      const lx = p.tx, ly = p.ty, len = def.depth * TILE, dur = 0.14 + 0.025 * def.depth;
+      const beam = M.fx['k_x_' + skill.id + '_beam'];
+      if (beam) {
+        const b = bigFx('k_x_' + skill.id + '_beam', len, 'beam' + def.depth, 4);
+        addFx(b, p.x, p.y - 18, { rot: Math.atan2(dy, dx) + Math.PI / 2, anchor: 'bottom' });
+      } else {
+        addFx(fxid, p.x + dx * TILE * 0.5, p.y - 20 + dy * TILE * 0.5,
+          { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: dx < 0 });
+      }
+      later(0.04, () => meleeImpact(2));
+      for (const e of hit) {
+        const d = Math.max(Math.abs(e.tx - lx), Math.abs(e.ty - ly));
+        later(0.04 + (beam ? 0.06 : dur * Math.min(1, d / def.depth)), () => {
+          smite(e, st.dmg, [dx, dy]);
           // A thrust drives them on along it; one that went through throws them aside.
           if (def.dash) fling(e, e.tx - dy, e.ty - dx); else fling(e, lx, ly);
-        }
-      });
+        });
+      }
       if (MELEE_LOOK[G.cls.id]) streak(p.x, p.y - 22, dx, dy, def.depth);
       if (def.dash) {
         const x0 = p.x, y0 = p.y;
@@ -4074,10 +4169,9 @@ function cast(skill, st) {
       // The whole screen, as 지폭지술 and its kind struck.
       const all = onScreen();
       if (!all.length) return retry(0.5);
-      addFx(fxid, 0, -26, { follow: true, scale: 1.4 });
-      // As 바람의나라 연 draws its great spells: the picture rains all over the screen in waves.
-      scatterFx(fxid, 14, 1.3);
-      all.slice(0, M.fx[fxid] && M.fx[fxid].cls === 'yeon' ? 3 : 10).forEach((e, i) => fxOn(fxid, e, { delay: 0.05 * i, scale: M.fx[fxid] && M.fx[fxid].cls === 'yeon' ? 0.6 : 0.9 }));
+      // As 바람의나라 연 draws its great spells: one picture, most of the screen high, over the hero
+      // (it rained in fourteen small copies before), and a small spark on each one struck.
+      screenFx(fxReach, skill.id);
       later(0.35, () => {
         G.shake = Math.max(G.shake, 0.25);
         for (const e of all) {
@@ -4087,7 +4181,7 @@ function cast(skill, st) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           // 포효검황: weaker with every tile away.
           const far = def.falloff ? Math.max(0.2, 1 - def.falloff * tdist(e, p)) : 1;
-          hurtEnemy(e, st.dmg * far);
+          smite(e, st.dmg * far);
         }
       });
       break;
@@ -4109,7 +4203,7 @@ function cast(skill, st) {
         meleeImpact(3);
         for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
-          hurtEnemy(e, st.dmg);
+          smite(e, st.dmg);
           fling(e, p.tx, p.ty);
         }
       });
@@ -4123,7 +4217,7 @@ function cast(skill, st) {
           aura: skill, loop: true, alpha: 0.7 };
         G.fxs.push(h);
       }
-      for (const e of around(p.tx, p.ty, 1)) hurtEnemy(e, st.dmg);
+      for (const e of around(p.tx, p.ty, 1)) smite(e, st.dmg);
       used = false;
       break;
     }
@@ -4301,10 +4395,14 @@ function castUlt() {
   audio.play('skill_' + def.id, 'ult');
   if (def.darken) G.darkUntil = G.t + def.darken;
   G.shake = 0.5;
-  // The 필살기 fills the screen, as 연's great spells do: its picture huge over the hero, a flash.
-  if (ultMode(G.cls.id) === 'hunt') {
-    addFx(grownFx(def.fx, 8), 0, -26, { follow: true, scale: 2.4 });
-    scatterFx(grownFx(def.fx, 8), 10, 1.5);
+  // The 필살기 fills the screen, as 연's great spells do: one picture as high as the screen over the
+  // hero (it was a hand across, in ten small copies), and the screen goes white for a blink and
+  // the world stops a frame or two (not in a raid or a war, where the party's blows go on).
+  if (ultMode(G.cls.id) === 'hunt') screenFx(grownFx(def.fx, 8), def.id, 1);
+  if (!G.stage.raid && !G.war) {
+    G.whiteAt = G.t;
+    G.hitstop = Math.max(G.hitstop || 0, 0.035);
+    G.hitstopAt = G.t;
   }
   const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
@@ -4345,7 +4443,10 @@ function castUlt() {
       }
     }
   } else {
-    seen.slice(0, 14).forEach((e, i) => fxOn(def.fx, e, { delay: i * 0.04 }));
+    // On the struck a small hit of its own (헬파이어's burst) or the class's spark, not the great
+    // picture again on each.
+    const hitPic = M.fx['k_x_' + def.id + '_hit'] ? 'k_x_' + def.id + '_hit' : MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hit : sparkOf(def.id, def);
+    if (M.fx[hitPic]) seen.slice(0, 14).forEach((e, i) => fxOn(hitPic, e, { delay: 0.3 + i * 0.03, scale: SPARK_SCALE[hitPic] || (MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hs * 1.3 : 0.9) }));
     later(0.4, () => seen.forEach(e => { if (e.hp > 0) hurtEnemy(e, base); }));
   }
   // What each class's 필살기 brings besides the blow.
@@ -5322,18 +5423,6 @@ function grownFx(id, lv) {
 }
 
 function updateStyle(dt) {}
-
-
-/** A spell's picture rained over the visible field: n copies in waves, large. */
-function scatterFx(id, n, scale) {
-  const p = G.player, w = VW / 2 - 20, h = VH / 2 - 20;
-  // Light (drawn added) copies well; a solid picture repeated large reads as blocks: fewer, smaller.
-  const f = M.fx[id];
-  if (f && f.cls === 'modern') return; // today's pictures are already large, and dark-backed
-  if (f && f.cls === 'yeon') { n = Math.min(n, 3); scale = Math.min(scale, 0.6); } // 연's are large already
-  if (f && !f.add) { n = Math.ceil(n / 3); scale = Math.min(scale, 1); }
-  for (let i = 0; i < n; i++) addFx(id, p.x + rand(-w, w), p.y - 20 + rand(-h, h), { delay: (i % 4) * 0.09 + rand(0, 0.05), scale: scale * rand(0.8, 1.2) });
-}
 
 
 /** The spells in hand, as 연's skill row: each icon in a frame of its 승급 tier, the time
@@ -6625,7 +6714,7 @@ function addFx(id, x, y, o = {}) {
   // and much to draw.
   if (area > 12000 && G.fxs.filter(f => f.id === id).length >= 4) return life;
   G.fxs.push({ id, x, y, t: -(o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
-    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000 });
+    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip });
   return life;
 }
 
@@ -6638,7 +6727,7 @@ function fxFrame(d, t, loop) {
   return d.length - 1;
 }
 
-function drawFx(id, x, y, t, scale, rot, anchor, loop) {
+function drawFx(id, x, y, t, scale, rot, anchor, loop, flip) {
   const f = M.fx[id];
   const im = images[`fx/${f.src || id}.png`];
   const i = fxFrame(durs(id), t, loop);
@@ -6653,7 +6742,8 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop) {
   if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
   ctx.translate(x, y);
   if (rot) ctx.rotate(rot);
-  if (f.ax !== undefined) {
+  if (flip) ctx.scale(-1, 1);
+  if (f.ax !== undefined && anchor !== 'mid') {
     // 연's effects carry their pivot: the target's feet (a little under a body's middle).
     const k = scale * (f.k || 1);
     ctx.drawImage(pic, sx, sy, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
@@ -7382,9 +7472,15 @@ function render(now) {
   // Spell effects over everything, at their own size.
   for (const f of G.fxs) {
     if (f.t < 0) continue;
-    const x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
+    let x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
+    if (f.mv) {
+      // Travelling (a row's arrow or beam): out to its end over mv[2] seconds, slowing at the last.
+      const k = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - k) * (1 - k);
+      x += f.mv[0] * e;
+      y += f.mv[1] * e;
+    }
     if (f.alpha) ctx.globalAlpha = f.alpha;
-    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop);
+    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip);
     ctx.globalAlpha = 1;
   }
   ctx.font = '8px G7';
@@ -7409,11 +7505,13 @@ function render(now) {
       drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, 0.32, 'font_gold');
     } else if (t.num && dmgkFont()) {
       // 연's damage lines (font_dmgk, morris9 with its orange material): pop in, settle, rise.
-      const base = t.ally ? 0.42 : t.crit ? 0.85 : t.heavy ? 0.7 : t.dot ? 0.45 : 0.6;
-      // As 연 shows a blow: it pops in large and white, then settles in its colour.
-      const fresh = t.t < 0.16 && !t.dot && M.hud.font_dmgk_w;
+      const base = t.ally ? 0.42 : t.crit ? 0.95 : t.heavy ? 0.7 : t.dot ? 0.45 : 0.6;
+      // As 연 shows a blow: a plain one white, a 치명타 larger and orange (it pops in white too);
+      // a companion's in orange, small.
+      const white = M.hud.font_dmgk_w, fresh = t.t < 0.16 && !t.dot && white;
       const pop = t.t < 0.16 ? (t.crit ? 1.7 : 1.4) - t.t * (t.crit ? 4.4 : 2.5) : 1;
-      const font = t.heal ? 'font_dmgk_g' : t.mana ? 'font_dmgk_b' : fresh ? 'font_dmgk_w' : t.crit ? 'font_dmgk_r' : 'font_dmgk_o';
+      const font = t.heal ? 'font_dmgk_g' : t.mana ? 'font_dmgk_b' : fresh ? 'font_dmgk_w'
+        : t.crit || t.ally || !white ? 'font_dmgk_o' : 'font_dmgk_w';
       drawDigits(t.text, Math.round(t.x), Math.round(t.y), null, (t.heal || t.mana ? 0.5 : base) * pop, font);
     } else if (t.num && dmgFont()) {
       // 연's own damage digits: white with a black edge, tinted for the kind of hit; they pop
@@ -7469,6 +7567,11 @@ function render(now) {
     gr.addColorStop(0, 'rgba(0,0,0,0)');
     gr.addColorStop(1, `rgba(0,0,0,${dark})`);
     ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // A 필살기's blink of white over the whole screen.
+  if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.32) {
+    ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - (G.t - G.whiteAt) / 0.32)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
   // A raid blast gathering: the screen's edge throbs red until it falls or is cut.

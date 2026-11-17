@@ -154,10 +154,11 @@ def material_names(r):
     return out
 
 
-def render(go, add_own=False, alpha_only=False):
+def render(go, add_own=False, alpha_only=False, add_all=False):
     """add_own: renderers with a material of their own (not Sprites-Default) are additive. Their
     shaders live in another bundle, so the name test above cannot tell; the mapping says so.
-    alpha_only: none is (a material whose name merely ends in _a, as the 도깨비's Totem_A)."""
+    alpha_only: none is (a material whose name merely ends in _a, as the 도깨비's Totem_A).
+    add_all: every one is (a flash drawn black on its own square whose material we cannot read)."""
     root_tr = comp(go, 'Transform')
     nodes = [('', root_tr)] + child_paths(root_tr)
     by_hash = {zlib.crc32(p.encode()) & 0xffffffff: (p, t) for p, t in nodes}
@@ -167,7 +168,7 @@ def render(go, add_own=False, alpha_only=False):
         r = comp(g, 'SpriteRenderer')
         if r is not None and g.m_IsActive is not False:
             rends.append({'path': p, 'tr': t, 'r': r, 'sprite': r.m_Sprite if r.m_Sprite.path_id else None,
-                          'alpha': r.m_Color.a, 'add': not alpha_only and (is_additive(r) or add_own) and (is_additive(r) or any(
+                          'alpha': r.m_Color.a, 'add': add_all or not alpha_only and (is_additive(r) or add_own) and (is_additive(r) or any(
                               n != 'Sprites-Default' for n in material_names(r))), 'order': r.m_SortingOrder,
                           'flip': (r.m_FlipX, r.m_FlipY), 'anim': {}})
     if not rends:
@@ -328,7 +329,7 @@ def main():
         pf = spec.get('prefab')
         if pf and pf.lower() in cont:
             try:
-                res = render(cont[pf.lower()].read(), bool(spec.get('add_own')), bool(spec.get('alpha_only')))
+                res = render(cont[pf.lower()].read(), bool(spec.get('add_own')), bool(spec.get('alpha_only')), bool(spec.get('add_all')))
             except Exception as e:
                 print(sid, pf, 'render failed', e)
                 res = None
@@ -337,6 +338,13 @@ def main():
                 st = to_strip(frames, ox, oy, add)
                 if st:
                     strip, cell, anchor = st
+                    # "alpha_gain": an effect whose sprites the client fades in with particles we do not
+                    # draw comes out nearly see-through; its alpha is raised (k times, at most opaque).
+                    g = spec.get('alpha_gain')
+                    if g and not add:
+                        arr = np.asarray(strip).astype(float)
+                        arr[:, :, 3] = np.clip(arr[:, :, 3] * g, 0, 255)
+                        strip = Image.fromarray(arr.astype(np.uint8))
                     strip.save(os.path.join(out, sid + '.png'), optimize=True)
                     index[sid] = {'cell': list(cell), 'n': len(frames), 'ms': round(1000 / fps), 'add': add,
                                   'anchor': [int(anchor[0]), int(anchor[1])], 'prefab': pf}

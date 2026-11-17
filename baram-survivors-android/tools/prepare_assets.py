@@ -414,11 +414,17 @@ def main():
             keep = list(range(0, len(rgb), step))
             d2 = [sum(durs[i:i + step]) for i in keep]
             w, h = box[2] - box[0], box[3] - box[1]
-            k = min(1.0, 150 / max(w, h))
+            # Stored at up to 320 pixels, so that drawn at 연's size (two to three times the old
+            # effects') it is not a blur; "k" draws it back at the old 150-pixel scale, where what
+            # the spell strikes is measured (game.js grows the picture, not the reach).
+            k = min(1.0, 320 / max(w, h))
+            k150 = min(1.0, 150 / max(w, h))
             pics = [rgb[i].crop(box).resize((max(1, round(w * k)), max(1, round(h * k))), Image.LANCZOS).convert("RGBA") for i in keep]
             strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
             icon(pics, True).save(os.path.join(out, "icon", fid + ".png"))
             manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": len(pics), "durs": d2, "add": True, "cls": "yeon"}
+            if k150 < k:
+                manifest["fx"][fid]["k"] = round(k150 / k, 4)
 
     # 연's own spell effects (GEAR_DIR/yskill/<skill id>.png strips + index.json, from
     # tools/yeon_skills.py): fx "k_<skill id>", drawn with their own pivot on the target's feet.
