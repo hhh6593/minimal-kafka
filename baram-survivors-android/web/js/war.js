@@ -2230,6 +2230,10 @@ function updateRaid(dt) {
   }
   if (!G.dead) h.aliveT += dt;
   if (afk()) W.afkT = (W.afkT || 0) + dt;
+  // 공대: the time the hero was in the fight (moved in the last three seconds, or by the boss,
+  // where its spells reach), for its tier. Standing back at the camp is not.
+  const pl = G.player, bs = W.boss;
+  if (!G.dead && (G.t - (W.movedT || 0) < 3 || (bs && !bs.dying && Math.hypot(bs.tx - pl.tx, bs.ty - pl.ty) <= 7))) W.activeT = (W.activeT || 0) + dt;
   heroRole(W, dt);
   if (G.dead && W.heroBack && G.t >= W.heroBack) heroUp(W);
   W.cmdT = (W.cmdT || 0) - dt;
@@ -2582,7 +2586,12 @@ function raidEnd(win, title) {
   W.why = win ? `${W.teams[1].name} 처치 · ${clock(W.killT || G.t)}` : W.wiped ? '공격대 전멸' : '시간 초과';
   const rows = board(W);
   const rank = rows.findIndex(x => x.b === W.hero);
-  const { tier, k } = tierOf(W, rows);
+  // A hero's spells fire by themselves, so one left standing at the camp still earned a share:
+  // the tier also weighs how much of the raid the hero spent in the fight.
+  const raw = tierOf(W, rows), act = Math.min(1, (W.activeT || 0) / Math.max(1, W.hero.aliveT * 0.9));
+  const k = Math.min(raw.k, 1.6) * Math.pow(act, 1.3);
+  const tier = k >= TIERS.S ? 'S' : k >= TIERS.A ? 'A' : k >= TIERS.B ? 'B' : 'C';
+  W.act = act;
   const tierN = { S: 4, A: 3, B: 2, C: 1 }[tier], tierK = { S: 1.5, A: 1.25, B: 1, C: 0.7 }[tier];
   const base = 10 * G.level + (G.stage.gwoe ? 30 : 0);
   const coins = Math.max(1, Math.round(base * tierK * (win ? 1 : 0.3)));
