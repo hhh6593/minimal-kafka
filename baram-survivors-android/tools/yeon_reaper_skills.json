@@ -20,5 +20,5 @@
  "rp_barrier": {"yid": "21001800", "name": "영기방벽", "prefab": "Skill_Effect_Reaper_Barrier", "icon": "Skill_Icon_21001800"},
  "rp_eye": {"yid": "21001300", "name": "개안", "prefab": "Skill_Effect_Reaper_MindEye_Cast", "icon": "Skill_Icon_21001300"},
  "rp_gate": {"yid": "21002300", "name": "저승문", "prefab": "Skill_Effect_Reaper_SoulArrow_Hit_B", "icon": "Skill_Icon_21002300"},
- "rp_ult": {"yid": "21002400", "name": "차사강림", "prefab": "Skill_Effect_Reaper_Advent_Cast", "icon": "Skill_Icon_21002400"}
+ "rp_ult": {"yid": "21002400", "name": "차사강림", "prefab": "Skill_Effect_Reaper_Advent_Cast", "icon": "Skill_Icon_21002400", "mixed": true}
 }

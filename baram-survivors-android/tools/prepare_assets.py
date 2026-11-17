@@ -32,6 +32,7 @@ import re
 import shutil
 import sys
 
+import numpy as np
 from PIL import Image
 
 # Item icons the game uses, by role (file names in itemImage/).
@@ -91,6 +92,27 @@ def unwhite(frames):
         out = [im.crop(box) for im in out]
     # Today's client draws at about twice the old one's pixel size.
     return [im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS) for im in out]
+
+
+def unshade(frames):
+    """A capture on white whose picture is mostly a black blot (귀염추혼소's cloud of bats: near-black
+    over 64% of a frame): the client's dark aura is a shade over the field, but a GIF has no
+    partial cover, so it came out solid black (with a dithered rim), and drawn screen-wide it hid the field under a black blot. Where near-black
+    covers 40% or more of some frame, the near-black is laid down as a shade (at most ~55% cover);
+    coloured pixels (the bats' red) keep theirs. Captures with dark outlines only (at most a
+    quarter of a frame: 화무십일홍, 탈명사식) are left alone."""
+    arrs = [np.asarray(f.convert("RGBA")).astype(np.float32) for f in frames]
+    blot = max(float(((a[..., 3] >= 128) & (a[..., :3].max(2) < 40)).mean()) for a in arrs)
+    if blot < 0.4:
+        return frames
+    out = []
+    for a in arrs:
+        a = a.copy()
+        # 0 for a coloured pixel, 1 for a black one (brightness under 24), a ramp between.
+        k = np.clip((60 - a[..., :3].max(2)) / 36, 0, 1)
+        a[..., 3] = np.minimum(a[..., 3], 255 - k * (255 - 140))
+        out.append(Image.fromarray(a.astype(np.uint8), "RGBA"))
+    return out
 
 
 def unframe(frames):
@@ -388,7 +410,7 @@ def main():
                 continue
             fid = n[:-4]
             frames, durs = frames_of(os.path.join(modern, n))
-            frames = unwhite(frames)
+            frames = unshade(unwhite(frames))
             strip(frames).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
             manifest["fx"][fid] = {"w": frames[0].width, "h": frames[0].height, "n": len(frames),
                                    "durs": [90] * len(frames), "add": False, "cls": "modern"}
