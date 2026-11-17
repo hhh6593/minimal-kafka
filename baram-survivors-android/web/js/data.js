@@ -37,7 +37,7 @@ export const CLASSES = [
   { id: 'magus', name: '마도사', hero: '1003', hp: 105, dmgK: 0.55, mp: 130, speed: 68, armor: 1, start: 'md_sphere', ult: 'md_ult',
     desc: '금기된 마력을 다루는 원거리 술사. 기공구슬로 얼리고 태우고, 광폭기로 화면을 휩쓴다.' },
   // 바람의나라 연's 천인 (Job_8): 호리병·포, figure, skills and sounds only from 연's resources.
-  { id: 'celestial', name: '천인', hero: '1003', hp: 165, dmgK: 0.52, mp: 110, speed: 72, armor: 2, start: 'cl_boom', ult: 'cl_ult',
+  { id: 'celestial', name: '천인', hero: '1003', hp: 190, dmgK: 0.52, mp: 110, speed: 72, armor: 2, start: 'cl_boom', ult: 'cl_ult',
     desc: '하늘의 힘을 다루는 술사. 불꽃과 번개를 떨어뜨리고, 몬스터 사이로 뛰어들어 휩쓴다.' },
   // 바람의나라 연's 도깨비 (Job_9): 방망이, figure, skills and sounds only from 연's resources.
   { id: 'dokkaebi', name: '도깨비', hero: '1001', hp: 210, dmgK: 2.0, mp: 70, speed: 66, armor: 3, start: 'dk_repel', ult: 'dk_ult',
