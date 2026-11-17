@@ -3054,7 +3054,11 @@ function hurtEnemy(e, dmg, push = null) {
       if (!crit && (low.v || 0) >= dmg) show = false;
       else G.texts.splice(G.texts.indexOf(low), 1);
     }
-    if (show) G.texts.push({ x: e.x + rand(-2, 2), y: e.y - e.m.h * e.scale - 8 - e.numN * 17, text: hitNum(dmg), t: 0, num: true, v: dmg,
+    // Over a crowd the numbers of neighbours would print on each other: one that would lands a line up.
+    let ny = e.y - e.m.h * e.scale - 8 - e.numN * 17;
+    const nt = hitNum(dmg), nw = nt.length * 6;
+    for (let k = 0; k < 4 && nums.some(t => Math.abs(t.y - ny) < 13 && Math.abs(t.x - e.x) < (nw + t.text.length * 6) / 2); k++) ny -= 15;
+    if (show) G.texts.push({ x: e.x + rand(-2, 2), y: ny, text: nt, t: 0, num: true, v: dmg,
       crit, heavy, ally: !!G.allyHitting, color: crit ? '#ff3a2a' : heavy ? '#ffb43a' : '#d8d8d8' });
   }
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
