@@ -126,7 +126,18 @@ export function initWar(api) {
   window.__warState = () => warState();
   window.__warBoard = () => openBoard();
   // Test: how many composited fighter frames are kept, and how many were made (cache churn).
-  window.__warFrames = () => ({ kept: frames.size, made: framesMade, looks: new Set([...frames.keys()].map(k => k.split('|')[0])).size });
+  window.__warFrames = () => {
+    const box = {};
+    for (const [k, e] of frames) {
+      const m = k.match(/^[a-z]+/);
+      if (!m) continue;
+      const c = m[0], b = box[c] = box[c] || [1e9, 1e9, -1, -1, 0, 0];
+      b[0] = Math.min(b[0], e.ox); b[1] = Math.min(b[1], e.oy); b[2] = Math.max(b[2], e.ox + e.w); b[3] = Math.max(b[3], e.oy + e.h);
+      b[4] += e.w * e.h; b[5]++;
+    }
+    for (const c in box) box[c][4] = Math.round(box[c][4] / box[c][5]);
+    return { kept: frames.size, made: framesMade, looks: new Set([...frames.keys()].map(k => k.split('|')[0])).size, warmLeft: warming.size, box };
+  };
   // Test: the hero's next step toward a tile along the field's paths (for a bot's input).
   window.__warStep = (x, y) => {
     const G = A.G(), W = G && G.war, p = G && G.player;
@@ -302,20 +313,44 @@ async function startWar(id, cls, role, opts = {}) {
   A.setChosenClass(cls);
   // The battlefield's pieces, before the field is shown.
   const loads = [];
+  // The field's pieces (1024 pixels square) as decoded bitmaps, kept for the war: drawn from their
+  // <img> each was decoded on the spot the first time it came into view (and again once the
+  // browser had let it go) — a long frame each time the fight moved across the field.
+  for (const [path, bm] of mapBms) if (!path.startsWith(`ywar/${id}_`)) { if (bm && bm.close) bm.close(); mapBms.delete(path); }
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
       const p = `ywar/${id}_${cx}_${cy}.png`;
       if (!A.images[p]) loads.push(A.loadImage(p));
+      if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
+  // The fighters' looks (two outfits a class), kept for the session: a later war's frames are
+  // made already (see warmLooks).
+  sessionLooks = sessionLooks || Object.fromEntries(A.CLASSES.map(c => [c.id, [0, 1].map(() => randGear(c, rnd(18, 44)))]));
+  const looks = sessionLooks;
+  // The effects of the war's spells (every class's kit, the hero's own, the hits, kills and
+  // revives) decoded now: a strip is decoded the first time it is drawn, and the first clash of
+  // a war drew forty of them at once (a 4000-pixel strip is a long frame on its own).
+  const fxIds = new Set(['h_hit_tiger', 'h_kill', 'k_revive', A.FX.revive, A.FX.shield, A.FX.heal]);
+  const skFx = id => { const d = id && SK[id]; if (!d) return; if (d.fx) fxIds.add(d.fx); if (d.fxs) for (const f of d.fxs) fxIds.add(f); };
+  for (const c of A.CLASSES) { const kit = kitFor(c); for (const id of [kit.basic[0], kit.aoe[0], kit.ult[0], kit.heal, kit.group, kit.curse]) skFx(id); }
+  for (const id of ['c_heal', 'p_realm', 'p_barrier', 'w_tiger', 'w_roar', 'm_curse', 'p_sky']) skFx(id);
+  for (const [id, d] of Object.entries(SK)) if (d.cls === cls.id) skFx(id);
+  for (const col of Object.values(A.SHOT_FX || {})) fxIds.add(col);
+  for (const id of fxIds) {
+    const f = id && A.M().fx[id];
+    const im = f && A.images[`fx/${f.src || id}.png`];
+    if (im && im.decode && !im.__decoded) loads.push(im.decode().then(() => { im.__decoded = true; }).catch(() => {}));
+  }
   await Promise.all(loads);
   const stage = {
     id: 'war_' + id, name: def.name, war: def, terrain: 'war', level: 10, monsters: [], intro: def.desc, pages: [],
   };
-  pendingWar = { def, role: ROLES[role] ? role : 'dps', side: opts.side === 'def' ? 'def' : 'atk', idle: !!opts.idle };
+  pendingWar = { def, role: ROLES[role] ? role : 'dps', side: opts.side === 'def' ? 'def' : 'atk', idle: !!opts.idle, looks };
   A.startRun(cls, stage);
   return true;
 }
-let pendingWar = null;
+let pendingWar = null, sessionLooks = null;
+const mapBms = new Map();
 
 /** Called from startRun when the stage is a war: the field, both guilds, the hero's place. */
 function setup() {
@@ -327,6 +362,10 @@ function setup() {
     bodies: [], squads: [], nextId: 1, flow: new Map(), sndT: 0, shoutT: 0, fxN: 0, round: 1, gateDown: false,
     map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
     heroDmgK: 1, roleK: 1, thinkIdx: 0, lastCmd: [0, 0], cmdSaid: 0, events: [],
+    // Counters for the tests (__warState().diag): whom the enemy's blows fall on, whom the
+    // healers mend, how long the guild's fighters stand about their camp.
+    diag: { atk: { hero: 0, tank: 0, other: 0 }, heal: { tank: 0, hero: 0, other: 0 }, campIdle: 0, stuck: {} },
+    looks: pendingWar.looks || {},
   };
   G.bossDue = false;
   // 연's PvP opening: an ink blot with 3, 2, 1, 시작 — nobody moves until it is done.
@@ -350,6 +389,19 @@ function setup() {
   // The field's unit: the hero's own blow at its level, its gear counting at the square root.
   W.U = (6 + 1.2 * p.lvl) * Math.sqrt(Math.max(1, p.gearPower || 1));
   W.refHp = W.U * 22;
+  // 전장 보정 by the hero's standing: the field's unit follows the hero's level and gear, but a
+  // hero of 승급 brings more than its blows (its spells' reach and holds, its 격, its armour, its
+  // life given back): a 5차 hero that played won every war, most by far (300 : 130). The
+  // enemy's fighters and guards strike harder and last longer by the hero's 승급 (its 진영대장
+  // strikes harder; its life, the war's objective, is left as it was), up to
+  // 5차 (+8.5%; past it the hero's blows are capped by War.scale anyway, and more made a 9차 hero
+  // lose most wars): measured with the test bots, a hero that stands about loses most wars, one
+  // that fights and plays the objective wins most, not all.
+  W.tier = A.promo ? A.promo(G.cls.id) : 0;
+  W.foeK = window.__warFoeK || 1 + 0.017 * Math.min(5, W.tier);
+  // The hero's armour counts at its square root against the guild's blows (as its gear does in
+  // the unit): a well-armoured hero took as little as a third of what an AI fighter took.
+  W.heroArmorK = Math.sqrt((20 + Math.min(46.7, Math.max(0, (p.armor || 0) + 2 * ((G.passives && G.passives.armor) || 0)))) / 20);
   // Teams: 0 is the hero's guild.
   W.teams = [0, 1].map(i => ({ id: i, name: GUILDS[i][0], color: GUILDS[i][1], cmd: null, squads: [], spawn: [0, 0], kills: 0 }));
   layout(W);
@@ -402,6 +454,7 @@ function setup() {
   if (btn) btn.hidden = false;
   document.body.classList.add('war');
   W.idle = pendingWar.idle;
+  warmLooks(W);
 }
 
 function blankStats() {
@@ -446,7 +499,7 @@ function mkFighter(W, team, role, squad) {
   const gear = pick(pool);
   // 전장 보정: a fighter's own strength (level and gear) counts, but pulled toward the field's.
   const own = Math.sqrt(lv / 30) * (0.85 + 0.3 * Math.random());
-  const pw = 1 + (own - 1) * 0.35;
+  const pw = (1 + (own - 1) * 0.35) * (team === 1 && !W.raid ? W.foeK || 1 : 1);
   const hpK = fighterHpK(role, cls);
   const name = pick(NAMES) + pick(TAGS);
   const f = {
@@ -492,7 +545,7 @@ function mkCommanders(W) {
   for (const team of [0, 1]) {
     const unit = A.M().yunit && A.M().yunit[units[team]] ? units[team] : null;
     const c = {
-      war: true, cmdr: true, id: W.nextId++, team, role: 'tank', cls: null, unit, name: `${W.teams[team].name} 진영대장`, lv: 50, pw: 1,
+      war: true, cmdr: true, id: W.nextId++, team, role: 'tank', cls: null, unit, name: `${W.teams[team].name} 진영대장`, lv: 50, pw: team === 1 ? W.foeK : 1,
       maxHp: W.refHp * (W.mode === 'commander' ? 10 : W.mode === 'siege' ? 14 : 20), hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.4, moving: false, phase: 0,
       face: 1, mdx: 0, mdy: 1, fdx: 0, fdy: 1, walkT: 0, pose: null, poseT: 0, flash: 0, stun: 0, slow: 0, curse: 0, st: null,
       m: { h: 96, area: 9000, id: unit || 'c' }, scale: 1.25, cd: { a: 1, b: 3, c: 6, d: 9, e: 4, r: 0 }, thinkT: 0, target: null, dest: null,
@@ -516,8 +569,8 @@ function mkTroops(W) {
       const u = units[team][i === 0 ? 2 : i % 2];
       const ok = A.M().yunit && A.M().yunit[u];
       const t = {
-        war: true, troop: true, id: W.nextId++, team, role: 'dps', cls: null, unit: ok ? u : null, name: i === 0 ? '경비대장' : '경비병', lv: 30, pw: i === 0 ? 1.3 : 1,
-        maxHp: W.refHp * (i === 0 ? 1.1 : 0.55), hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.3, moving: false, phase: 0,
+        war: true, troop: true, id: W.nextId++, team, role: 'dps', cls: null, unit: ok ? u : null, name: i === 0 ? '경비대장' : '경비병', lv: 30, pw: (i === 0 ? 1.3 : 1) * (team === 1 ? W.foeK : 1),
+        maxHp: W.refHp * (i === 0 ? 1.1 : 0.55) * (team === 1 ? W.foeK : 1), hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.3, moving: false, phase: 0,
         face: 1, mdx: 0, mdy: 1, fdx: 0, fdy: 1, walkT: 0, pose: null, poseT: 0, flash: 0, stun: 0, slow: 0, curse: 0, st: null,
         m: { h: 52, area: 3000, id: u }, scale: 1, cd: { a: rnd(0, 1.2), b: 3, c: 6, d: 9, e: 4, r: 0 }, thinkT: Math.random() * 0.2, target: null, dest: null,
         stats: blankStats(), hitBy: new Map(), dmgIn: [], shield: 0, speed: 58, dead: false, respawnAt: 0,
@@ -646,6 +699,19 @@ export const War = {
     return rate > target ? dmg * target / rate : dmg;
   },
   heroDown: () => heroDown(),
+  /**
+   * The ground the hero is holding, if it stands on one: a 거점's circle, the cart's ring (pushing
+   * or stopping it), a watch post not yet ours. game.js keeps the hero's leaps inside it (warHold).
+   */
+  anchor: () => {
+    const G = A.G(), W = G.war;
+    if (!W || W.raid || W.over || G.dead) return null;
+    const p = G.player;
+    if (W.flags) for (const f of W.flags) if (Math.hypot(p.tx - f.x, p.ty - f.y) <= 2.2) return { x: f.x, y: f.y, r: 2.2 };
+    if (W.mode === 'escort' && W.cart && Math.hypot(p.tx - W.cart.tx, p.ty - W.cart.ty) <= 3) return { x: W.cart.tx, y: W.cart.ty, r: 3 };
+    for (const z of W.zones) if (z.owner !== 0 && Math.hypot(p.tx - z.x, p.ty - z.y) <= 1.5) return { x: z.x, y: z.y, r: 1.5 };
+    return null;
+  },
   /** The player moved the hero (game.js input): not away. */
   moved: () => { const G = A.G(); if (G.war) G.war.movedT = G.t; },
   neediest: () => neediest(),
@@ -714,6 +780,9 @@ function update(dt) {
   for (const b of W.bodies) if (!b.dead) W.alive[b.team].push(b);
   if (!h.dead) W.alive[0].push(h);
   if (W.gate && !W.gateDown) W.alive[W.gate.team].push(W.gate);
+  // How many foes have each one as their target (pickFoe spreads the blows by it).
+  for (const t of [0, 1]) for (const b of W.alive[t]) b.engaged = 0;
+  for (const t of [0, 1]) for (const b of W.alive[t]) if (b.target && b.target.engaged !== undefined && !b.target.dead) b.target.engaged++;
   // Bodies: steps, statuses, timers every frame; thinking ~8 times a second, staggered.
   for (const b of W.bodies) {
     if (b.dead) {
@@ -759,6 +828,18 @@ function tickBody(W, b, dt) {
   // Health back slowly; quickly at the camp.
   const home = W.teams[b.team].spawn, atBase = Math.abs(b.tx - home[0]) + Math.abs(b.ty - home[1]) <= 4;
   b.hp = Math.min(b.maxHp, b.hp + b.maxHp * (atBase ? 0.08 : 0.006) * dt);
+  if (W.diag && !W.raid && b.team === 0 && !b.troop && !b.cmdr) {
+    // Standing about the camp more than five seconds after rising there, with no foe near and not
+    // mending (the 1분대 that keeps a 거점 or the 진영대장 by the camp is at its post, not idle).
+    const near = Math.abs(b.tx - home[0]) + Math.abs(b.ty - home[1]) <= 5;
+    const post = b.squad && b.squad.order && Math.abs(b.squad.order.x - home[0]) + Math.abs(b.squad.order.y - home[1]) <= 6;
+    if (near && !post && W.t - (b.upT || 0) > 5 && b.state !== 'retreat' && !nearest(W, b, 7)) {
+      W.diag.campIdle += dt;
+      const k = b.squad.id + ':' + b.role + ':' + b.cls.id;
+      W.diag.stuck[k] = (W.diag.stuck[k] || 0) + dt;
+      if (window.__warWhy) (W.diag.why = W.diag.why || {})[k] = [b.tx, b.ty, b.dest, b.state, b.moving, b.blocked, b.target && b.target.name, Math.round(hpk(b) * 100), b.squad.order && [b.squad.order.x, b.squad.order.y], b.carry ? 'carry' : '', b.kit.range];
+    }
+  }
   b.thinkT -= dt;
   if (b.thinkT <= 0) {
     b.thinkT += 0.125;
@@ -801,10 +882,11 @@ function walk(W, b) {
     if (safe && W.danger.has(dk(nx, ny)) && b.dodge > 0.6) continue;
     if (A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.blocked = 0; return; }
   }
-  // A raid's fighters are players: one standing in the way changes places (both step).
-  if (W.raid && opts.length) {
+  // Fighters are players: one of its own side standing in the way changes places (both step).
+  // In a war too: a crowd at the camp (its guards, the risen) boxed a fighter in for good.
+  if (opts.length) {
     const [dx, dy] = opts[0], o = A.occ.get(k2(b.tx + dx, b.ty + dy));
-    if (o && o.war && o.team === b.team && !o.moving && !o.dead && open(W, b.tx + dx, b.ty + dy)) {
+    if (o && o.war && o.team === b.team && !o.moving && !o.dead && !o.cmdr && open(W, b.tx + dx, b.ty + dy, b.team) && open(W, b.tx, b.ty, o.team)) {
       A.occ.delete(k2(o.tx, o.ty));
       A.occ.delete(k2(b.tx, b.ty));
       const ox = o.tx, oy = o.ty;
@@ -869,6 +951,26 @@ function nearest(W, b, r) {
   }
   return best;
 }
+/**
+ * Whom a fighter of the war turns on: the near first, but a tank draws the blows (it stands to be
+ * struck), one that many already strike is passed over for another, and the hero is one of its
+ * guild, not the one the whole field runs at. Before, every foe took the nearest, and a foe the
+ * hero's spells touched turned on the hero (one in seven of its hits, and a hero's spells hit
+ * many times a second): the whole enemy guild ended up on the hero.
+ */
+function pickFoe(W, b, r) {
+  const G = A.G();
+  let best = null, bs = 1e9;
+  for (const e of W.alive[1 - b.team]) {
+    if (e.gate) continue;
+    if (e.hero && G.buffs.stealth > G.t) continue;
+    const d = d2(b, e);
+    if (d > r) continue;
+    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0);
+    if (s < bs) { bs = s; best = e; }
+  }
+  return best;
+}
 function hpk(b) { return b.hp / b.maxHp; }
 function alive(t) { return t && !t.dead && t.hp > 0 && !(t.gate && A.G().war.gateDown); }
 
@@ -886,11 +988,16 @@ function think(W, b) {
     if (Math.random() < 0.4) talk(W, b, ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐', '저 죽어요!']);
   }
   if (b.state === 'retreat') {
-    if (k > 0.75) b.state = 'go';
+    if (k > 0.75) { b.state = 'go'; b.retreatTo = undefined; }
     else {
-      const healer = W.alive[b.team].find(m => m.role === 'healer' && !m.hero && !m.troop && d2(m, b) < 10 && m !== b);
+      // To a healer near (the same one until mended) or the camp: chosen once, not anew each
+      // thought (the two in turns kept a hurt fighter stepping on the spot).
+      if (b.retreatTo === undefined || (b.retreatTo && !alive(b.retreatTo))) {
+        const healer = W.alive[b.team].find(m => m.role === 'healer' && !m.hero && !m.troop && d2(m, b) < 10 && m !== b);
+        b.retreatTo = healer && Math.random() < 0.7 ? healer : null;
+      }
       const sp = W.teams[b.team].spawn;
-      b.dest = healer && Math.random() < 0.7 ? [healer.tx, healer.ty] : sp;
+      b.dest = b.retreatTo ? [b.retreatTo.tx, b.retreatTo.ty] : sp;
       const t = nearest(W, b, b.kit.range + 0.5);
       if (t) act(W, b, t);
       return;
@@ -916,12 +1023,18 @@ function think(W, b) {
     }
   }
   // An assault: the objective first once it is near (the 진영대장 does not wait its turn).
-  if (!t && order.kind === 'assault' && alive(order.obj) && d2(b, order.obj) < 12 && (b.role !== 'tank' || !nearest(W, b, 2))) t = order.obj;
-  if (!t && b.target && alive(b.target) && d2(b, b.target) < 9) t = b.target;
-  if (!t && sq.target && alive(sq.target) && d2(b, sq.target) < 9) t = sq.target;
-  if (!t) t = nearest(W, b, b.role === 'tank' ? 6 : 7);
+  let why = t ? 'peel' : '';
+  if (!t && order.kind === 'assault' && alive(order.obj) && d2(b, order.obj) < 12 && (b.role !== 'tank' || !nearest(W, b, 2))) { t = order.obj; why = 'obj'; }
+  // Taunted: the taunter, while the taunt lasts.
+  if (!t && b.taunt && b.taunt.until > G.t && alive(b.taunt.by) && d2(b, b.taunt.by) < 9) { t = b.taunt.by; why = 'taunt'; }
+  // A target is held a few seconds, then looked at again.
+  if (!t && b.target && alive(b.target) && d2(b, b.target) < 9 && G.t < (b.retargetT || 0)) { t = b.target; why = b.tWhy || 'held'; }
+  if (!t && sq.target && alive(sq.target) && d2(b, sq.target) < 9) { t = sq.target; why = 'squad'; }
+  if (!t) { t = pickFoe(W, b, b.role === 'tank' ? 6 : 7); why = 'pick'; }
   // The objective's own target: the gate, the commander, the cart's defenders.
-  if (!t && order.obj && alive(order.obj) && order.obj.team !== b.team) t = order.obj;
+  if (!t && order.obj && alive(order.obj) && order.obj.team !== b.team) { t = order.obj; why = 'order'; }
+  b.tWhy = why;
+  if (t !== b.target) b.retargetT = G.t + rnd(2, 3.5);
   b.target = t;
   if (t) {
     const dist = t.gate ? gateDist(t, b) : d2(b, t);
@@ -979,7 +1092,7 @@ function leaderPick(W, b, order) {
   let best = null, bs = -1e9;
   for (const [e, d] of near) {
     const s = (e.role === 'healer' ? 3 : e.cls && (e.cls.id === 'mage' || e.cls.id === 'archer') ? 1.5 : 0) + (1 - hpk(e)) * 4 - d * 0.6
-      + (e.carry ? 3 : 0) + (e.hero ? 0.5 : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0);
+      + (e.carry ? 3 : 0) - (e.hero ? 1 : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0) - 0.4 * Math.min(5, e.engaged || 0);
     if (s > bs) { bs = s; best = e; }
   }
   if (best !== sq.target) {
@@ -993,6 +1106,101 @@ function leaderPick(W, b, order) {
 }
 
 function thinkHealer(W, b, order) {
+  const G = A.G(), sq = b.squad;
+  // Dived: back off from what strikes it, and call for a peel.
+  const recent = b.dmgIn.filter(x => G.t - x[0] < 2).reduce((a, x) => a + x[1], 0);
+  const close = nearest(W, b, 2);
+  if (close || recent > b.maxHp * 0.2) {
+    const from = close || b.lastHitBy || nearest(W, b, 6);
+    if (from) {
+      const ax = Math.sign(b.tx - from.tx) || pick([-1, 1]), ay = Math.sign(b.ty - from.ty) || pick([-1, 1]);
+      b.dest = snap(W, b.tx + ax * 3, b.ty + ay * 2);
+    }
+    if (G.t - (b.calledT || -9) > 6) { b.calledT = G.t; talk(W, b, ['힐러 물렸어요!', '탱님 저 좀요!', '뒤에 붙었어요!']); }
+  }
+  // Revive a fallen mate close by.
+  const ghost = b.cd.r <= 0 && W.ghosts.find(g => g.b.team === b.team && !g.b.cmdr && !g.b.hero && d2(g, b) < (W.raid ? 7 : 5) && A.G().t - g.t < (W.raid ? 12 : 6));
+  if (ghost) { revive(W, b, ghost); return; }
+  // Whom to mend: the most in need near, the tank first while it is being struck (the hero too,
+  // as any of the guild). Before, the tank only came first by a twentieth of its life, and the
+  // healers stood by their squad's leader — in the hero's squad, with the hero as its tank, the
+  // healer itself: it walked out, saw a foe, stepped back three tiles from it, again and again,
+  // at the camp, and the hero-tank was never in its reach.
+  let low = null, lk = 0.92;
+  for (const m of W.alive[b.team]) {
+    if (m.gate || m.cmdr) continue;
+    const d = d2(m, b);
+    if (d > 9) continue;
+    const struck = G.t - (m.lastHitT || -9) < 2.5;
+    const k = hpk(m) - (m.squad === sq ? 0.04 : 0) - (m.role === 'tank' ? (struck ? 0.2 : 0.06) : 0) - (struck ? 0.04 : 0) + (m.troop ? 0.15 : 0) + (d > 7 ? 0.05 : 0);
+    if (k < lk) { lk = k; low = m; }
+  }
+  const hurt = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 5 && hpk(m) < 0.7).length;
+  if (hurt >= 3 && b.cd.d <= 0) {
+    b.cd.d = 12;
+    const gid = b.kit.group || b.kit.heal;
+    // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
+    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
+    shout(W, b, gid ? SK[gid].name : '천공의희원');
+    for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
+    pose(b, 'cast');
+  } else if (low && b.cd.a <= 0 && d2(low, b) <= 7) {
+    b.cd.a = 3.2;
+    const hid = b.kit.heal || 'c_heal';
+    const n = low.maxHp * (0.08 + 0.02 * b.pw);
+    A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => healBody(W, b, low, n) });
+    if (onScreen(b)) {
+      const d = SK[hid];
+      const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
+      if (fx && fxOk()) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
+      if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
+      sound(W, b, 'skill_c_heal', 'heal');
+    }
+    pose(b, 'cast');
+  } else if (b.cd.b <= 0) {
+    // 보호: the squad near takes less for a while.
+    b.cd.b = 14;
+    for (const m of W.alive[b.team]) if (!m.gate && d2(m, b) < 4) guard(W, m, 5);
+    shout(W, b, '보호');
+    pose(b, 'cast');
+  } else {
+    const t = nearest(W, b, 5);
+    if (t && b.cd.e <= 0) act(W, b, t);
+  }
+  // Stand two tiles behind the tank it keeps (its squad's, the hero when the hero is that tank),
+  // on the far side from the tank's nearest foe; walk up to one it must mend but cannot reach.
+  if (!close) {
+    const anchor = healerAnchor(W, b, sq, order);
+    let at;
+    if (low && d2(low, b) > 7) at = [low.tx, low.ty];
+    else if (anchor) {
+      const foe = nearest(W, anchor, 8);
+      if (foe) {
+        const dx = anchor.tx - foe.tx, dy = anchor.ty - foe.ty, n = Math.hypot(dx, dy) || 1;
+        at = [Math.round(anchor.tx + dx / n * 2.2), Math.round(anchor.ty + dy / n * 2.2)];
+      } else at = d2(anchor, order) < 6 ? formation(W, b, order) : [anchor.tx + (b.jx || 0), anchor.ty + 1];
+    } else at = formation(W, b, order);
+    const [sx, sy] = snap(W, at[0], at[1]);
+    b.dest = Math.abs(sx - b.tx) + Math.abs(sy - b.ty) <= 1 ? null : [sx, sy];
+  }
+}
+
+/** The fighter a healer keeps: its squad's tank (the hero, when the hero is that tank), else the
+ * guild's tank nearest its squad's order, else a mate of its squad. */
+function healerAnchor(W, b, sq, order) {
+  const G = A.G();
+  let best = null, bd = 1e9;
+  for (const m of W.alive[b.team]) {
+    if (m.role !== 'tank' || m.cmdr || m.troop || m.gate || m === b) continue;
+    if (m.squad === sq) return m;
+    const d = Math.hypot(m.tx - order.x, m.ty - order.y);
+    if (d < bd && d < 10) { bd = d; best = m; }
+  }
+  return best || sq.members.find(m => m !== b && m.role !== 'healer' && (m.hero ? !G.dead : !m.dead)) || null;
+}
+
+/** A raid's healer, as it was before the war's healers were changed (the raids keep their own tuning). */
+function thinkHealerRaid(W, b, order) {
   const G = A.G(), sq = b.squad;
   // Dived: back off from what strikes it, and call for a peel.
   const recent = b.dmgIn.filter(x => G.t - x[0] < 2).reduce((a, x) => a + x[1], 0);
@@ -1111,7 +1319,7 @@ function thinkCmdr(W, b) {
       b.cd.a = 1.6;
       b.atkAt = G.t;
       A.faceTo(b, near[0][0].tx, near[0][0].ty);
-      for (const [e] of near) hit(W, b, e, W.U * 1.6);
+      for (const [e] of near) hit(W, b, e, W.U * 1.6 * (b.pw || 1));
       if (onScreen(b) && fxOk()) A.fxOn(SK.w_tiger.fx, near[0][0], { scale: 1.1 });
     }
     if (b.cd.d <= 0 && near.length >= 3 && !b.wind) {
@@ -1126,7 +1334,7 @@ function thinkCmdr(W, b) {
       b.wind = null;
       for (const e of W.alive[1 - b.team]) {
         if (e.gate || Math.hypot(e.tx - w.x, e.ty - w.y) > w.r) continue;
-        hit(W, b, e, W.U * 3.5);
+        hit(W, b, e, W.U * 3.5 * (b.pw || 1));
         if (!e.hero) e.stun = Math.max(e.stun, 1);
       }
       if (onScreen(b) && fxOk()) A.addFx(SK.w_roar.fx, b.x, b.y - 30, { scale: 1.4 });
@@ -1277,6 +1485,10 @@ function hit(W, src, t, dmg) {
   if (!alive(t) || W.over) return;
   if (W.raid && !t.war && !t.hero) return raidHit(W, src, t, dmg);
   if (src.dead && !src.cmdr) dmg *= 0.5;
+  if (W.diag && src.team === 1 && !t.gate) {
+    W.diag.atk[t.hero ? 'hero' : t.role === 'tank' && !t.cmdr ? 'tank' : 'other']++;
+    if (t.hero) { const w = W.diag.heroWhy = W.diag.heroWhy || {}, k = src.target === t ? src.tWhy || (src.troop ? 'troop' : src.cmdr ? 'cmdr' : '?') : 'splash'; w[k] = (w[k] || 0) + 1; }
+  }
   dmg *= rnd(0.9, 1.1);
   if (t.curse > 0) dmg *= 1.25;
   if (t.shield > G.t) dmg *= 0.75;
@@ -1285,7 +1497,7 @@ function hit(W, src, t, dmg) {
   if (src.team === 1 && W.scoutBuff && W.scoutBuff[1] > G.t) dmg *= 1.1;
   if (t.hero) {
     if (G.dead) return;
-    let d = dmg / W.refHp * G.player.maxHp * 0.85;
+    let d = dmg / W.refHp * G.player.maxHp * 0.85 * (W.heroArmorK || 1);
     if (W.role === 'tank') d *= 0.8 / W.roleK;
     W.hero.lastHitBy = src;
     W.hero.lastHitT = G.t;
@@ -1335,14 +1547,20 @@ function healBody(W, src, m, n) {
   const G = A.G();
   if (!alive(m)) return;
   if (m.hero) {
-    const hn = n / W.refHp * G.player.maxHp;
+    // A healer's mend is a share of the mended one's life (m.maxHp, the hero's own life for the
+    // hero): in a war it is the hero's share as it is. (It was turned from the field's units as
+    // well, so the hero got its share times its life over a fighter's — about half a mend.)
+    const hn = W.raid ? n / W.refHp * G.player.maxHp : n;
     const before = G.player.hp;
     A.heal(hn, false, true);
-    credit(src, 'heal', (G.player.hp - before) / G.player.maxHp * W.refHp);
+    const got = (G.player.hp - before) / G.player.maxHp * W.refHp;
+    credit(src, 'heal', got);
+    if (W.diag && !src.hero && m.team === 0 && !W.raid) W.diag.heal.hero += got / W.refHp;
     return;
   }
   n = Math.min(n, m.maxHp - m.hp);
   if (n <= 0) return;
+  if (W.diag && !src.hero && m.team === 0 && !W.raid) W.diag.heal[m.role === 'tank' && !m.cmdr ? 'tank' : 'other'] += n / W.refHp;
   m.hp += n;
   credit(src, 'heal', n);
   num(W, m, n, true);
@@ -1425,8 +1643,14 @@ function heroHit(e, dmg) {
     credit(W.hero, 'obj', dmg / W.refHp * 6);
     if (e.hp <= 0) gateBreak(W, W.hero);
   }
-  // The struck turns on the hero now and then (tanks keep their own fight).
-  if (!e.cmdr && !e.gate && e.role !== 'tank' && Math.random() < 0.15) e.target = W.hero;
+  // The struck turns on the hero now and then (tanks keep their own fight): when it has no one in
+  // reach, or once in a while (a hero's spells strike many times a second; one in seven of its
+  // hits used to turn every foe they touched).
+  if (!e.cmdr && !e.gate && e.role !== 'tank' && e.target !== W.hero && G.t >= (e.retargetT || 0) && (!alive(e.target) || Math.random() < 0.03)) {
+    e.target = W.hero;
+    e.tWhy = 'struck';
+    e.retargetT = G.t + rnd(2, 3);
+  }
 }
 
 function kill(W, f, killer) {
@@ -1484,6 +1708,7 @@ function respawn(W, b) {
   b.st = null;
   b.state = 'go';
   b.taunt = null;
+  b.upT = W.t;
   const at = b.home || W.teams[b.team].spawn;
   placeBody(W, b, at);
   (b.team === 1 ? G.enemies : G.party).push(b);
@@ -1687,7 +1912,7 @@ function dropPoint(W, team) {
     const f = (mine.length ? mine : W.flags).reduce((a, c) => (Math.abs(c.x - W.teams[team].spawn[0]) < Math.abs(a.x - W.teams[team].spawn[0]) ? c : a));
     return [f.x, f.y];
   }
-  if (W.mode === 'escort') return [W.cart.x, W.cart.y];
+  if (W.mode === 'escort') return [W.cart.tx, W.cart.ty]; // tiles (its x, y are pixels: carriers walked off the map)
   if (W.mode === 'siege') return team === W.attacker ? [W.gate.tx, W.gate.y1 + 1] : [W.gate.tx, W.gate.y0 - 1];
   return W.teams[team].cmd.home;
 }
@@ -2021,9 +2246,9 @@ function heroShot(G) {
   const e = frames.get(b.lastKey);
   if (!e) return '';
   const c = document.createElement('canvas');
-  c.width = e.pic.width;
-  c.height = e.pic.height;
-  c.getContext('2d').drawImage(e.pic, 0, 0);
+  c.width = e.w;
+  c.height = e.h;
+  c.getContext('2d').drawImage(e.pic, e.sx, e.sy, e.w, e.h, 0, 0, e.w, e.h);
   try { return c.toDataURL(); } catch (err) { return ''; }
 }
 
@@ -2098,7 +2323,7 @@ function warState() {
     gate: W.gate && { hp: Math.round(W.gate.hp / W.gate.maxHp * 100), down: W.gateDown },
     cmd: W.teams.map(t => Math.round(hpk(t.cmd) * 100)), alive: W.alive ? W.alive.map(a => a.length) : null,
     kills: W.teams.map(t => t.kills), hero: { ...W.hero.stats, role: W.role, dead: G.dead, afk: W.afkT || 0 }, result: W.result && { tier: W.result.tier, mats: W.result.mats, gold: W.result.gold, rank: W.result.rank },
-    bodies: W.bodies.length, dead: W.bodies.filter(b => b.dead).length,
+    bodies: W.bodies.length, dead: W.bodies.filter(b => b.dead).length, diag: W.diag, hlvl: G.player.lvl, startLvl: W.startLvl, tier: W.tier, foeK: W.foeK,
   };
 }
 
@@ -2200,6 +2425,7 @@ function raidSetup() {
   const btn = document.getElementById('war-sb-btn');
   if (btn) btn.hidden = false;
   document.body.classList.add('war');
+  warmLooks(W);
 }
 
 function updateRaid(dt) {
@@ -2355,7 +2581,7 @@ function thinkRaid(W, b) {
       return;
     }
   }
-  if (b.role === 'healer') return thinkHealer(W, b, order);
+  if (b.role === 'healer') return thinkHealerRaid(W, b, order);
   if (b.role === 'support') supportBuffs(W, b);
   let t = null;
   // Tanks hold the boss: when it turns from the tanks one of them pulls it back.
@@ -2626,7 +2852,7 @@ function drawMap(camX, camY) {
   // Only the part of each piece in view (a whole 1024-pixel piece per frame was most of the cost).
   for (let cy = Math.max(0, Math.floor(camY / c)); cy * c < Math.min(m.h, camY + VH); cy++)
     for (let cx = Math.max(0, Math.floor(camX / c)); cx * c < Math.min(m.w, camX + VW); cx++) {
-      const im = A.images[`ywar/${W.def.id}_${cx}_${cy}.png`];
+      const path = `ywar/${W.def.id}_${cx}_${cy}.png`, im = mapBms.get(path) || A.images[path];
       if (!im || !im.width) continue;
       const sx = Math.max(0, Math.floor(camX - cx * c)), sy = Math.max(0, Math.floor(camY - cy * c));
       const sw = Math.min(im.width - sx, Math.ceil(camX + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(camY + VH - cy * c - sy) + 1);
@@ -2637,6 +2863,7 @@ function drawMap(camX, camY) {
 /** Under the bodies: the flags' circles, the cart, the gate's doors, the crates, the posts. */
 function drawGround() {
   const G = A.G(), W = G.war, ctx = A.ctx;
+  composeTick();
   if (W.raid) return drawRaidGround(G, W, ctx);
   const ring = (x, y, r, color, k = 1) => {
     ctx.save();
@@ -2796,7 +3023,7 @@ function keep(map, key, c) {
 }
 /** A body's frame kept cropped to what is drawn (most of a cell is empty): { pic, ox, oy }. */
 function keepFrame(key, c) {
-  const g = c.getContext('2d'), W = c.width, H = c.height;
+  const g = c.getContext('2d', { willReadFrequently: true }), W = c.width, H = c.height;
   const d = new Uint32Array(g.getImageData(0, 0, W, H).data.buffer);
   // The drawn box: rows from the top and bottom, then columns only within those rows.
   const AM = 0xff000000; // alpha, little-endian
@@ -2811,21 +3038,19 @@ function keepFrame(key, c) {
       for (let x = W - 1; x > x1; x--) if (d[r + x] & AM) { x1 = x; break; }
     }
   }
-  const e = { pic: c, ox: 0, oy: 0 };
-  if (x1 >= x0) {
-    const t = document.createElement('canvas');
-    t.width = x1 - x0 + 1;
-    t.height = y1 - y0 + 1;
-    t.getContext('2d').drawImage(c, -x0, -y0);
-    e.pic = t;
-    e.ox = x0;
-    e.oy = y0;
-  }
+  // The drawn box of the picture: drawn from the canvas by its box until the bitmap of just that
+  // box is made (a second, cropped canvas cost as much again).
+  const e = x1 >= x0 ? { pic: c, sx: x0, sy: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, ox: x0, oy: y0 } : { pic: c, sx: 0, sy: 0, w: W, h: H, ox: 0, oy: 0 };
   framesMade++;
   if (frames.size > 2400) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
   frames.set(key, e);
-  if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src).then(bm => { if (e.pic === src) e.pic = bm; }).catch(() => {}); }
+  lookAny.set(key.slice(0, key.indexOf('|')), key);
+  if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src, e.sx, e.sy, e.w, e.h).then(bm => { if (e.pic === src) { e.pic = bm; e.sx = e.sy = 0; } }).catch(() => {}); }
   return e;
+}
+/** A kept frame drawn with its top left at (x, y) of the cell. */
+function blit(ctx, e, x, y) {
+  ctx.drawImage(e.pic, e.sx, e.sy, e.w, e.h, x + e.ox, y + e.oy, e.w, e.h);
 }
 const markers = [null, null];
 function markerPic(team) {
@@ -2910,16 +3135,145 @@ function drawUnit(yu, b, row, f, mirror, alpha) {
   }
   const ctx = A.ctx;
   ctx.globalAlpha = alpha;
-  ctx.drawImage(c.pic, Math.round(b.x - (mirror ? cw - fx : fx) * s) + c.ox, Math.round(b.y - fy * s) + c.oy);
+  blit(ctx, c, Math.round(b.x - (mirror ? cw - fx : fx) * s), Math.round(b.y - fy * s));
   ctx.globalAlpha = 1;
 }
 
 // A fighter's frame with all its layers composited once (per class, outfit, row and frame) and
 // kept: one drawImage a fighter instead of six, and the shadow from one small picture.
-const frames = new Map(), labels = new Map();
+const frames = new Map(), labels = new Map(), lookAny = new Map();
 let framesMade = 0;
 let shadowPic = null;
 const drawFighterKey = (b, pose) => drawFighter(b, 0, 0, pose, 1, true);
+/**
+ * Composited frames cost: a war's fifty fighters wear some twenty looks of about fifty frames
+ * each, every look drawn from five to seven sheets of 642x1339. Drawn from their <img>, the sheets
+ * were decoded on the spot, and with a hundred of them the browser's cache of decoded pictures
+ * could not keep them: each new frame decoded its sheets again - the first seconds of a war were
+ * seconds of decoding (a stutter of a second and more on a phone).
+ * Now each look's frames are made ahead, as soon as the war is set (warmLooks): its sheets are
+ * decoded once, off the main thread, into bitmaps (fetch + createImageBitmap), all its frames made
+ * from them a few milliseconds a frame, the bitmaps let go; the canvases are made in their own
+ * memory (willReadFrequently: the crop's read back is a copy, not a wait on the GPU). Meanwhile,
+ * and whenever a frame is still missing, a fighter shows a frame it has (the last it showed), and
+ * a frame of play makes new ones for a few milliseconds at most.
+ */
+const COMPOSE_MS = 3, WARM_MS = 20;
+let composeMs = 0, warmGen = 0;
+const warming = new Set();
+const nowMs = () => performance.now();
+/** Called once a drawn frame (drawGround): the budget of frames made in play starts again. */
+function composeTick() { composeMs = 0; }
+function lookOf(cls, gear) {
+  const H = A.M().yhero2 && A.M().yhero2[cls.id];
+  const yv2 = H && A.yGearVariants(cls, gear || {});
+  return yv2 ? { cls, yv2, yvKey: cls.id + JSON.stringify(yv2), H } : null;
+}
+function lookFrames(H) {
+  const out = [];
+  for (const order of ['idle', 'walk', 'atk', 'cast', 'dead'])
+    for (const [name, a] of Object.entries(H.anims)) {
+      if (!name.startsWith(order)) continue;
+      for (let f = 0; f < a.n; f++) for (const m of name.endsWith('_side') ? [false, true] : [false]) out.push([a, f, m]);
+    }
+  return out;
+}
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+/** A sheet decoded off the main thread (its <img> drawn into a canvas decodes it on the spot). */
+function sheetBitmap(path) {
+  if (!window.createImageBitmap || !window.fetch) return Promise.resolve(null);
+  return fetch('assets/' + path).then(r => (r.ok ? r.blob() : null)).then(bl => (bl ? createImageBitmap(bl) : null)).catch(() => null);
+}
+async function warmLooks(W) {
+  const gen = ++warmGen, G = A.G();
+  const seen = new Map();
+  for (const b of W.bodies) {
+    if (!b.cls) continue;
+    const L = lookOf(b.cls, b.gear);
+    if (!L) continue;
+    b.yv2 = L.yv2; b.yvKey = L.yvKey;
+    const d = Math.abs(b.tx - G.player.tx) + Math.abs(b.ty - G.player.ty);
+    const had = seen.get(L.yvKey);
+    if (!had) seen.set(L.yvKey, Object.assign(L, { d }));
+    else had.d = Math.min(had.d, d);
+  }
+  // The looks round the hero first; the ones already made (an earlier war's) not again.
+  const looks = [...seen.values()].filter(L => lookFrames(L.H).some(([a, f, m]) => !frames.has(L.yvKey + '|' + a.row + '|' + f + (m ? 'm' : '')))).sort((x, y) => x.d - y.d);
+  warming.clear();
+  for (const L of looks) warming.add(L.yvKey);
+  const paths = L => Object.entries(L.yv2).map(([kind, v]) => [kind, L.H.layers[kind] && L.H.layers[kind][v]]).filter(x => x[1]).map(([kind, meta]) => [kind, 'yhero2/' + meta.file]);
+  const uses = new Map(), bms = new Map();
+  for (const L of looks) for (const [, p] of paths(L)) uses.set(p, (uses.get(p) || 0) + 1);
+  const want = L => { for (const [, p] of paths(L)) if (!bms.has(p)) bms.set(p, sheetBitmap(p)); };
+  try {
+    for (let i = 0; i < looks.length; i++) {
+      const L = looks[i];
+      want(L);
+      if (looks[i + 1]) want(looks[i + 1]); // the next look's sheets decode while this one's frames are made
+      const src = {};
+      for (const [kind, p] of paths(L)) src[kind] = await bms.get(p);
+      if (gen !== warmGen || A.G() !== G) return;
+      const list = lookFrames(L.H);
+      for (let j = 0; j < list.length;) {
+        // Most of it in the opening count (the field stands still: a slower frame there is not
+        // seen), the rest a little a frame.
+        const t0 = nowMs(), budget = G.war && G.war.countdown > 0 ? WARM_MS : COMPOSE_MS * 0.7;
+        while (j < list.length && nowMs() - t0 < budget) { const [a, f, m] = list[j++]; composeFrame(L.H, L, a, f, m, true, src); }
+        if (j < list.length) { await nextFrame(); if (gen !== warmGen || A.G() !== G) return; }
+      }
+      warming.delete(L.yvKey);
+      for (const [, p] of paths(L)) {
+        const n = uses.get(p) - 1;
+        uses.set(p, n);
+        if (n <= 0) { const bm = await bms.get(p); if (bm && bm.close) bm.close(); bms.delete(p); }
+      }
+      await nextFrame();
+    }
+  } finally {
+    if (gen === warmGen) warming.clear();
+    for (const [, pr] of bms) pr.then(bm => bm && bm.close && bm.close());
+  }
+}
+function composeFrame(H, b, a, f, mirror, force, src) {
+  const k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
+  let c = frames.get(k);
+  if (c) return c;
+  // While its look is being made ahead, or past this frame's time, a frame is not made in play.
+  if (!force && (composeMs > COMPOSE_MS || warming.has(b.yvKey))) return null;
+  const t0 = nowMs();
+  const [cw, ch] = H.cell, [fx, fy] = H.foot;
+  const sheets = {};
+  for (const [kind, v] of Object.entries(b.yv2)) {
+    const meta = H.layers[kind] && H.layers[kind][v];
+    if (!meta) continue;
+    let im = src && src[kind];
+    if (!im) {
+      const path = 'yhero2/' + meta.file;
+      if (!(path in A.images)) A.loadImage(path);
+      im = A.images[path];
+      if (!im || !im.complete || !im.width) return src ? null : false;
+    }
+    sheets[kind] = { im, cols: meta.cols || 1e9 };
+  }
+  c = document.createElement('canvas');
+  c.width = cw;
+  c.height = ch;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  // The shadow under the feet, in the same picture.
+  g.fillStyle = 'rgba(0,0,0,0.3)';
+  g.beginPath();
+  g.ellipse(mirror ? cw - fx : fx, fy - 1, 10, 3.5, 0, 0, Math.PI * 2);
+  g.fill();
+  if (mirror) { g.translate(cw, 0); g.scale(-1, 1); }
+  for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
+    const sh = sheets[kind];
+    if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
+  }
+  c = keepFrame(k, c);
+  c.m = mirror;
+  composeMs += nowMs() - t0;
+  return c;
+}
 function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   const M = A.M(), H = M.yhero2 && M.yhero2[b.cls.id];
   if (!H) return false;
@@ -2935,35 +3289,20 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
   else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
-  const [cw, ch] = H.cell, [fx, fy] = H.foot, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
-  const k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
-  let c = frames.get(k);
+  const [cw] = H.cell, [fx, fy] = H.foot;
+  let mirror = name !== 'dead' && dir === 'side' && fdx > 0;
+  let k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
+  const last = b.lastKey && frames.has(b.lastKey) ? b.lastKey : lookAny.get(b.yvKey);
+  // A fighter with no frame at all yet is made one now, unless its look is being made ahead (it
+  // shows within the opening count).
+  let c = composeFrame(H, b, a, f, mirror, noDraw || (!(last && frames.has(last)) && !warming.has(b.yvKey)));
+  if (c === false) return false;
   if (!c) {
-    const sheets = {};
-    for (const [kind, v] of Object.entries(b.yv2)) {
-      const meta = H.layers[kind] && H.layers[kind][v];
-      if (!meta) continue;
-      const path = 'yhero2/' + meta.file;
-      if (!(path in A.images)) A.loadImage(path);
-      const im = A.images[path];
-      if (!im || !im.complete || !im.width) return false;
-      sheets[kind] = { im, cols: meta.cols || 1e9 };
-    }
-    c = document.createElement('canvas');
-    c.width = cw;
-    c.height = ch;
-    const g = c.getContext('2d');
-    // The shadow under the feet, in the same picture.
-    g.fillStyle = 'rgba(0,0,0,0.3)';
-    g.beginPath();
-    g.ellipse(mirror ? cw - fx : fx, fy - 1, 10, 3.5, 0, 0, Math.PI * 2);
-    g.fill();
-    if (mirror) { g.translate(cw, 0); g.scale(-1, 1); }
-    for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
-      const sh = sheets[kind];
-      if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
-    }
-    c = keepFrame(k, c);
+    // Out of this frame's making time: the frame it showed last (made already), as it was.
+    c = frames.get(last);
+    if (!c) return true;
+    k = last;
+    mirror = !!c.m;
   }
   b.lastKey = k;
   if (noDraw) return true;
@@ -2979,7 +3318,7 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
     g.fill();
   }
   ctx.globalAlpha = alpha;
-  ctx.drawImage(c.pic, Math.round(x) - (mirror ? cw - fx : fx) + c.ox, Math.round(y) - fy + c.oy);
+  blit(ctx, c, Math.round(x) - (mirror ? cw - fx : fx), Math.round(y) - fy);
   ctx.globalAlpha = 1;
   return true;
 }

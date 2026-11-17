@@ -3439,6 +3439,20 @@ function drawShocks() {
 }
 
 /**
+ * 대항전: while the hero stands in a 거점's circle (or by the cart, or on a watch post it is
+ * taking), a technique that carries it to a foe (쇄혼비무's dash, 비영승보, 파천검무, 돌진, the
+ * 필살기's leap) does not carry it out: it goes only as far as the circle's edge, or strikes from
+ * where the hero stands. In 연 such a leap pulled the hero off the point it was taking (the
+ * circle lost, the count started again); here the blow lands and the hero keeps the point. Only
+ * in a war: a hunt and a raid leap as before.
+ */
+function warHold(tx, ty) {
+  if (!G.war || G.war.raid) return false;
+  const z = War.anchor();
+  return !!z && Math.hypot(tx - z.x, ty - z.y) > z.r;
+}
+
+/**
  * The hero went from (x0, y0) to where it stands in one move (a dash, 비영승보, 진섬): three
  * fading copies of it along the way, and it is seen to slide the last of it, not pop.
  */
@@ -3983,6 +3997,13 @@ function cast(skill, st) {
         let k = 2;
         while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
+        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && warHold(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
+          // 대항전, on a point: the flurry reaches out to the foe; the hero stays in the circle.
+          if (fxid) fxOn(fxid, b);
+          smite(b, st.dmg * 1.6, [fx0, fy0]);
+          meleeSlash(b.tx, b.ty, fx0, fy0, 0);
+          break;
+        }
         if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && !occ.has(key(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1)))) {
           addFx(fxid, p.x, p.y - 26, { scale: 0.6 });
           const x0 = p.x, y0 = p.y;
@@ -4046,7 +4067,7 @@ function cast(skill, st) {
       const bx = e.tx + fx0, by = e.ty + fy0;
       // 연's picture for the way it goes (up, down, left; right the left turned over).
       const [bf, bflip] = dirFx(fxid, skill.id, fx0, fy0);
-      if (ahead[0] && !occ.has(key(bx, by))) {
+      if (ahead[0] && !occ.has(key(bx, by)) && !warHold(bx, by)) {
         addFx(bf, p.x, p.y - 26, { scale: 0.7, flip: bflip });
         const x0 = p.x, y0 = p.y;
         p.x = bx * TILE + TILE / 2;
@@ -4232,7 +4253,7 @@ function cast(skill, st) {
         // Through the row to the farthest open tile along it.
         for (let k = def.depth + 1; k >= 1; k--) {
           const tx = p.tx + dx * k, ty = p.ty + dy * k;
-          if (occ.has(key(tx, ty))) continue;
+          if (occ.has(key(tx, ty)) || warHold(tx, ty)) continue; // (in a war's point, not past its edge)
           p.tx = tx;
           p.ty = ty;
           p.x = tx * TILE + TILE / 2;
@@ -4509,7 +4530,7 @@ function castUlt() {
       if (MELEE.has(G.cls.id)) {
         const spot = DIRS.map(([dx, dy]) => [target.tx + dx, target.ty + dy]).filter(([x, y]) => free(x, y))
           .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-        if (spot) {
+        if (spot && !warHold(spot[0], spot[1])) {
           const x0 = p.x, y0 = p.y;
           p.x = spot[0] * TILE + TILE / 2;
           p.y = spot[1] * TILE + TILE - 6;
@@ -5587,7 +5608,7 @@ function classFlourish(def, skill, st) {
     if (near && !beside && !p.stepping && G.t - (G.dashAt || -9) > 1.5 && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
       const spot = DIRS.map(([dx, dy]) => [near.tx + dx, near.ty + dy]).filter(([x, y]) => free(x, y))
         .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-      if (spot) {
+      if (spot && !warHold(spot[0], spot[1])) {
         G.dashAt = G.t;
         // Landing in the crowd, the hero is untouchable for a moment (it chose the fight, not the blows).
         p.inv = Math.max(p.inv, 0.5);
@@ -8722,6 +8743,7 @@ window.__silentSkills = () => {
     .map(([id, d]) => [id, d.name, d.kind, audio.map['skill_' + id] || null]);
 };
 window.__game = () => G;
+window.__images = () => images; // test: the loaded pictures
 window.__clear = () => clearStage();
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
@@ -8736,10 +8758,10 @@ const War = initWar({
   G: () => G, setG: v => { G = v; }, M: () => M, Z: () => Z, VW: () => VW, VH: () => VH, settings: () => settings,
   progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
   saveProgress: () => saveJson('bs_progress', progress),
-  ctx, canvas, images, occ, CLASSES, SKILLS, FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
+  ctx, canvas, images, occ, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
-  applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage,
+  applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
   heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
   // 공대 (the raid on the war's fighters)
   strike: allyStrike, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
