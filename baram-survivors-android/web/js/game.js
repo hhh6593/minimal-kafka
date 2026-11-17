@@ -7044,6 +7044,8 @@ function render(now) {
   ctx.font = '10px G9';
   for (const t of G.texts) {
     ctx.globalAlpha = t.t < 0.7 ? 1 : 1 - (t.t - 0.7) / 0.4;
+    // No number over the top bar (the ground's name, the boss's life): one up there is not drawn.
+    if (t.num && t.y < camY + 56) continue;
     if (t.box) {
       const w = Math.ceil(ctx.measureText(t.text).width) + 6, x = Math.round(t.x - w / 2), y = Math.round(t.y - 10);
       ctx.fillStyle = 'rgba(34,30,92,0.9)';
