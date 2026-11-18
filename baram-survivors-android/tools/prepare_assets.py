@@ -718,6 +718,33 @@ def main():
                 shutil.copyfile(os.path.join(h2, c["portrait"]), os.path.join(out, "yhero2", c["portrait"]))
             manifest["yhero2"][cls_id] = c
 
+    # 바람의나라 연's 외형 (코디) items as more layers of the same heroes (GEAR_DIR/ycostume/<class>/
+    # <kind>_c<id>.webp + icons/ + index.json, from tools/yeon_costume.py): each joins its class's
+    # layers as variant "c<id>" (the head without hair as "nohair"); the list of items, their
+    # names and icons go to manifest["ycostume"] for the 코디 window.
+    cdir = os.path.join(gear_src, "ycostume") if gear_src else None
+    manifest["ycostume"] = {}
+    if cdir and os.path.isfile(os.path.join(cdir, "index.json")) and manifest["yhero2"]:
+        with open(os.path.join(cdir, "index.json"), encoding="utf-8") as f:
+            cindex = json.load(f)
+        os.makedirs(os.path.join(out, "ycostume"), exist_ok=True)
+        for cls_id, kinds in cindex["layers"].items():
+            c = manifest["yhero2"].get(cls_id)
+            if not c:
+                continue
+            for kind, variants in kinds.items():
+                for v, meta in variants.items():
+                    shutil.copyfile(os.path.join(cdir, meta["file"]), os.path.join(out, "yhero2", meta["file"]))
+                    c["layers"].setdefault(kind, {})[v] = meta
+        items = {}
+        for iid, it in cindex["items"].items():
+            it = dict(it, classes=[x for x in it["classes"] if x in manifest["yhero2"]])
+            if it.get("icon"):
+                shutil.copyfile(os.path.join(cdir, it["icon"]), os.path.join(out, "ycostume", f"{iid}.png"))
+                it["icon"] = f"ycostume/{iid}.png"
+            items[iid] = it
+        manifest["ycostume"] = items
+
     # 바람의나라 연's own item icons for the pieces (GEAR_DIR/yitemicon/<class>/<kind>_<key>.png +
     # index.json, from tools/yeon_itemicons.py), keyed as the 연 looks are.
     ii = os.path.join(gear_src, "yitemicon") if gear_src else None

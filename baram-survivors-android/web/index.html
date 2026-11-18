@@ -235,6 +235,25 @@
   .fd-mat.ok { color: #1a6a10; } .fd-mat.no { color: #a01800; }
   .fd-mat small { color: #8a6a40; text-align: right; }
   .fd-go { margin-top: auto; align-self: flex-end; min-width: 90px; }
+  /* 코디 window: the forge's look, the hero in the chosen costume walking in four directions. */
+  #coordi { position: fixed; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .6); }
+  #coordi[hidden] { display: none; }
+  #coordi-box { width: min(96vw, 860px); height: min(94vh, 380px); display: flex; flex-direction: column; background: #e8d4a8; border: 3px solid #5a2e0e; padding: 6px; box-sizing: border-box; }
+  #coordi-box .caption { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #5a1a00; }
+  #coordi-box .caption small { flex: 1; color: #6a4a20; font-weight: 400; font-size: 10px; }
+  #coordi-close { min-width: 0; padding: 2px 10px; font-size: 11px; }
+  #coordi-tabs { display: flex; gap: 3px; margin: 4px 0; flex-wrap: wrap; }
+  #coordi-tabs .btn, .coordi-poses .btn, .coordi-actions .btn { min-width: 0; padding: 3px 9px; font-size: 11px; }
+  #coordi-tabs .btn.on, .coordi-poses .btn.on { background: #7a2a08; color: #ffe8b0; }
+  #coordi-tabs i { font-style: normal; background: #2a9a20; color: #fff; border-radius: 6px; padding: 0 4px; font-size: 9px; }
+  #coordi-body { flex: 1; min-height: 0; display: flex; gap: 6px; }
+  #coordi-list { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; align-content: start; }
+  #coordi-detail { flex: 1.1; overflow-y: auto; background: #f4e6c4; border: 1px solid #b08850; padding: 6px; font: 10px G9, monospace; color: #4a2a08; display: flex; flex-direction: column; gap: 4px; }
+  #coordi-preview { position: static; inset: auto; flex: none; width: 100%; height: auto; background: #3e5a3a; image-rendering: pixelated; border: 1px solid #b08850; }
+  .coordi-poses, .coordi-actions { display: flex; gap: 3px; }
+  .coordi-actions { margin-top: auto; justify-content: flex-end; }
+  .coordi-info b { font-size: 12px; color: #5a1a00; }
+  .coordi-info .btn { margin-top: 3px; min-width: 0; padding: 2px 10px; font-size: 11px; }
   #trade { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
   #trade-box { width: min(96vw, 520px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px;
@@ -565,6 +584,7 @@
     <button class="btn" data-go="raid">레이드</button>
     <button class="btn" data-go="war">대항전</button>
     <button class="btn" data-go="smith">장비</button>
+    <button class="btn" data-go="coordi">코디</button>
     <button class="btn" data-go="merchant">상점</button>
     <button class="btn" data-go="inn">주막</button>
     <button class="btn" data-go="clerk">의뢰</button>
@@ -576,6 +596,14 @@
     <div class="caption"><span id="forge-title"></span> <small id="forge-gold"></small><button id="forge-close" class="btn">닫기</button></div>
     <div id="forge-tabs"></div>
     <div id="forge-body"><div id="forge-list"></div><div id="forge-detail"></div></div>
+  </div>
+</div>
+
+<div id="coordi" hidden>
+  <div id="coordi-box">
+    <div class="caption"><span id="coordi-title"></span> <small id="coordi-gold"></small><button id="coordi-close" class="btn">닫기</button></div>
+    <div id="coordi-tabs"></div>
+    <div id="coordi-body"><div id="coordi-list"></div><div id="coordi-detail"></div></div>
   </div>
 </div>
 
@@ -705,7 +733,7 @@
     <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
     <div id="equip-rows"></div>
     <div id="equip-stats"></div>
-    <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="equip-cards" class="btn">괴력난신</button><button id="close-equip" class="btn">닫기</button></div>
+    <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="equip-cards" class="btn">괴력난신</button><button id="equip-coordi" class="btn">코디</button><button id="close-equip" class="btn">닫기</button></div>
   </div>
 </div>
 <div id="banner" hidden></div>
