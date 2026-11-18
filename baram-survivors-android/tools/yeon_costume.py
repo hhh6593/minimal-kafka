@@ -82,6 +82,8 @@ WEAPON_WORDS = [
     (r'봉|장$|장\(|지팡이|석장|깃발|기$', ['mage', 'poet']),
     (r'검|도$|도\(|칼|낫|낭아|부$', ['warrior', 'rogue']),
 ]
+JOB_NAMES = {'전사': 'warrior', '도적': 'rogue', '주술사': 'mage', '도사': 'poet', '궁사': 'archer', '무사': 'lancer',
+             '격투가': 'monk', '마도사': 'magus', '천인': 'celestial', '도깨비': 'dokkaebi', '차사': 'reaper'}
 # By the parts, failing the name.
 WEAPON_PARTS = {
     'spear': ['lancer'], 'left': ['monk', 'magus'], 'back': ['dokkaebi'],
@@ -334,6 +336,10 @@ def main():
             if p is not None and a <= p < b:
                 return [c]
         nm = re.sub(r'\s*\(치장용\)|\[[^\]]*\]\s*', '', names.get(iid, '')).strip()
+        # A collab look made once per job says whose it is: "…현무파천궁(궁사)".
+        m = re.search(r'\((전사|도적|주술사|도사|궁사|무사|격투가|마도사|천인|도깨비|차사)\)', nm)
+        if m:
+            return [JOB_NAMES[m.group(1)]]
         for pat, cl in WEAPON_WORDS:
             if re.search(pat, nm):
                 return cl
