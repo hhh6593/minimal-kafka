@@ -1,0 +1,15 @@
+{
+ "r_jiok": {"name": "지옥무영", "prefab": "Skill_Effect_Thief_3rd_02_Spawn", "keep_reach": true, "why": "SkillsArchiving 22201 지옥무영: icon Skill_Icon_Thief_3rd_02 (as today's 20220800), prefab Thief_3rd_02_Spawn; was old GIF 98"},
+ "p_baekho2": {"name": "백호의희원'첨", "prefab": "Skill_Effect_Shaman_3rd_01", "keep_reach": true, "why": "Skills_Player 20420900's own prefab; was old GIF 133"},
+ "p_reflect": {"name": "반탄공", "prefab": "Skill_Effect_42808", "keep_reach": true, "why": "SkillsArchiving 42808 반탄공: icon skill_fighter_42808 (as today's 20420600), prefab 42808; was Shaman_6th_01_buff_A"},
+ "w_bless": {"name": "신의축복", "prefab": "Skill_Effect_0014", "keep_reach": true, "why": "SkillsArchiving 11101 신의축복: prefab 0014; was Warrior_Impregnability_Buff"},
+ "r_forget": {"name": "망각", "prefab": "Skill_Effect_0006", "keep_reach": true, "why": "SkillsArchiving 21101 망각: prefab 0006; was old GIF 86"},
+ "p_life": {"name": "생명의기원", "prefab": "Skill_Common_3019", "keep_reach": true, "why": "생명의기원's record prefab; Heal_White is 누리의 기원's"},
+ "c_heal": {"name": "누리의 기원", "prefab": "Skill_Effect_Sharman_Heal_White", "add_all": true, "frames": 19, "keep_reach": true, "why": "(last frame, a flat grey disc, dropped) 누리의 기원's record prefab; was old GIFs 3…79"},
+ "mk_feint": {"name": "허허실실", "prefab": "Skill_Effect_Monk_ItemRecoverIncrease", "keep_reach": true, "why": "SkillsArchiving 51601 허허실실: icon skill_icon_51601 (ours), prefab Monk_ItemRecoverIncrease; was Monk_EnergyRelease"},
+ "cl_yeorae": {"name": "여래의장", "prefab": "Skill_Effect_Celestial_1st_UniformChange_Cast", "keep_reach": true, "why": "SkillsArchiving 113201 여래의장: icon Skill_Icon_113201 (ours); was CompleteDefense_Break (완전방어's)"},
+ "cl_storm": {"name": "불가살이선풍", "prefab": "Skill_Effect_Celestial_ImmortalityStorm_Creation", "keep_reach": true, "why": "its record prefab, drawn now (GrayArea_Creation_Cast came out a black disc)"},
+ "cl_blood2": {"name": "혈류강탈'극", "prefab": "Skill_Effect_Celestial_BloodRobbery_Reinforce_Domination", "keep_reach": true, "why": "its record prefab, drawn now (purple); was the grey SoulField_Domination"},
+ "l_genesis": {"name": "천지개벽", "prefab": "Skill_Effect_Lancer_4th_03_3", "keep_reach": true, "why": "its record prefab (_3: the spear falls, then the field of blades); was _2"},
+ "m_nodo": {"name": "노도성황", "prefab": "Skill_Effect_Magician_3rd_02", "keep_reach": true, "why": "no prefab in its record; 3rd_01/03 are 지폭지술/마기지체's, icon Skill_Icon_Magician_3rd_02, and this clip plays SFX_Magician_3rd_01 (노도성황's sound); was old GIF 97"}
+}
