@@ -843,7 +843,8 @@ function tickBody(W, b, dt) {
   // Health back slowly; quickly at the camp.
   const home = W.teams[b.team].spawn, atBase = Math.abs(b.tx - home[0]) + Math.abs(b.ty - home[1]) <= 4;
   b.hp = Math.min(b.maxHp, b.hp + b.maxHp * (atBase ? 0.08 : 0.006) * dt);
-  if (b.mp < 1) b.mp = Math.min(1, b.mp + (atBase ? 0.1 : 0.022) * dt);
+  // (A raid's healers mend all the while: their mana comes back faster, or the raid's healing fell short.)
+  if (b.mp < 1) b.mp = Math.min(1, b.mp + (atBase ? 0.1 : W.raid ? 0.06 : 0.022) * dt);
   if (W.diag && !W.raid && b.team === 0 && !b.troop && !b.cmdr) {
     // Standing about the camp more than five seconds after rising there, with no foe near and not
     // mending (the 1분대 that keeps a 거점 or the 진영대장 by the camp is at its post, not idle).
@@ -1258,7 +1259,7 @@ function thinkHealerRaid(W, b, order) {
   let low = null, lk = 0.85;
   for (const m of W.alive[b.team]) {
     if (m.gate || m.cmdr || d2(m, b) > (m.hero ? 8.5 : 7)) continue;
-    const k = hpk(m) - (m.squad === sq ? 0.05 : 0) - (m.role === 'tank' ? 0.05 : 0) - (m.hero ? 0.08 : 0);
+    const k = hpk(m) - (m.squad === sq ? 0.05 : 0) - (m.role === 'tank' ? 0.05 : 0);
     if (k < lk) { lk = k; low = m; }
   }
   const hurt = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 5 && hpk(m) < 0.7).length;
