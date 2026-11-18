@@ -7080,8 +7080,17 @@ function cardScore(o) {
       if (o.lv >= 6) v += 2;
     } else {
       v = attack ? (attacks < 3 ? 12 : 8) : d.kind === 'heal' ? (low ? 9 : 5) : d.kind === 'blink' ? 3 : 5;
-      v += (d.promo || 0) * 1.2;
+      v += (d.promo || 0) * 2;
       if (o.mastered) v += 2;
+      // Keep room for the 승급 spells still to come: with six slots and every hunt starting over,
+      // the low-level 0차 spells filled them all and the hero's 3~9차 spells never got in.
+      // While fewer free slots are left than better spells will open (by their level), a spell
+      // of a lower 승급 than those is put after raising what is held and the passives.
+      const free = MAX_SKILLS - G.skills.length, lvl = p.lvl, pr = promoOf(G.cls.id);
+      const later = Object.entries(SKILLS).filter(([id, x]) => (x.cls === G.cls.id) && !x.evolved && x.kind !== 'ult'
+        && !SUPPORT_KINDS.has(x.kind) && (x.promo || 0) > (d.promo || 0) && (x.promo || 0) <= pr && (x.req || 1) > lvl
+        && !G.skills.some(s => s.id === id)).length;
+      if (attack && later && free <= Math.min(later, 3)) v -= 9;
     }
     if (attack && AREA_KINDS.has(d.kind)) v += 2;
     if (kept.includes(o.id)) v += 3;
