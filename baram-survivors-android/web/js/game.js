@@ -1174,8 +1174,9 @@ function abyssBurst(e) {
 
 /** 주작의 기운 (items.js JUJAK_AURA): an ally within its reach of the hero strikes this much harder. */
 function auraK(m) {
+  if (G && G.player && G.player.aura) G.auraAll = (G.auraAll || 0) + 1; // allies' blows while worn (for the tests)
   if (!inAura(m)) return 1;
-  G.auraN = (G.auraN || 0) + 1; // blows strengthened (for the tests)
+  G.auraN = (G.auraN || 0) + 1; // of them, strengthened
   return 1 + G.player.aura;
 }
 function inAura(m) {
@@ -1499,7 +1500,7 @@ function wornGyeok(cls, g) {
 function weaponFamilyOf(cls, t, spId) {
   const sp = spId && SPECIAL[spId];
   if (t === undefined || t < 0) return null;
-  return familyOf(sp, !sp && t === dragonTier(cls), !sp && !!raidOf(cls, 'weapon', t));
+  return familyOf(sp, !sp && t === dragonTier(cls), !sp && t > 0 && !!raidOf(cls.id, 'weapon', t));
 }
 /** 주작의 기운 of a set of gear (0 when none): 주작선장's by its star, the 주작's 용무기 제십's. */
 function auraOf(cls, g) {
@@ -1624,7 +1625,7 @@ function buildEquip() {
         btn.append(sm);
         const tag = document.createElement('i');
         tag.className = 'fam';
-        tag.textContent = WEAPON_FAMILY.dragon.role;
+        tag.textContent = WEAPON_FAMILY.dragon.name;
         btn.append(tag);
       }
       if (kind === 'weapon' && t >= 0) btn.title = familyTitle(weaponFamilyOf(cls, t, null));
@@ -1649,7 +1650,7 @@ function buildEquip() {
       if (fam && WEAPON_FAMILY[fam]) {
         const tag = document.createElement('i');
         tag.className = 'fam';
-        tag.textContent = WEAPON_FAMILY[fam].role;
+        tag.textContent = WEAPON_FAMILY[fam].name;
         btn.append(tag);
       }
       markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
@@ -8597,8 +8598,8 @@ function matImage(id) {
 function drawAuraRing(p) {
   const r = JUJAK_AURA.r * TILE, k = 0.5 + 0.5 * Math.sin(G.t * 2.4);
   ctx.save();
-  ctx.strokeStyle = `rgba(255, 120, 40, ${0.16 + 0.1 * k})`;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(255, 120, 40, ${0.24 + 0.14 * k})`;
+  ctx.lineWidth = 3;
   ctx.setLineDash([6, 5]);
   ctx.lineDashOffset = -G.t * 12;
   ctx.beginPath();
@@ -8618,9 +8619,11 @@ function drawAuraIcons() {
   ctx.globalAlpha = a;
   for (const m of allies) {
     if (!inAura(m) || Math.abs(m.x - p.x) > VW || Math.abs(m.y - p.y) > VH) continue;
-    const x = Math.round(m.x + 10), y = Math.round(m.y - 74 + Math.sin(G.t * 3 + m.x) * 1.5);
-    if (im && im.width) ctx.drawImage(im, x, y, 11, 11);
-    else { ctx.fillStyle = '#ff7a2a'; ctx.beginPath(); ctx.arc(x + 5, y + 5, 3, 0, Math.PI * 2); ctx.fill(); }
+    // Just over its health bar (a war's fighter's at 52 over its feet, a companion's higher).
+    const S = 18, x = Math.round(m.x - S / 2), y = Math.round(m.y - (m.war ? 56 : 80) - S + Math.sin(G.t * 3 + m.x) * 1.5);
+    ctx.fillStyle = 'rgba(255, 110, 30, 0.35)';
+    ctx.beginPath(); ctx.arc(x + S / 2, y + S / 2, S * 0.62, 0, Math.PI * 2); ctx.fill();
+    if (im && im.width) ctx.drawImage(im, x, y, S, S);
   }
   ctx.restore();
 }
