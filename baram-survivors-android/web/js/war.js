@@ -1748,9 +1748,23 @@ function heroDown() {
   W.hero.hitBy.clear();
   if (W.raid && G.aggro === p) G.aggro = raidAggro();
   W.feed.push({ t: G.t, a: by ? by.name : '?', at: 1, b: W.hero.name, bt: 0 });
+  // 레이드: the hero gets up a few times only (raidRevives); then it lies till the raid is over
+  // and the raiders fight on (the result, rewards and the way back to town as always).
+  if (W.raid && W.revivesLeft !== undefined) {
+    if (W.revivesLeft <= 0) {
+      W.heroOut = true;
+      W.heroBack = 0;
+      W.ghosts.push({ b: W.hero, tx: p.tx, ty: p.ty, x: p.x, y: p.y, t: G.t, until: G.t + 1e6 });
+      A.say('부활 횟수를 모두 썼습니다. 레이드가 끝날 때까지 다시 일어날 수 없습니다 — 공대원들이 싸움을 이어갑니다.', 'warn');
+      A.banner('부활 횟수 소진');
+      A.audio().play('lose');
+      return true;
+    }
+    W.revivesLeft--;
+  }
   W.heroBack = G.t + (W.raid ? 9 + Math.min(8, W.t / 45) : 7 + Math.min(6, W.t / 60));
   W.ghosts.push({ b: W.hero, tx: p.tx, ty: p.ty, x: p.x, y: p.y, t: G.t, until: W.heroBack });
-  A.say(`쓰러졌습니다… ${Math.ceil(W.heroBack - G.t)}초 뒤 진영에서 다시 일어납니다.`, 'warn');
+  A.say(`쓰러졌습니다… ${Math.ceil(W.heroBack - G.t)}초 뒤 진영에서 다시 일어납니다.${W.raid && W.revivesLeft !== undefined ? ` (남은 부활 ${W.revivesLeft}회)` : ''}`, 'warn');
   A.audio().play('lose');
   return true;
 }
@@ -2342,6 +2356,10 @@ function warState() {
 // capped apart, see heroCap). hurtLo/Hi: the boss's blows on
 // a raider (see raidHurt). cut: how often a raider with a hold cuts the boss's blast.
 const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroK: 24.0, hurtLo: 1.3, hurtHi: 1.35, cut: 0.25 };
+/** How many times the hero gets up in a raid of this rung (멧돼지왕 2 … 아이라바타 18). */
+export function raidRevives(level) {
+  return level <= 7 ? 5 : level <= 13 ? 4 : 3;
+}
 // Red-floor tiles by a number key (tiles of a raid can lie a little outside the arena).
 const dk = (x, y) => (x + 1000) * 10000 + (y + 1000);
 
@@ -2358,6 +2376,9 @@ function raidSetup() {
     map: { cols, rows, w: cols * TILE, h: rows * TILE, chunk: 1024, walk: new Uint8Array(cols * rows).fill(1) },
   };
   W.countdown = 4;
+  // The hero's revives: five in the first raids, four in the middle ones, three in the hardest
+  // (아그니, 아이라바타 …). Before, it got up as often as it fell.
+  W.revivesLeft = W.reviveMax = raidRevives(G.level);
   W.camp = RAID.camp.slice();
   W.lair = RAID.lair.slice();
   // 격 that suit the role, and the role's own bonus, as in the war.
@@ -3448,7 +3469,10 @@ function hud() {
   ctx.fillText(`${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`, cw / 2, by0 + 11 * u);
   // The mode's own line.
   let line = `${W.def.name} · ${W.def.title}`;
-  if (W.raid) line = W.boss ? '' : `${W.def.name} · 쓰러진 공대원 ${W.bodies.filter(b => b.dead).length}`;
+  if (W.raid) {
+    const rv = W.revivesLeft === undefined ? '' : W.heroOut ? '부활 소진' : `남은 부활 ${W.revivesLeft}회`;
+    line = W.boss ? rv : `${W.def.name} · 쓰러진 공대원 ${W.bodies.filter(b => b.dead).length}${rv ? ' · ' + rv : ''}`;
+  }
   if (W.mode === 'capture') line += ` · ${W.flags.map(f => (f.owner === 0 ? '●' : f.owner === 1 ? '○' : '◌') + f.name).join(' ')} (목표 ${W.def.target}점)`;
   else if (W.mode === 'commander') line += ` · 처치 ${W.score[0]} : ${W.score[1]}`;
   else if (W.mode === 'escort') {
@@ -3473,6 +3497,8 @@ function hud() {
     y += 13 * u;
   }
   ctx.globalAlpha = 1;
+  // Where the feed ends (canvas pixels): the pickup list (game.js drawLootFeed) goes under it.
+  W.feedBottom = W.feed.length ? y - 6 * u : 0;
   // Bottom: each side's 진영대장 (as the reference: 북 100% · 진영대장 · 남 100%).
   const bh = 8 * u, by = ch - bh - 2 * u, half = cw / 2 - 40 * u;
   if (!W.raid) {
@@ -3523,6 +3549,9 @@ function hud() {
   if (G.dead && W.heroBack) {
     ctx.font = `${Math.round(14 * u)}px G11`;
     hudText(`부활까지 ${Math.ceil(W.heroBack - G.t)}초`, cw / 2, ch / 2 - 40 * u, '#ff9a8a');
+  } else if (G.dead && W.heroOut) {
+    ctx.font = `${Math.round(13 * u)}px G11`;
+    hudText('부활 횟수 소진 · 공대원들이 싸움을 이어갑니다', cw / 2, ch / 2 - 40 * u, '#ff9a8a');
   }
   if (W.hero.carry) {
     ctx.font = `${Math.round(11 * u)}px G11`;
