@@ -27,6 +27,8 @@ const DIR4 = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 // Twenty-five a side: five squads of five (the squads are only how the AI is organised; the
 // commanders send most of them to the same place, so the guild fights as one crowd).
 const SQUADS = 5;
+// 전장 보정 per 승급 of the hero (W.foeK): to 5차, and from 5차 to 9차.
+const FOE_K5 = 0.024, FOE_K9 = 0;
 const ROLES = {
   tank: { name: '탱커', desc: '앞줄에서 적을 붙잡고 도발한다. 받은 피해와 막아 낸 공격이 기여도가 된다.', bonus: '체력 +35% · 받는 피해 -20% · 6초마다 주변 적 도발' },
   healer: { name: '힐러', desc: '가장 위태로운 아군을 살린다. 회복량과 부활이 기여도가 된다.', bonus: '회복 +60% · 4초마다 주변 아군 기원 · 쓰러진 아군 위에 서면 부활' },
@@ -409,7 +411,8 @@ function setup() {
   // lose most wars): measured with the test bots, a hero that stands about loses most wars, one
   // that fights and plays the objective wins most, not all.
   W.tier = A.promo ? A.promo(G.cls.id) : 0;
-  W.foeK = window.__warFoeK || 1 + 0.017 * Math.min(5, W.tier);
+  // Past 5차 the enemy keeps growing a little (toward an even war at 9차 on the hard modes).
+  W.foeK = window.__warFoeK || 1 + FOE_K5 * Math.min(5, W.tier) + FOE_K9 * clamp(W.tier - 5, 0, 4);
   // The hero's armour counts at its square root against the guild's blows (as its gear does in
   // the unit): a well-armoured hero took as little as a third of what an AI fighter took.
   W.heroArmorK = Math.sqrt((20 + Math.min(46.7, Math.max(0, (p.armor || 0) + 2 * ((G.passives && G.passives.armor) || 0)))) / 20);
@@ -1722,7 +1725,10 @@ function kill(W, f, killer) {
   if (at >= 0) list.splice(at, 1);
   // A raider lies longer (a healer can raise it meanwhile) and longer still once the boss rages.
   const respawnK = W.raid ? 14 + Math.min(8, W.t / 40) + (G.enraged ? 12 : 0)
-    : (f.cmdr ? 40 : f.troop ? 25 : 7 + Math.min(6, W.t / 60)) + (W.slowRise === f.team ? 5 : 0);
+    : (f.cmdr ? 40 : f.troop ? 25 : 7 + Math.min(6, W.t / 60)) + (W.slowRise === f.team ? 5 : 0)
+      // 대장전 is scored in kills: a guild well ahead rises a little slower, one well behind a little
+      // sooner (a lead fed itself — fewer foes up, more kills — to 180 : 90 either way).
+      + (W.mode === 'commander' && !f.cmdr && !f.troop ? clamp((W.score[f.team] - W.score[1 - f.team]) / 12, -3, 3) : 0);
   f.respawnAt = W.mode === 'commander' && f.cmdr ? 0 : G.t + respawnK;
   f.dest = null;
   f.target = null;
@@ -2597,7 +2603,10 @@ function commanderPlan(W, team, set, squads, blob) {
   }
   if (P.phase === 'gather') {
     const there = alive.filter(m => Math.hypot(m.tx - mid[0], m.ty - mid[1]) < 6).length;
-    const ready = W.t > 25 + 25 * (1 - a) && (there >= alive.length * (0.7 - 0.2 * a) || G.t - P.at > 14);
+    // Into their court only with the numbers or once the clock runs (a guild that went in
+    // short-handed fed the other its kills).
+    const up = W.alive[team].length - W.alive[1 - team].length;
+    const ready = W.t > 25 + 25 * (1 - a) && (there >= alive.length * (0.7 - 0.2 * a) || G.t - P.at > 14) && (up >= 2 || W.left < 200);
     if (ready) {
       P.phase = 'assault';
       P.at = G.t;
@@ -2659,7 +2668,9 @@ function partyCasts(W, b) {
   let to = null;
   const has = m => m.hero ? G.buffs[kind === 'guard' ? 'guard' : kind] > G.t + 1 : (kind === 'power' ? m.powT > G.t + 1 : m.shield > G.t + 1);
   if (b.team === 0 && !G.dead && d2(W.hero, b) <= 6 && !has(W.hero) && (Math.random() < 0.7 || W.raid)) to = W.hero;
-  else for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && !m.troop && !m.hero && d2(m, b) <= 5 && !has(m) && (!to || (m.lastHitT || 0) > (to.lastHitT || 0))) to = m;
+  // The enemy guild's buffs go first to its own leaders, as ours go to the hero.
+  else if (b.team === 1 && Math.random() < 0.7) { for (const m of W.alive[1]) if (m.leader && !m.cmdr && m !== b && d2(m, b) <= 6 && !has(m)) { to = m; break; } }
+  if (!to) for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && !m.troop && !m.hero && d2(m, b) <= 5 && !has(m) && (!to || (m.lastHitT || 0) > (to.lastHitT || 0))) to = m;
   if (!to) { b.cd.f = 2; return false; }
   b.cd.f = rnd(9, 15) / Math.max(0.7, b.skill || 1);
   b.mp -= 0.07;
@@ -2832,12 +2843,9 @@ function finalPoint(W, prev) {
       - Math.hypot(b.x - (W.teams[0].spawn[0] + W.teams[1].spawn[0]) / 2, b.y - (W.teams[0].spawn[1] + W.teams[1].spawn[1]) / 2))[0];
     return { x: mid.x, y: mid.y, f: mid, name: `${mid.name} 거점` };
   }
-  if (W.mode === 'commander') {
-    const lead = W.score[0] === W.score[1] ? (hpk(W.teams[0].cmd) >= hpk(W.teams[1].cmd) ? 0 : 1) : W.score[0] > W.score[1] ? 0 : 1;
-    if (prev && prev.team !== undefined) { const c = W.teams[prev.team].cmd; return { ...prev, x: c.tx, y: c.ty }; }
-    const c = W.teams[lead].cmd;
-    return { x: c.tx, y: c.ty, team: lead, name: `${W.teams[lead].name} 진영대장` };
-  }
+  // 대장전: the middle of the court (at the leading side's 대장 the trailing guild ran into its
+  // camp, its guards and its risen, and fed it kills: 180 : 90 either way).
+  if (W.mode === 'commander') return { x: W.def.mid[0], y: W.def.mid[1], name: '백호성 안뜰 중앙' };
   if (W.mode === 'escort') return { x: W.cart.tx, y: W.cart.ty, name: '수레 마지막 길목' };
   const c = W.teams[1 - W.attacker].cmd;
   return { x: c.tx, y: c.ty, name: '수성대장' };
@@ -2875,7 +2883,7 @@ function finalOrders(W, team, set, squads) {
   squads.forEach((q, i) => {
     q.keep = false;
     let x = f.x, y = f.y, kind = 'capture', obj = null;
-    if (W.mode === 'commander') { const c = W.teams[f.team].cmd; kind = f.team === team ? 'defend' : 'assault'; obj = f.team === team ? null : c; x = c.tx; y = c.ty; }
+    if (W.mode === 'commander') kind = 'hold';
     else if (W.mode === 'escort') kind = team === W.attacker ? 'escort' : 'intercept';
     else if (W.mode === 'siege') { kind = team === W.attacker ? 'assault' : 'defend'; obj = team === W.attacker ? W.teams[1 - W.attacker].cmd : null; }
     set(q, x + ((i % 3) - 1) * 1.3, y + (i > 2 ? 1 : -1) * 0.9, kind, obj, null);
@@ -2914,12 +2922,14 @@ function soloThink(W, b, order) {
     let best = null, bs = -1e9;
     const R = st === 'hunter' ? 22 : 18;
     for (const e of foes) {
-      if (e.gate || e.troop || e.cmdr || (e.hero && (G.buffs.stealth > G.t || G.player.hp / G.player.maxHp > 0.5))) continue;
+      // The hero too: the strongest of its guild, hunted when it walks alone or is hurt (the enemy's
+      // hunters passed it over, and the hero's side alone had a star its guild rallied round).
+      if (e.gate || e.troop || e.cmdr || (e.hero && (G.buffs.stealth > G.t || (G.player.hp / G.player.maxHp > 0.6 && around(e, W.alive[0], 4) > 1)))) continue;
       const d = d2(b, e);
       if (d > R) continue;
       let s = -d * 0.25;
       if (st === 'diver') s += e.role === 'healer' ? 6 : e.role === 'support' ? 1 : -4;
-      else s += (around(e, W.alive[e.team], 4) === 0 ? 4 : 0) + (e.pw > 1.04 || e.leader ? 2 : 0) + (1 - hpk(e)) * 3 + (e.role === 'healer' ? 1.5 : 0) - (e.role === 'tank' ? 2 : 0);
+      else s += (around(e, W.alive[e.team], 4) === 0 ? 4 : 0) + (e.pw > 1.04 || e.leader || e.hero ? 2 : 0) + (1 - hpk(e)) * 3 + (e.role === 'healer' ? 1.5 : 0) - (e.role === 'tank' ? 2 : 0);
       // Not into a crowd of theirs.
       s -= Math.max(0, around(e, W.alive[e.team], 4) - 1) * 1.5;
       if (s > bs) { bs = s; best = e; }
