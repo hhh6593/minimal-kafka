@@ -1,8 +1,15 @@
 {
 "about": "Which of 연's Items_Avatar items yeon_costume.py tries: every item of these slots, less the female-only (by name or tag) and those excluded by id. Those that cover every frame of a class's own piece are kept.",
 "female": "\\(여\\)|\\(여성\\)|여자|여성용|女|드레스|치마|원피스|비키니",
-"skip_tags": ["WEDDING_DRESS"],
+"skip_tags": [
+"WEDDING_DRESS"
+],
 "about_drop": "Women's pieces the name does not mark (처녀귀신, 족두리, 비녀 ...) and the rental copies of a look (… (7일), [기간제], 대여용).",
 "drop_names": "처녀귀신|족두리|비녀|크롭탑|연지 곤지|여흑산|\\(\\d+일\\)|대여용|\\[기간제\\]",
-"exclude": []
+"exclude": [],
+"about_hf": "헤어·얼굴 (yeon_costume.py ... hair head): 연's men's hair styles (Hair_0xxx; the women's are Hair_1xxx) and faces, less those named for women; hf_exclude by id (583 연 올림 머리: 연 is the princess).",
+"hf_drop_names": "처녀귀신|아가씨|춘향|어우동|공실이|꽃의 여신|비녀",
+"hf_exclude": [
+583
+]
 }

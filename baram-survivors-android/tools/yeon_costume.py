@@ -175,6 +175,8 @@ def main():
     names = json.load(open(names_path))
     cfg = json.load(open(cfg_path))
     index = json.load(open(os.path.join(yh2, 'index.json')))
+    if set(kinds) <= set(HF_TYPES):
+        return hair_face(units, table, names, cfg, index, yh2, out, kinds, t0)
     want = candidates(table, names, cfg, kinds)
     lim = int(os.environ.get('COSTUME_LIMIT', 0))
     only = os.environ.get('COSTUME_IDS')
@@ -640,6 +642,300 @@ def main():
                     kv.pop(f'c{iid}', None)
     flush()
     print('items', {k: sum(1 for v in result['items'].values() if v['kind'] == k) for k in TYPES}, round(time.time() - t0))
+
+
+# ---------------------------------------------------------------- 헤어 · 얼굴 (the character's own hair and face)
+
+# Our item kinds -> 연's Items_Avatar Type: the character's hair style and face (in 연 picked at the
+# 미용실 and 성형외과), not costumes: their pictures are in Units, beside the avatar's own.
+HF_TYPES = {'hair': 'HAIR', 'head': 'HEAD'}
+# Each class's own hair (the texture of its Hair_0000 sheet, as tools/yeon_gear.py, yeon_archer.py
+# and yeon_job.py draw it) and how its frames map onto the avatar's stand-ins.
+OWN_HAIR = {'warrior': -2261347332773257848, 'rogue': 2370381450423049812, 'mage': -3198846463903518966,
+            'poet': 297653128484753130, 'archer': YA.HAIR_TEX}
+OWN_HAIR.update({c: J['hair'] for c, J in YJ.JOBS.items()})
+# 연's hair sheets hold the front hair down, side, up (0-2) and again (4-6, with 3 and 7 a tail seen
+# from behind), then what hangs behind the body: down and side (8-9: a braid, long hair, a tail;
+# empty for short styles) and again (10-11). The avatar's stand-ins count the front hair up, side,
+# down (and 3, the spear's thrust upward) and the hair behind side (Hair_1000_b_0), down (_b_1).
+# (yeon_job.py read the hair behind from 3-4, which holds the tail seen from behind and the second
+# front: it never showed, the game drawing no hair behind until a 헤어 is picked.)
+REMAP = {'0': '2', '2': '0', '3': '2'}
+REMAP_B = {'1': '8', '0': '9'}
+# The warrior's rig (yeon_gear.py) never drew the hair behind, and kept the stand-in's 3 as it is.
+OLD_RIG = {'warrior', 'rogue', 'mage', 'poet'}
+
+
+def hair_face(units, table, names, cfg, index, yh2, out, kinds, t0):
+    """The hair styles and faces of 연's 미용실 as layers: a face is the Head part from the face's
+    own sheet (Head_<n>, same frame numbers as the avatar's), a hair style its A sheet (the B sheet
+    is the same hair pressed flat, for under a hat) in the Hair part, and its tail or braid in the
+    Hair_b part. Kept for a class when every frame its head shows has the face and the hair."""
+    fem = re.compile(cfg.get('female', r'\(여\)|여자|여성'))
+    drop = re.compile(cfg['hf_drop_names']) if cfg.get('hf_drop_names') else None
+    skip = {str(x) for x in cfg.get('hf_exclude', [])}
+    env = UnityPy.load(units)
+    parts, clips = Y.build(env)
+    crc = {v['name']: k for k, v in parts.items()}
+    # Textures by container path, sprites by texture and frame number, icons by name.
+    tex_at, icon_at = {}, {}
+    for path, obj in env.container.items():
+        lp = path.lower()
+        if obj.type.name == 'Texture2D' and '/characters/avatar/' in lp:
+            tex_at[lp] = obj.path_id
+        elif obj.type.name == 'Sprite' and ('_icon' in lp or '_thumb' in lp):
+            icon_at[lp.rsplit('/', 1)[-1]] = obj
+    by_tex = {}
+    for o in env.objects:
+        if o.type.name != 'Sprite':
+            continue
+        n = o.peek_name()
+        if not (n.startswith('Hair_') or n.lower().startswith('head_')):
+            continue
+        idx = n.rsplit('_', 1)[-1]
+        if not idx.isdigit():
+            continue
+        try:
+            sp = o.read()
+        except Exception:
+            continue
+        by_tex.setdefault(sp.m_RD.texture.path_id, {})[idx] = sp
+    print('hair/face sheets', len(by_tex), round(time.time() - t0), flush=True)
+
+    def hair_tex(it):
+        pf = (last(it, 'Prefab') or '').lower()
+        if not pf.endswith('.prefab'):
+            return None
+        folder = 'assets/patchresources/' + pf[:-len('.prefab')] + '/'
+        return next((t for p, t in tex_at.items() if p.startswith(folder)), None)
+
+    def face_tex(it):
+        es = (last(it, 'EquipSprite') or '').lower()
+        return tex_at.get('assets/patchresources/' + es) if es.startswith('units/') else None
+
+    # The items tried: 연's men's styles (the women's are numbered Hair_1xxx: 금화도사 머리(남) is
+    # Hair_0145, (여) Hair_1081), less those named for women.
+    want = []
+    for iid, it in table.items():
+        kind = next((k for k, t in HF_TYPES.items() if t == last(it, 'Type')), None)
+        if kind not in kinds or iid in skip:
+            continue
+        nm = names.get(iid, '')
+        if not nm or fem.search(nm) or (drop and drop.search(nm)):
+            continue
+        if kind == 'hair' and re.search(r'/hair_1\d{3}_a\.prefab$', (last(it, 'Prefab') or '').lower()):
+            continue
+        want.append((kind, iid))
+    want.sort(key=lambda x: (x[0], int(x[1])))
+    print('candidates', {k: sum(1 for x in want if x[0] == k) for k in kinds}, flush=True)
+
+    imgs = {}
+
+    def pic(sp):
+        k = sp.object_reader.path_id
+        if k not in imgs:
+            imgs[k] = sp.image.convert('RGBA')
+        return imgs[k]
+
+    def place(pos, tmpl, alt, root):
+        sp = alt or tmpl
+        geo = tmpl if alt is not None and (int(alt.m_Rect.width), int(alt.m_Rect.height)) == (int(tmpl.m_Rect.width), int(tmpl.m_Rect.height)) else sp
+        im = pic(sp)
+        r = geo.m_Rect
+        px, py = geo.m_Pivot.x * r.width, (1 - geo.m_Pivot.y) * r.height
+        off = sp.m_RD.textureRectOffset
+        px -= off.x
+        py -= sp.m_Rect.height - off.y - im.height
+        x, y = pos
+        if root is not None:
+            x += root[0]
+            y += root[1]
+        return (im, x - px, -y - py)
+
+    tmpl_cache = {}
+
+    def template(s):
+        if not s or not s['active'] or s['sprite'] is None or not s['sprite'].path_id:
+            return None
+        pid = s['sprite'].path_id
+        if pid not in tmpl_cache:
+            try:
+                tmpl_cache[pid] = s['sprite'].read()
+            except Exception:
+                tmpl_cache[pid] = None
+        return tmpl_cache[pid]
+
+    frame_cache = {}
+
+    def clip_frames(cname):
+        if cname not in frame_cache:
+            frame_cache[cname] = [st for _, st in Y.frames(clips[cname], parts)[0]]
+        return frame_cache[cname]
+
+    def layer(kind, tid, st, old):
+        """[(img, x, y)] of the face (head), the hair (hair) or the hair behind (back) in a frame;
+        None when the sheet lacks a frame the avatar shows."""
+        slot = {'head': 'Head', 'hair': 'Hair', 'back': 'Hair_b'}[kind]
+        k = crc.get(slot)
+        s = st.get(k) if k is not None else None
+        tmpl = template(s)
+        if tmpl is None:
+            return []
+        idx = tmpl.m_Name.rsplit('_', 1)[1]
+        sheet = by_tex.get(tid, {})
+        if kind == 'head':
+            alt = sheet.get(idx)
+        elif kind == 'hair':
+            alt = sheet.get({'0': '2', '2': '0'}.get(idx, idx) if old else REMAP.get(idx, idx))
+        else:
+            alt = sheet.get(REMAP_B.get(idx, '-'))
+            if alt is None:
+                return []  # nothing behind: a short style
+        if alt is None:
+            return None
+        return [place(s['pos'], tmpl, alt, st[0]['pos'] if k != 0 else None)]
+
+    def render(cls, kind, tid, old=None):
+        H = index[cls]
+        anims = class_anims(cls)
+        drawn = {}
+        for key in H['anims']:
+            for i, st in enumerate(clip_frames(anims[key])):
+                d = layer(kind, tid, st, old)
+                if d is None:
+                    return None
+                cut = []
+                for im, x, y in d:
+                    bb = im.getbbox()
+                    if bb:
+                        cut.append((im.crop(bb), x + bb[0], y + bb[1]))
+                drawn[(key, i)] = cut
+        return drawn
+
+    os.makedirs(os.path.join(out, 's'), exist_ok=True)
+    os.makedirs(os.path.join(out, 'icons'), exist_ok=True)
+    ip = os.path.join(out, 'index.json')
+    result = json.load(open(ip)) if os.path.exists(ip) else {'items': {}, 'layers': {}, 'tried': {}}
+    by_hash = {}
+    for cls_l in result['layers'].values():
+        for kv in cls_l.values():
+            for meta in kv.values():
+                if meta.get('hash'):
+                    by_hash[meta['hash']] = meta['file']
+
+    def save(cls, drawn, fname):
+        H = index[cls]
+        rows = sorted(H['anims'], key=lambda k: H['anims'][k]['row'])
+        ncol = max(H['anims'][k]['n'] for k in rows)
+        nrow = max(H['anims'][k]['row'] for k in rows) + 1
+        allp = [p for v in drawn.values() for p in v]
+        x0 = min(math.floor(x) for _, x, _ in allp)
+        y0 = min(math.floor(y) for _, _, y in allp)
+        x1 = max(math.ceil(x + im.width) for im, x, _ in allp)
+        y1 = max(math.ceil(y + im.height) for im, _, y in allp)
+        W, Hh, FX, FY = x1 - x0, y1 - y0, -x0, -y0
+        sheet = Image.new('RGBA', (W * ncol, Hh * nrow))
+        for key in rows:
+            r = H['anims'][key]['row']
+            for i in range(H['anims'][key]['n']):
+                for im, x, y in drawn.get((key, i), []):
+                    sheet.alpha_composite(im, ((i % ncol) * W + int(round(FX + x)), (r + i // ncol) * Hh + int(round(FY + y))))
+        buf = io.BytesIO()
+        sheet.save(buf, 'WEBP', lossless=True, quality=80, method=4)
+        data = buf.getvalue()
+        h = hashlib.sha1(data).hexdigest()[:16]
+        if h in by_hash:
+            fn = by_hash[h]
+        else:
+            fn = f's/{fname}.webp'
+            with open(os.path.join(out, fn), 'wb') as f:
+                f.write(data)
+            by_hash[h] = fn
+        return {'file': fn, 'cols': ncol, 'cell': [W, Hh], 'foot': [FX, FY], 'hash': h}
+
+    # The frames each class shows its head in (dead included: 연's ghost is a head too).
+    need = {}
+    for cls, H in index.items():
+        anims = class_anims(cls)
+        for kind, slot in (('head', 'Head'), ('hair', 'Hair')):
+            need[(cls, kind)] = {(key, i) for key in H['anims'] for i, st in enumerate(clip_frames(anims[key]))
+                                 if template(st.get(crc[slot])) is not None}
+    # The class's own hair as a layer of its own, for a new face under the class's hair: drawn
+    # over the hairless head it gives back the head the class always had.
+    if 'hair' in kinds:
+        for cls in index:
+            d = render(cls, 'hair', OWN_HAIR[cls], cls if cls in OLD_RIG else None)
+            if d is None or not any(d.values()):
+                print('no own hair', cls)
+                continue
+            result['layers'].setdefault(cls, {}).setdefault('hair', {})['own'] = save(cls, d, f'hair_own_{cls}')
+    skipped = []
+    for kind, iid in want:
+        it = table[iid]
+        tid = hair_tex(it) if kind == 'hair' else face_tex(it)
+        bald = kind == 'hair' and not last(it, 'Prefab')
+        if tid is None and not bald:
+            skipped.append((iid, names.get(iid), 'no picture in Units'))
+            continue
+        got, why = [], []
+        for cls in index:
+            if bald:
+                got.append(cls)
+                continue
+            d = render(cls, kind, tid)
+            if d is None:
+                why.append(cls + ': lacks a frame')
+                continue
+            bare = [f for f in need[(cls, kind)] if not d.get(f)]
+            # A hair style may leave the ghost (dead) bare; a face may not.
+            if kind == 'hair':
+                bare = [f for f in bare if f[0] != 'dead']
+            if bare:
+                why.append(f'{cls}: bare {bare[:3]}')
+                continue
+            L = result['layers'].setdefault(cls, {})
+            L.setdefault(kind, {})[f'c{iid}'] = save(cls, d, f'{kind}_{iid}_{cls}')
+            if kind == 'hair':
+                b = render(cls, 'back', tid)
+                if b and any(b.values()):
+                    L.setdefault('back', {})[f'c{iid}'] = save(cls, b, f'back_{iid}_{cls}')
+            got.append(cls)
+        if not got:
+            skipped.append((iid, names.get(iid), '; '.join(why[:2])))
+            continue
+        e = {'kind': kind, 'name': names.get(iid, ''), 'grade': 0, 'classes': got}
+        if bald:
+            e['whole'] = 1  # a hair style of no hair: the head drawn bare
+        ic = (last(it, 'Sprite') or '').split('/')[-1].lower()
+        o = icon_at.get(ic)
+        if o is not None:
+            try:
+                im = o.read().image.convert('RGBA')
+                box = im.getbbox()
+                if box:
+                    im = im.crop(box)
+                if max(im.size) > 64:
+                    k = 64 / max(im.size)
+                    im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+                im.save(os.path.join(out, 'icons', f'{iid}.png'), optimize=True)
+                e['icon'] = f'icons/{iid}.png'
+            except Exception:
+                pass
+        result['items'][iid] = e
+        imgs.clear()
+    # Items no longer tried leave the index.
+    keep = {iid for _, iid in want}
+    for iid in [i for i, e in result['items'].items() if e['kind'] in kinds and (i not in keep or any(i == s[0] for s in skipped))]:
+        del result['items'][iid]
+        for cls_l in result['layers'].values():
+            for k in ('hair', 'back', 'head'):
+                if k in cls_l:
+                    cls_l[k].pop(f'c{iid}', None)
+    json.dump(result, open(ip + '.tmp', 'w'), ensure_ascii=False, separators=(',', ':'))
+    os.replace(ip + '.tmp', ip)
+    for s in skipped:
+        print('skipped', *s)
+    print('items', {k: sum(1 for v in result['items'].values() if v['kind'] == k) for k in kinds}, round(time.time() - t0))
 
 
 if __name__ == '__main__':
