@@ -73,7 +73,7 @@ export const GYEOK = {
   jujakbul: { name: '주작의 불꽃', on: 'hit', chance: 0.12, cd: 8, dmg: 2, fx: 'g_sinsu_jujak', fx2: 'g_sinsu_jujak_fire', fxK: 1.6, st: ['mark', 8, 0.3], st2: ['burn', 4, 1] },
   cheongsinsok: { name: '청룡의 신속', on: 'hit', chance: 0.12, cd: 10, dmg: 1.5, fx: 'g_tf_chungryong', self: ['speed', 5, 0.35] },
   // 백호's own: 연's 백호 신수 weapon effect (Sinsu_Weapon_Backho: the ground torn, white flames) and its claws.
-  baekmaeng: { name: '백호의 맹렬', on: 'hit', chance: 0.12, cd: 10, dmg: 4, area: 1, fx: 'g_sw_backho', fx2: 'g_tf_backho_hit', fxK: 1.8, self: ['power', 6, 0.2] },
+  baekmaeng: { name: '백호의 맹렬', on: 'hit', chance: 0.12, cd: 10, dmg: 4, area: 1, fx: 'g_tf_backho', fxK: 1.25, self: ['power', 6, 0.2] }, // 연's 백호 strike: claws torn across, then the roaring tiger's head (Sinsu_Weapon_Backho's dust and sparks read as a brown blot)
   // 현무's own: 연's 현무 신수 weapon effect (Sinsu_Weapon_Hyunmu: the crystal shell closing round).
   hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fx: 'g_sw_hyunmu', fx2: 'g_tf_hyunmu', fxK: 1.8, st: ['stun', 2], self: ['ward', 4, 0.4] },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),

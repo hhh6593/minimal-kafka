@@ -4834,8 +4834,8 @@ function updatePet(dt) {
       }
       G.allyHitting = false;
       if (fxBudget('pet', 2)) {
-        if (M.fx.g_sw_backho) addFx('g_sw_backho', pet.x, pet.y, { scale: 1.8, anchor: 'bottom' });
-        if (M.fx.g_tf_backho_hit) addFx('g_tf_backho_hit', pet.x, pet.y - 20, { scale: 0.9 });
+        // 연's white-tiger strike (skill_effect_transform_backho): claws, then the roaring head.
+        if (M.fx.g_tf_backho) addFx('g_tf_backho', pet.x, pet.y, { scale: 0.85 });
       }
       G.shake = Math.max(G.shake, 0.06);
       audio.play('kill');
@@ -4856,7 +4856,7 @@ function updatePet(dt) {
     pet.face = Math.sign(prey.x - pet.x) || pet.face;
     return;
   }
-  const hx = p.x - (p.face || 1) * 30, hy = p.y + 4;
+  const hx = p.x - (p.face || 1) * 30, hy = p.y + (G.cpet ? -16 : 4); // above a 코디 환수 when one walks too
   const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
   if (d > TILE * 8) { pet.x = hx; pet.y = hy; }
   else if (d > 6) {
@@ -4866,6 +4866,25 @@ function updatePet(dt) {
     if (Math.abs(dx) > 2) pet.face = Math.sign(dx);
     pet.row = Math.abs(dy) > Math.abs(dx) * 1.5 ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
     pet.f = pet.row[Math.floor(pet.t / 0.1) % pet.row.length];
+  } else pet.f = PET_PROWL[Math.floor(pet.t / 0.25) % 2];
+}
+/** In town too, 백호환령부's tiger walks at the hero's heel (it was seen only on the hunting grounds). */
+function townTiger(dt) {
+  if (savedGear(T.cls).capeSp !== 'cr_sinsu_baekho' || !M.fx.g_pet_baekho) { T.tiger = null; return; }
+  const face = T.fdx ? Math.sign(T.fdx) : (T.tiger ? T.tiger.lastFace || 1 : 1);
+  const pet = T.tiger = T.tiger || { pet: true, x: T.x - 30, y: T.y, face: 1, t: 0, f: 0, lastFace: 1 };
+  pet.lastFace = face;
+  pet.t += dt;
+  const hx = T.x - face * 30, hy = T.y + (T.cpet ? -16 : 4);
+  const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
+  if (d > 260) { pet.x = hx; pet.y = hy; }
+  else if (d > 6) {
+    const v = Math.min(d, (TILE / 0.24) * (T.cls.speed / 70) * 1.3 * dt);
+    pet.x += dx / d * v;
+    pet.y += dy / d * v;
+    if (Math.abs(dx) > 2) pet.face = Math.sign(dx);
+    const row = Math.abs(dy) > Math.abs(dx) * 1.5 ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
+    pet.f = row[Math.floor(pet.t / 0.1) % row.length];
   } else pet.f = PET_PROWL[Math.floor(pet.t / 0.25) % 2];
 }
 function drawPet(pet) {
@@ -5069,6 +5088,7 @@ function updateTown(dt) {
   }
   townWarps();
   updateCosPet(T, T, T.cls.id, dt, (TILE / 0.24) * (T.cls.speed / 70));
+  townTiger(dt);
   // Who is close enough to talk to: the nearest within reach (across a shop's counter in a house).
   const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 84) : TOWN_TILE * 1.6;
   const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)
@@ -5177,7 +5197,7 @@ function drawTown(now) {
       for (const d of yt.doors) drawWayOut({ x: d.x, y: d.y + 4, label: d.label }, now);
     } else if (yt.exits[T.area]) drawWayOut({ x: yt.exits[T.area].x, y: yt.exits[T.area].y + 4, label: '장터로' }, now);
   }
-  const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }], T.cpet ? [{ cpet: T.cpet, y: T.cpet.y }] : []);
+  const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }], T.cpet ? [{ cpet: T.cpet, y: T.cpet.y }] : [], T.tiger ? [{ tiger: T.tiger, y: T.tiger.y }] : []);
   if (yt && T.area === 'market') for (const pt of yt.portals) if (pt.art === 'statue') bodies.push({ statue: pt, y: pt.y - 12 });
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
@@ -5187,6 +5207,10 @@ function drawTown(now) {
     }
     if (b.cpet) {
       drawCosPet(ctx, b.cpet);
+      continue;
+    }
+    if (b.tiger) {
+      drawPet(b.tiger);
       continue;
     }
     if (b.hero) {
