@@ -47,6 +47,7 @@ export function loadCostumes() {
     const metas = j.files.map(([file, cols, cw, ch, fx, fy]) => ({ file, cols, cell: [cw, ch], foot: [fx, fy] }));
     const items = {};
     for (const [id, [kind, name, grade, set, whole, icon]] of Object.entries(j.items)) {
+      if (/\[사용안함\]|사용안함/.test(name)) continue; // 연's retired entries ("[사용안함]용마제일검")
       items[id] = { id, kind, name, grade: Math.max(0, Math.min(4, grade)), set, whole: !!whole, icon: icon ? `ycostume/i/${id}.png` : null, classes: [] };
     }
     const H2 = A.M().yhero2 || {};
