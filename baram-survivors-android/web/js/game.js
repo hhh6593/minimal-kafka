@@ -4874,36 +4874,42 @@ function updatePet(dt) {
     pet.face = Math.sign(prey.x - pet.x) || pet.face;
     return;
   }
-  const hx = p.x - (p.face || 1) * 66, hy = p.y + (G.cpet ? -18 : 4); // above a 코디 환수 when one walks too
-  const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
-  if (d > TILE * 8) { pet.x = hx; pet.y = hy; }
-  else if (d > 6) {
-    const v = Math.min(d, heroSpeed() * 1.3 * dt);
-    pet.x += dx / d * v;
-    pet.y += dy / d * v;
-    if (Math.abs(dx) > 2) pet.face = Math.sign(dx);
-    pet.row = Math.abs(dy) > Math.abs(dx) * 1.5 ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
-    pet.f = pet.row[Math.floor(pet.t / 0.1) % pet.row.length];
-  } else pet.f = PET_PROWL[Math.floor(pet.t / 0.25) % 2];
+  tigerFollow(pet, p.x, p.y, p.moving ? p.fdx : 0, !!G.cpet, heroSpeed(), dt);
 }
 /** In town too, 백호환령부's tiger walks at the hero's heel (it was seen only on the hunting grounds). */
 function townTiger(dt) {
   if (savedGear(T.cls).capeSp !== 'cr_sinsu_baekho' || !M.fx.g_pet_baekho) { T.tiger = null; return; }
-  const face = T.fdx ? Math.sign(T.fdx) : (T.tiger ? T.tiger.lastFace || 1 : 1);
-  const pet = T.tiger = T.tiger || { pet: true, x: T.x - 30, y: T.y, face: 1, t: 0, f: 0, lastFace: 1 };
-  pet.lastFace = face;
+  const pet = T.tiger = T.tiger || { pet: true, x: T.x - 66, y: T.y, face: 1, t: 0, f: 0 };
   pet.t += dt;
-  const hx = T.x - face * 66, hy = T.y + (T.cpet ? -18 : 4);
+  tigerFollow(pet, T.x, T.y, T.moving ? T.fdx : 0, !!T.cpet, (TILE / 0.24) * (T.cls.speed / 70), dt);
+}
+/** The tiger at the hero's heel, smoothly: it keeps one side of the hero and changes it only when
+ *  the hero walks the other way (not each time a blow turns the hero, which made it dart across
+ *  and back), eases toward its spot instead of start-stop steps, and walks its cycle by distance. */
+function tigerFollow(pet, x, y, walkDx, belowPet, speed, dt) {
+  if (walkDx) pet.side = -Math.sign(walkDx); // behind the way the hero walks
+  const side = pet.side || -1;
+  const hx = x + side * 66, hy = y + (belowPet ? -18 : 4);
   const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
-  if (d > 260) { pet.x = hx; pet.y = hy; }
-  else if (d > 6) {
-    const v = Math.min(d, (TILE / 0.24) * (T.cls.speed / 70) * 1.3 * dt);
+  if (d > TILE * 8) { pet.x = hx; pet.y = hy; pet.walking = false; return; }
+  // Walking starts past 12px and stops under 3 (no flicker between the two at one distance).
+  pet.walking = pet.walking ? d > 3 : d > 12;
+  if (pet.walking) {
+    const v = Math.min(d, Math.max(speed * 0.6, Math.min(speed * 1.6, d * 5)) * dt);
     pet.x += dx / d * v;
     pet.y += dy / d * v;
-    if (Math.abs(dx) > 2) pet.face = Math.sign(dx);
-    const row = Math.abs(dy) > Math.abs(dx) * 1.5 ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
-    pet.f = row[Math.floor(pet.t / 0.1) % row.length];
-  } else pet.f = PET_PROWL[Math.floor(pet.t / 0.25) % 2];
+    pet.dist = (pet.dist || 0) + v;
+    if (Math.abs(dx) > 10) pet.face = Math.sign(dx);
+    // Up or down only when clearly so; the row is kept while it stays so.
+    const vert = Math.abs(dy) > Math.abs(dx) * 2;
+    if (vert || Math.abs(dx) > Math.abs(dy)) pet.row = vert ? (dy < 0 ? PET_BACK : PET_FRONT) : PET_PROWL;
+    const row = pet.row || PET_PROWL;
+    pet.f = row[Math.floor(pet.dist / 14) % row.length]; // a frame every 14px walked
+  } else {
+    if (Math.abs(x - pet.x) > 4) pet.face = Math.sign(x - pet.x); // at rest it looks toward the hero
+    pet.row = PET_PROWL;
+    pet.f = PET_PROWL[Math.floor(pet.t / 0.4) % 2];
+  }
 }
 function drawPet(pet) {
   const f = M.fx.g_pet_baekho, im = images['fx/g_pet_baekho.png'];
@@ -5281,7 +5287,7 @@ function townErrand(id) {
   if (T) T.near = n;
   talk();
 }
-document.querySelectorAll('#town-quick button').forEach(b => { b.onclick = () => townErrand(b.dataset.go); });
+document.querySelectorAll('#town-quick button[data-go]').forEach(b => { b.onclick = () => townErrand(b.dataset.go); });
 
 function talk() {
   const n = T && T.near;
@@ -8527,6 +8533,8 @@ function togglePause(force) {
 function syncSettings() {
   $('#opt-bgm').textContent = '배경음: ' + (settings.bgm ? '켬' : '끔');
   $('#opt-sfx').textContent = '효과음: ' + (settings.sfx ? '켬' : '끔');
+  // The same two switches on the title and in town (소리 끄기 without starting a hunt).
+  for (const b of document.querySelectorAll('.snd')) b.textContent = (b.dataset.sound === 'bgm' ? '배경음 ' : '효과음 ') + (settings[b.dataset.sound] ? '켬' : '끔');
   $('#opt-num').textContent = '피해 숫자: ' + (settings.numbers ? '켬' : '끔');
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
@@ -8608,6 +8616,8 @@ $('#opt-bgm').onclick = () => {
   saveJson('bs_settings', settings);
   syncSettings();
 };
+document.querySelectorAll('.snd').forEach(b => { b.onclick = () => $(b.dataset.sound === 'bgm' ? '#opt-bgm' : '#opt-sfx').click(); });
+syncSettings();
 $('#opt-sfx').onclick = () => {
   settings.sfx = !settings.sfx;
   audio.setSfx(settings.sfx);
