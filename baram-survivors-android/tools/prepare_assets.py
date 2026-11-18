@@ -667,6 +667,24 @@ def main():
             index = json.load(f)
         for mid, u in index.items():
             usrc = os.path.join(udir, mid + ".png")
+            # 연's own monsters (tools/yeon_grounds.py: the grounds out of 연's maps) have no old
+            # picture: their sheet is the monster, and its first standing frame its picture.
+            if u.get("own") and os.path.isfile(usrc):
+                sheet, nu = repack_unit(usrc, u)
+                if sheet is None:
+                    continue
+                first = nu["anims"].get("idle_down") or nu["anims"].get("walk_down") or next(iter(nu["anims"].values()))
+                cw, ch = nu["cell"]
+                pic = sheet.crop((0, first["row"] * ch, cw, (first["row"] + 1) * ch))
+                pic = pic.crop(pic.getbbox() or (0, 0, cw, ch))
+                pic.save(os.path.join(out, "mon", mid + ".png"), optimize=True)
+                sheet.save(os.path.join(out, "yunit", mid + ".png"), optimize=True)
+                nu["foot_w"] = max(10, pic.width // 2)
+                manifest["yunit"][mid] = nu
+                # quick: 연's MoveSpeed (40 for most; 128 and up for the darting ones).
+                manifest["monsters"].append({"id": mid, "w": pic.width, "h": pic.height, "pages": [], "name": u.get("name", ""),
+                                             "quick": int(float(u.get("move") or 0)) >= 96})
+                continue
             if not yunit_sure(u) or u.get("prefab") in YUNIT_WRONG or mid in YUNIT_WRONG_IDS or not os.path.isfile(usrc):
                 continue
             # A namesake can be another creature altogether (연's 흑다람쥐 is a wrestler): a

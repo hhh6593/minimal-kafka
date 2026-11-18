@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""Hunting grounds out of 바람의나라 연's own maps: the survey of its hunting maps, and every
+asset a ground of tools/yeon_grounds.json needs.
+
+    yeon_grounds.py survey DEC_DIR OUT.json         every 연 hunting map and what it holds
+    yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR
+
+DEC_DIR holds the decrypted bundles (tools/yeon_dexor.py): Commons, Units, Image, Sounds and the
+Maps_* bundles.
+
+연's tables (Commons: Maps, Units_Field, Units_FieldBoss; MonoBehaviours with a `_buffer`) share
+one binary layout: a list of field names, (field, value) leaf pairs, a string pool, and at the end
+a run of 24-byte nodes (name, value, child offset, child count, leaf offset, leaf count). A map is
+a `Map` node: its ID, name and group name (Strings keys), file (the map's bytes in a Maps_*
+bundle), music, proper level, and its Spawn lines (UnitID, Count, At; At=BOSS marks the field
+boss). A unit's prefab (Units/Characters/Monster_xxxx) and name (Unit_<id>_Name) are in the unit
+tables. read_table() turns a table into dicts.
+
+survey writes, for each hunting map (Mode FIELD with spawns) grouped by its group name: level,
+music, monsters (name, unit, prefab, and whether the prefab is in Units.unity3d, which is what
+tools/yeon_units.py draws), the field boss, and the bundle that holds the map.
+
+build, for each ground of SPEC ({"tabs": {...}, "grounds": [...]}, see tools/yeon_grounds.json):
+  - its monsters, leader and boss: tools/yeon_units.py sheets into GEAR_DIR/yunit/y<unit>.png,
+    merged into its index.json with "own": true (prepare_assets.py gives them a monster entry
+    of their own: they have no old picture), 연's name, unit id and MoveSpeed;
+  - its floor and props: tools/yeon_maps.py (auto floor tiles, auto props) for terrain y_<id>
+    into GEAR_DIR/floor_y and prop_y;
+  - its music: the map's own clip out of Sounds.unity3d as AUDIO_DIR/bgm/<clip>.mp3 (96k,
+    loudness-matched; the build makes it OGG);
+  - its pin: GEAR_DIR/ymap/index.json (the stage-select tabs), with a new tab's 연 map picture
+    (a Texture2D of Image.unity3d) where SPEC names one.
+"""
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+
+def read_table(buf, rec_name):
+    """연's binary table as a list of records (dicts; repeated fields become lists)."""
+    _, nend, _, pool = struct.unpack('<4I', buf[:16])
+    names, i = {}, 16
+    while i < nend and buf[i]:
+        names[i - 16] = buf[i + 1:i + 1 + buf[i]].decode()
+        i += 1 + buf[i]
+
+    def s(o):
+        if pool + o >= len(buf):
+            return ''
+        return buf[pool + o + 1:pool + o + 1 + buf[pool + o]].decode('utf-8', 'replace')
+    w = struct.unpack('<%dI' % ((pool - nend) // 4), buf[nend:nend + (pool - nend) // 4 * 4])
+    # The nodes are the tail: walk back while the words still read as nodes.
+    base = len(w)
+    while base >= 6 and w[base - 6] in names and w[base - 6] != 0:
+        base -= 6
+
+    def node(t):
+        return w[base + 6 * t:base + 6 * t + 6]
+
+    def leaf(off, cnt):
+        d = {}
+        for t in range(cnt):
+            a, b = w[off // 4 + 2 * t], w[off // 4 + 2 * t + 1]
+            d.setdefault(names.get(a, '?'), []).append(s(b))
+        return {k: v[0] if len(v) == 1 else v for k, v in d.items()}
+
+    def obj(n):
+        rec = leaf(n[4], n[5]) if n[4] else {}
+        for c in range(n[2] // 24, n[2] // 24 + n[3]) if n[3] else ():
+            m = node(c)
+            key = names[m[0]]
+            val = obj(m) if (m[3] or m[4]) else s(m[1])
+            if key in rec:
+                if not isinstance(rec[key], list):
+                    rec[key] = [rec[key]]
+                rec[key].append(val)
+            else:
+                rec[key] = val
+        return rec
+    return [obj(node(t)) for t in range((len(w) - base) // 6)
+            if names[node(t)[0]] == rec_name and (node(t)[3] or node(t)[4])]
+
+
+def one(v):
+    return v[0] if isinstance(v, list) else v
+
+
+class Res:
+    """The tables and names of the decrypted bundles."""
+
+    def __init__(self, dec):
+        import UnityPy
+        self.dec = dec
+        env = UnityPy.load(os.path.join(dec, 'Commons.unity3d'))
+        bufs, strings = {}, ''
+        for o in env.objects:
+            if o.type.name == 'MonoBehaviour':
+                n = o.peek_name()
+                if n in ('Maps', 'Units_Field', 'Units_FieldBoss'):
+                    bufs[n] = bytes(o.read_typetree()['_buffer'])
+            elif o.type.name == 'TextAsset' and o.peek_name() == 'Strings':
+                sc = o.read().m_Script
+                strings = sc.decode('utf-8', 'replace') if isinstance(sc, bytes) else sc
+        self.str = dict(re.findall(r'<String Key="([^"]+)"><!\[CDATA\[(.*?)\]\]></String>', strings, re.S))
+        self.maps = read_table(bufs['Maps'], 'Map')
+        self.units = {}
+        for t in ('Units_Field', 'Units_FieldBoss'):
+            for r in read_table(bufs[t], 'Unit'):
+                p = one(r.get('Prefab')) or ''
+                tags = r.get('Tag') or []
+                self.units[one(r['ID'])] = {
+                    'prefab': p.split('/')[-1].replace('.prefab', ''), 'table': t,
+                    'boss': 'BOSS' in (tags if isinstance(tags, list) else [tags]) or t == 'Units_FieldBoss',
+                    'move': one(r.get('MoveSpeed')), 'atk': one(r.get('AttackTime'))}
+
+    def name(self, key):
+        key = one(key) or ''
+        return self.str.get(key, key)
+
+    def unit_name(self, uid):
+        return self.str.get(f'Unit_{uid}_Name', '')
+
+
+def unit_prefabs(dec):
+    import UnityPy
+    env = UnityPy.load(os.path.join(dec, 'Units.unity3d'))
+    return {o.peek_name() for o in env.objects if o.type.name == 'GameObject'}
+
+
+def map_bundles(dec):
+    """map file name (lower case) -> the Maps_* bundle that holds it."""
+    import UnityPy
+    out = {}
+    for b in sorted(os.listdir(dec)):
+        if not b.startswith('Maps') or not b.endswith('.unity3d'):
+            continue
+        env = UnityPy.load(os.path.join(dec, b))
+        for k in env.container:
+            base = k.rsplit('/', 1)[-1]
+            if base.endswith('.bytes'):
+                out.setdefault(base[:-6].lower(), b)
+    return out
+
+
+def survey(dec, out):
+    R = Res(dec)
+    pref = unit_prefabs(dec)
+    where = map_bundles(dec)
+    groups = {}
+    for m in R.maps:
+        if one(m.get('Mode')) != 'FIELD' or not m.get('Spawn'):
+            continue
+        f = (one(m.get('File')) or '').replace('.bytes', '')
+        g = re.sub(r'\s*\d+$', '', R.name(m.get('GroupName')) or R.name(m.get('Name')))
+        if not g or g.startswith('폭:') or g.startswith('Map_'):
+            continue
+        G = groups.setdefault(g, {'group': g, 'maps': [], 'bundle': where.get(f.lower()), 'lv': [],
+                                  'music': {}, 'monsters': {}, 'boss': {}})
+        G['maps'].append(f)
+        G['lv'].append(int(one(m.get('ProperLevel')) or 0))
+        G['music'][one(m.get('Music'))] = G['music'].get(one(m.get('Music')), 0) + 1
+        spawns = m['Spawn'] if isinstance(m['Spawn'], list) else [m['Spawn']]
+        for x in spawns:
+            uid = one(x.get('UnitID'))
+            u = R.units.get(uid)
+            if not u:
+                continue
+            row = {'unit': uid, 'name': R.unit_name(uid), 'prefab': u['prefab'], 'drawable': u['prefab'] in pref}
+            if one(x.get('At')) == 'BOSS' or u['boss']:
+                G['boss'][uid] = row
+            else:
+                G['monsters'].setdefault(uid, row)
+    rows = []
+    for G in groups.values():
+        G['lv'] = [min(G['lv']), max(G['lv'])]
+        G['music'] = max(G['music'], key=G['music'].get)
+        G['monsters'] = list(G['monsters'].values())
+        G['boss'] = list(G['boss'].values())
+        G['drawable'] = sum(1 for r in G['monsters'] if r['drawable'])
+        rows.append(G)
+    rows.sort(key=lambda g: g['lv'][0])
+    json.dump(rows, open(out, 'w'), ensure_ascii=False, indent=0)
+    for G in rows:
+        print(f"{G['group'][:16]:16} Lv{G['lv'][0]:>4} {G['music'] or '-':32} {G['bundle'] or '-':22} "
+              f"{G['drawable']}/{len(G['monsters'])} drawable :: "
+              + ', '.join(r['name'] for r in G['monsters'][:6])
+              + (' || ' + ', '.join(r['name'] for r in G['boss'][:2]) if G['boss'] else ''))
+
+
+def build(spec_path, dec, gear, audio):
+    import yeon_maps
+    spec = json.load(open(spec_path, encoding='utf-8'))
+    R = Res(dec)
+    grounds = spec['grounds']
+    # Monsters, leaders and bosses.
+    match = {}
+    for g in grounds:
+        for uid in g['units'] + [g['mini'], g['boss']]:
+            u = R.units[str(uid)]
+            match['y%s' % uid] = {'prefab': u['prefab'], 'name': R.unit_name(str(uid)), 'yeon': R.unit_name(str(uid)),
+                                  'unit': str(uid), 'tier': 0, 'own': True, 'move': u['move'], 'atk': u['atk']}
+    udir = os.path.join(gear, 'yunit')
+    os.makedirs(udir, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        mp = os.path.join(tmp, 'match.json')
+        json.dump(match, open(mp, 'w'), ensure_ascii=False)
+        subprocess.run([sys.executable, '-I', os.path.join(HERE, 'yeon_units.py'), os.path.join(dec, 'Units.unity3d'), mp, tmp],
+                       check=True, stdout=subprocess.DEVNULL)
+        got = json.load(open(os.path.join(tmp, 'index.json')))
+        ip = os.path.join(udir, 'index.json')
+        idx = json.load(open(ip)) if os.path.isfile(ip) else {}
+        for k, u in got.items():
+            os.replace(os.path.join(tmp, k + '.png'), os.path.join(udir, k + '.png'))
+            u.update({kk: match[k][kk] for kk in ('tier', 'name', 'yeon', 'unit', 'own', 'move', 'atk')})
+            idx[k] = u
+        missing = sorted(set(match) - set(got))
+        if missing:
+            raise SystemExit(f'units not drawn: {missing}')
+        json.dump(idx, open(ip, 'w'), ensure_ascii=False)
+    print(len(got), 'units')
+    # Floors and props, a terrain of its own for each ground.
+    terr = {}
+    for g in grounds:
+        b = os.path.join(dec, g['bundle'])
+        # floor_tiles: the map's tiles named outright where its walkable cells are too few to read.
+        terr['y_' + g['id']] = {'floor': {'bundle': b, 'map': g['map'], 'auto': True, 'tiles': g.get('floor_tiles')},
+                                'props_auto': {'bundle': os.path.join(dec, g.get('props_bundle', g['bundle'])), 'map': g.get('props_map', g['map']), 'n': g.get('props', 6)}}
+    yeon_maps.build(None, gear, {'terrains': terr})
+    # Music.
+    bdir = os.path.join(audio, 'bgm')
+    os.makedirs(bdir, exist_ok=True)
+    want = {g['music'] for g in grounds} - {f[:-4] for f in os.listdir(bdir)}
+    if want:
+        import UnityPy
+        env = UnityPy.load(os.path.join(dec, 'Sounds.unity3d'))
+        for o in env.objects:
+            if o.type.name == 'AudioClip' and o.peek_name() in want:
+                c = o.read()
+                with tempfile.TemporaryDirectory() as tmp:
+                    for nm, data in c.samples.items():
+                        wav = os.path.join(tmp, 'a.wav')
+                        open(wav, 'wb').write(data)
+                        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-af', 'loudnorm=I=-18:TP=-1.5',
+                                        '-ar', '44100', '-b:a', '96k', os.path.join(bdir, c.m_Name + '.mp3')], check=True)
+                        break
+                want.discard(c.m_Name)
+        if want:
+            raise SystemExit(f'music not found: {sorted(want)}')
+    # Pins on the stage-select tabs.
+    ydir = os.path.join(gear, 'ymap')
+    os.makedirs(ydir, exist_ok=True)
+    ip = os.path.join(ydir, 'index.json')
+    yidx = json.load(open(ip)) if os.path.isfile(ip) else {}
+    for tab, t in spec.get('tabs', {}).items():
+        if tab not in yidx:
+            if t.get('render'):
+                # A region with no world-map picture: its 연 hub map itself, every layer, scaled down.
+                from PIL import Image
+                im = yeon_maps.render(os.path.join(dec, t['bundle']), t['render']).convert('RGB')
+                im.thumbnail((t.get('size', 1024), t.get('size', 1024)), Image.LANCZOS)
+                src = f"{t['bundle']} {t['render']} (the map, rendered)"
+            else:
+                import UnityPy
+                env = UnityPy.load(os.path.join(dec, t['bundle']))
+                tex = next(o.read() for o in env.objects if o.type.name == 'Texture2D' and o.peek_name() == t['image'])
+                im = tex.image.convert('RGB')
+                src = f"{t['bundle']} {t['image']}"
+            im.save(os.path.join(ydir, tab + '.png'), optimize=True)
+            yidx[tab] = {'file': tab + '.png', 'w': im.width, 'h': im.height, 'src': src, 'stages': {}}
+    for g in grounds:
+        # A ground that moved to another tab leaves its old pin.
+        for t in yidx.values():
+            t['stages'].pop(g['id'], None)
+        if g['tab'] in yidx:
+            yidx[g['tab']]['stages'][g['id']] = g['at']
+    json.dump(yidx, open(ip, 'w'), ensure_ascii=False, indent=1)
+    print('grounds', len(grounds))
+
+
+def main():
+    if sys.argv[1] == 'survey':
+        survey(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == 'build':
+        build(*sys.argv[2:6])
+    else:
+        raise SystemExit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

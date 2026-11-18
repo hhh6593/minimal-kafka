@@ -162,7 +162,8 @@ function stageMonsters(stage) {
   // Grounds known only by their page: the biggest monsters lead.
   if (!boss) boss = { m: list[list.length - 1], name: stage.name + '의 주인', scale: 1.3 };
   if (!mini) mini = { m: list[Math.max(0, list.length - 2)], name: stage.name + ' 우두머리', scale: 1.2 };
-  let pool = list.filter(m => m.area <= 5200 && m.h <= 100 && m !== boss.m);
+  // A ground of big monsters (stage.big, 연's werewolves and tree spirits) lets them walk with the crowd.
+  let pool = list.filter(m => m.area <= (stage.big || 5200) && m.h <= 100 && m !== boss.m);
   if (pool.length < 3) pool = list.filter(m => m !== boss.m);
   if (!pool.length) pool = list;
   pool.forEach((m, i) => { m.rank = i / Math.max(1, pool.length - 1); });
@@ -360,7 +361,9 @@ function makeGround(kind) {
   return ctx.createPattern(c, 'repeat');
 }
 
-const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35 };
+const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35,
+  // 연's grounds under the earth or the sea (tools/yeon_grounds.py).
+  y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_abyss: 0.6, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
 
 function resize() {
   // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
@@ -454,9 +457,15 @@ function bestOpenStage() {
   return best;
 }
 
+/** 끝없는 지옥 (stage.hidden): shown once 철상지옥 has been conquered three times, or with ?abyss. */
+function abyssFound() {
+  return QUERY.has('abyss') || !!progress.abyss;
+}
+
 function unlocked(i) {
   // The first fourteen open one after another; an added ground when its own is conquered.
   const s = STAGES[i];
+  if (s.hidden && !abyssFound()) return false;
   if (s.open) return QUERY.has('all') || !!progress.cleared[s.open];
   return QUERY.has('all') || i === 0 || !!progress.cleared[STAGES[i - 1].id];
 }
@@ -482,6 +491,7 @@ function buildStages() {
     map.innerHTML = '';
     const order = STAGES.map((s, i) => [s, i, s.level !== undefined ? s.level : i]).sort((a, b) => a[2] - b[2]);
     for (const [s, i] of order) {
+      if (s.hidden && !abyssFound()) continue;
       const open = unlocked(i), done = !!progress.cleared[s.id];
       const b = document.createElement('button');
       b.className = 'raid stagecard' + (open ? '' : ' locked') + (s === pickedStage ? ' on' : '');
@@ -542,7 +552,7 @@ function buildStages() {
     map.append(t);
   }
   STAGES.forEach((s, i) => {
-    if (s.map !== mapTab) return;
+    if (s.map !== mapTab || (s.hidden && !abyssFound())) return;
     const b = document.createElement('button');
     const open = unlocked(i), done = !!progress.cleared[s.id];
     b.className = 'pin' + (open ? '' : ' locked') + (done ? ' cleared' : open ? ' next' : '')
@@ -695,7 +705,7 @@ for (const b of document.querySelectorAll('#map-tabs button')) {
       return;
     }
     pickedStage = STAGES.find((s, i) => s.map === mapTab && unlocked(i) && !progress.cleared[s.id])
-      || STAGES.find(s => s.map === mapTab);
+      || STAGES.find(s => s.map === mapTab && !s.hidden);
     buildStages();
   };
 }
@@ -3024,14 +3034,16 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   const ease = G.stage.ease || 1;
   const tough = (1 + G.level * 0.1) * (1 + t / 133) * (G.cleared ? 1.5 : 1) * ease;
   const rank = kind ? 1 : m.rank;
-  let hp = (6 + m.area / 70) * tough;
+  // On a ground of big monsters a big one is no tougher than the others' biggest.
+  const area = G.stage.big ? Math.min(m.area, 5200) : m.area;
+  let hp = (6 + area / 70) * tough;
   // Elites as in D2 Survivors: champions ×8 life, ×1.5 damage, ×3 experience; a named leader
   // ×12, ×1.25, ×5; followers ×2 life.
   const base = hp;
   if (kind === 'champ') hp = base * 8;
   if (kind === 'minion') hp = base * 2;
-  if (kind === 'mini') hp = Math.max(base * 12, (70 + m.area / 10) * tough * 2);
-  if (kind === 'boss') hp = (180 + m.area / 5) * tough * 4;
+  if (kind === 'mini') hp = Math.max(base * 12, (70 + area / 10) * tough * 2);
+  if (kind === 'boss') hp = (180 + area / 5) * tough * 4;
   const e = {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
@@ -3099,7 +3111,8 @@ const TEMPERS = {
 function temperOf(m) {
   const lv = G.stage.raid ? 12 : G.level, r = Math.random();
   const timid = Math.max(0, 0.35 - lv * 0.035) * (m.rank < 0.5 ? 1.2 : 0.8);
-  const fierce = Math.min(0.3, 0.05 + lv * 0.02);
+  // 연's darting kinds (its MoveSpeed 128 and up: riders, wolves, birds) are fierce twice as often.
+  const fierce = Math.min(0.3, 0.05 + lv * 0.02) * (m.quick ? 2 : 1);
   return r < timid ? 'timid' : r > 1 - fierce ? 'fierce' : 'normal';
 }
 /** The original wander: turn to a random side (and step only if already facing it), or walk on. */
@@ -3886,7 +3899,12 @@ function clearStage() {
   } else {
     progress.cleared[G.stage.id] = true;
     promote();
-    if (Math.random() < 0.15) dropCostume([0, 1, 2], '보스의 보물');
+    if (G.stage.id === 'cheolsang' && !progress.abyss && st.clears.cheolsang >= 3) {
+      progress.abyss = true;
+      later(2.2, () => { say('철상지옥 바닥 밑에서 무언가 울린다… 끝없는 지옥으로 가는 길이 열렸다.', 'sys'); banner('끝없는 지옥'); });
+    }
+    // From the grounds past 타계 (Lv 18 and up) the rarer looks, as from the raids.
+    if (Math.random() < 0.15) dropCostume(G.level >= 18 ? [1, 2] : [0, 1, 2], '보스의 보물');
   }
   saveJson('bs_progress', progress);
   record();
@@ -7573,6 +7591,53 @@ function drawYhero(clsId, armor, b, x, y, pose, alpha) {
   return true;
 }
 
+// ---------------------------------------------------------------- 끝없는 지옥
+// The deepest ground is lit only by a torch round the hero, as Diablo's cellars: a near-black
+// shade with a flickering hole where the hero stands, a veil of dried blood left even in the
+// light, and faint holes round its leaders and the boss so they loom up before they reach the
+// light. The monsters are darkened (their leaders blood-cast) copies made once. Everything is
+// 연's own picture under these code passes (no drawn art). The shade is drawn at a quarter of
+// the screen's size and stretched (it is all soft gradients): one small canvas, a few gradient
+// fills and one drawImage a frame (full-size blend passes halved the frame rate at 4x CPU).
+const ABYSS_TINT = 'brightness(0.6) saturate(0.55)';
+const ABYSS_LEAD_TINT = 'brightness(0.75) sepia(0.6) hue-rotate(-28deg) saturate(2.2)';
+const ABYSS_Q = 4;
+let abyssShade = null;
+function drawAbyss(px, py, camX, camY) {
+  const q = ABYSS_Q, w = Math.ceil(canvas.width / q), h = Math.ceil(canvas.height / q);
+  if (!abyssShade || abyssShade.width !== w || abyssShade.height !== h) {
+    abyssShade = document.createElement('canvas');
+    abyssShade.width = w;
+    abyssShade.height = h;
+  }
+  const g = abyssShade.getContext('2d');
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = 'rgba(26,3,2,0.97)';
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'destination-out';
+  const hole = (x, y, r, a) => {
+    x /= q; y /= q; r /= q;
+    const gr = g.createRadialGradient(x, y, r * 0.12, x, y, r);
+    gr.addColorStop(0, `rgba(0,0,0,${a})`);
+    gr.addColorStop(0.55, `rgba(0,0,0,${a * 0.75})`);
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr;
+    g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  };
+  // The torch: it breathes and flickers.
+  const t = G.t, flick = 1 + 0.05 * Math.sin(t * 13) + 0.035 * Math.sin(t * 31 + 1.3) + 0.02 * Math.sin(t * 7.7);
+  hole(px, py, Math.min(canvas.width, canvas.height) * 0.36 * flick, 0.8);
+  for (const e of G.enemies) {
+    if (!e.kind || e.kind === 'minion') continue;
+    hole((e.x - camX) * Z, (e.y - 20 - camY) * Z, Z * (e.kind === 'boss' ? 60 : 32), e.kind === 'boss' ? 0.5 : 0.32);
+  }
+  const sm = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(abyssShade, 0, 0, w * q, h * q);
+  ctx.imageSmoothingEnabled = sm;
+}
+
 // ---------------------------------------------------------------- 연's own monsters
 // The monsters as 바람의나라 연 draws them (tools/yeon_units.py): a sheet per monster with walk,
 // idle, attack and death in three directions (the side one faces left; mirrored for right),
@@ -7855,7 +7920,7 @@ function render(now) {
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
     // The treasure-bearer in gold, from a tinted copy made once.
-    monsterTint = b.flee ? GOLD_TINT : null;
+    monsterTint = b.flee ? GOLD_TINT : G.stage.abyss ? (b.kind && b.kind !== 'minion' ? ABYSS_LEAD_TINT : ABYSS_TINT) : null;
     if (b.beast) drawBeast(b, 1, lx, ly, 0.62 * s);
     else drawMonster(b, b.x + lx, b.y + ly, s);
     monsterTint = null;
@@ -8017,6 +8082,7 @@ function render(now) {
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (G.stage.abyss) drawAbyss((p.x - camX) * Z, (p.y - 22 - camY) * Z, camX, camY);
   const dark = DARK[G.stage.terrain];
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
