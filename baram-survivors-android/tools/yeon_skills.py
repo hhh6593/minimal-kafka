@@ -528,7 +528,7 @@ def color_mm(cm, x, rnd):
 
 def particles(ps, t_rel, t_alive_end, seed):
     """The particles a ParticleSystem (typetree) shows t_rel seconds after it started:
-    [(x, y, size_x, size_y, rot, rgba, frame, vx, vy)] in the system's local units."""
+    [(x, y, z, size_x, size_y, rot, rgba, frame, (vx, vy, vz))] in the system's local units."""
     rng = np.random.RandomState(seed & 0x7fffffff)
     im = ps['InitialModule']; em = ps['EmissionModule']
     dur = max(0.01, ps.get('lengthInSec', 1.0))
@@ -606,11 +606,11 @@ def particles(ps, t_rel, t_alive_end, seed):
                 v = rng.randn(3); v /= max(1e-6, np.linalg.norm(v)); d = d * (1 - ra) + v * ra
         v0 = d * speed
         pos = p + v0 * age
-        vx_, vy_ = v0[0], v0[1]
+        vel_ = v0.copy()
         if vel.get('enabled'):
             ex = [minmax(vel[k], f, r[8]) for k in ('x', 'y', 'z')]
             pos = pos + np.array(ex) * age
-            vx_ += ex[0]; vy_ += ex[1]
+            vel_ = vel_ + np.array(ex)
         pos[1] -= 0.5 * 9.81 * grav * age * age
         k = 1.0
         if sz.get('enabled'):
@@ -628,7 +628,7 @@ def particles(ps, t_rel, t_alive_end, seed):
             fo = minmax(uv['frameOverTime'], (f * uv.get('cycles', 1)) % 1.0, r[7])
             st0 = minmax(uv.get('startFrame', {'scalar': 0}), 0, r[7])
             frame = int(min(nfr - 1, max(0, np.floor(fo * nfr + st0))))
-        out.append((pos[0], pos[1], pos[2], size * k, sy * k, a_, cl, frame, vx_, vy_))
+        out.append((pos[0], pos[1], pos[2], size * k, sy * k, a_, cl, frame, vel_))
     return out
 
 
@@ -878,7 +878,7 @@ def render(go, add_own=False, alpha_only=False, add_all=False):
                 k_a = (tcol[3] * 2 if tcol and ('Legacy' in mi['shader'] or 'Particles' in mi['shader']) else tcol[3] if tcol else 1.0)
                 if '_Color' in mi['colors'] and not tcol:
                     cc = props.get('_Color', mi['colors']['_Color']); k_rgb = np.array(cc[:3]); k_a = cc[3]
-                for (x, y, z, sx, sy, ang, cl, fr, vx, vy) in particles(ps, t - rr['t_on'], end_t, rr['seed']):
+                for (x, y, z, sx, sy, ang, cl, fr, vel3) in particles(ps, t - rr['t_on'], end_t, rr['seed']):
                     if cl[3] * k_a <= 0.01 or sx <= 0:
                         continue
                     if uv.get('enabled') and uv.get('animationType', 0) == 1:
@@ -896,7 +896,12 @@ def render(go, add_own=False, alpha_only=False, add_all=False):
                     c_, s_ = np.cos(ang), np.sin(ang)
                     Q = np.array([[c_ * sx * ssc / tw, -s_ * -sy * ssc / th, 0], [s_ * sx * ssc / tw, c_ * -sy * ssc / th, 0]])
                     if rr['mode'] == 1:  # stretched along its way
-                        sp_ = np.hypot(vx, vy)
+                        # its way as seen: the system's own turn applied (a cone tipped over to
+                        # throw upwards goes up the screen, not along its local z, which is unseen)
+                        # (shortened as much as it heads into the screen)
+                        vw = Rw @ vel3
+                        vx, vy = vw[0], vw[1]
+                        sp_ = np.linalg.norm(vel3) * np.hypot(vx, vy) / max(1e-9, np.linalg.norm(vw))
                         L = sx * ssc * getattr(rr['r'], 'm_LengthScale', 2.0) + sp_ * getattr(rr['r'], 'm_VelocityScale', 0) * ssc
                         a2 = np.arctan2(vy, vx) if sp_ > 1e-6 else 0
                         c2, s2 = np.cos(a2), np.sin(a2)
