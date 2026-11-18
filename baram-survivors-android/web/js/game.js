@@ -4822,7 +4822,7 @@ function updatePet(dt) {
   if (pet.state === 'leap') {
     const k = Math.min(1, pet.t / 0.35);
     pet.x = pet.fx + (pet.tx - pet.fx) * k;
-    pet.y = pet.fy + (pet.ty - pet.fy) * k - Math.sin(k * Math.PI) * 26;
+    pet.y = pet.fy + (pet.ty - pet.fy) * k - Math.sin(k * Math.PI) * 40;
     pet.f = PET_POUNCE[Math.min(PET_POUNCE.length - 1, Math.floor(k * PET_POUNCE.length))];
     if (k >= 1) {
       // The landing: the claws round about, 연's 백호 hit.
@@ -4835,7 +4835,7 @@ function updatePet(dt) {
       G.allyHitting = false;
       if (fxBudget('pet', 2)) {
         // 연's white-tiger strike (skill_effect_transform_backho): claws, then the roaring head.
-        if (M.fx.g_tf_backho) addFx('g_tf_backho', pet.x, pet.y, { scale: 0.85 });
+        if (M.fx.g_tf_backho) addFx('g_tf_backho', pet.x, pet.y, { scale: 1.1 });
       }
       G.shake = Math.max(G.shake, 0.06);
       audio.play('kill');
@@ -4856,7 +4856,7 @@ function updatePet(dt) {
     pet.face = Math.sign(prey.x - pet.x) || pet.face;
     return;
   }
-  const hx = p.x - (p.face || 1) * 30, hy = p.y + (G.cpet ? -16 : 4); // above a 코디 환수 when one walks too
+  const hx = p.x - (p.face || 1) * 66, hy = p.y + (G.cpet ? -18 : 4); // above a 코디 환수 when one walks too
   const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
   if (d > TILE * 8) { pet.x = hx; pet.y = hy; }
   else if (d > 6) {
@@ -4875,7 +4875,7 @@ function townTiger(dt) {
   const pet = T.tiger = T.tiger || { pet: true, x: T.x - 30, y: T.y, face: 1, t: 0, f: 0, lastFace: 1 };
   pet.lastFace = face;
   pet.t += dt;
-  const hx = T.x - face * 30, hy = T.y + (T.cpet ? -16 : 4);
+  const hx = T.x - face * 66, hy = T.y + (T.cpet ? -18 : 4);
   const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
   if (d > 260) { pet.x = hx; pet.y = hy; }
   else if (d > 6) {
@@ -4890,7 +4890,7 @@ function townTiger(dt) {
 function drawPet(pet) {
   const f = M.fx.g_pet_baekho, im = images['fx/g_pet_baekho.png'];
   if (!f || !im || !im.width) return;
-  const k = 0.55 * (f.k || 1);
+  const k = 1.0 * (f.k || 1); // 연's 사신수 at its own size: a beast bigger than the hero, not a pup at its heel
   ctx.save();
   ctx.translate(Math.round(pet.x), Math.round(pet.y));
   // The sheet's tiger faces left; turned for the right.
@@ -4898,7 +4898,7 @@ function drawPet(pet) {
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(0, -2, 20, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -2, 36, 9, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.drawImage(im, pet.f * f.w, 0, f.w, f.h, -f.ax * k, -f.ay * k, f.w * k, f.h * k);
