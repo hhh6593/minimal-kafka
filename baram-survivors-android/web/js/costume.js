@@ -5,11 +5,19 @@
 // keeps its own choice (progress.costume.wear[cls]); what is owned is shared by all classes, and
 // owning many gives small lasting bonuses, as 연's 코디 수집 (capped as before).
 //
+// 헤어·얼굴: 연's own hair styles and faces (its 미용실 and 성형외과, tools/yeon_costume.py hair head),
+// free and always owned, as the old 미용실 was. The hero's head is then drawn in parts: the face
+// (head "c<id>", or "nohair": the class's own face without its hair), the hair over it (hair
+// "c<id>", or "own": the class's own hair) and what of it hangs behind the body (back "c<id>").
+//
 // Some 1400 looks and 360 pets: their list (assets/ycostume/index.json, prepare_assets.py) is read
 // after the title shows, and each sheet only when it is worn or tried on. The layers join the
 // classes' own (manifest yhero2[cls].layers[kind]["c<id>"]), each with its own cell and foot.
 
-export const KINDS = [['armor', '의상'], ['helmet', '머리'], ['cape', '등'], ['face', '얼굴'], ['weapon', '무기'], ['shield', '방패'], ['pet', '환수']];
+export const KINDS = [['armor', '의상'], ['hair', '헤어'], ['head', '얼굴'], ['helmet', '모자'], ['cape', '등'], ['face', '장식'], ['weapon', '무기'], ['shield', '방패'], ['pet', '환수']];
+// Kinds every class has for free: not bought, not dropped, not counted in 코디 수집.
+const FREE = new Set(['hair', 'head']);
+const isFree = it => !!it && FREE.has(it.kind);
 // 연's grades (the items' MinGrade). 일반·고급 can be bought at any time; 희귀·영웅 when the shop
 // has them in its stock (it turns over every six hours); 전설 only from 뽑기 and the best rewards.
 export const GRADES = [
@@ -49,6 +57,8 @@ export function loadCostumes() {
     for (const [id, [kind, name, grade, set, whole, icon]] of Object.entries(j.items)) {
       if (/\[사용안함\]|사용안함/.test(name)) continue; // 연's retired entries ("[사용안함]용마제일검")
       items[id] = { id, kind, name, grade: Math.max(0, Math.min(4, grade)), set, whole: !!whole, icon: icon ? `ycostume/i/${id}.png` : null, classes: [] };
+      // A hair style of no hair (대머리) has no picture: every class can wear it.
+      if (kind === 'hair' && whole) items[id].classes = Object.keys(A.M().yhero2 || {});
     }
     const H2 = A.M().yhero2 || {};
     for (const [cls, kinds] of Object.entries(j.layers)) {
@@ -59,7 +69,7 @@ export function loadCostumes() {
         for (const [v, fi] of Object.entries(vs)) {
           L[v] = metas[fi];
           const it = items[v.slice(1)];
-          if (it && kind !== 'wback' && kind !== 'head' && !it.classes.includes(cls)) it.classes.push(cls);
+          if (it && kind !== 'wback' && kind !== 'back' && !it.classes.includes(cls)) it.classes.push(cls);
         }
       }
     }
@@ -92,7 +102,7 @@ function state() {
   return p.costume;
 }
 
-export function ownsCostume(id) { return !!state().own[id]; }
+export function ownsCostume(id) { return isFree(costumeItems()[id]) || !!state().own[id]; }
 /** How many are owned (the list need not be read yet: 코디 수집 counts from the save). */
 export function ownedCount() { return Object.keys(state().own).length; }
 
@@ -102,7 +112,7 @@ export function wornCostume(clsId) {
   const w = state().wear[clsId] || {}, items = costumeItems(), out = {};
   for (const [kind, id] of Object.entries(w)) {
     const it = items[id];
-    if (it && it.kind === kind && state().own[id] && it.classes.includes(clsId)) out[kind] = id;
+    if (it && it.kind === kind && ownsCostume(id) && it.classes.includes(clsId)) out[kind] = id;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -119,7 +129,7 @@ export function setCostume(clsId, kind, id) {
 /** Gives a look or pet (a drop, a purchase, a pull); false when it was owned already. */
 export function giveCostume(id) {
   const s = state();
-  if (s.own[id] || !costumeItems()[id]) return false;
+  if (s.own[id] || !costumeItems()[id] || isFree(costumeItems()[id])) return false;
   s.own[id] = 2; // 2: new, not yet looked at
   version++;
   A.save();
@@ -129,7 +139,7 @@ export function giveCostume(id) {
 /** Not owned yet, at random, of the grades given; null when none is left. */
 export function randomCostume(grades = [0, 1, 2, 3]) {
   const items = costumeItems(), own = state().own;
-  const left = Object.keys(items).filter(id => !own[id] && grades.includes(items[id].grade));
+  const left = Object.keys(items).filter(id => !own[id] && !isFree(items[id]) && grades.includes(items[id].grade));
   return left.length ? left[Math.floor(Math.random() * left.length)] : null;
 }
 
@@ -157,16 +167,44 @@ export function costumeBonus() {
 export function costumeVariants(H, cos, out) {
   if (!cos) return out;
   const items = costumeItems();
+  let wholeHat = false;
   for (const [kind, id] of Object.entries(cos)) {
     const v = 'c' + id;
-    if (kind === 'pet' || !H.layers[kind] || !H.layers[kind][v]) continue;
+    if (kind === 'pet' || FREE.has(kind) || !H.layers[kind] || !H.layers[kind][v]) continue;
     out[kind] = v;
     // A weapon look brings its own second part (behind the body, the off hand), or none.
     if (kind === 'weapon') {
       if (H.layers.wback && H.layers.wback[v]) out.wback = v;
       else delete out.wback;
     }
-    if (kind === 'helmet' && items[id] && items[id].whole && H.layers.head && H.layers.head.nohair) out.head = 'nohair';
+    if (kind === 'helmet' && items[id] && items[id].whole && H.layers.head && H.layers.head.nohair) {
+      out.head = 'nohair';
+      wholeHat = true;
+    }
+  }
+  return headParts(H, cos, out, wholeHat);
+}
+
+/** 헤어·얼굴: the head in parts (a face, a hair over it, what hangs behind), the hat that holds the
+ *  hair (wholeHat) leaving the face alone. Without either the class's own head stays whole. */
+function headParts(H, cos, out, wholeHat) {
+  const L = H.layers, hair = cos.hair, face = cos.head;
+  if (!hair && !face) return out;
+  const fv = face && L.head && L.head['c' + face] ? 'c' + face : 'nohair';
+  if (!L.head || !L.head[fv]) return out;
+  if (wholeHat) {
+    out.head = fv;
+    return out;
+  }
+  const it = hair && costumeItems()[hair];
+  if (it && it.whole) out.head = fv; // 대머리: the face alone
+  else if (hair && L.hair && L.hair['c' + hair]) {
+    out.head = fv;
+    out.hair = 'c' + hair;
+    if (L.back && L.back['c' + hair]) out.back = 'c' + hair;
+  } else if (fv !== 'nohair' && L.hair && L.hair.own) {
+    out.head = fv;
+    out.hair = 'own';
   }
   return out;
 }
@@ -194,6 +232,11 @@ export function layerOrder(a, f, kinds) {
   if (kinds.face && !z.includes('face')) {
     const i = z.indexOf('head');
     if (i >= 0) z.splice(i + 1, 0, 'face');
+  }
+  // A hair of its own goes over the face, under a face decoration and the hat.
+  if (kinds.hair && !z.includes('hair')) {
+    const i = z.indexOf('head');
+    if (i >= 0) z.splice(i + 1, 0, 'hair');
   }
   if (kinds.wback && !z.includes('wback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'wback');
   return z;
@@ -276,7 +319,7 @@ function shop() {
   const s = state(), items = costumeItems(), slot = Math.floor(Date.now() / SHOP_MS);
   if (!s.shop || s.shop.slot !== slot || !s.shop.ids.every(id => items[id])) {
     // Mostly 희귀 and 영웅 (the grades not for sale at all times), some of the others.
-    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id]);
+    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id] && !isFree(items[id]));
     const ids = [];
     for (let i = 0; i < SHOP_N * 6 && ids.length < SHOP_N && pool.length; i++) {
       const id = pool[Math.floor(Math.random() * pool.length)], g = items[id].grade;
@@ -324,13 +367,15 @@ const F = { q: '', grade: -1, own: 'all', sets: false };
 let lastPulls = [];
 const $ = s => document.querySelector(s);
 
-export function openCoordi() {
+/** Opens the 코디 window (on the tab `at`, e.g. 'hair' from the equip window). */
+export function openCoordi(at) {
   const cls = A.cls();
   if (!cls || !A.M().yhero2 || !A.M().yhero2[cls.id] || !A.M().ycostume || !A.M().ycostume.index) {
     A.say('이 직업은 아직 코디를 입을 수 없습니다.', 'warn');
     return;
   }
   state();
+  if (at && KINDS.some(([k]) => k === at)) { tab = at; vscroll.top = 0; }
   $('#coordi').hidden = false;
   const go = () => {
     trial = Object.assign({}, state().wear[cls.id] || {});
@@ -365,7 +410,7 @@ function tabCount(cls, kind) {
   let n = 0, fresh = 0;
   for (const id in items) {
     const it = items[id];
-    if (it.kind !== kind || !own[id] || !canWear(cls, it)) continue;
+    if (it.kind !== kind || !(own[id] || isFree(it)) || !canWear(cls, it)) continue;
     n++;
     if (own[id] === 2) fresh++;
   }
@@ -375,7 +420,7 @@ function tabCount(cls, kind) {
 function buildCoordi() {
   const cls = A.cls(), items = costumeItems(), p = A.progress();
   $('#coordi-title').textContent = `코디 · ${cls.name}`;
-  const total = Object.keys(items).length;
+  const total = Object.values(items).filter(it => !isFree(it)).length;
   $('#coordi-gold').textContent = `${A.won(p.gold || 0)} · 레이드주화 ${p.coins || 0} · 수집 ${ownedCount()}/${total}`;
   const tb = $('#coordi-tabs');
   tb.innerHTML = '';
@@ -409,12 +454,14 @@ function listIds(cls) {
     const it = items[id];
     if (it.kind !== tab || !canWear(cls, it)) return false;
     if (F.grade >= 0 && it.grade !== F.grade) return false;
-    if (F.own === 'own' && !own[id]) return false;
-    if (F.own === 'not' && own[id]) return false;
+    if (F.own === 'own' && !own[id] && !isFree(it)) return false;
+    if (F.own === 'not' && (own[id] || isFree(it))) return false;
     if (F.own === 'new' && own[id] !== 2) return false;
     return !q || it.name.toLowerCase().includes(q) || (it.set && it.set.toLowerCase().includes(q));
   });
-  ids.sort((x, y) => ((own[y] ? 1 : 0) - (own[x] ? 1 : 0)) || items[y].grade - items[x].grade || items[x].name.localeCompare(items[y].name, 'ko'));
+  // (헤어·얼굴 in 연's own order, its ids: the plain ones first.)
+  if (FREE.has(tab)) ids.sort((x, y) => +x - +y);
+  else ids.sort((x, y) => ((own[y] ? 1 : 0) - (own[x] ? 1 : 0)) || items[y].grade - items[x].grade || items[x].name.localeCompare(items[y].name, 'ko'));
   return ids;
 }
 
@@ -489,13 +536,14 @@ function paintRows() {
         const d = document.createElement('div');
         if (c.none) {
           d.className = 'forge-item' + (!trial[tab] ? ' on' : '');
-          d.innerHTML = '<div class="noimg"></div><b>' + (tab === 'pet' ? '데리고 다니지 않기' : '장비 그대로') + '</b><small>코디 없음</small>';
+          d.innerHTML = '<div class="noimg"></div><b>' + ({ pet: '데리고 다니지 않기', hair: '직업 기본 머리', head: '직업 기본 얼굴' }[tab] || '장비 그대로')
+            + '</b><small>' + (FREE.has(tab) ? '처음 모습' : '코디 없음') + '</small>';
           d.onclick = () => { delete trial[tab]; pick = null; repaint(cls); };
         } else {
-          const it = items[c.id], o = own[c.id], g = GRADES[it.grade];
+          const it = items[c.id], free = isFree(it), o = free || own[c.id], g = GRADES[it.grade];
           d.className = 'forge-item' + (trial[tab] === c.id ? ' on' : '') + (o ? ' ready' : ' done');
           d.innerHTML = (it.icon ? `<img loading="lazy" decoding="async" src="assets/${it.icon}" alt="">` : '<div class="noimg"></div>')
-            + `<b>${it.name}</b><small style="color:${g.color}">${g.name}${o ? ' · 보유' : ''}</small>` + (o === 2 ? '<em>NEW</em>' : '');
+            + `<b>${it.name}</b>` + (free ? '<small>무료</small>' : `<small style="color:${g.color}">${g.name}${o ? ' · 보유' : ''}</small>`) + (o === 2 ? '<em>NEW</em>' : '');
           if (o === 2) seen.add(c.id);
           d.onclick = () => { trial[tab] = c.id; pick = c.id; repaint(cls); };
         }
@@ -561,8 +609,10 @@ function buildDetail(detail, cls) {
   if (it) {
     const g = GRADES[it.grade], own = ownsCostume(id);
     const note = it.kind === 'weapon' || it.kind === 'shield' ? ' · 모습만: 장비 창에는 실제 무기·별·용무기 단계 그대로'
-      : it.kind === 'pet' ? ' · 사냥·마을·레이드·대항전에서 뒤를 따라다님' : ' · 능력치는 장비 그대로';
-    info.innerHTML = `<b>${it.name}</b> <span style="color:${g.color}">${g.name}</span>${it.set ? ` <small>· ${it.set}</small>` : ''}<br>`
+      : it.kind === 'pet' ? ' · 사냥·마을·레이드·대항전에서 뒤를 따라다님'
+        : isFree(it) ? ' · 언제든 무료로 바꿈(머리째 덮는 모자를 쓰면 머리카락은 가려짐)' : ' · 능력치는 장비 그대로';
+    info.innerHTML = isFree(it) ? `<b>${it.name}</b> <span>${it.kind === 'hair' ? '헤어' : '얼굴'}</span><br><small>연의 ${it.kind === 'hair' ? '미용실' : '성형외과'}${note}</small>`
+      : `<b>${it.name}</b> <span style="color:${g.color}">${g.name}</span>${it.set ? ` <small>· ${it.set}</small>` : ''}<br>`
       + `<small>${own ? '보유' : howToGet(it, shop().ids.includes(id))}${it.whole ? ' · 머리째 덮는 장식' : ''}${note}</small>`;
     const b = buyButton(id, () => buildCoordi());
     if (b) info.append(document.createElement('br'), b);

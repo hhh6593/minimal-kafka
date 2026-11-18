@@ -1446,8 +1446,15 @@ function buildEquip() {
     bb.onclick = () => { wearBest(cls); buildEquip(); };
     box.append(bb);
   }
-  // The old wardrobe's hair picks do not reach a hero drawn in 연's own figure: no row for them.
-  if (hasAvatars() && !(M.yhero2 && M.yhero2[cls.id])) {
+  // A hero drawn in 연's own figure changes hair and face in the 코디 window (연's own 헤어·얼굴).
+  if (M.yhero2 && M.yhero2[cls.id]) {
+    const hb = document.createElement('button');
+    hb.className = 'btn wear-best'; // a row of its own across the grid
+    hb.id = 'equip-hairface';
+    hb.textContent = '헤어·얼굴 바꾸기 (코디)';
+    hb.onclick = () => openCoordi('hair');
+    box.append(hb);
+  } else if (hasAvatars()) {
     // 머리 모양: any of the wardrobe's hair, kept per class, as the 미용실 did.
     const h = document.createElement('h4');
     h.textContent = '머리';
