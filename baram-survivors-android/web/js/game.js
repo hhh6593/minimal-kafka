@@ -6127,7 +6127,7 @@ function partyAct(m) {
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.3;
         addShot(m, t, { color: '#ff8a20', glow: '#ffd060', size: 4, speed: 460, onHit: () => {
-          fxOn(SKILLS.m_fire.fxs[Math.min(7, m.lv)], t);
+          fxOn(SKILLS.m_fire.fxs ? SKILLS.m_fire.fxs[Math.min(7, m.lv)] : SKILLS.m_fire.fx, t);
           hurtEnemy(t, 8 * pw);
         } });
         audio.play('skill_m_fire', 'spell', Math.min(8, m.lv * 2));

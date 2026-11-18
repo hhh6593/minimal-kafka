@@ -1871,7 +1871,7 @@ function heroRole(W, dt) {
     let low = null, lk = 0.8;
     for (const m of W.alive[0]) if (!m.hero && !m.gate && d2(m, h) < 5 && hpk(m) < lk) { lk = hpk(m); low = m; }
     if (low) {
-      const fx = spellFx('c_heal', p.lvl); // (a 기원 re-rendered as one strip has no grades)
+      const fx = SK.c_heal.fxs ? SK.c_heal.fxs[Math.min(7, Math.floor(p.lvl / 5))] : SK.c_heal.fx;
       if (fx) A.addFx(fx, low.x, low.y - 26, { scale: 0.9 });
       healBody(W, h, low, low.maxHp * 0.08 * W.roleK);
       A.floatText(low.x, low.y - 70, '기원', '#fff', true);
