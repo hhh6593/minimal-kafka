@@ -3460,7 +3460,8 @@ function hud() {
   // Kill feed, top right.
   ctx.textAlign = 'right';
   const icon = img('ui_Icon_KillLog');
-  let y = 46 * u;
+  // Under the 연속 처치 count (drawn at 64 / 860 of the width, top right), not across it.
+  let y = Math.max(46 * u, 104 * cw / 860);
   for (const f of W.feed.slice(-5)) {
     const a = Math.min(1, (6 - (G.t - f.t)) * 2);
     ctx.globalAlpha = a;
