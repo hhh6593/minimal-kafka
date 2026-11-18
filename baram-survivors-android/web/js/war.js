@@ -2626,7 +2626,8 @@ function partyCasts(W, b) {
   const G = A.G(), pk = b.party;
   if (!pk) return false;
   // The hero lying near: raised where it fell (a healer only, after a moment's notice).
-  if (b.team === 0 && b.role === 'healer' && G.dead && b.cd.r <= 0) {
+  // (Not a raid hero whose revives are spent: it lies till the raid is over.)
+  if (b.team === 0 && b.role === 'healer' && G.dead && b.cd.r <= 0 && !W.heroOut) {
     const g = W.ghosts.find(x => x.b === W.hero);
     if (g && Math.hypot(g.tx - b.tx, g.ty - b.ty) < (W.raid ? 7 : 6) && G.t - g.t > 1 + (b.lagK || 1) * 0.6 && (!W.raid || !G.over)) {
       if (Math.hypot(g.tx - b.tx, g.ty - b.ty) > 3) { b.dest = snap(W, g.tx, g.ty); return true; }
