@@ -18,6 +18,8 @@
 //   - 레이드 (공대): a raid is fought on the same fighters — the hero and twenty-four raiders against
 //     the raid's boss and servants, which stay game.js's monsters (see the 레이드 section).
 
+import { frameBox, drawLayers, dropCostume } from './costume.js';
+
 let A = null; // game.js internals (initWar)
 const TILE = 48;
 const k2 = (x, y) => x + ',' + y;
@@ -2219,6 +2221,8 @@ function finish(W, win, why) {
   if (won) pr.war.won++;
   const bt = pr.war.best[W.def.id];
   if (!bt || 'SABC'.indexOf(tier) < 'SABC'.indexOf(bt)) pr.war.best[W.def.id] = tier;
+  // 코디: a war won gives a costume (S and A tiers a rarer one).
+  if (won) dropCostume(tierN >= 3 ? [1, 2] : [0, 1, 2], '대항전 승리');
   A.saveProgress();
   W.result = { win, why, tier, tierK, mats, gold, rank: rank + 1, rows };
   G.over = true;
@@ -3241,7 +3245,6 @@ function composeFrame(H, b, a, f, mirror, force, src) {
   // While its look is being made ahead, or past this frame's time, a frame is not made in play.
   if (!force && (composeMs > COMPOSE_MS || warming.has(b.yvKey))) return null;
   const t0 = nowMs();
-  const [cw, ch] = H.cell, [fx, fy] = H.foot;
   const sheets = {};
   for (const [kind, v] of Object.entries(b.yv2)) {
     const meta = H.layers[kind] && H.layers[kind][v];
@@ -3253,8 +3256,10 @@ function composeFrame(H, b, a, f, mirror, force, src) {
       im = A.images[path];
       if (!im || !im.complete || !im.width) return src ? null : false;
     }
-    sheets[kind] = { im, cols: meta.cols || 1e9 };
+    sheets[kind] = { im, meta };
   }
+  // The class's cell, grown where a 코디 reaches past it (costume.js).
+  const box = frameBox(H, Object.values(sheets).map(s => s.meta)), { cw, ch, fx, fy } = box;
   c = document.createElement('canvas');
   c.width = cw;
   c.height = ch;
@@ -3265,12 +3270,10 @@ function composeFrame(H, b, a, f, mirror, force, src) {
   g.ellipse(mirror ? cw - fx : fx, fy - 1, 10, 3.5, 0, 0, Math.PI * 2);
   g.fill();
   if (mirror) { g.translate(cw, 0); g.scale(-1, 1); }
-  for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
-    const sh = sheets[kind];
-    if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
-  }
+  drawLayers(g, H, sheets, a, f, box);
   c = keepFrame(k, c);
   c.m = mirror;
+  c.box = box;
   composeMs += nowMs() - t0;
   return c;
 }
@@ -3289,7 +3292,6 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
   else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
-  const [cw] = H.cell, [fx, fy] = H.foot;
   let mirror = name !== 'dead' && dir === 'side' && fdx > 0;
   let k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
   const last = b.lastKey && frames.has(b.lastKey) ? b.lastKey : lookAny.get(b.yvKey);
@@ -3318,6 +3320,7 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
     g.fill();
   }
   ctx.globalAlpha = alpha;
+  const { cw, fx, fy } = c.box || { cw: H.cell[0], fx: H.foot[0], fy: H.foot[1] };
   blit(ctx, c, Math.round(x) - (mirror ? cw - fx : fx), Math.round(y) - fy);
   ctx.globalAlpha = 1;
   return true;

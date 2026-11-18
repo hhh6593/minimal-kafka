@@ -7,6 +7,7 @@ import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -919,7 +920,10 @@ $('#speed-btn').onclick = () => {
 
 function savedGear(cls) {
   progress.gear = progress.gear || {};
-  return Object.assign({ armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 }, progress.gear[cls.id]);
+  const g = Object.assign({ armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 }, progress.gear[cls.id]);
+  // The 코디 worn over it (costume.js): looks only, kept apart from the saved gear.
+  Object.defineProperty(g, 'cos', { value: wornCostume(cls.id), enumerable: false, writable: true });
+  return g;
 }
 
 // 괴력난신 ★ 효과: cards by 괴수 and slot (★1-★3, the best kept), all classes share them; the
@@ -965,13 +969,13 @@ function applyGear() {
   }
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
-  const cs = cardSet(), promo = promoOf(c);
-  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0) + cs.hp + PROMO_BONUS.hp * promo;
+  const cs = cardSet(), promo = promoOf(c), cb = costumeBonus(); // cb: 코디 수집
+  const hp = G.cls.hp + pow('armor') * 20 + extra('helmet') * 12 + 40 * (bonus.life || 0) + cs.hp + PROMO_BONUS.hp * promo + cb.hp;
   p.hp += hp - (p.gearHp || G.cls.hp);
   p.maxHp += hp - (p.gearHp || G.cls.hp);
   p.gearHp = hp;
-  p.armor = G.cls.armor + (hasShield(G.cls.id) ? Math.max(0, pow('shield') + 1) : Math.max(0, Math.floor(pow('armor') / 2) + 1)) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
-  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo);
+  p.armor = G.cls.armor + (hasShield(G.cls.id) ? Math.max(0, pow('shield') + 1) : Math.max(0, Math.floor(pow('armor') / 2) + 1)) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor + cb.armor;
+  p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo) * (1 + cb.dmg);
   // 격: what the worn pieces loose by themselves (gyeok.js), and the statuses the shields ward off.
   const gy = [];
   p.wards = new Set();
@@ -3671,9 +3675,12 @@ function clearStage() {
       say(`레이드주화 ${coins}개를 받았습니다.`, 'sys');
     }
     if (G.stage.gwoe) gwoeCards();
+    // 코디: a raid won gives a costume now and then (the higher raids the rarer ones).
+    if (Math.random() < 0.4 + 0.03 * G.level) dropCostume(G.level >= 10 ? [1, 2] : [0, 1, 2], '레이드 보상');
   } else {
     progress.cleared[G.stage.id] = true;
     promote();
+    if (Math.random() < 0.15) dropCostume([0, 1, 2], '보스의 보물');
   }
   saveJson('bs_progress', progress);
   record();
@@ -5009,6 +5016,7 @@ window.__townWalk = (x, y) => !townBlocked(x, y);
 /** The town's shortcut buttons: an errand by the NPC's id, or the raid list. */
 function townErrand(id) {
   if (id === 'war') return War.openBoard();
+  if (id === 'coordi') return openCoordi();
   if (id === 'raid') {
     mapTab = 'raid';
     // A raid picked, or the list would open on the map of the hardest hunting ground instead.
@@ -7249,14 +7257,16 @@ function yGearVariants(cls, gear) {
   }
   // What of the weapon goes behind the body (the 무사's spear shaft, the 격투가's far fist).
   if (out.weapon && H.layers.wback && H.layers.wback[out.weapon]) out.wback = out.weapon;
-  return out;
+  // The 코디 worn over the gear (costume.js): its looks replace the slots' own.
+  return costumeVariants(H, gear.cos, out);
 }
 
 /** Draws a hero from 연's layers in the frame's own order; false when the class has none. */
 function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   const H = M.yhero2 && M.yhero2[cls.id];
   if (!H) return false;
-  const want = b.yv && b.yvGear === gear ? b.yv : (b.yvGear = gear, b.yv = yGearVariants(cls, gear || {}));
+  const want = b.yv && b.yvGear === gear && b.yvCos === costumeVersion() ? b.yv
+    : (b.yvGear = gear, b.yvCos = costumeVersion(), b.yv = yGearVariants(cls, gear || {}));
   const sheets = {};
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
@@ -7267,7 +7277,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
       if (kind === 'body' || kind === 'head') return false;
       continue;
     }
-    sheets[kind] = { im, cols: meta.cols || 1e9 };
+    sheets[kind] = { im, meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
@@ -7278,7 +7288,9 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
   else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
-  const [cw, ch] = H.cell, [fx, fy] = H.foot, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
+  // The class's cell, grown where a 코디 reaches past it (wings, tall hats).
+  const box = frameBox(H, Object.values(sheets).map(s => s.meta));
+  const { cw, ch, fx, fy } = box, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
   ctx.save();
   ctx.globalAlpha = 0.3 * alpha;
   ctx.fillStyle = '#000';
@@ -7294,11 +7306,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     const c = document.createElement('canvas');
     c.width = cw;
     c.height = ch;
-    const g = c.getContext('2d');
-    for (const kind of (a.z && a.z[f]) || ['body', 'armor', 'head', 'helmet', 'shield', 'weapon']) {
-      const sh = sheets[kind];
-      if (sh) g.drawImage(sh.im, (f % sh.cols) * cw, (a.row + Math.floor(f / sh.cols)) * ch, cw, ch, 0, 0, cw, ch);
-    }
+    drawLayers(c.getContext('2d'), H, sheets, a, f, box);
     if (heroFrames.size > 300) heroFrames.delete(heroFrames.keys().next().value);
     heroFrames.set(key, pic = c);
     if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (heroFrames.get(key) === c) heroFrames.set(key, bm); }).catch(() => {});
@@ -8767,5 +8775,14 @@ const War = initWar({
   strike: allyStrike, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
   altName: c => (PARTY[c.id] ? PARTY[c.id].names[0] : c.name), raidFail: title => showResults(title),
 });
+
+// 코디 (costume.js): 연's costume items over the gear, chosen in town.
+initCostume({
+  M: () => M, progress: () => progress, save: () => saveJson('bs_progress', progress), say, won,
+  cls: () => (G ? G.cls : chosenClass), savedGear, yGearVariants,
+  changed: () => { if (G && G.player && G.player.gear) G.player.gear.cos = wornCostume(G.cls.id); },
+});
+bindCoordi();
+$('#equip-coordi').onclick = () => openCoordi();
 
 boot();
