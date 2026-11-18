@@ -36,6 +36,12 @@ export const COLLECT = [
   [10, { hp: 20 }], [30, { armor: 1 }], [60, { dmg: 0.02 }], [120, { hp: 30 }], [200, { dmg: 0.02 }],
   [320, { armor: 1 }], [480, { dmg: 0.03 }], [700, { hp: 50 }], [1000, { dmg: 0.03 }],
 ];
+// 투명 모자 · 투명 망토: worn in the 모자 and 등 slots, they hide the helmet or cape the hero has on
+// (its stats stay), showing the hair (or the 헤어 picked). Free and always owned, like 코디 없음.
+export const HIDE = 'hide';
+const HIDE_NAME = { helmet: '투명 모자', cape: '투명 망토' };
+// 아바타 프리셋: each class keeps this many whole looks (progress.costume.presets[cls]).
+const PRESETS = 5;
 // Given at the first visit: something to wear before the first purchase.
 const STARTER = ['76017', '202093', '804206'];
 
@@ -52,7 +58,7 @@ export function loadCostumes() {
   const m = A && A.M() && A.M().ycostume;
   if (loading || !m || !m.index) return loading || Promise.resolve(null);
   loading = fetch('assets/' + m.index).then(r => r.json()).then(j => {
-    const metas = j.files.map(([file, cols, cw, ch, fx, fy]) => ({ file, cols, cell: [cw, ch], foot: [fx, fy] }));
+    const metas = j.files.map(([file, cols, cw, ch, fx, fy, side]) => ({ file, cols, cell: [cw, ch], foot: [fx, fy], side }));
     const items = {};
     for (const [id, [kind, name, grade, set, whole, icon]] of Object.entries(j.items)) {
       if (/\[사용안함\]|사용안함/.test(name)) continue; // 연's retired entries ("[사용안함]용마제일검")
@@ -102,7 +108,7 @@ function state() {
   return p.costume;
 }
 
-export function ownsCostume(id) { return isFree(costumeItems()[id]) || !!state().own[id]; }
+export function ownsCostume(id) { return id === HIDE || isFree(costumeItems()[id]) || !!state().own[id]; }
 /** How many are owned (the list need not be read yet: 코디 수집 counts from the save). */
 export function ownedCount() { return Object.keys(state().own).length; }
 
@@ -111,10 +117,21 @@ export function wornCostume(clsId) {
   if (!A || !D) return null;
   const w = state().wear[clsId] || {}, items = costumeItems(), out = {};
   for (const [kind, id] of Object.entries(w)) {
+    if (id === HIDE) {
+      if (HIDE_NAME[kind]) out[kind] = id;
+      continue;
+    }
     const it = items[id];
     if (it && it.kind === kind && ownsCostume(id) && it.classes.includes(clsId)) out[kind] = id;
   }
   return Object.keys(out).length ? out : null;
+}
+
+/** Whether a class can wear id in that slot (an owned look its figure has, or 투명). */
+function wearable(clsId, kind, id) {
+  if (id === HIDE) return !!HIDE_NAME[kind];
+  const it = costumeItems()[id];
+  return !!it && it.kind === kind && ownsCostume(id) && it.classes.includes(clsId);
 }
 
 export function setCostume(clsId, kind, id) {
@@ -169,6 +186,11 @@ export function costumeVariants(H, cos, out) {
   const items = costumeItems();
   let wholeHat = false;
   for (const [kind, id] of Object.entries(cos)) {
+    // 투명 모자 / 망토: the worn helmet or cape not drawn (its stats stay).
+    if (id === HIDE) {
+      if (HIDE_NAME[kind]) delete out[kind];
+      continue;
+    }
     const v = 'c' + id;
     if (kind === 'pet' || FREE.has(kind) || !H.layers[kind] || !H.layers[kind][v]) continue;
     out[kind] = v;
@@ -239,7 +261,26 @@ export function layerOrder(a, f, kinds) {
     if (i >= 0) z.splice(i + 1, 0, 'hair');
   }
   if (kinds.wback && !z.includes('wback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'wback');
+  // A weapon look's two layers each know, per frame, the side of the body 연 draws them on (its
+  // sorting): where the class's own weapon is on the other side, the layer moves across (청룡
+  // 심판의낫's shaft behind the body, its blade in front).
+  for (const kind of ['weapon', 'wback']) {
+    const side = sideOf(kinds[kind], a, f);
+    if (!side || !z.includes(kind)) continue;
+    const i = z.indexOf(kind), b = z.indexOf('body');
+    if (b < 0 || (side === 'f') === (i > b)) continue;
+    z.splice(i, 1);
+    if (side === 'f') z.splice(Math.max(z.indexOf('body'), z.indexOf('armor')) + 1, 0, kind);
+    else z.splice(z.indexOf('body'), 0, kind);
+  }
   return z;
+}
+
+/** 'f' (in front of the body), 'b' (behind) or null: a weapon look's layer in frame f of anim a. */
+function sideOf(sh, a, f) {
+  const s = sh && sh.meta && sh.meta.side, r = s && s[a.row];
+  const c = r && r[f];
+  return c === 'f' || c === 'b' ? c : null;
 }
 
 /** Draws frame f of anim a from sheets {kind: {im, meta}} onto g, the feet at box.fx, box.fy. */
@@ -473,7 +514,8 @@ function renderList(cls) {
   // Rows: the 벗기 cell first; with 세트, items of a set (two or more of this slot, as 연 names
   // its sets) under the set's name, the rest after (the 벗기 cell then on a row of its own).
   const cells = [];
-  const rows = [{ cells: [{ none: true }] }];
+  const lead = HIDE_NAME[tab] ? [{ none: true }, { hide: true }] : [{ none: true }];
+  const rows = [{ cells: lead }];
   if (F.sets) {
     const by = new Map();
     for (const id of ids) {
@@ -491,7 +533,7 @@ function renderList(cls) {
   } else {
     // The 벗기 cell leads the first row.
     rows.length = 0;
-    cells.push({ none: true });
+    cells.push(...lead);
     cells.push(...ids.map(id => ({ id })));
   }
   for (let i = 0; i < cells.length; i += cols) rows.push({ cells: cells.slice(i, i + cols) });
@@ -539,6 +581,10 @@ function paintRows() {
           d.innerHTML = '<div class="noimg"></div><b>' + ({ pet: '데리고 다니지 않기', hair: '직업 기본 머리', head: '직업 기본 얼굴' }[tab] || '장비 그대로')
             + '</b><small>' + (FREE.has(tab) ? '처음 모습' : '코디 없음') + '</small>';
           d.onclick = () => { delete trial[tab]; pick = null; repaint(cls); };
+        } else if (c.hide) {
+          d.className = 'forge-item ready' + (trial[tab] === HIDE ? ' on' : '');
+          d.innerHTML = `<div class="noimg hide"></div><b>${HIDE_NAME[tab]}</b><small>무료 · 보유</small>`;
+          d.onclick = () => { trial[tab] = HIDE; pick = null; repaint(cls); };
         } else {
           const it = items[c.id], free = isFree(it), o = free || own[c.id], g = GRADES[it.grade];
           d.className = 'forge-item' + (trial[tab] === c.id ? ' on' : '') + (o ? ' ready' : ' done');
@@ -606,7 +652,10 @@ function buildDetail(detail, cls) {
   detail.append(poses);
   const info = document.createElement('div');
   info.className = 'coordi-info';
-  if (it) {
+  if (id === HIDE && HIDE_NAME[tab]) {
+    info.innerHTML = `<b>${HIDE_NAME[tab]}</b> <span>무료</span><br><small>쓰고 있는 ${tab === 'helmet' ? '투구·모자' : '망토'}를 감춥니다. 능력치는 장비 그대로`
+      + `${tab === 'helmet' ? ', 머리(고른 헤어)가 보입니다' : ''}.</small>`;
+  } else if (it) {
     const g = GRADES[it.grade], own = ownsCostume(id);
     const note = it.kind === 'weapon' || it.kind === 'shield' ? ' · 모습만: 장비 창에는 실제 무기·별·용무기 단계 그대로'
       : it.kind === 'pet' ? ' · 사냥·마을·레이드·대항전에서 뒤를 따라다님'
@@ -637,8 +686,100 @@ function buildDetail(detail, cls) {
   strip.textContent = '모두 벗기';
   strip.onclick = () => { trial = {}; pick = null; buildCoordi(); };
   row.append(strip, save);
-  detail.append(row);
+  detail.append(presetRow(cls), row);
   drawPreview();
+}
+
+// ---------------------------------------------------------------- 아바타 프리셋
+
+/** A class's preset slots: [{name?, wear: {kind: id}} | null] (old saves have none). */
+function presets(clsId) {
+  const s = state();
+  if (!s.presets || typeof s.presets !== 'object') s.presets = {};
+  const p = Array.isArray(s.presets[clsId]) ? s.presets[clsId] : [];
+  while (p.length < PRESETS) p.push(null);
+  return (s.presets[clsId] = p.slice(0, PRESETS));
+}
+
+/** The preset's look as this class can wear it now (what it no longer owns or fits left off). */
+function presetWear(clsId, pr) {
+  const out = {};
+  for (const [kind, id] of Object.entries((pr && pr.wear) || {})) if (KINDS.some(([k]) => k === kind) && wearable(clsId, kind, id)) out[kind] = id;
+  return out;
+}
+
+/** Saves the look tried on (what is owned of it) in slot i. */
+export function savePreset(clsId, i, look, name) {
+  const p = presets(clsId), wear = presetWear(clsId, { wear: look });
+  p[i] = { name: name || (p[i] && p[i].name) || `프리셋 ${i + 1}`, wear };
+  state().presets[clsId] = p;
+  A.save();
+  return p[i];
+}
+
+/** Wears slot i at once; false when it is empty. */
+export function applyPreset(clsId, i) {
+  const pr = presets(clsId)[i];
+  if (!pr) return false;
+  const wear = presetWear(clsId, pr);
+  for (const [kind] of KINDS) setCostume(clsId, kind, wear[kind] || null);
+  if (A.changed) A.changed();
+  return wear;
+}
+
+let presetSave = false;
+
+const sameLook = (a, b) => {
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every(k => a[k] === b[k]);
+};
+
+/** 프리셋 [1]..[5] [저장]: a tap wears a slot (the one worn now is marked); 저장 (a name if wanted)
+ *  then a slot keeps the look tried on. */
+function presetRow(cls) {
+  const row = document.createElement('div');
+  row.className = 'coordi-presets';
+  const lab = document.createElement('small');
+  lab.textContent = presetSave ? '저장할 칸' : '프리셋';
+  row.append(lab);
+  let name = null;
+  if (presetSave) {
+    name = document.createElement('input');
+    name.type = 'text';
+    name.maxLength = 12;
+    name.placeholder = '이름(선택)';
+    row.append(name);
+  }
+  const worn = presetWear(cls.id, { wear: state().wear[cls.id] || {} });
+  presets(cls.id).forEach((pr, i) => {
+    const b = document.createElement('button');
+    const now = pr && !presetSave && sameLook(presetWear(cls.id, pr), worn);
+    b.className = 'btn' + (pr ? ' full' : '') + (presetSave ? ' pick' : '') + (now ? ' on' : '');
+    b.textContent = pr && !presetSave ? (pr.name.length > 5 ? String(i + 1) : pr.name.replace(/^프리셋 /, '')) : String(i + 1);
+    b.title = pr ? `${pr.name} · ${Object.keys(pr.wear).length}칸` : '빈 칸';
+    b.onclick = () => {
+      if (presetSave) {
+        presetSave = false;
+        const p = savePreset(cls.id, i, trial, name && name.value.trim().slice(0, 12));
+        A.say(`지금 모습을 ${p.name}에 저장했습니다.`, 'sys');
+      } else if (!pr) {
+        A.say(`프리셋 ${i + 1}은 비어 있습니다. 저장을 누르고 칸을 고르면 지금 모습이 들어갑니다.`, 'warn');
+        return;
+      } else {
+        trial = applyPreset(cls.id, i);
+        pick = null;
+        A.say(`${pr.name}을(를) 입었습니다.`, 'sys');
+      }
+      buildCoordi();
+    };
+    row.append(b);
+  });
+  const sv = document.createElement('button');
+  sv.className = 'btn' + (presetSave ? ' on' : '');
+  sv.textContent = presetSave ? '취소' : '저장';
+  sv.onclick = () => { presetSave = !presetSave; buildDetail($('#coordi-detail'), cls); };
+  row.append(sv);
+  return row;
 }
 
 function itemCell(id, extra) {
@@ -813,7 +954,7 @@ export function bindCoordi() {
   $('#coordi-sets').onclick = e => { F.sets = !F.sets; e.target.classList.toggle('on', F.sets); vscroll.top = 0; buildCoordi(); };
   // Test: give and wear costumes, open the window (the verify scripts).
   window.__costume = { give: giveCostume, wear: setCostume, items: costumeItems, open: openCoordi, worn: wornCostume, bonus: costumeBonus,
-    sheet: testSheet, load: loadCostumes, pull, shop, filter: F, state };
+    sheet: testSheet, load: loadCostumes, pull, shop, filter: F, state, savePreset, applyPreset, presets, HIDE };
 }
 
 /** Test: every frame of every anim of a class in a look, as the game composes them (a data URL;

@@ -740,7 +740,7 @@ def main():
     # icons/, index.json, from tools/yeon_costume.py) and 연's pets (GEAR_DIR/ypet/, from
     # tools/yeon_pets.py). Some 1400 looks and 360 pets: their list goes to ycostume/index.json, read
     # by the game after the title shows, never into the manifest the game waits for:
-    #   {"files": [[path, cols, cw, ch, fx, fy]], "items": {id: [kind, name, grade, set, whole, icon]},
+    #   {"files": [[path, cols, cw, ch, fx, fy, side?]], "items": {id: [kind, name, grade, set, whole, icon]},
     #    "layers": {cls: {kind: {variant: file index}}},
     #    "pets": {id: [name, grade, file, cols, cw, ch, fx, fy, {anim: [row, n, ms]}, icon]}}
     cdir = os.path.join(gear_src, "ycostume") if gear_src else None
@@ -763,7 +763,7 @@ def main():
                         fidx[meta["file"]] = len(files)
                         fn = "c/" + os.path.basename(meta["file"])
                         shutil.copyfile(os.path.join(cdir, meta["file"]), os.path.join(out, "yhero2", fn))
-                        files.append([fn, meta["cols"]] + meta["cell"] + meta["foot"])
+                        files.append([fn, meta["cols"]] + meta["cell"] + meta["foot"] + ([meta["side"]] if meta.get("side") else []))
                     layers.setdefault(cls_id, {}).setdefault(kind, {})[v] = fidx[meta["file"]]
         items = {}
         for iid, it in cindex["items"].items():

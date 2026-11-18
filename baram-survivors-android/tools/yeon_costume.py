@@ -365,7 +365,7 @@ def main():
             imgs[k] = sp.image.convert('RGBA')
         return imgs[k]
 
-    def place(pos, tmpl, alt, root):
+    def place(pos, tmpl, alt, root, m=None):
         sp = alt or tmpl
         geo = tmpl if alt is not None and (int(alt.m_Rect.width), int(alt.m_Rect.height)) == (int(tmpl.m_Rect.width), int(tmpl.m_Rect.height)) else sp
         im = pic(sp)
@@ -378,7 +378,34 @@ def main():
         if root is not None:
             x += root[0]
             y += root[1]
+        if m is not None:
+            return turned(im, px, py, x, -y, m)
         return (im, x - px, -y - py)
+
+    def turned(im, px, py, x, y, m):
+        """The picture turned by m (2x2, y up) about its pivot (px, py in the picture), the pivot
+        landing on (x, y) (y down): a mirror (연 shows a weapon from behind by turning it 180
+        degrees about y, or a scale of -1) exactly, any other turn by nearest pixels."""
+        a, b, c, d = m[0][0], -m[0][1], -m[1][0], m[1][1]  # the same in picture space (y down)
+        if abs(b) < 1e-3 and abs(c) < 1e-3 and abs(abs(a) - 1) < 1e-3 and abs(abs(d) - 1) < 1e-3:
+            if a < 0:
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+                px = im.width - px
+            if d < 0:
+                im = im.transpose(Image.FLIP_TOP_BOTTOM)
+                py = im.height - py
+            return (im, x - px, y - py)
+        det = a * d - b * c
+        if abs(det) < 1e-6:
+            return (im.crop((0, 0, 1, 1)).point(lambda v: 0), x, y)
+        cs = [(a * (u - px) + b * (v - py), c * (u - px) + d * (v - py)) for u, v in ((0, 0), (im.width, 0), (0, im.height), (im.width, im.height))]
+        x0, y0 = math.floor(min(p[0] for p in cs)), math.floor(min(p[1] for p in cs))
+        x1, y1 = math.ceil(max(p[0] for p in cs)), math.ceil(max(p[1] for p in cs))
+        ia, ib, ic, idd = d / det, -b / det, -c / det, a / det
+        # output (X, Y) -> offset (X + x0, Y + y0) -> source pivot + inverse(offset)
+        out = im.transform((max(1, x1 - x0), max(1, y1 - y0)), Image.AFFINE,
+                           (ia, ib, ia * x0 + ib * y0 + px, ic, idd, ic * x0 + idd * y0 + py), resample=Image.NEAREST)
+        return (out, x + x0, y + y0)
 
     def template(s):
         if not s or not s['active'] or s['sprite'] is None or not s['sprite'].path_id:
@@ -387,6 +414,34 @@ def main():
             return s['sprite'].read()
         except Exception:
             return None
+
+    def weapon_split(tx, st, cname, t):
+        """The item's parts at this moment of the avatar's clip, in two layers, as 연 sorts them:
+        the main part (Weapon, Weapon_Spear) and its children the weapon layer, the rest (behind,
+        the off hand) wback; but a child on the other side of the body from its main part goes to
+        wback too. Each layer gets its side ('f' in front of the body, 'b' behind, '' both or
+        none). 청룡 심판의낫 holds its shaft behind the body and its blade in front (a nested
+        Weapon/Weapon_F): drawn as one layer the shaft crossed the chest."""
+        body = st[0]['order']
+        got = []
+        for name, sp, pos, order, m in IC.posed(tx['item'], cname, t):
+            if FX_PART.search(name):
+                continue
+            got.append((name, sp, pos, order, m, 'f' if order >= body else 'b'))
+        main = {g[0]: g[5] for g in got if g[0] in YI.MAIN_PARTS}
+        out = {'weapon': ([], set()), 'wback': ([], set())}
+        for name, sp, pos, order, m, side in got:
+            top = name.split('/')[0]
+            k = 'weapon' if top in YI.MAIN_PARTS else 'wback'
+            if k == 'weapon' and name != top and top in main and main[top] != side:
+                k = 'wback'
+            out[k][0].append((order, place(pos, sp, sp, st[0]['pos'], m)))
+            out[k][1].add(side)
+        res = {}
+        for k, (lst, sides) in out.items():
+            lst.sort(key=lambda o: o[0])
+            res[k] = ([p for _, p in lst], next(iter(sides)) if len(sides) == 1 else '')
+        return res
 
     def body_frame(st):
         b = st[0]['sprite']
@@ -402,14 +457,16 @@ def main():
         """[(img, x, y)] of one layer in one frame; None when the item lacks a frame it needs."""
         out_l = []
         root = st[0]['pos']
-        if kind in ('weapon', 'wback') or (kind == 'shield' and tx.get('item')):
+        if kind in ('weapon', 'wback'):
             if not tx.get('item'):
                 return out_l
-            for name, sp, pos, order in IC.at(tx['item'], cname, t):
-                if FX_PART.search(name):
-                    continue
-                if kind == 'shield' or (name in YI.MAIN_PARTS) == (kind == 'weapon'):
-                    out_l.append(place(pos, sp, sp, root))
+            lst, side = weapon_split(tx, st, cname, t)[kind]
+            cur_side[0] = side if lst else ''
+            return lst
+        if kind == 'shield' and tx.get('item'):
+            for name, sp, pos, order, m in sorted(IC.posed(tx['item'], cname, t), key=lambda p: p[3]):
+                if not FX_PART.search(name):
+                    out_l.append(place(pos, sp, sp, root, m))
             return out_l
         if kind == 'cape':
             s = st.get(crc.get('Cape'))
@@ -488,14 +545,21 @@ def main():
                 if meta.get('hash'):
                     by_hash[meta['hash']] = meta['file']
 
+    cur_side = ['']
+    side_of = {}
+
     def render(kind, tx, gkey):
-        """{(anim, i): [(img, x, y)]} of a layer in the clips of a group; None if a frame lacks."""
+        """{(anim, i): [(img, x, y)]} of a layer in the clips of a group; None if a frame lacks.
+        A weapon layer's side_of[kind]: {(anim, i): 'f' | 'b' | ''}, the side of the body it is
+        drawn on in each frame."""
+        sides = {}
         rows = [k for k in index[groups[gkey][0]]['anims']]
         anims = class_anims(groups[gkey][0])
         drawn = {}
         for key in rows:
             cname = anims[key]
             for i, (t, st) in enumerate(frame_cache[cname]):
+                cur_side[0] = ''
                 d = layer_of(kind, tx, st, cname, t)
                 if d is None:
                     return None
@@ -505,9 +569,13 @@ def main():
                     if bb:
                         cut.append((im.crop(bb), x + bb[0], y + bb[1]))
                 drawn[(key, i)] = cut
+                if kind in ('weapon', 'wback'):
+                    sides[(key, i)] = cur_side[0] if cut else ''
+        if kind in ('weapon', 'wback'):
+            side_of[kind] = sides
         return drawn
 
-    def save(kind, iid, gkey, drawn, fname):
+    def save(kind, iid, gkey, drawn, fname, sides=None):
         H = index[groups[gkey][0]]
         rows = sorted(H['anims'], key=lambda k: H['anims'][k]['row'])
         ncol = max(H['anims'][k]['n'] for k in rows)
@@ -535,7 +603,15 @@ def main():
             with open(os.path.join(out, fn), 'wb') as f:
                 f.write(data)
             by_hash[h] = fn
-        return {'file': fn, 'cols': ncol, 'cell': [W, Hh], 'foot': [FX, FY], 'hash': h}
+        meta = {'file': fn, 'cols': ncol, 'cell': [W, Hh], 'foot': [FX, FY], 'hash': h}
+        if sides:
+            # Per frame, the side of the body the layer is drawn on (f in front, b behind, . none):
+            # a string per sheet row, a letter per frame. costume.js puts the layer there (layerOrder).
+            side = [''] * nrow
+            for key in rows:
+                side[H['anims'][key]['row']] = ''.join(sides.get((key, i)) or '.' for i in range(H['anims'][key]['n']))
+            meta['side'] = side
+        return meta
 
     def flush():
         json.dump(result, open(ip + '.tmp', 'w'), ensure_ascii=False, separators=(',', ':'))
@@ -571,6 +647,7 @@ def main():
                     continue
                 lk = ['weapon', 'wback'] if kind == 'weapon' else [kind]
                 draws = {k: render(k, tx, gkey) for k in lk}
+                sides = {k: dict(side_of.get(k, {})) for k in lk if k in ('weapon', 'wback')}
                 d = draws[lk[0]]
                 if kind == 'weapon' and d is not None and draws['wback']:
                     # A weapon held behind (the 천인's gourd, a bow at rest) shows in its second
@@ -602,6 +679,8 @@ def main():
                                         dk = [kk for kk in sorted(draws[k]) if kk[0].endswith(f[0].split('_')[-1]) and draws[k].get(kk)]
                                         if dk:
                                             draws[k][f] = draws[k][dk[0]]
+                                            if k in sides:
+                                                sides[k][f] = sides[k].get(dk[0], '')
                 metas = {}
                 for cls in cl:
                     need = {(k, i) for k, i in own[cls].get('head', ()) if k != 'dead'} if whole else own[cls].get(kind, set())
@@ -614,7 +693,7 @@ def main():
                     if not metas:
                         for k in lk:
                             if draws[k] and any(draws[k].values()):
-                                metas[k] = save(k, iid, gkey, draws[k], f'{k}_{iid}_{gname[gkey]}')
+                                metas[k] = save(k, iid, gkey, draws[k], f'{k}_{iid}_{gname[gkey]}', sides.get(k))
                     for k, meta in metas.items():
                         result['layers'].setdefault(cls, {}).setdefault(k, {})[f'c{iid}'] = meta
                     got.append(cls)
