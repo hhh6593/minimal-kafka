@@ -718,32 +718,58 @@ def main():
                 shutil.copyfile(os.path.join(h2, c["portrait"]), os.path.join(out, "yhero2", c["portrait"]))
             manifest["yhero2"][cls_id] = c
 
-    # 바람의나라 연's 외형 (코디) items as more layers of the same heroes (GEAR_DIR/ycostume/<class>/
-    # <kind>_c<id>.webp + icons/ + index.json, from tools/yeon_costume.py): each joins its class's
-    # layers as variant "c<id>" (the head without hair as "nohair"); the list of items, their
-    # names and icons go to manifest["ycostume"] for the 코디 window.
+    # 바람의나라 연's 외형 (코디) items as more layers of the same heroes (GEAR_DIR/ycostume/: s/*.webp,
+    # icons/, index.json, from tools/yeon_costume.py) and 연's pets (GEAR_DIR/ypet/, from
+    # tools/yeon_pets.py). Some 1400 looks and 360 pets: their list goes to ycostume/index.json, read
+    # by the game after the title shows, never into the manifest the game waits for:
+    #   {"files": [[path, cols, cw, ch, fx, fy]], "items": {id: [kind, name, grade, set, whole, icon]},
+    #    "layers": {cls: {kind: {variant: file index}}},
+    #    "pets": {id: [name, grade, file, cols, cw, ch, fx, fy, {anim: [row, n, ms]}, icon]}}
     cdir = os.path.join(gear_src, "ycostume") if gear_src else None
+    pdir = os.path.join(gear_src, "ypet") if gear_src else None
     manifest["ycostume"] = {}
     if cdir and os.path.isfile(os.path.join(cdir, "index.json")) and manifest["yhero2"]:
         with open(os.path.join(cdir, "index.json"), encoding="utf-8") as f:
             cindex = json.load(f)
-        os.makedirs(os.path.join(out, "ycostume"), exist_ok=True)
+        co = os.path.join(out, "ycostume")
+        # The sheets sit with the heroes' own (yhero2/c/), so the game loads them as any layer.
+        os.makedirs(os.path.join(out, "yhero2", "c"), exist_ok=True)
+        os.makedirs(os.path.join(co, "i"), exist_ok=True)
+        files, fidx, layers = [], {}, {}
         for cls_id, kinds in cindex["layers"].items():
-            c = manifest["yhero2"].get(cls_id)
-            if not c:
+            if cls_id not in manifest["yhero2"]:
                 continue
             for kind, variants in kinds.items():
                 for v, meta in variants.items():
-                    shutil.copyfile(os.path.join(cdir, meta["file"]), os.path.join(out, "yhero2", meta["file"]))
-                    c["layers"].setdefault(kind, {})[v] = meta
+                    if meta["file"] not in fidx:
+                        fidx[meta["file"]] = len(files)
+                        fn = "c/" + os.path.basename(meta["file"])
+                        shutil.copyfile(os.path.join(cdir, meta["file"]), os.path.join(out, "yhero2", fn))
+                        files.append([fn, meta["cols"]] + meta["cell"] + meta["foot"])
+                    layers.setdefault(cls_id, {}).setdefault(kind, {})[v] = fidx[meta["file"]]
         items = {}
         for iid, it in cindex["items"].items():
-            it = dict(it, classes=[x for x in it["classes"] if x in manifest["yhero2"]])
+            has_icon = 0
             if it.get("icon"):
-                shutil.copyfile(os.path.join(cdir, it["icon"]), os.path.join(out, "ycostume", f"{iid}.png"))
-                it["icon"] = f"ycostume/{iid}.png"
-            items[iid] = it
-        manifest["ycostume"] = items
+                shutil.copyfile(os.path.join(cdir, it["icon"]), os.path.join(co, "i", f"{iid}.png"))
+                has_icon = 1
+            items[iid] = [it["kind"], it["name"], it.get("grade", 1), it.get("set") or "", it.get("whole", 0), has_icon]
+        pets = {}
+        if pdir and os.path.isfile(os.path.join(pdir, "index.json")):
+            with open(os.path.join(pdir, "index.json"), encoding="utf-8") as f:
+                pindex = json.load(f)
+            os.makedirs(os.path.join(co, "p"), exist_ok=True)
+            for pid, pe in pindex.items():
+                shutil.copyfile(os.path.join(pdir, pe["file"]), os.path.join(co, "p", pe["file"]))
+                has_icon = 0
+                if pe.get("icon"):
+                    shutil.copyfile(os.path.join(pdir, pe["icon"]), os.path.join(co, "i", f"p{pid}.png"))
+                    has_icon = 1
+                anims = {k: [a["row"], a["n"], a["ms"]] for k, a in pe["anims"].items()}
+                pets[pid] = [pe["name"], pe["grade"], "p/" + pe["file"], pe["cols"]] + pe["cell"] + pe["foot"] + [anims, has_icon]
+        with open(os.path.join(co, "index.json"), "w", encoding="utf-8") as f:
+            json.dump({"files": files, "items": items, "layers": layers, "pets": pets}, f, ensure_ascii=False, separators=(",", ":"))
+        manifest["ycostume"] = {"index": "ycostume/index.json", "items": len(items), "pets": len(pets)}
 
     # 바람의나라 연's own item icons for the pieces (GEAR_DIR/yitemicon/<class>/<kind>_<key>.png +
     # index.json, from tools/yeon_itemicons.py), keyed as the 연 looks are.

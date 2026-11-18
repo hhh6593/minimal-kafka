@@ -238,22 +238,37 @@
   /* 코디 window: the forge's look, the hero in the chosen costume walking in four directions. */
   #coordi { position: fixed; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .6); }
   #coordi[hidden] { display: none; }
-  #coordi-box { width: min(96vw, 860px); height: min(94vh, 380px); display: flex; flex-direction: column; background: #e8d4a8; border: 3px solid #5a2e0e; padding: 6px; box-sizing: border-box; }
+  #coordi-box { width: min(98vw, 900px); height: min(96vh, 420px); display: flex; flex-direction: column; background: #e8d4a8; border: 3px solid #5a2e0e; padding: 4px 6px 6px; box-sizing: border-box; }
   #coordi-box .caption { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #5a1a00; }
-  #coordi-box .caption small { flex: 1; color: #6a4a20; font-weight: 400; font-size: 10px; }
+  #coordi-box .caption small { flex: 1; color: #6a4a20; font-weight: 400; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #coordi-close { min-width: 0; padding: 2px 10px; font-size: 11px; }
-  #coordi-tabs { display: flex; gap: 3px; margin: 4px 0; flex-wrap: wrap; }
-  #coordi-tabs .btn, .coordi-poses .btn, .coordi-actions .btn { min-width: 0; padding: 3px 9px; font-size: 11px; }
-  #coordi-tabs .btn.on, .coordi-poses .btn.on { background: #7a2a08; color: #ffe8b0; }
+  #coordi-tabs { display: flex; gap: 2px; margin: 3px 0 2px; overflow-x: auto; flex: none; scrollbar-width: none; }
+  #coordi-tabs .btn, .coordi-poses .btn, .coordi-actions .btn, #coordi-filter .btn { min-width: 0; padding: 3px 7px; font-size: 11px; white-space: nowrap; flex: none; }
+  #coordi-tabs .btn.on, .coordi-poses .btn.on, #coordi-filter .btn.on { background: #7a2a08; color: #ffe8b0; }
   #coordi-tabs i { font-style: normal; background: #2a9a20; color: #fff; border-radius: 6px; padding: 0 4px; font-size: 9px; }
+  #coordi-filter { display: flex; gap: 3px; margin-bottom: 3px; align-items: center; flex: none; }
+  #coordi-filter[hidden] { display: none; }
+  #coordi-filter input, #coordi-filter select { font: 11px G9, monospace; padding: 2px 4px; border: 1px solid #b08850; background: #fff8e4; color: #4a2a08; min-width: 0; }
+  #coordi-filter input { flex: 1; width: 60px; }
+  #coordi-filter small { font: 10px G9, monospace; color: #6a4a20; white-space: nowrap; }
   #coordi-body { flex: 1; min-height: 0; display: flex; gap: 6px; }
-  #coordi-list { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; align-content: start; }
-  #coordi-detail { flex: 1.1; overflow-y: auto; background: #f4e6c4; border: 1px solid #b08850; padding: 6px; font: 10px G9, monospace; color: #4a2a08; display: flex; flex-direction: column; gap: 4px; }
+  #coordi-list { flex: 1; overflow-y: auto; position: relative; contain: strict; }
+  #coordi-list .vrow { position: absolute; left: 0; right: 0; display: grid; gap: 4px; }
+  #coordi-list .vhead { position: absolute; left: 0; right: 0; font: 11px G9, monospace; font-weight: 700; color: #5a1a00; border-bottom: 1px solid #b08850; padding: 2px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #coordi-list .forge-item { height: 58px; box-sizing: border-box; padding: 2px; position: relative; }
+  #coordi-list .forge-item img, #coordi-list .forge-item .noimg { width: 28px; height: 28px; }
+  #coordi-list .forge-item em { position: absolute; top: 1px; right: 2px; font: 8px G9, monospace; font-style: normal; color: #fff; background: #c02010; padding: 0 2px; border-radius: 3px; }
+  #coordi-list .coordi-note { position: absolute; left: 0; right: 0; font: 11px G9, monospace; color: #6a4a20; padding: 6px; }
+  #coordi-detail { flex: 1.05; overflow-y: auto; background: #f4e6c4; border: 1px solid #b08850; padding: 5px; font: 10px G9, monospace; color: #4a2a08; display: flex; flex-direction: column; gap: 3px; }
   #coordi-preview { position: static; inset: auto; flex: none; width: 100%; height: auto; background: #3e5a3a; image-rendering: pixelated; border: 1px solid #b08850; }
-  .coordi-poses, .coordi-actions { display: flex; gap: 3px; }
+  .coordi-poses, .coordi-actions { display: flex; gap: 3px; flex-wrap: wrap; }
   .coordi-actions { margin-top: auto; justify-content: flex-end; }
   .coordi-info b { font-size: 12px; color: #5a1a00; }
   .coordi-info .btn { margin-top: 3px; min-width: 0; padding: 2px 10px; font-size: 11px; }
+  .coordi-pulls { display: flex; flex-wrap: wrap; gap: 3px; }
+  .coordi-pulls span { display: flex; flex-direction: column; align-items: center; width: 54px; font-size: 9px; text-align: center; }
+  .coordi-pulls img { width: 28px; height: 28px; object-fit: contain; image-rendering: pixelated; }
+  @media (max-height: 380px) { #coordi-box { height: 98vh; } #coordi-preview { max-height: 34vh; object-fit: contain; } }
   #trade { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
   #trade-box { width: min(96vw, 520px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px;
@@ -603,6 +618,7 @@
   <div id="coordi-box">
     <div class="caption"><span id="coordi-title"></span> <small id="coordi-gold"></small><button id="coordi-close" class="btn">닫기</button></div>
     <div id="coordi-tabs"></div>
+    <div id="coordi-filter"><input id="coordi-q" type="search" placeholder="이름 찾기" autocomplete="off"><select id="coordi-grade"></select><select id="coordi-own"><option value="all">전체</option><option value="own">보유</option><option value="not">미보유</option><option value="new">새로 얻음</option></select><button id="coordi-sets" class="btn">세트</button><small id="coordi-count"></small></div>
     <div id="coordi-body"><div id="coordi-list"></div><div id="coordi-detail"></div></div>
   </div>
 </div>

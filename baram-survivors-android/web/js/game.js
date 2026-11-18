@@ -8,7 +8,7 @@ import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -145,6 +145,8 @@ async function boot() {
   if (M.ui.ytitle) document.body.classList.add('ytitle');
   showScreen('title');
   requestAnimationFrame(frame);
+  // The 코디 list (some 1400 looks and 360 pets) after the title is up: its sheets only when worn.
+  setTimeout(() => loadCostumes(), 50);
 }
 
 /** The monsters of a hunting ground, weakest first, with its boss and middle boss. */
@@ -2322,6 +2324,8 @@ function update(dt) {
   updateAllies(dt);
   G.allyHitting = false;
   if (!G.dead) updatePet(dt);
+  // The 코디 pet at the hero's heel (looks only).
+  updateCosPet(G, G.player, G.cls.id, dt, heroSpeed());
   tickHeroStatus();
   updateParty(dt);
   updateShots(dt);
@@ -5064,6 +5068,7 @@ function updateTown(dt) {
     T.walkT += dt * 1000;
   }
   townWarps();
+  updateCosPet(T, T, T.cls.id, dt, (TILE / 0.24) * (T.cls.speed / 70));
   // Who is close enough to talk to: the nearest within reach (across a shop's counter in a house).
   const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 84) : TOWN_TILE * 1.6;
   const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)
@@ -5172,12 +5177,16 @@ function drawTown(now) {
       for (const d of yt.doors) drawWayOut({ x: d.x, y: d.y + 4, label: d.label }, now);
     } else if (yt.exits[T.area]) drawWayOut({ x: yt.exits[T.area].x, y: yt.exits[T.area].y + 4, label: '장터로' }, now);
   }
-  const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }]);
+  const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }], T.cpet ? [{ cpet: T.cpet, y: T.cpet.y }] : []);
   if (yt && T.area === 'market') for (const pt of yt.portals) if (pt.art === 'statue') bodies.push({ statue: pt, y: pt.y - 12 });
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
     if (b.statue) {
       drawWayOut(b.statue, now);
+      continue;
+    }
+    if (b.cpet) {
+      drawCosPet(ctx, b.cpet);
       continue;
     }
     if (b.hero) {
@@ -7771,7 +7780,7 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(propsInView(camX, camY)) : War.props()) : propsInView(camX, camY), G.pet ? [G.pet] : []);
+  const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(propsInView(camX, camY)) : War.props()) : propsInView(camX, camY), G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
@@ -7787,6 +7796,10 @@ function render(now) {
     }
     if (b.pet) {
       drawPet(b);
+      continue;
+    }
+    if (b.cpet) {
+      drawCosPet(ctx, b, hidden ? 0.35 : 1);
       continue;
     }
     if (b.prop) {
@@ -8965,6 +8978,7 @@ window.__game = () => G;
 window.__images = () => images; // test: the loaded pictures
 window.__clear = () => clearStage();
 window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
+window.__enterTown = c => enterTown(CLASSES[c]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
