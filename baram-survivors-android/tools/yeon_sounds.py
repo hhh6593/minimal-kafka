@@ -192,7 +192,7 @@ MAP = {
         'gogyun': 'bgm_00000144_48', 'spidercave': 'bgm_00000154_48', 'gareung': 'bgm_00000145_48',
         'pokyeom': 'bgm_00000146_48', 'baekdu': 'bgm_00000156', 'baekdu2': 'bgm_00000105_48',
         'baekdu3': 'bgm_00000155', 'baekdu4': 'bgm_00000124_48', 'hwatang': 'bgm_00000128_48', 'hanbing': 'bgm_00000120',
-        'geohae': 'bgm_00000119_48', 'cheolsang': 'bgm_00000124_48', 'abyss': 'BGM_Raid_Hell_StoryField', 'zud': 'bgm_00000137_64', 'zud2': 'bgm_00000136_32',
+        'geohae': 'bgm_00000119_48', 'cheolsang': 'bgm_00000124_48', 'abyss': 'BGM_Raid_Hell_StoryField', 'abyss2': 'bgm_jail_1_32', 'abyss3': 'BGM_Raid_Hell_2ndBoss', 'abyss4': 'BGM_Raid_Hell_3rdBoss', 'cow': 'bgm_00000002_48', 'zud': 'bgm_00000137_64', 'zud2': 'bgm_00000136_32',
         'sandolim': 'BGM_Raid_UnderSky_1stBoss', 'fallforest': 'BGM_Raid_UnderSky_1stStoryField',
         'jagwi': 'bgm_00000128_48', 'oldaram': 'bgm_00000166', 'haya': 'BGM_Raid_China_1stField_48',
         'lobi': 'BGM_Raid_UnderSky_2ndStoryField', 'aram': 'BGM_Raid_UnderSky_3rdStoryField',

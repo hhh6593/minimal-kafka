@@ -231,8 +231,10 @@ def build(spec_path, dec, gear, audio):
         b = os.path.join(dec, g['bundle'])
         # floor_tiles: the map's tiles named outright where its walkable cells are too few to read.
         terr['y_' + g['id']] = {'floor': {'bundle': b, 'map': g['map'], 'auto': True, 'tiles': g.get('floor_tiles')},
+                                # props_extra: 연's MapObjects pieces (a torch: the abyss's light sources)
+                                'props': g.get('props_extra', []),
                                 'props_auto': {'bundle': os.path.join(dec, g.get('props_bundle', g['bundle'])), 'map': g.get('props_map', g['map']), 'n': g.get('props', 6)}}
-    yeon_maps.build(None, gear, {'terrains': terr})
+    yeon_maps.build(None, gear, {'objects': os.path.join(dec, 'MapObjects.unity3d'), 'terrains': terr})
     # Music.
     bdir = os.path.join(audio, 'bgm')
     os.makedirs(bdir, exist_ok=True)

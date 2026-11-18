@@ -1,0 +1,42 @@
+{
+ "ab_slash": {
+  "prefab": "skill_abyss_wepone_1_last",
+  "why": "연 심연 무기 1의 마지막 타격: 검붉은 베기"
+ },
+ "ab_embers": {
+  "prefab": "skill_effect_monk_groundexplosionhit",
+  "why": "격투가 지면 폭발의 불꽃 튐"
+ },
+ "ab_smoke": {
+  "prefab": "nurarihyon_b_smogexplosion",
+  "why": "누라리횬의 연기 폭발: 검은 연기"
+ },
+ "ab_flame": {
+  "prefab": "japan_otake_flame",
+  "why": "오타케마루의 불길"
+ },
+ "ab_shadow": {
+  "prefab": "skill_abyss_wepone_15_last",
+  "why": "연 심연 무기 15의 마지막: 검은 그림자 용"
+ },
+ "ab_fireburst": {
+  "prefab": "skill_effect_boss_dnfm_eghen_flame",
+  "why": "에겐의 화염 폭발"
+ },
+ "ab_spree": {
+  "prefab": "skill_effect_hell_phase1_spree",
+  "why": "지옥 레이드 1페이즈 난무: 검은 연기와 불"
+ },
+ "ab_molten": {
+  "prefab": "skill_abyss_wepone_10_first_1",
+  "why": "연 심연 무기 10: 녹은 불덩이"
+ },
+ "ab_darkburst": {
+  "prefab": "nurarihyon_b_explosion",
+  "why": "누라리횬의 어둠 폭발"
+ },
+ "ab_lava": {
+  "prefab": "skill_effect_monster_10148_smash_fire",
+  "why": "불타는 강타의 용암"
+ }
+}

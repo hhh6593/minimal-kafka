@@ -1223,12 +1223,16 @@ export const STAGES = [
     level: 21, open: 'geohae', monsters: ['y314019', 'y314020', 'y314021'],
     mini: { id: 'y615019', name: '어둑시니', scale: 1.5 }, boss: { id: 'y615008', name: '새우니', scale: 1.4 },
     intro: '쇠 평상의 지옥, 가장 깊은 곳. 철상귀와 생사귀 사이로 어둑시니가 스민다' },
-  // 끝없는 지옥 (연's name for its endless hell): below 철상지옥, hidden. It shows itself when 철상지옥
-  // has been conquered three times (or with ?abyss). Lit only round the hero (game.js ABYSS).
-  { id: 'abyss', v3: true, hidden: true, abyss: true, bgm: 'BGM_Raid_Hell_StoryField', name: '끝없는 지옥', lv: '???', terrain: 'y_abyss', map: 'hell', at: [0.5, 0.11],
-    level: 23, open: 'cheolsang', monsters: ['y314021', 'y314020', 'y314003', 'y314018', 'y615019'],
-    mini: { id: 'y615020', name: '어둑시니 우두머리', scale: 1.9 }, boss: { id: 'y615021', name: '끝없는 어둠', scale: 2.6 },
-    intro: '철상지옥 밑, 빛이 닿지 않는 곳. 횃불 하나만큼만 보이고, 어둠 속에서 무언가 다가온다' },
+  // 끝없는 지옥 (연's name for its endless hell), a descent after Diablo II's: four floors below
+  // 철상지옥, hidden until 철상지옥 has been conquered three times (or ?abyss), each lit only by a
+  // torch round the hero (game.js drawAbyss; abyss.light: the torch's reach, a share of the
+  // screen). Their names and bosses' titles are homages to Diablo II; the pictures, monsters and
+  // music are all 연's. Only here fall 마법·희귀·고유 weapons (items.js). Past the last floor's
+  // boss, now and then, a way opens to a secret meadow of cows (the 비밀의 소 레벨).
+  { id: 'abyss', v3: true, hidden: true, abyss: { light: 0.4 }, bgm: 'BGM_Raid_Hell_StoryField', name: '지하 묘지', lv: '???', terrain: 'y_abyss', map: 'hell', at: [0.5, 0.11],
+    level: 23, open: 'cheolsang', monsters: ['y304170', 'y304101', 'y304104', 'y304107', 'y304100', 'y304103', 'y304106'],
+    mini: { id: 'y304102', name: '무덤지기', scale: 1.4 }, boss: { id: 'y304105', name: '핏빛 백작', scale: 2 },
+    intro: '끝없는 지옥 첫째 층. 선우의 무덤 밑, 저주받은 병사들이 횃불을 들고 묘지를 지킨다' },
   { id: 'zud', v3: true, bgm: 'bgm_00000137_64', name: '조드의 고원', lv: '780', terrain: 'y_zud', map: 'world_1', at: [0.3, 0.13],
     level: 18, open: 'tagye', big: 5600, monsters: ['y315010', 'y315011', 'y315012', 'y315001', 'y315002', 'y315003'],
     mini: { id: 'y616001', name: '고원 척후대장', scale: 1.3 }, boss: { id: 'y616004', name: '고원 기마대장', scale: 1.4 },
@@ -1269,6 +1273,23 @@ export const STAGES = [
     level: 22, open: 'aram', monsters: ['y315522', 'y315523', 'y315524'],
     mini: { id: 'y315523', name: '도성 문지기', scale: 1.4 }, boss: { id: 'y616508', name: '종막의 묘귀', scale: 1.5 },
     intro: '하늘 아래 땅 끝의 옛 도성. 수호자와 문지기가 무너진 성을 지킨다' },
+  // The abyss floors below 지하 묘지 (abyss, above), last here so no older special changes its option.
+  { id: 'abyss2', v3: true, hidden: true, abyss: { light: 0.36 }, bgm: 'bgm_jail_1_32', name: '고통의 전당', lv: '???', terrain: 'y_abyss2', map: 'hell', at: [0.22, 0.22],
+    level: 24, open: 'abyss', monsters: ['y303216', 'y303218', 'y303230', 'y303231', 'y303217', 'y303220', 'y303238'],
+    mini: { id: 'y303233', name: '울부짖는 달걀귀신', scale: 1.6 }, boss: { id: 'y303229', name: '고통의 처녀', scale: 2.2 },
+    intro: '둘째 층. 흉가의 뒤편이 끝없이 이어진 전당, 귀신과 독충이 우는 곳' },
+  { id: 'abyss3', v3: true, hidden: true, abyss: { light: 0.32 }, bgm: 'BGM_Raid_Hell_2ndBoss', name: '혼돈의 성역', lv: '???', terrain: 'y_abyss3', map: 'hell', at: [0.52, 0.6],
+    level: 25, open: 'abyss2', monsters: ['y314021', 'y314020', 'y314003', 'y314018', 'y615019'],
+    mini: { id: 'y615020', name: '어둠의 사도', scale: 1.9 }, boss: { id: 'y615021', name: '공포의 군주', scale: 2.6 },
+    intro: '셋째 층. 철상지옥 밑, 빛이 닿지 않는 성역. 어둠 그 자체가 다가온다' },
+  { id: 'abyss4', v3: true, hidden: true, abyss: { light: 0.36 }, bgm: 'BGM_Raid_Hell_3rdBoss', name: '세계석 요새', lv: '???', terrain: 'y_abyss4', map: 'hell', at: [0.86, 0.52],
+    level: 26, open: 'abyss3', monsters: ['y304028', 'y304027', 'y304029', 'y304136', 'y304032', 'y304031', 'y304033', 'y304034'],
+    mini: { id: 'y604007', name: '세계석의 수호자', scale: 1.4 }, boss: { id: 'y615013', name: '파괴의 군주', scale: 2 },
+    intro: '마지막 층. 시왕의 심판정 아래 요새, 망령의 장수들이 세계석을 지킨다' },
+  { id: 'cow', v3: true, hidden: true, cow: true, abyss: { light: 0.55 }, bgm: 'bgm_00000002_48', name: '비밀의 소 레벨', lv: '음매', terrain: 'y_cow', map: 'hell', at: [0.86, 0.17],
+    level: 26, open: 'abyss4', big: 5600, monsters: ['y111010', 'y304623', 'y315005', 'y315006'],
+    mini: { id: 'y304623', name: '성난 코뿔소', scale: 1.3 }, boss: { id: 'y304635', name: '소 왕', scale: 1.8 },
+    intro: '그런 곳은 없다. …정말로' },
 ];
 
 // The clock of a hunting ground, as D2 Survivors' acts: the boss comes at 4:00 (shortened from D2 Survivors' 6:00 for tempo); a named

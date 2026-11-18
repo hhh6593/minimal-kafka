@@ -8,10 +8,11 @@ import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet, costumeItems } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
+  RARITY, loadAbyssLoot, rollAbyssItem, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -36,6 +37,8 @@ let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true, bu
 if (settings.tiles === undefined) settings.tiles = true;
 let best = loadJson('bs_best', {});
 let progress = loadJson('bs_progress', { cleared: {} });
+// The 끝없는 지옥's weapons found so far, each with its own affixes (items.js).
+loadAbyssLoot(progress.abyssLoot);
 // Which grounds each class has conquered: its 승급 come from these. Grounds conquered before
 // classes were told apart count for every class.
 if (!progress.byClass) {
@@ -363,7 +366,7 @@ function makeGround(kind) {
 
 const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35,
   // 연's grounds under the earth or the sea (tools/yeon_grounds.py).
-  y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_abyss: 0.6, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
+  y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
 
 function resize() {
   // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
@@ -457,15 +460,19 @@ function bestOpenStage() {
   return best;
 }
 
-/** 끝없는 지옥 (stage.hidden): shown once 철상지옥 has been conquered three times, or with ?abyss. */
+/** 끝없는 지옥 (stage.hidden): shown once 철상지옥 has been conquered three times, or with ?abyss;
+ *  the 비밀의 소 레벨 once its way has opened past the last floor's boss. */
 function abyssFound() {
   return QUERY.has('abyss') || !!progress.abyss;
+}
+function hiddenShown(s) {
+  return !s.hidden || (s.cow ? QUERY.has('abyss') || !!progress.cowLevel : abyssFound());
 }
 
 function unlocked(i) {
   // The first fourteen open one after another; an added ground when its own is conquered.
   const s = STAGES[i];
-  if (s.hidden && !abyssFound()) return false;
+  if (!hiddenShown(s)) return false;
   if (s.open) return QUERY.has('all') || !!progress.cleared[s.open];
   return QUERY.has('all') || i === 0 || !!progress.cleared[STAGES[i - 1].id];
 }
@@ -491,7 +498,7 @@ function buildStages() {
     map.innerHTML = '';
     const order = STAGES.map((s, i) => [s, i, s.level !== undefined ? s.level : i]).sort((a, b) => a[2] - b[2]);
     for (const [s, i] of order) {
-      if (s.hidden && !abyssFound()) continue;
+      if (!hiddenShown(s)) continue;
       const open = unlocked(i), done = !!progress.cleared[s.id];
       const b = document.createElement('button');
       b.className = 'raid stagecard' + (open ? '' : ' locked') + (s === pickedStage ? ' on' : '');
@@ -552,7 +559,7 @@ function buildStages() {
     map.append(t);
   }
   STAGES.forEach((s, i) => {
-    if (s.map !== mapTab || (s.hidden && !abyssFound())) return;
+    if (s.map !== mapTab || !hiddenShown(s)) return;
     const b = document.createElement('button');
     const open = unlocked(i), done = !!progress.cleared[s.id];
     b.className = 'pin' + (open ? '' : ' locked') + (done ? ' cleared' : open ? ' next' : '')
@@ -978,7 +985,7 @@ function applyGear() {
   const bonus = p.bonus = {};
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
-    if (sp) bonus[sp.opt.id] = (bonus[sp.opt.id] || 0) + 1;
+    if (sp) for (const o of sp.opts || [sp.opt.id]) bonus[o] = (bonus[o] || 0) + 1;
   }
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
@@ -1008,6 +1015,12 @@ function applyGear() {
     if (ss && SINSU[ss] && step >= 10) gy.push({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] });
   }
   p.gyeoks = gy;
+  // An abyss weapon's strike effect (items.js ABYSS_SWING): its kind's (close-in or far).
+  const ws = g.weaponSp && SPECIAL[g.weaponSp];
+  const far = !MELEE_WEAPON.has(c), set = ABYSS_SWING[far ? 'ranged' : 'melee'];
+  const have = layers => layers.filter(l => M.fx[l[0]]);
+  p.swing = ws && ws.swing && have(set.hit).length ? { ...ws.swing, hit: have(set.hit), heavy: ws.swing.heavy ? have(set.heavy) : null } : null;
+  p.trail = far && ws && ws.rarity && have(ABYSS_TRAIL.layers).length ? { ...ABYSS_TRAIL, layers: have(ABYSS_TRAIL.layers) } : null;
 }
 
 /** A 격's weight: the hero's own blow at their level (the 격 power multiplies it; might() is
@@ -1022,6 +1035,26 @@ const GYEOK_CD_K = 0.6;
 /** The wearer struck ('hit') or was struck ('hurt'): each worn 격 may go off. */
 function gyeokProc(on, t) {
   const p = G.player;
+  if (on === 'hit' && p.swing && t && t.m) {
+    const w = p.swing;
+    // With the blow: on the frame the weapon lands (half way through the swing or cast pose the
+    // damage starts), a close-in weapon's slash between the hero's weapon and the struck, turned
+    // the way the blow travels; a far weapon's where its arrow or bolt lands. Sized to the hero.
+    const land = p.poseT > 0 ? p.poseT * 0.5 : 0.08, melee = MELEE_WEAPON.has(G.cls.id);
+    const hx = p.x, hy = p.y - 22, ex = t.x, ey = t.y - 18, ang = Math.atan2(ey - hy, ex - hx);
+    const at = (k, dy) => melee ? [hx + (ex - hx) * k, hy + (ey - hy) * k + dy] : [ex, ey + dy];
+    if (G.t >= (G.swingAt || 0)) {
+      G.swingAt = G.t + w.cd;
+      w.hit.forEach(([id, sc, dy, dl], i) => {
+        const [x, y] = at(i ? 0.95 : 0.6, dy);
+        addFx(id, x, y, { scale: sc * w.scale * ABYSS_FX_K, delay: land + dl, rot: melee && !i ? ang - Math.PI / 2 : 0 });
+      });
+    }
+    if (w.heavy && w.heavy.length && G.t >= (G.heavyAt || 0)) {
+      G.heavyAt = G.t + w.hcd;
+      for (const [id, sc, dy, dl] of w.heavy) { const [x, y] = at(0.9, dy); addFx(id, x, y, { scale: sc * ABYSS_FX_K, delay: land + dl }); }
+    }
+  }
   if (!p.gyeoks || !p.gyeoks.length || !t || !t.m) return;
   G.gyeokCd = G.gyeokCd || {};
   for (const g of p.gyeoks) {
@@ -1210,6 +1243,12 @@ function yItemIcon(cls, kind, t, spId) {
   return f ? 'assets/yitemicon/' + f : null;
 }
 function pieceIcon(cls, kind, t, spId) {
+  // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
+  const ab = spId && SPECIAL[spId] && SPECIAL[spId].base && SPECIAL[spId].base[cls.id];
+  const abIt = ab && costumeItems()[ab[0]];
+  if (abIt && abIt.icon && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers.weapon['c' + ab[0]]) return 'assets/' + abIt.icon;
+  const lt = spId && SPECIAL[spId] && SPECIAL[spId].lookTier ? SPECIAL[spId].lookTier[cls.id] : undefined;
+  if (lt !== undefined) return yItemIcon(cls, kind, lt, null) || (hasAvatars() ? gearIcon(cls.id, kind, lt) : null);
   const y = yItemIcon(cls, kind, t, spId);
   if (y) return y;
   if (spId && SPECIAL[spId]) {
@@ -1272,6 +1311,17 @@ function gearImage(g) {
 }
 
 function pickGear(g) {
+  if (g.sp && SPECIAL[g.sp] && SPECIAL[g.sp].rarity) {
+    // An abyss weapon: one of a kind, in gold, with the 승급 fanfare.
+    const sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id), R = RARITY.unique;
+    bag(G.cls).push('sp:' + g.sp);
+    audio.play('promote');
+    (G.gained = G.gained || []).push(`[${R.name}] ${name}`);
+    saveJson('bs_progress', progress);
+    say(`${R.name} 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''})`, 'sys');
+    banner(`${R.name} · ${name}`);
+    return;
+  }
   if (g.sp) {
     // A special: kept by its own id; a second one sells well.
     const b = bag(G.cls), id = 'sp:' + g.sp, sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id);
@@ -1507,7 +1557,7 @@ function buildEquip() {
       const t = specialBase(sp, cls.id), btn = document.createElement('button');
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
       const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.gyeok && GYEOK[sp.gyeok] ? `${GYEOK[sp.gyeok].name}` : sp.ward ? `${STATUS[sp.ward].name} 막기` : sp.opt.text}</small>`;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span${sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${sp.rarity ? `[${RARITY.unique.name}] ` : sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.gyeok && GYEOK[sp.gyeok] ? `${GYEOK[sp.gyeok].name}` : sp.ward ? `${STATUS[sp.ward].name} 막기` : sp.opt.text}</small>`;
       btn.title = [sp.opt.text, sp.gyeok ? gyeokText(sp.gyeok) : '', sp.ward ? `${STATUS[sp.ward].name}에 걸리지 않는다` : ''].filter(Boolean).join('\n');
       markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
       btn.onclick = () => {
@@ -3721,6 +3771,21 @@ function rollSpecial(e) {
   emote(Math.random() < 0.5 ? 'really' : 'hehe', G.player);
 }
 
+/**
+ * 끝없는 지옥's weapons (items.js rollAbyssItem): 고유 only, and rare: the boss a third of the time
+ * (the 소 왕 always, his own horn), a leader one in ten, a champion one in a hundred; the rest none.
+ */
+// ---- abyss drop rates (retune here) ----
+const ABYSS_DROP = { boss: 0.35, mini: 0.1, champ: 0.01 };
+function rollAbyss(e) {
+  const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
+  if (!cowKing && !(Math.random() < (ABYSS_DROP[e.kind] || 0))) return;
+  progress.abyssLoot = progress.abyssLoot || {};
+  const sp = rollAbyssItem(progress.abyssLoot, G.level, cowKing ? 'cow' : null);
+  G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: RARITY.unique.color });
+  say(`${RARITY.unique.name} 아이템이 떨어졌습니다!`, 'warn');
+}
+
 /** Materials of the ground's kind: a few from bosses, sometimes from the strong ones. */
 function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
@@ -3761,6 +3826,7 @@ function killEnemy(e) {
     if (c.n >= 100) emote(c.n >= 300 ? 'godgame' : 'gains', G.player);
   }
   rollSpecial(e);
+  if (G.stage.abyss) rollAbyss(e);
   rollMats(e);
   // For the 의뢰: every kill counts, by ground, and bosses by ground.
   const st = qstats();
@@ -3901,7 +3967,13 @@ function clearStage() {
     promote();
     if (G.stage.id === 'cheolsang' && !progress.abyss && st.clears.cheolsang >= 3) {
       progress.abyss = true;
-      later(2.2, () => { say('철상지옥 바닥 밑에서 무언가 울린다… 끝없는 지옥으로 가는 길이 열렸다.', 'sys'); banner('끝없는 지옥'); });
+      // The Cairn Stones' nod: five stones light, and the way down opens.
+      later(2.2, () => { say('철상지옥 바닥의 돌 다섯 개가 붉게 빛난다… 끝없는 지옥, 지하 묘지로 가는 문이 열렸다.', 'sys'); banner('끝없는 지옥'); });
+    }
+    // Past the 파괴의 군주, now and then, a way to the cows.
+    if (G.stage.id === 'abyss4' && !progress.cowLevel && Math.random() < 0.25) {
+      progress.cowLevel = true;
+      later(2.6, () => { say('어디선가 소 울음소리가 들린다… 음매. 비밀의 소 레벨로 가는 문이 열렸다.', 'sys'); banner('비밀의 소 레벨'); });
     }
     // From the grounds past 타계 (Lv 18 and up) the rarer looks, as from the raids.
     if (Math.random() < 0.15) dropCostume(G.level >= 18 ? [1, 2] : [0, 1, 2], '보스의 보물');
@@ -7507,7 +7579,13 @@ function yGearVariants(cls, gear) {
     // 백호환령부 is not worn on the back: it walks beside the hero (updatePet).
     if (sp === 'cr_sinsu_baekho') continue;
     let v = null;
-    if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
+    // An abyss weapon looks its class's named 연 weapon, dressed (items.js ABYSS_BASE), or where the
+    // build lacks that layer a plain iron or steel one (ABYSS_LOOK_TIER).
+    const lt = sp && SPECIAL[sp] && SPECIAL[sp].lookTier && SPECIAL[sp].lookTier[cls.id];
+    const ab = sp && SPECIAL[sp] && SPECIAL[sp].base && SPECIAL[sp].base[cls.id];
+    if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
+    else if (lt !== undefined && lt !== null && map['t' + lt]) v = map['t' + lt];
+    else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
     else if (kind === 'weapon' && t === dragonTier(cls)) v = map['dragon' + starOf(cls, `weapon:${t}`)] || map['t' + t];
     else if (t !== undefined && t >= 0) v = map['t' + t];
     if (v && H.layers[kind] && H.layers[kind][v]) out[kind] = v;
@@ -7525,6 +7603,8 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   const want = b.yv && b.yvGear === gear && b.yvCos === costumeVersion() ? b.yv
     : (b.yvGear = gear, b.yvCos = costumeVersion(), b.yv = yGearVariants(cls, gear || {}));
   const sheets = {};
+  // An abyss weapon worn: its layers dressed in black, blood and fire (by its rarity).
+  const dz = !window.__noDress && gear && gear.weaponSp && SPECIAL[gear.weaponSp] && SPECIAL[gear.weaponSp].dress;
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
     if (!(path in images)) loadImage(path);
@@ -7534,7 +7614,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
       if (kind === 'body' || kind === 'head') return false;
       continue;
     }
-    sheets[kind] = { im, meta };
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(im, path, dz.tint) : im, meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
@@ -7557,12 +7637,14 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   ctx.globalAlpha = alpha;
   // The layers composited once per frame and kept: six draws from big sheets each frame (연's
   // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
-  const key = cls.id + JSON.stringify(want) + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~');
+  const key = cls.id + JSON.stringify(want) + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
+    + (dz ? '|d' + dz.tint : '');
   let pic = heroFrames.get(key);
   if (!pic) {
     const c = document.createElement('canvas');
     c.width = cw;
     c.height = ch;
+    if (dz && sheets.weapon) dressFrame(c, H, sheets, a, f, box, dz, key);
     drawLayers(c.getContext('2d'), H, sheets, a, f, box);
     if (heroFrames.size > 300) heroFrames.delete(heroFrames.keys().next().value);
     heroFrames.set(key, pic = c);
@@ -7571,10 +7653,127 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   ctx.translate(Math.round(x), Math.round(y));
   if (mirror) ctx.scale(-1, 1);
   ctx.drawImage(pic, -fx, -fy);
+  if (dz) drawBladeFlames(bladePts.get(key), -fx, -fy, dz);
   ctx.restore();
   return true;
 }
 const heroFrames = new Map();
+
+// ---- the abyss weapons' dress (items.js ABYSS_DRESS): 연's weapon, the game's colours over it.
+// The weapon layer's sheet recoloured once (black, blood red, ember edges where it was brightest),
+// per sheet and strength; with it the swing trail the sheet carries. Each composed hero frame (cached
+// as the hero's are) gets a red glow under the weapon and its blade points: a few spots spread along
+// the weapon's long axis in that very cell, so the fire follows the blade in every direction and frame.
+const dressSheets = new Map();
+function dressedSheet(im, path, t) {
+  const k = path + '|' + t;
+  let c = dressSheets.get(k);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = im.width;
+  c.height = im.height;
+  const g = c.getContext('2d');
+  g.drawImage(im, 0, 0);
+  try {
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (!p[i + 3]) continue;
+      const l = (0.3 * p[i] + 0.59 * p[i + 1] + 0.11 * p[i + 2]) / 255;
+      const r = Math.min(235, Math.max(8, Math.pow(l, 1.6) * 330)), gg = Math.min(140, Math.max(0, (l - 0.6) * 260)), b = Math.min(20, l * 12);
+      p[i] += (r - p[i]) * t;
+      p[i + 1] += (gg - p[i + 1]) * t;
+      p[i + 2] += (b - p[i + 2]) * t;
+    }
+    g.putImageData(d, 0, 0);
+  } catch (e) { /* a tainted sheet keeps its colours */ }
+  dressSheets.set(k, c);
+  return c;
+}
+const bladePts = new Map();
+function dressFrame(c, H, sheets, a, f, box, dz, key) {
+  // The weapon alone in this cell: its glow under the hero, and the spots its fire stands on.
+  const w = document.createElement('canvas');
+  w.width = c.width;
+  w.height = c.height;
+  const wg = w.getContext('2d');
+  drawLayers(wg, H, { weapon: sheets.weapon, wback: sheets.wback }, a, f, box);
+  const pts = [];
+  try {
+    const d = wg.getImageData(0, 0, w.width, w.height).data, xs = [], ys = [];
+    for (let y = 0; y < w.height; y += 2) for (let x = 0; x < w.width; x += 2) if (d[(y * w.width + x) * 4 + 3] > 100) { xs.push(x); ys.push(y); }
+    if (xs.length > 6) {
+      let mx = 0, my = 0;
+      for (let i = 0; i < xs.length; i++) { mx += xs[i]; my += ys[i]; }
+      mx /= xs.length; my /= xs.length;
+      let sxx = 0, syy = 0, sxy = 0;
+      for (let i = 0; i < xs.length; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+      const th = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(th), uy = Math.sin(th);
+      const ts = xs.map((x, i) => (x - mx) * ux + (ys[i] - my) * uy), order = ts.map((t, i) => i).sort((i, j) => ts[i] - ts[j]);
+      const n = dz.flames;
+      for (let k = 0; k < n; k++) {
+        const i = order[Math.round((0.08 + 0.84 * (n > 1 ? k / (n - 1) : 0.5)) * (order.length - 1))];
+        pts.push([xs[i], ys[i]]);
+      }
+    }
+  } catch (e) { /* no fire on a tainted sheet */ }
+  bladePts.set(key, pts);
+  if (bladePts.size > 300) bladePts.delete(bladePts.keys().next().value);
+  if (dz.glow > 0) {
+    const g = c.getContext('2d');
+    g.save();
+    g.filter = 'blur(2px)';
+    g.globalAlpha = dz.glow;
+    const r = document.createElement('canvas');
+    r.width = w.width;
+    r.height = w.height;
+    const rg = r.getContext('2d');
+    rg.drawImage(w, 0, 0);
+    rg.globalCompositeOperation = 'source-in';
+    rg.fillStyle = '#ff2a0a';
+    rg.fillRect(0, 0, r.width, r.height);
+    g.drawImage(r, 0, 0);
+    g.drawImage(r, 0, 0);
+    g.restore();
+  }
+}
+// The fire: 연's archer 화염벽, each of its frames cut into its three tongues, deepened to blood orange.
+let flameTongues = null;
+function tongues() {
+  if (flameTongues) return flameTongues.length ? flameTongues : null;
+  const fm = M.fx.k_a_firewall, path = fm && `fx/${fm.src || 'k_a_firewall'}.png`;
+  if (!fm) return (flameTongues = []), null;
+  if (!(path in images)) loadImage(path);
+  const im = images[path];
+  if (!im || !im.complete || !im.width) return null;
+  const out = [], cols = (fm.src ? M.fx[fm.src].cols : fm.cols) || 1e9, n = Math.min(durs('k_a_firewall').length, 24);
+  for (let k = 0; k < n; k++) {
+    const sx = (k % cols) * fm.w, sy = Math.floor(k / cols) * fm.h;
+    for (let t = 0; t < 3; t++) {
+      const c = document.createElement('canvas'), tw = Math.floor(fm.w / 3);
+      c.width = tw;
+      c.height = fm.h;
+      const g = c.getContext('2d');
+      g.drawImage(im, sx + t * tw, sy, tw, fm.h, 0, 0, tw, fm.h);
+      g.globalCompositeOperation = 'multiply';
+      g.fillStyle = '#ff8c4c';
+      g.fillRect(0, 0, tw, fm.h);
+      g.globalCompositeOperation = 'destination-in';
+      g.drawImage(im, sx + t * tw, sy, tw, fm.h, 0, 0, tw, fm.h);
+      out.push(c);
+    }
+  }
+  return (flameTongues = out);
+}
+function drawBladeFlames(pts, ox, oy, dz) {
+  const T = pts && pts.length && tongues();
+  if (!T) return;
+  const now = performance.now() / 70;
+  for (let j = 0; j < pts.length; j++) {
+    const im = T[(Math.floor(now) + j * 7) % T.length], k = 0.2 * dz.fsc * (0.85 + 0.3 * ((j * 37) % 10) / 10);
+    const w = im.width * k, h = im.height * k;
+    ctx.drawImage(im, ox + pts[j][0] - w / 2, oy + pts[j][1] - h * 0.85, w, h);
+  }
+}
 
 /** Draws a hero from 연's sheet; false when there is none for the class. */
 function drawYhero(clsId, armor, b, x, y, pose, alpha) {
@@ -7596,13 +7795,28 @@ function drawYhero(clsId, armor, b, x, y, pose, alpha) {
 // shade with a flickering hole where the hero stands, a veil of dried blood left even in the
 // light, and faint holes round its leaders and the boss so they loom up before they reach the
 // light. The monsters are darkened (their leaders blood-cast) copies made once. Everything is
-// 연's own picture under these code passes (no drawn art). The shade is drawn at a quarter of
+// 연's own picture under these code passes (no drawn art). The shade is drawn at a fifth of
 // the screen's size and stretched (it is all soft gradients): one small canvas, a few gradient
 // fills and one drawImage a frame (full-size blend passes halved the frame rate at 4x CPU).
 const ABYSS_TINT = 'brightness(0.6) saturate(0.55)';
 const ABYSS_LEAD_TINT = 'brightness(0.75) sepia(0.6) hue-rotate(-28deg) saturate(2.2)';
-const ABYSS_Q = 4;
-let abyssShade = null;
+const ABYSS_Q = 5;
+let abyssShade = null, abyssTickMade = 0;
+const abyssHalf = document.createElement('canvas');
+// The two soft discs the darkness is made of, drawn once.
+const ABYSS_STAMP = (() => {
+  const disc = stops => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 4, 32, 32, 32);
+    for (const [at, col] of stops) gr.addColorStop(at, col);
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 64, 64);
+    return c;
+  };
+  return { light: disc([[0, 'rgba(0,0,0,1)'], [0.55, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']]),
+    fog: disc([[0, 'rgba(30,22,22,0.32)'], [1, 'rgba(30,22,22,0)']]) };
+})();
 function drawAbyss(px, py, camX, camY) {
   const q = ABYSS_Q, w = Math.ceil(canvas.width / q), h = Math.ceil(canvas.height / q);
   if (!abyssShade || abyssShade.width !== w || abyssShade.height !== h) {
@@ -7610,32 +7824,87 @@ function drawAbyss(px, py, camX, camY) {
     abyssShade.width = w;
     abyssShade.height = h;
   }
-  const g = abyssShade.getContext('2d');
-  g.globalCompositeOperation = 'source-over';
-  g.clearRect(0, 0, w, h);
-  g.fillStyle = 'rgba(26,3,2,0.97)';
-  g.fillRect(0, 0, w, h);
-  g.globalCompositeOperation = 'destination-out';
-  const hole = (x, y, r, a) => {
-    x /= q; y /= q; r /= q;
-    const gr = g.createRadialGradient(x, y, r * 0.12, x, y, r);
-    gr.addColorStop(0, `rgba(0,0,0,${a})`);
-    gr.addColorStop(0.55, `rgba(0,0,0,${a * 0.75})`);
-    gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr;
-    g.fillRect(x - r, y - r, 2 * r, 2 * r);
-  };
-  // The torch: it breathes and flickers.
-  const t = G.t, flick = 1 + 0.05 * Math.sin(t * 13) + 0.035 * Math.sin(t * 31 + 1.3) + 0.02 * Math.sin(t * 7.7);
-  hole(px, py, Math.min(canvas.width, canvas.height) * 0.36 * flick, 0.8);
-  for (const e of G.enemies) {
-    if (!e.kind || e.kind === 'minion') continue;
-    hole((e.x - camX) * Z, (e.y - 20 - camY) * Z, Z * (e.kind === 'boss' ? 60 : 32), e.kind === 'boss' ? 0.5 : 0.32);
+  const t = G.t, sx = x => (x - camX) * Z, sy = y => (y - camY) * Z;
+  const onScreen = (x, y) => x > -80 && y > -80 && x < canvas.width + 80 && y < canvas.height + 80;
+  // The shade is made anew every third frame (the camera keeps the hero still on screen, so only
+  // the far lights lag a frame or two); drawn every frame.
+  G.abyssTick = (G.abyssTick || 0) + 1;
+  if (G.abyssTick % 3 === 1 || abyssShade.made !== G) {
+    abyssShade.made = G;
+    abyssTickMade = G.abyssTick;
+    const g = abyssShade.getContext('2d');
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = 'rgba(26,3,2,0.97)';
+    g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'destination-out';
+    // A light is one soft disc stamp, drawn at its size and strength (no gradient made a frame).
+    const hole = (x, y, r, a) => {
+      x /= q; y /= q; r /= q;
+      g.globalAlpha = a;
+      g.drawImage(ABYSS_STAMP.light, x - r, y - r, 2 * r, 2 * r);
+    };
+    // The torch: it breathes and flickers.
+    const flick = 1 + 0.05 * Math.sin(t * 13) + 0.035 * Math.sin(t * 31 + 1.3) + 0.02 * Math.sin(t * 7.7);
+    const light = (G.stage.abyss && G.stage.abyss.light) || 0.36;
+    hole(px, py, Math.min(canvas.width, canvas.height) * light * flick, 0.8);
+    let fires = 0; // six burning at most: the rest stay dark
+    for (const e of G.enemies) {
+      // 연's cursed torches (저주받은 횃불) carry their own fire.
+      if (e.m.id === 'y304170') { const x = sx(e.x), y = sy(e.y - 30); if (fires < 6 && onScreen(x, y)) { hole(x, y, Z * 34 * flick, 0.6); fires++; } continue; }
+      if (!e.kind || e.kind === 'minion') continue;
+      hole(sx(e.x), sy(e.y - 20), Z * (e.kind === 'boss' ? 60 : 32), e.kind === 'boss' ? 0.5 : 0.32);
+    }
+    // The floor's fires (연's torch among its props), a spell's flash, a drop's beam.
+    for (const b of G.seenProps || []) {
+      if (M.prop[b.prop] && M.prop[b.prop][3] === 'torch') hole(sx(b.x), sy(b.y - 20), Z * 40 * (1 + 0.08 * Math.sin(t * 9 + b.x)), 0.7);
+    }
+    let n = 0;
+    for (const f of G.fxs) {
+      if (n >= 6 || f.t < 0) continue;
+      const x = sx(f.x), y = sy(f.y);
+      if (onScreen(x, y)) { hole(x, y, Z * 30, 0.45); n++; }
+    }
+    for (const d of G.drops) if (d.beam) hole(sx(d.x), sy(d.y - 20), Z * 26, 0.6);
+    // Fog: slow banks of murk drifting over even what the torch lights.
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = 1;
+    for (let i = 0; i < 3; i++) {
+      const fx = (((t * (6 + i * 3) + i * 211 - camX * 0.6) % 900) + 900) % 900 * Z / q - 100, fy = ((i * 0.33 + 0.12) * h);
+      const fr = (120 + i * 40) * Z / q;
+      g.drawImage(ABYSS_STAMP.fog, fx - fr, fy - fr, 2 * fr, 2 * fr);
+    }
   }
+  // Stretched smooth (it is all soft gradients) into a half-size canvas when it is made, and that
+  // drawn up blocky: a smooth stretch to the whole screen each frame cost a slow phone 4 ms.
   const sm = ctx.imageSmoothingEnabled;
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(abyssShade, 0, 0, w * q, h * q);
+  if (abyssHalf.made !== abyssShade.made || abyssHalf.tick !== abyssTickMade) {
+    const hw = Math.ceil(canvas.width / 2), hh = Math.ceil(canvas.height / 2);
+    if (abyssHalf.width !== hw || abyssHalf.height !== hh) { abyssHalf.width = hw; abyssHalf.height = hh; }
+    const hg = abyssHalf.getContext('2d');
+    hg.imageSmoothingEnabled = true;
+    hg.clearRect(0, 0, hw, hh);
+    hg.drawImage(abyssShade, 0, 0, w * q / 2, h * q / 2);
+    abyssHalf.made = abyssShade.made;
+    abyssHalf.tick = abyssTickMade;
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(abyssHalf, 0, 0, abyssHalf.width * 2, abyssHalf.height * 2);
   ctx.imageSmoothingEnabled = sm;
+  // A dropped weapon's beam shines through the dark, as Diablo's do.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const d of G.drops) {
+    if (!d.beam) continue;
+    const x = sx(d.x), y = sy(d.y), bh = Z * 110, a = 0.55 + 0.2 * Math.sin(t * 5 + d.x);
+    const bg = ctx.createLinearGradient(0, y - bh, 0, y);
+    bg.addColorStop(0, 'rgba(0,0,0,0)');
+    bg.addColorStop(1, d.beam);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = bg;
+    ctx.fillRect(x - Z * 4, y - bh, Z * 8, bh);
+  }
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------- 연's own monsters
@@ -7663,7 +7932,8 @@ function yunitAnim(u, b) {
   }
   const walk = pick(`walk_${dir}`, 'walk_side', 'walk_down');
   const idle = pick(`idle_${dir}`);
-  const a = b.moving || !idle ? walk : idle;
+  // A unit that never walks (연's cursed torch) keeps standing in its idle row as it moves.
+  const a = (b.moving || !idle) && walk ? walk : idle || walk;
   if (!a) return null;
   b.seed = b.seed || Math.floor(Math.random() * 1000);
   return { a, f: Math.floor((performance.now() + b.seed) / a.ms) % a.n, dir, dx };
@@ -7847,7 +8117,19 @@ function render(now) {
     const im = d.kind === 'gear' ? gearImage(d.gear) : d.kind === 'mat' ? matImage(d.mat)
       : images[`item/${M.items[d.kind].id}.png`];
     if (!im) continue;
-
+    if (d.beam) {
+      // Diablo's drop beam: a column of the rarity's colour over the piece, breathing.
+      const bh = 90, a = 0.5 + 0.2 * Math.sin(now * 5);
+      const bg = ctx.createLinearGradient(0, d.y - bh, 0, d.y);
+      bg.addColorStop(0, 'rgba(0,0,0,0)');
+      bg.addColorStop(1, d.beam);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = bg;
+      ctx.fillRect(Math.round(d.x - 5), Math.round(d.y - bh), 10, bh);
+      ctx.restore();
+    }
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
@@ -7872,7 +8154,9 @@ function render(now) {
   }
 
   // Bodies, back to front.
-  const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(propsInView(camX, camY)) : War.props()) : propsInView(camX, camY), G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
+  const seenProps = G.war && !G.war.raid ? [] : propsInView(camX, camY);
+  G.seenProps = seenProps;
+  const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(seenProps) : War.props()) : seenProps, G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
   bodies.push(p);
   bodies.sort((a, b) => a.y - b.y);
   const hidden = G.buffs.stealth > G.t;
@@ -7940,7 +8224,8 @@ function render(now) {
       // A champion's tag only near the hero or once struck: a pack of tags cluttered the crowd.
       const tag = b.kind === 'boss' || b.kind === 'mini' || (b.shown && G.t - b.shown < 3)
         || Math.abs(b.x - G.player.x) + Math.abs(b.y - G.player.y) < TILE * 5;
-      if (b.name && tag) outline(b.name, b.x, b.y - b.m.h * s - 4, b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
+      if (b.name && tag) outline(b.name, b.x, b.y - b.m.h * s - 4, G.stage.abyss ? (b.kind === 'champ' ? '#7a9cff' : '#d8a64a')
+        : b.kind === 'boss' ? '#ff8a6a' : '#ffe070');
     }
     // Its 상태이상, in 연's own debuff icon, over its head.
     if (b.stIcon && b.st && b.st[b.stIcon]) {
@@ -7992,6 +8277,7 @@ function render(now) {
 
   drawShocks();
   // Spell effects over everything, at their own size.
+  const trail = !G.war && p.trail, puffs = [];
   for (const f of G.fxs) {
     if (f.t < 0) continue;
     let x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
@@ -8000,10 +8286,16 @@ function render(now) {
       const k = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - k) * (1 - k);
       x += f.mv[0] * e;
       y += f.mv[1] * e;
+      // An abyss far weapon: black smoke and embers behind it as it flies.
+      if (trail && k < 1 && !f.trailFx && G.t >= (f.trailAt || 0) && puffs.length < 6) { f.trailAt = G.t + trail.cd; puffs.push([x, y]); }
     }
     if (f.alpha) ctx.globalAlpha = f.alpha;
     drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip);
     ctx.globalAlpha = 1;
+  }
+  if (trail) {
+    for (const sh of G.shots) if (sh.mine && G.t >= (sh.trailAt || 0) && puffs.length < 8) { sh.trailAt = G.t + trail.cd; puffs.push([sh.x, sh.y]); }
+    for (const [x, y] of puffs) for (const [id, sc] of trail.layers) { addFx(id, x, y, { scale: sc * trail.scale }); G.fxs[G.fxs.length - 1].trailFx = true; }
   }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
@@ -8083,7 +8375,8 @@ function render(now) {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (G.stage.abyss) drawAbyss((p.x - camX) * Z, (p.y - 22 - camY) * Z, camX, camY);
-  const dark = DARK[G.stage.terrain];
+  // (the abyss has its own darkness: no second vignette over it)
+  const dark = !G.stage.abyss && DARK[G.stage.terrain];
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
     const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -9061,6 +9354,15 @@ window.__Z = () => Z;
 window.__hurtPlayer = d => hurtPlayer(d, null);
 window.__hurtPlayerFrom = (d, e) => hurtPlayer(d, e);
 window.__event = k => huntEvent(k);
+// For trying effects out: one of the build's effects at a place.
+window.__fx = (id, x, y, o) => addFx(id, x, y, o || {});
+// For trying the abyss loot out: a unique (by name, else any) dropped beside the hero.
+window.__abyssDrop = u => {
+  progress.abyssLoot = progress.abyssLoot || {};
+  const sp = rollAbyssItem(progress.abyssLoot, G.level, u);
+  G.drops.push({ x: G.player.x + 40, y: G.player.y + 10, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: RARITY.unique.color });
+  return sp.id;
+};
 window.__openPortal = t => openPortal(t);
 window.__silentSkills = () => {
   const has = n => (Array.isArray(n) ? n : [n]).some(x => x && x !== '-' && audio.has(String(x).split('@')[0]));

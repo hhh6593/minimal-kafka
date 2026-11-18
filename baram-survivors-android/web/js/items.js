@@ -25,7 +25,7 @@ const PREFIX = {
   gareung: '가릉도의', pokyeom: '폭염도의', baekdu: '백두의', baekdu2: '요괴목의', baekdu3: '기룡의', baekdu4: '선인의',
   hanbing: '한빙의', geohae: '거해의', zud: '고원의', zud2: '주술사의', sandolim: '협곡의', fallforest: '몰락의', jagwi: '자귀의',
   oldaram: '섬망의', haya: '하야의', lobi: '세암의', aram: '황무지의', ancient: '도성의',
-  hwatang: '화탕의', cheolsang: '철상의', abyss: '끝없는 어둠의',
+  hwatang: '화탕의', cheolsang: '철상의', abyss: '묘지의', abyss2: '고통의', abyss3: '혼돈의', abyss4: '세계석의', cow: '음매의',
 };
 
 // The extra options, in turn. Each special has one.
@@ -89,12 +89,14 @@ export function specialBase(sp, cls) {
 
 export function specialName(sp, cls) {
   if (sp.craft) return typeof sp.craft.name === 'string' ? sp.craft.name : sp.craft.name[cls];
+  if (sp.rarity) return abyssName(sp);
   return `${PREFIX[sp.src]} ${GEAR[cls][sp.kind][specialBase(sp, cls)]}`;
 }
 
 /** A special counts a rank above its base, and half a rank more for a 격 or a ward. */
 export function specialPower(sp, cls) {
   if (sp.craft) return sp.craft.pow + (sp.gyeok ? 0.5 : 0);
+  if (sp.rarity) return gearPower(cls, sp.kind, specialBase(sp, cls)) + RARITY[sp.rarity].pow;
   return gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0);
 }
 
@@ -132,12 +134,12 @@ export const MATS = {
   // raise the 용무기 from 제일 to 제십.
   gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong', 'raid_airavata', 'greatwall', 'qin', 'haya'] },
   steel: { name: '순수의 강철', icon: 'm_steel', from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin', 'raid_agni', 'wolf', 'ancient'] },
-  essence: { name: '조화의 정수', icon: 'm_essence', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss'] },
-  soul: { name: '거마족의 영혼석', icon: 'm_soul', from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss'] },
+  essence: { name: '조화의 정수', icon: 'm_essence', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  soul: { name: '거마족의 영혼석', icon: 'm_soul', from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
   scroll: { name: '제작 고문서', icon: 'm_scroll', from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
-  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss'] },
-  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss'] },
-  silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss'] },
+  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
   // The 사신수's 성물 (the original's 신수현신공성전: four of a 신수 make its 지존 piece; 연 keeps
   // 주작혈안 and 백호광안 among its items, whose icons these are). From the raids of the 신수's
   // nature, and the 길드대항전.
@@ -145,7 +147,7 @@ export const MATS = {
   sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger'] },
   sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', from: ['raid_varuna', 'raid_hydra'] },
   sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', from: ['raid_sea'] },
-  silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'abyss'] },
+  silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
 };
 /** How many of a material a kill drops: most fall from bosses (3-5), some from mini bosses. */
 export function matCount(id, kind, raid) {
@@ -328,4 +330,114 @@ export function craftRecipe(cls) {
 export const STAR_MAX = 5;
 export function starCost(star) {
   return { copies: star + 1, gold: 150 * star * star };
+}
+
+// ---------------------------------------------------------------- 끝없는 지옥's loot
+// The 끝없는 지옥's weapons, only there: 고유 only (gold: a Diablo II name, fixed affixes and its own
+// 격, a 연 effect), one of a kind and a real find. Each is kept in progress.abyssLoot
+// ({ id: { kind, rarity: 'unique', rank, u } }) and registered as a special ('sp:ab…' in the bag,
+// weaponSp when worn), so the bag, the equip window, the forge's stars and the 전투력 take it as
+// they take any special. color: its beam and name in the dark, ui: its name on the parchment
+// windows. Its power stays under the raid sets: the plain top weapon + pow. (An old save's 마법 and
+// 희귀 pieces, from when there were three grades, load as 고유: loadAbyssLoot.)
+export const RARITY = {
+  unique: { name: '고유', color: '#d8a64a', ui: '#a0601a', pow: 2 },
+};
+// Their looks: one of 연's own high named weapons per class (its 코디 weapon layer, ABYSS_BASE: the
+// 진일염화검 and its 염화 kin, the 진'청일기창 ...), "dressed" in the abyss's colours by the game:
+// the weapon's pixels (and the swing trail its sheet carries) darkened to black and blood red, a
+// red glow round it and 연's fire tongues (the archer's 화염벽) standing along the blade, following it
+// cell by cell in every direction (game.js dressedSheet, bladePoints). ABYSS_DRESS sets how much by
+// rarity. Where a build lacks the layer the plain line's iron or steel one is worn instead
+// (ABYSS_LOOK_TIER, also its icon then). The look is only the look: the power is the abyss's rank's.
+// ---- abyss weapon tuning (retune here) ----
+export const ABYSS_BASE = {
+  warrior: [7100495, '진일염화검'], rogue: [7100303, "진'청일기창"], mage: [7100498, '청염단강봉'],
+  poet: [7100305, "진'적염곤봉"], archer: [7100500, '흑일멸화궁'], lancer: [7100501, '백일신멸창'],
+  monk: [7100499, '백운뇌권갑'], magus: [9988277, '적혼의 단봉'], celestial: [7100502, '청월염표창'],
+  dokkaebi: [7100503, '적월염퇴'], reaper: [7100654, '선일태도'],
+};
+// tint: how far to black-red (0..1); glow: the red halo's strength; flames: tongues along the blade;
+// fsc: their size.
+export const ABYSS_DRESS = { tint: 1, glow: 0.65, flames: 5, fsc: 1 };
+export const ABYSS_LOOK_TIER = {
+  plain: { warrior: 1, rogue: 2, mage: 1, poet: 1, archer: 2, lancer: 2, monk: 2, magus: 2, celestial: 2, dokkaebi: 2, reaper: 2 },
+  dark: { warrior: 1, rogue: 2, mage: 4, poet: 1, archer: 3, lancer: 4, monk: 3, magus: 4, celestial: 4, dokkaebi: 4, reaper: 4 },
+};
+// What the weapon does as it strikes, the same for every weapon of a kind: black and burning fire,
+// 연's own pictures layered (tools/yeon_abyss_fx.json, fx k_ab_*: 연's 심연 weapon effects, the hell
+// raid's 난무, 누라리횬's smoke and dark explosion, the boss fires). Each look is layers of
+// [fx, scale, dy, delay s]: the dark first, the fire flaring over it a moment later. Two kinds: the
+// close-in weapons (a dark-red slash and a spray of embers; a unique's heavier blow a dark burst
+// with a molten fireball rising out of it) and the far ones, bows and casters' staves, fans and
+// gourds (black smoke and embers where the blow lands; a unique's the hell raid's black smoke and
+// fire). A caster's blow lands on its target as an arrow does, so they share the far set.
+export const ABYSS_SWING = {
+  melee: { hit: [['k_ab_slash', 1, 0, 0], ['k_ab_embers', 1.1, -6, 0.08]],
+    heavy: [['k_ab_darkburst', 0.6, 0, 0], ['k_ab_molten', 0.45, -10, 0.15]] },
+  ranged: { hit: [['k_ab_smoke', 0.6, 0, 0], ['k_ab_embers', 1.2, -6, 0.05]],
+    heavy: [['k_ab_spree', 1, 0, 0]] },
+};
+// size (× the layers' own), seconds between strikes' effects, the heavy blow every hcd s.
+export const SWING_OF = { scale: 1.05, cd: 0.3, heavy: 1, hcd: 1.2 };
+// A far weapon's flying spells and arrows leave a trail: puffs of black smoke and embers behind
+// them, every cd seconds while they fly.
+// The strike effects' size against the hero (a blow of the weapon, not a spell of its own).
+export const ABYSS_FX_K = 0.75;
+export const ABYSS_TRAIL = { layers: [['k_ab_smoke', 0.24], ['k_ab_embers', 0.55]], scale: 1, cd: 0.05 };
+export const MELEE_WEAPON = new Set(['warrior', 'rogue', 'lancer', 'monk', 'dokkaebi', 'reaper']);
+// The uniques: names after Diablo II's, each with a dark look that fits it and a 격 out of
+// gyeok.js (연's own effect, to match the look: poison for the fang, fire for the horn ...).
+export const ABYSS_UNIQUES = [
+  { u: 'raven', name: '피의 까마귀 발톱', opts: ['power', 'speed'], gyeok: 'saseong' },
+  { u: 'andariel', name: '안다리엘의 독니', opts: ['power', 'regen'], gyeok: 'maengdok' },
+  { u: 'mephisto', name: '메피스토의 증오', opts: ['haste', 'mana', 'power'], gyeok: 'binggyeol' },
+  { u: 'diablo', name: '공포의 군주의 뿔', opts: ['power', 'boss', 'life'], gyeok: 'yeomryeong' },
+  { u: 'baal', name: '바알의 세계석 조각', opts: ['power', 'haste', 'guard'], gyeok: 'jiok' },
+  { u: 'tyrael', name: '티리엘의 맹세', opts: ['boss', 'speed', 'regen'], gyeok: 'nakroe' },
+  { u: 'cow', name: '소 왕의 뿔', opts: ['power', 'magnet'], gyeok: 'gijeol' },
+];
+const OPT_BY = Object.fromEntries(OPTIONS.map(o => [o.id, o]));
+
+function registerAbyss(id, d) {
+  const un = ABYSS_UNIQUES.find(x => x.u === d.u) || ABYSS_UNIQUES[0];
+  const opts = un.opts.filter(o => OPT_BY[o]);
+  SPECIAL[id] = { id, src: 'abyss', srcName: '끝없는 지옥', raid: false, kind: d.kind, rank: d.rank, rarity: d.rarity,
+    opts, opt: { id: opts[0], text: opts.map(o => OPT_BY[o].text).join(' · ') }, gyeok: un.gyeok,
+    ward: null, abName: un.name,
+    // The look on the hero (a plain weapon's) and the strike's effect.
+    lookTier: ABYSS_LOOK_TIER.dark, base: ABYSS_BASE, dress: ABYSS_DRESS, swing: SWING_OF };
+  return SPECIAL[id];
+}
+
+/** The abyss pieces already found (an old save has none). A 마법 or 희귀 piece from when there were
+ *  three grades becomes a 고유, the same one for the same piece (by its id), and is kept so. */
+export function loadAbyssLoot(loot) {
+  for (const [id, d] of Object.entries(loot || {})) {
+    if (d.rarity !== 'unique' || !ABYSS_UNIQUES.some(x => x.u === d.u)) {
+      const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow');
+      let h = 0;
+      for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      d.rarity = 'unique';
+      d.u = pool[h % pool.length].u;
+      delete d.opts;
+      delete d.name;
+    }
+    registerAbyss(id, d);
+  }
+}
+
+/** A new abyss weapon, kept; returns its special. One of the uniques (not the 소 왕's horn, which
+ *  only he drops) unless named. */
+export function rollAbyssItem(loot, rank, uniq = null) {
+  const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow');
+  const d = { kind: 'weapon', rarity: 'unique', rank, u: uniq || pool[Math.floor(Math.random() * pool.length)].u };
+  let n = Object.keys(loot).length + 1;
+  while (loot['ab' + n]) n++;
+  loot['ab' + n] = d;
+  return registerAbyss('ab' + n, d);
+}
+
+function abyssName(sp) {
+  return sp.abName;
 }
