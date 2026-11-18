@@ -2324,7 +2324,17 @@ function update(dt) {
         s.timer = Math.max(0, s.timer);
         continue;
       }
-      if (s.timer <= 0) fireSkill(s, 1);
+      if (s.timer <= 0) {
+        // A blow with no foe in its own reach is not thrown (in a 대항전 the hero swung 초혼비무
+        // at empty ground while walking between the fights): it waits, ready, for the first foe
+        // to come within that skill's reach. Heals, buffs and summons still go out.
+        const st0 = stats(s), rch = st0.dmg && !SKILLS[s.id].heal ? skillReach(SKILLS[s.id], st0) : 0;
+        if (rch && !G.enemies.some(e => tdist(e, p) <= rch)) {
+          s.timer = 0;
+          continue;
+        }
+        fireSkill(s, 1);
+      }
     }
     if (chain.length && !G.chainRun && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
@@ -3953,6 +3963,22 @@ function sweepField() {
 //
 // Spells land on their target at once, as in the game: no flying bolts. Sizes are in tiles.
 
+/** How far (tiles) a damaging skill reaches from the hero, by its kind: a foe must be within it
+ *  for the skill to be thrown. 0: no such check (summons, auras). */
+function skillReach(d, st) {
+  const r = st.radius ?? d.radius ?? 0, rg = st.range ?? d.range;
+  switch (d.kind) {
+    case 'nova': return r + 1.5;
+    case 'cleave': return r + 2;
+    case 'slash': return typeof d.dash === 'number' ? d.dash + 1 : 2;
+    case 'blink': return (rg || 4) + 1;
+    case 'strike': return (rg || 6) + r;
+    case 'spell': case 'spell4': return rg || 6;
+    case 'line': return 6;
+    case 'screen': return 9;
+    default: return 0;
+  }
+}
 function nearestEnemies(n, range, from = G.player) {
   return G.enemies
     .map(e => [e, tdist(e, from)])
