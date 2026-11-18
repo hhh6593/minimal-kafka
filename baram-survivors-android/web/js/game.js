@@ -3704,6 +3704,8 @@ function holdGround(tx, ty) {
   if (settings.dashMode === 'stay') return true;
   if (onRed(tx, ty)) return true;
   if (!G.war || G.war.raid) return false;
+  // 대항전: never onto a wall, nor through one (the castle's walls, a cliff, the shut gate).
+  if (!War.clear(G.player.tx, G.player.ty, tx, ty)) return true;
   const z = War.anchor();
   return !!z && Math.hypot(tx - z.x, ty - z.y) > z.r;
 }
@@ -4191,7 +4193,7 @@ function lure() {
     }
   }
   for (const e of foes) {
-    const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p))
+    const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p) && (!G.war || War.clear(e.tx, e.ty, x, y)))
       .sort((a, b) => Math.hypot(a[0] - e.tx, a[1] - e.ty) - Math.hypot(b[0] - e.tx, b[1] - e.ty))[0];
     if (!spot) continue;
     leave(e);
@@ -4331,7 +4333,7 @@ function cast(skill, st) {
       if (!near.length && def.dash) {
         // 쇄혼비무: only the way the hero faces, to the first monster up to four tiles off.
         let k = 2;
-        while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
+        while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k)) && (!G.war || G.war.raid || War.open(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
         if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && holdGround(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
           // Held (a war's point, the red floor, 제자리): the flurry reaches the foe; the hero stays.
@@ -4662,7 +4664,7 @@ function cast(skill, st) {
     case 'summon': {
       for (let i = 0; i < st.count; i++) {
         const m = monsterById[def.allies[(skill.lv + i) % def.allies.length]];
-        const spot = DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy]).find(([x, y]) => free(x, y));
+        const spot = DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy]).find(([x, y]) => free(x, y) && (!G.war || G.war.raid || War.open(x, y)));
         if (!m || !spot) continue;
         const a = { m, ally: true, scale: 1, t: 0, life: st.duration, dmg: st.dmg, face: 1, phase: 0, cd: 0, atk: 0,
           hp: 1, flash: 0, mdx: 0, mdy: 1 };
@@ -5056,7 +5058,7 @@ function updateAllies(dt) {
     if (a.cd > 0) continue;
     a.cd = 0.3;
     const tgt = nearestEnemies(1, 8, a)[0] || G.player;
-    for (const [dx, dy] of towards(a, tgt.tx, tgt.ty)) if (step(a, dx, dy, 0.28)) break;
+    for (const [dx, dy] of towards(a, tgt.tx, tgt.ty)) if ((!G.war || G.war.raid || War.open(a.tx + dx, a.ty + dy)) && step(a, dx, dy, 0.28)) break;
   }
   for (const a of G.allies) if (a.t >= a.life) leave(a);
   G.allies = G.allies.filter(a => a.t < a.life);

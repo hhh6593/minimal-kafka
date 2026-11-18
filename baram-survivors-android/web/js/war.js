@@ -529,6 +529,7 @@ function mkFighter(W, team, role, squad) {
   f.hp = f.maxHp;
   persona(f);
   f.style = warStyle(W, f);
+  f.timid = timidOf(W, f);
   W.bodies.push(f);
   return f;
 }
@@ -669,7 +670,10 @@ function placeBody(W, b, at) {
   const [x, y] = freeNear(W, at[0], at[1], b.team);
   A.occ.delete(k2(b.tx, b.ty));
   A.place(b, x, y);
+  moved(b, 'place');
 }
+/** Who last moved a body, for the wall test (__wallCheck): war.js's own steps, or else game.js's. */
+function moved(b, how) { b.mv = how; b.mvX = b.tx; b.mvY = b.ty; }
 function freeNear(W, x, y, team) {
   for (let r = 0; r < 10; r++)
     for (let dx = -r; dx <= r; dx++)
@@ -688,6 +692,7 @@ function heroTo(x, y) {
   p.x = nx * TILE + TILE / 2;
   p.y = ny * TILE + TILE - 6;
   p.stepping = false;
+  if (W.hero) W.hero.__wc = null; // (set down, not carried: the wall test)
   p.moving = false;
 }
 
@@ -697,6 +702,16 @@ export const War = {
   setup: () => setup(),
   update: dt => update(dt),
   open: (x, y) => { const G = A.G(); return open(G.war, x, y, 0); },
+  /** Whether a body can be carried from (x0, y0) to (x1, y1) in one move (a leap, a dash, a pull):
+   * the tile is open and no wall or shut gate stands on the straight line between. */
+  clear: (x0, y0, x1, y1) => {
+    const W = A.G().war;
+    if (W.raid) return true;
+    if (!open(W, x1, y1, 0)) return false;
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 3;
+    for (let i = 1; i < n; i++) if (!open(W, Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), 0)) return false;
+    return true;
+  },
   down: e => kill(A.G().war, e, A.G().war.hero),
   credit: (e, dmg) => heroHit(e, dmg),
   /** 전장 보정 for the hero's own blows: past about four fighters' blows a second (more for a
@@ -751,6 +766,8 @@ export const War = {
   cam: (cx, cy) => {
     const G = A.G(), m = G.war.map, VW = A.VW(), VH = A.VH();
     if (G.war.raid) return [cx, cy];
+    // Test (__warCam = [x, y]): the camera on a spot of the field instead of the hero.
+    if (window.__warCam) { cx = Math.round(window.__warCam[0] - VW / 2); cy = Math.round(window.__warCam[1] - VH / 2); }
     return [m.w > VW ? clamp(cx, 0, m.w - VW) : Math.round((m.w - VW) / 2), m.h > VH ? clamp(cy, 0, m.h - VH) : Math.round((m.h - VH) / 2)];
   },
   openBoard: () => openBoard(),
@@ -828,6 +845,7 @@ function update(dt) {
   if (G.fxs.length > 45) G.fxs.splice(0, G.fxs.length - 45);
   if (window.__dbgWar && window.__dbgWar.notext) G.texts.length = 0;
   if (window.__dbgWar && window.__dbgWar.nofx) G.fxs.length = 0;
+  if (window.__wallCheck) wallCheck(W);
   checkEnd(W);
 }
 
@@ -880,8 +898,8 @@ function walk(W, b) {
     // A raid's field is open: straight on, the other way round when the first is taken.
     opts = A.towards(b, dx0, dy0);
     if (opts.length === 1) opts.push(opts[0][0] ? [0, pick([-1, 1])] : [pick([-1, 1]), 0]);
-  } else if (near <= 3) {
-    opts = A.towards(b, dx0, dy0);
+  } else if (near <= 3 && (opts = A.towards(b, dx0, dy0)).some(([dx, dy]) => open(W, b.tx + dx, b.ty + dy, b.team))) {
+    // (Close by, straight on; round by the paths when a wall stands in the straight way.)
   } else {
     const f = flowTo(W, dx0, dy0, b.team), here = f[b.ty * cols + b.tx];
     opts = [];
@@ -900,7 +918,7 @@ function walk(W, b) {
     if (!open(W, nx, ny, b.team)) continue;
     // Not onto a red tile it has seen (a careless one walks in anyway).
     if (safe && W.danger.has(dk(nx, ny)) && b.dodge > 0.6) continue;
-    if (A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.blocked = 0; return; }
+    if (A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.blocked = 0; moved(b, 'walk'); return; }
   }
   // Fighters are players: one of its own side standing in the way changes places (both step).
   // In a war too: a crowd at the camp (its guards, the risen) boxed a fighter in for good.
@@ -912,6 +930,7 @@ function walk(W, b) {
       const ox = o.tx, oy = o.ty;
       startStep(o, b.tx, b.ty, dur);
       startStep(b, ox, oy, dur);
+      moved(o, 'swap'); moved(b, 'swap');
       b.fdx = dx; b.fdy = dy; b.blocked = 0;
       return;
     }
@@ -920,7 +939,7 @@ function walk(W, b) {
   b.blocked = (b.blocked || 0) + 1;
   if (b.blocked > 2) {
     const [dx, dy] = pick(DIR4);
-    if (open(W, b.tx + dx, b.ty + dy, b.team) && A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; }
+    if (open(W, b.tx + dx, b.ty + dy, b.team) && A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; moved(b, 'side'); }
     b.blocked = 0;
   }
 }
@@ -967,7 +986,7 @@ function nearest(W, b, r) {
     if (e.gate) continue;
     if (e.hero && A.G().buffs.stealth > A.G().t) continue;
     const d = d2(b, e);
-    if (d <= bd) { bd = d; best = e; }
+    if (d <= bd && !unseen(W, b, e, d)) { bd = d; best = e; }
   }
   return best;
 }
@@ -985,7 +1004,7 @@ function pickFoe(W, b, r) {
     if (e.gate) continue;
     if (e.hero && G.buffs.stealth > G.t) continue;
     const d = d2(b, e);
-    if (d > r) continue;
+    if (d > r || unseen(W, b, e, d)) continue;
     const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
     if (s < bs) { bs = s; best = e; }
   }
@@ -1002,6 +1021,8 @@ function think(W, b) {
   const k = hpk(b);
   // Taunted: the taunter is the target for a while.
   if (b.taunt && b.taunt.until > G.t && alive(b.taunt.by)) b.target = b.taunt.by;
+  // The timid: tucked behind a wall or in a corner while the odds are bad (hideThink).
+  if (hideThink(W, b, order)) return;
   // Low: back to a healer or the camp; back in once mended.
   if (b.state !== 'retreat' && (k < (b.role === 'tank' ? 0.2 : 0.3)) && !b.carry) {
     b.state = 'retreat';
@@ -1080,6 +1101,13 @@ function think(W, b) {
       b.dest = gateFront(W, b);
     } else if (dist > 1.1) b.dest = [t.tx, t.ty];
     else b.dest = null;
+    // The timid keep to the edge of a fight: a blade goes in only on a foe its friends are on
+    // already (else it waits a few tiles back), a caster strikes from its full reach.
+    if (b.timid && !t.gate && !t.cmdr && W.phase !== 'final' && b.role !== 'healer') {
+      const ax = Math.sign(b.tx - t.tx), ay = Math.sign(b.ty - t.ty);
+      if (range <= 1 && !(t.engaged > 0) && dist > 1.1 && t.target !== b) b.dest = dist > 4 ? [t.tx + ax * 3, t.ty + ay * 3] : null;
+      else if (range > 1 && dist < range - 1 && !t.gate) b.dest = [clamp(b.tx + (ax || pick([-1, 1])) * 2, 0, W.map.cols - 1), b.ty + ay];
+    }
     if (dist <= range + 0.5) act(W, b, t);
     // A fighter does not chase far from its order.
     // (One that chases a kill goes further, and lags behind its squad.)
@@ -1493,8 +1521,8 @@ function guard(W, m, sec) {
 }
 
 function onScreen(b) {
-  const G = A.G(), p = G.player;
-  return Math.abs(b.x - p.x) < A.VW() / 2 + 60 && Math.abs(b.y - p.y) < A.VH() / 2 + 80;
+  const G = A.G(), c = window.__warCam, x = c ? c[0] : G.player.x, y = c ? c[1] : G.player.y;
+  return Math.abs(b.x - x) < A.VW() / 2 + 60 && Math.abs(b.y - y) < A.VH() / 2 + 80;
 }
 function fxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('war', 12); }
 function castFx(W, b, id, at, scale) {
@@ -1734,6 +1762,7 @@ function kill(W, f, killer) {
   f.target = null;
   W.ghosts.push({ b: f, tx: f.tx, ty: f.ty, x: f.x, y: f.y, t: G.t, until: f.respawnAt || G.t + 3 });
   if (f.carry) dropCrate(W, f);
+  if (f.hide) endHide(W, f, 'died');
   // The killer and those who struck it within six seconds (for a tenth of its life at least, so
   // a sweep that grazed it does not count): kills and assists.
   const by = killer && killer.team !== f.team ? killer : f.lastHitBy;
@@ -2929,7 +2958,9 @@ function soloThink(W, b, order) {
       if (d > R) continue;
       let s = -d * 0.25;
       if (st === 'diver') s += e.role === 'healer' ? 6 : e.role === 'support' ? 1 : -4;
-      else s += (around(e, W.alive[e.team], 4) === 0 ? 4 : 0) + (e.pw > 1.04 || e.leader || e.hero ? 2 : 0) + (1 - hpk(e)) * 3 + (e.role === 'healer' ? 1.5 : 0) - (e.role === 'tank' ? 2 : 0);
+      else s += (around(e, W.alive[e.team], 4) === 0 ? 4 : 0) + (e.pw > 1.04 || e.leader || e.hero ? 2 : 0) + (1 - hpk(e)) * 3 + (e.role === 'healer' ? 1.5 : 0) - (e.role === 'tank' ? 2 : 0)
+        // One seen running off to hide (or hiding where it was seen go): easy prey, sought out.
+        + (e.hide ? (e.hide.seenBy === b.team ? 6 : d < 10 ? 3 : 0) : 0);
       // Not into a crowd of theirs.
       s -= Math.max(0, around(e, W.alive[e.team], 4) - 1) * 1.5;
       if (s > bs) { bs = s; best = e; }
@@ -2953,6 +2984,8 @@ function soloThink(W, b, order) {
   b.target = t;
   b.tWhy = st;
   const dist = d2(b, t), range = b.kit.range;
+  // A hider found in its corner.
+  if (t.hide && t.hide.phase === 'wait' && dist <= 2.5 && !t.hide.found) found(W, t, b);
   if (range > 1) b.dest = dist > range ? [t.tx, t.ty] : dist < 2 ? [clamp(b.tx + (Math.sign(b.tx - t.tx) || 1) * 2, 0, W.map.cols - 1), b.ty] : null;
   else b.dest = dist > 1.1 ? [t.tx, t.ty] : null;
   if (dist <= range + 0.5) {
@@ -2990,6 +3023,228 @@ function duelCheck(W, b, t) {
 function inDuel(W, b, e) {
   const d = e.duel;
   return !!(d && d.until > A.G().t && d.with !== b && alive(d.with));
+}
+
+// ------------------------------------------------ the weak hide (숨기)
+// A weak player in a guild war does not stand in the middle of it: it keeps to the edge, and when
+// the odds turn (outnumbered, its life low, a healer jumped with no tank by) it runs behind a
+// wall or into a corner out of the enemy's sight, waits there, peeks out, and comes back in when
+// its friends are winning; caught there, it runs to them shouting for help. A few of each guild
+// at most, and never the one carrying a crate: the objectives go on. Hunters look in the corners.
+
+const HIDE_MAX = 3;
+
+/** Whether a fighter is one of the timid: the cautious, some weak healers, a few other weak ones. */
+function timidOf(W, f) {
+  if (W.raid || f.role === 'tank') return false;
+  const weak = f.pw < 0.94 || f.lv <= 22;
+  if (f.style === 'cautious') return true;
+  if (f.role === 'healer') return weak && Math.random() < 0.5;
+  return weak && Math.random() < 0.15;
+}
+
+/** Whether the walk grid lets one see from (ax, ay) to (bx, by): no closed tile on the line between. */
+function los(W, ax, ay, bx, by) {
+  const m = W.map, n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 2;
+  for (let i = 1; i < n; i++) {
+    const x = Math.round(ax + (bx - ax) * i / n), y = Math.round(ay + (by - ay) * i / n);
+    if ((x !== ax || y !== ay) && (x !== bx || y !== by) && !m.walk[y * m.cols + x]) return false;
+  }
+  return true;
+}
+
+/** A hider in its corner, out of b's sight: passed over (the war's look-arounds) unless right by it. */
+function unseen(W, b, e, d) {
+  return !!(e.hide && e.hide.phase === 'wait' && d > 2.5 && !los(W, b.tx, b.ty, e.tx, e.ty));
+}
+
+/**
+ * A place to hide from the foes near (walking distance up to nine): out of their sight lines (a
+ * wall between), tucked against walls (a corner, a nook, a side yard), away from them and not
+ * through them. Null when there is none worth it.
+ */
+function hideSpot(W, b, foes) {
+  const m = W.map, cols = m.cols, rows = m.rows, seen = new Set();
+  const q = [[b.tx, b.ty, 0]];
+  foes = foes.filter(e => Math.abs(e.tx - b.tx) + Math.abs(e.ty - b.ty) <= 18);
+  seen.add(b.ty * cols + b.tx);
+  let best = null, bs = -1e9;
+  const fx = foes.reduce((a, e) => a + e.tx, 0) / foes.length, fy = foes.reduce((a, e) => a + e.ty, 0) / foes.length;
+  for (let h = 0; h < q.length; h++) {
+    const [x, y, st] = q[h];
+    if (st >= 2) {
+      let near = 1e9, sees = 0;
+      for (const e of foes) {
+        const d = Math.abs(e.tx - x) + Math.abs(e.ty - y);
+        near = Math.min(near, d);
+        if (d <= 16 && los(W, e.tx, e.ty, x, y)) { sees++; break; }
+      }
+      if (!sees && near >= 4) {
+        let wall = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if ((dx || dy) && (nx < 0 || ny < 0 || nx >= cols || ny >= rows || !m.walk[ny * cols + nx])) wall++;
+        }
+        if (wall >= 2) {
+          // Away from the foes (not round them to the far side of the fight).
+          const away = (Math.abs(x - fx) + Math.abs(y - fy)) - (Math.abs(b.tx - fx) + Math.abs(b.ty - fy));
+          // (A corner or a nook, three sides walled or more, well before a wall's foot.)
+          const sc = (wall >= 3 ? 3 : 0) + Math.min(5, wall) * 1.2 + Math.min(near, 9) * 0.5 + clamp(away, -4, 4) * 0.6 - st * 0.3 - (A.occ.has(k2(x, y)) ? 4 : 0);
+          if (sc > bs) { bs = sc; best = [x, y]; }
+        }
+      }
+    }
+    if (st >= 9) continue;
+    for (const [dx, dy] of DIR4) {
+      const nx = x + dx, ny = y + dy, ni = ny * cols + nx;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || seen.has(ni) || !open(W, nx, ny, b.team)) continue;
+      // Not past a foe to get there.
+      if (foes.some(e => Math.abs(e.tx - nx) + Math.abs(e.ty - ny) <= 1)) continue;
+      seen.add(ni);
+      q.push([nx, ny, st + 1]);
+    }
+  }
+  return best;
+}
+
+/** Test counters (__warState().diag.hide): how often the timid hide, why, how it ends, for how long. */
+function hideDiag(W) {
+  return W.diag && (W.diag.hide = W.diag.hide || { starts: 0, team: [0, 0], why: {}, found: 0, fled: 0, peeks: 0, back: 0, timeout: 0, time: 0, n: 0, max: 0 });
+}
+
+/** The hider stops hiding (how: back in, fled, …); its time hidden counted. */
+function endHide(W, b, how) {
+  const G = A.G(), h = b.hide;
+  if (!h) return;
+  b.hide = null;
+  b.hideCd = G.t + rnd(10, 20);
+  const D = hideDiag(W);
+  if (D) {
+    const t = G.t - h.at0;
+    D.time += t; D.n++; D.max = Math.max(D.max, t);
+    D[how] = (D[how] || 0) + 1;
+  }
+}
+
+/** A hider come upon in its corner. */
+function found(W, t, by) {
+  t.hide.found = true;
+  t.hide.by = by;
+  const D = hideDiag(W);
+  if (D) {
+    D.found++;
+    if (by.style === 'hunter') D.byHunter = (D.byHunter || 0) + 1;
+    (D.log = D.log || []).length < 12 && D.log.push([Math.round(W.t), t.team, t.name, t.tx, t.ty, by.name, by.style || '']);
+  }
+  if (t.team === 0) chat(W, t, 'found', ['살려줘요!!', '들켰다 ㅠㅠ', '저 좀 살려줘요!', '헉 찾아왔어'], { every: 8, p: 0.9, emo: Math.random() < 0.5 ? 'surprise' : null });
+  else if (by.team === 0) chat(W, by, 'found', ['숨어 있는 거 찾았다 ㅋㅋ', '거기 숨어 있었네?', '구석에 하나 있다 ㅋ'], { every: 12, p: 0.8 });
+}
+
+/**
+ * The timid's play: true when it acted. Out of a fight going badly into a hiding place, there a
+ * while, a peek, back in when the odds are good; caught, away to its friends.
+ */
+function hideThink(W, b, order) {
+  const G = A.G();
+  if (!b.timid || b.carry || W.raid) return false;
+  const h = b.hide;
+  const foes = W.alive[1 - b.team], mates = W.alive[b.team];
+  const count = (list, x, y, r) => { let n = 0; for (const o of list) if (o !== b && !o.gate && Math.abs(o.tx - x) + Math.abs(o.ty - y) <= r) n++; return n; };
+  const k = hpk(b);
+  if (!h) {
+    if (G.t < (b.hideCd || 0)) return false;
+    const near = foes.filter(e => !e.gate && !e.troop && Math.abs(e.tx - b.tx) + Math.abs(e.ty - b.ty) <= 6);
+    if (!near.length) return false;
+    const nf = near.length, nm = count(mates, b.tx, b.ty, 5);
+    const struck = G.t - (b.lastHitT || -9) < 1.5;
+    // In the 결전 only the hurt hide: the rest come to the point.
+    let why = null;
+    if (k < 0.4) why = 'low';
+    else if (W.phase !== 'final' && b.role === 'healer' && struck && !mates.some(m => m.role === 'tank' && d2(m, b) < 3)) why = 'healer';
+    else if (W.phase !== 'final' && nf >= 2 && nf > nm + 1) why = 'odds';
+    if (!why) return false;
+    let n = 0;
+    for (const m of mates) if (m.hide) n++;
+    if (n >= HIDE_MAX) return false;
+    b.hideCd = G.t + 2; // (looked, and found no place: not again at once)
+    const spot = hideSpot(W, b, foes.filter(e => !e.gate));
+    if (!spot) return false;
+    // Seen going: the hunters of the other side know where to look.
+    const seenBy = Math.random() < 0.8 && near.some(e => los(W, e.tx, e.ty, b.tx, b.ty)) ? 1 - b.team : -1;
+    b.hide = { spot, phase: 'go', at0: G.t, until: G.t + rnd(8, 16), why, seenBy, found: false, fight: [b.tx, b.ty] };
+    b.state = 'go';
+    b.retreatTo = undefined;
+    const D = hideDiag(W);
+    if (D) { D.starts++; D.team[b.team]++; D.why[why] = (D.why[why] || 0) + 1; }
+    chat(W, b, 'hide', why === 'low' ? ['피 없어서 숨을게요', '잠깐 숨어요 ㅠ', '저 숨어 있을게요'] : why === 'healer' ? ['힐러 물려서 숨어요!', '살려줘요 저 숨을게요', '탱님 저 좀요 ㅠ'] : ['저 숨어 있을게요', '쪽수 밀려서 빠짐', '잠깐 숨을게요'], { every: 12, p: 0.55, emo: Math.random() < 0.3 ? 'sweat' : null });
+    b.dest = spot;
+    b.target = null;
+    return true;
+  }
+  const D = hideDiag(W);
+  // Not for ever: half a minute at most, then back to the war whatever the odds.
+  if (G.t - h.at0 > 30) { endHide(W, b, 'timeout'); return false; }
+  const closest = nearest(W, b, 4);
+  // Caught (a foe on it, or at it with a clear line): away to its friends, calling for help.
+  if (h.phase !== 'flee' && closest && (d2(closest, b) <= 2 || (h.phase === 'wait' && los(W, closest.tx, closest.ty, b.tx, b.ty)))) {
+    if (h.phase === 'wait' && !h.found) found(W, b, closest);
+    h.phase = 'flee';
+    h.fleeT = G.t + rnd(3, 5);
+    if (b.team === 0) chat(W, b, 'help', ['살려줘요!!', '저 쫓기고 있어요 ㅠㅠ', '도와줘요!!'], { every: 6, p: 0.8, emo: Math.random() < 0.4 ? 'dizzy' : null });
+  }
+  if (h.phase === 'flee') {
+    let best = null, bd = 1e9;
+    for (const m of mates) { if (m === b || m.gate || m.hide) continue; const d = d2(m, b); if (d > 2 && d < bd && count(mates, m.tx, m.ty, 3) >= 2) { bd = d; best = m; } }
+    const sp = W.teams[b.team].spawn;
+    b.dest = best ? [best.tx, best.ty] : [sp[0], sp[1]];
+    const t = nearest(W, b, b.kit.range + 0.5);
+    if (t) act(W, b, t);
+    if (G.t > h.fleeT || (best && bd <= 3) || !nearest(W, b, 6)) endHide(W, b, 'fled');
+    return true;
+  }
+  if (h.phase === 'go') {
+    if (b.tx !== h.spot[0] || b.ty !== h.spot[1]) {
+      b.dest = h.spot;
+      if (G.t - h.at0 > 9 && !h.waitAt) endHide(W, b, 'timeout');
+      return true;
+    }
+    h.phase = 'wait';
+    h.waitAt = h.waitAt || G.t;
+    h.peekT = G.t + rnd(3, 6);
+  }
+  if (h.phase === 'wait') {
+    b.dest = null;
+    b.target = null;
+    // A potion or two while it waits (thinking eight times a second).
+    b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.025 * 0.125);
+    if (G.t > h.peekT || (G.t > h.until && k > 0.5)) {
+      h.phase = 'peek';
+      h.peekUntil = G.t + rnd(1.2, 2.2);
+      // A step or two out of the corner, toward where the fight was.
+      const dx = Math.sign(h.fight[0] - b.tx), dy = Math.sign(h.fight[1] - b.ty);
+      h.peekAt = dx && open(W, b.tx + dx * 2, b.ty, b.team) ? [b.tx + dx * 2, b.ty] : dy && open(W, b.tx, b.ty + dy * 2, b.team) ? [b.tx, b.ty + dy * 2] : [b.tx + dx, b.ty + dy];
+      if (D) D.peeks++;
+    }
+    return true;
+  }
+  if (h.phase === 'peek') {
+    b.dest = open(W, h.peekAt[0], h.peekAt[1], b.team) ? h.peekAt : null;
+    // A caster pokes from the corner.
+    const t = nearest(W, b, b.kit.range + 0.5);
+    if (t && b.kit.range > 1) act(W, b, t);
+    if (G.t < h.peekUntil) return true;
+    const near = foes.filter(e => !e.gate && Math.abs(e.tx - b.tx) + Math.abs(e.ty - b.ty) <= 9);
+    const good = k > 0.65 && (near.length === 0 || count(mates, b.tx, b.ty, 8) >= near.length + 1);
+    if (good || G.t > h.until + 10 || W.phase === 'final' && k > 0.5) {
+      chat(W, b, 'back', ['지금 들어갈게요!', '이제 갑니다', '나도 갈게요 ㅋ'], { every: 14, p: 0.5 });
+      endHide(W, b, 'back');
+      return false;
+    }
+    h.phase = 'go';
+    b.dest = h.spot;
+    return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------- the end
@@ -3172,6 +3427,52 @@ function toggleBoard() {
   if (!sb.hidden) { sb.hidden = true; return; }
   sb.innerHTML = `<h2 style="color:#ffd27a;text-align:center;margin:2px">현황 · ${G.war.def.name} <small>(누르면 닫힘)</small></h2>${tables(G.war, board(G.war))}`;
   sb.hidden = false;
+}
+
+/**
+ * Test (window.__wallCheck = { truth?: { <war>: walk rows } }): every update, every body's tile
+ * (fighters, guards, commanders, the hero, its summons, the cart) against the walk grid (or a
+ * given one), and each move of more than one tile checked along its line for a wall crossed.
+ * Counts by kind and cause (the last mover: walk, swap, side, place; the hero's step or leap; a
+ * pull) in __wallCheck.v; the first few in __wallCheck.log.
+ */
+function wallCheck(W) {
+  const wc = window.__wallCheck, G = A.G(), m = W.map, truth = wc.truth && wc.truth[W.def.id];
+  const closed = (x, y) => x < 0 || y < 0 || x >= m.cols || y >= m.rows || (truth ? truth[y][x] !== '.' : !m.walk[y * m.cols + x]);
+  const v = wc.v = wc.v || {};
+  wc.frames = (wc.frames || 0) + 1;
+  const p = G.player;
+  const look = (b, kind, x, y, cause) => {
+    wc.samples = (wc.samples || 0) + 1;
+    const prev = b.__wc;
+    b.__wc = [x, y];
+    const grid = truth && x >= 0 && y >= 0 && x < m.cols && y < m.rows && m.walk[y * m.cols + x] ? 'grid:' : '';
+    const add = what => {
+      const k = kind + ' ' + what;
+      // Frames on a closed tile (wc.f), and the times one came onto one (v).
+      wc.f = (wc.f || 0) + 1;
+      const at = what[0] + x + ',' + y;
+      if (b.__wcBad === at) return;
+      b.__wcBad = at;
+      v[k] = (v[k] || 0) + 1;
+      if ((wc.log = wc.log || []).length < 40) wc.log.push([W.def.id, Math.round(W.t * 10) / 10, k, b.name, x, y, prev]);
+    };
+    if (closed(x, y)) add('on:' + grid + cause);
+    else b.__wcBad = null;
+    // (A body set down at its camp or by a revive is not carried through what lies between.)
+    if (prev && cause !== 'place' && Math.abs(prev[0] - x) + Math.abs(prev[1] - y) > 1) {
+      const n = Math.max(Math.abs(prev[0] - x), Math.abs(prev[1] - y)) * 3;
+      for (let i = 1; i < n; i++) {
+        const cx = Math.round(prev[0] + (x - prev[0]) * i / n), cy = Math.round(prev[1] + (y - prev[1]) * i / n);
+        if (closed(cx, cy)) { add('cross:' + cause); break; }
+      }
+    }
+  };
+  for (const b of W.bodies) if (b.dead) b.__wc = null; else look(b, b.cmdr ? 'cmdr' : b.troop ? 'troop' : 'fighter', b.tx, b.ty, b.mvX === b.tx && b.mvY === b.ty ? b.mv : 'pull');
+  if (!G.dead) look(W.hero, 'hero', p.tx, p.ty, p.slide && G.t - p.slide.t < 0.3 ? 'leap' : 'step');
+  else W.hero.__wc = null;
+  for (const a of G.allies) look(a, 'summon', a.tx, a.ty, 'summon');
+  if (W.cart) look(W.cart, 'cart', W.cart.tx, W.cart.ty, 'cart');
 }
 
 function warState() {
@@ -3741,6 +4042,16 @@ function drawMap(camX, camY) {
       const sw = Math.min(im.width - sx, Math.ceil(camX + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(camY + VH - cy * c - sy) + 1);
       if (sw > 0 && sh > 0) ctx.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
     }
+  // Test (__dbgWar.walls): the walk grid's closed tiles over the map, to hold against its walls.
+  if (window.__dbgWar && window.__dbgWar.walls) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+    ctx.strokeStyle = 'rgba(255,0,0,0.6)';
+    for (let y = Math.max(0, Math.floor(camY / TILE)); y * TILE < camY + VH && y < m.rows; y++)
+      for (let x = Math.max(0, Math.floor(camX / TILE)); x * TILE < camX + VW && x < m.cols; x++)
+        if (!m.walk[y * m.cols + x]) { ctx.fillRect(x * TILE, y * TILE, TILE, TILE); ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1); }
+    ctx.restore();
+  }
 }
 
 /** Under the bodies: the flags' circles, the cart, the gate's doors, the crates, the posts. */

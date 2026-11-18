@@ -10,8 +10,10 @@ town is drawn) and OUT_DIR/ywar/index.json:
 
     {"<war>": {"w", "h", "chunk": 1024, "cols", "rows", "walk": ["..#.", ...], "map", "crop"}}
 
-walk is the map's own movables on the game's 48-pixel tiles (a tile is open when 연's 32-pixel
-tile under its middle is). With --preview also OUT_DIR/ywar_preview/<war>.png: the crop at a
+walk is the map's own movables on the game's 48-pixel tiles (walk_grid: a tile is open when 연's
+32-pixel tiles under its middle and under a body's feet are, no wall of 연's runs between it and an
+open neighbour, and it is not under a roof's eaves). With --walk only index.json is rewritten (the
+pieces kept). With --preview also OUT_DIR/ywar_preview/<war>.png: the crop at a
 third, with the 48-pixel grid every 5 tiles, for placing the objectives.
 
 Also (OUT_DIR is the GEAR_DIR the build reads):
@@ -110,20 +112,151 @@ def units(dec, out):
         json.dump(idx, open(ip, 'w'), ensure_ascii=False)
 
 
+ROOF = 2  # 연's tile layer drawn over the walkers: roofs, the caps of walls, a gate's lintel
+
+
+def blocked32(data, crop):
+    """연's 32-pixel tiles in the crop a body may not stand on: not movable, or under the eaves.
+
+    The eaves: 연 draws its roof layer over the walkers, so a movable tile under a roof's edge is
+    one a walker passes behind. This game draws the whole field under its bodies, and one there
+    stood on the roof or the top of the wall. Such a tile is closed when the roof over it ends on a
+    wall or a house below (the tiles under it, roofed and movable, run into an unmovable one within
+    four): a gate's passage under its lintel runs on into open ground (or on under a deep roof) and
+    stays open.
+    """
+    W = data['width']
+    x0, y0, x1, y1 = crop
+    mv = data['movables']
+    roof = data['tileLayers'][ROOF]['tiles']
+    w, h = x1 - x0, y1 - y0
+    blk = [[not mv[(y0 + y) * W + x0 + x] for x in range(w)] for y in range(h)]
+    under = [[mv[(y0 + y) * W + x0 + x] and roof[(y0 + y) * W + x0 + x]['aioTileID'] >= 0 for x in range(w)] for y in range(h)]
+    # 연's unseen blockers: unmovable tiles with nothing drawn over a floor the walkers walk on
+    # elsewhere (a bar of three in the 길림 meadow, the 백호 statue's square on the court), where 연
+    # stands a map object (a tree, a lantern, a statue) this field does not draw. An unseen wall
+    # held the bodies back for no reason the player could see, and the timid hid behind thin air:
+    # such a tile is opened.
+    ground = data['tileLayers'][0]['tiles']
+    gid = lambda x, y: ground[(y0 + y) * W + x0 + x]['aioTileID']
+    on_floor = {}
+    for y in range(h):
+        for x in range(w):
+            if not blk[y][x]:
+                on_floor[gid(x, y)] = on_floor.get(gid(x, y), 0) + 1
+    for y in range(h):
+        for x in range(w):
+            if blk[y][x] and on_floor.get(gid(x, y), 0) >= 8 and not any(
+                    L['tiles'][(y0 + y) * W + x0 + x]['aioTileID'] >= 0 for L in data['tileLayers'][1:]):
+                blk[y][x] = False
+    out = [row[:] for row in blk]
+    for y in range(h):
+        for x in range(w):
+            if not under[y][x]:
+                continue
+            yy = y
+            while yy < h and yy - y <= 4 and under[yy][x]:
+                yy += 1
+            if yy - y <= 4 and (yy >= h or blk[yy][x]):
+                out[y][x] = True
+    return out
+
+
+def walk_grid(blk, cols, rows):
+    """The game's 48-pixel walk grid from 연's 32-pixel blocked tiles.
+
+    A cell is closed when the 연 tile under its middle or under a body's feet (6 pixels above its
+    bottom) is. Sampling the middle alone missed 연's thin walls (one tile thick, a cliff's edge, a
+    fence) on every third 연 row and column, the ones split between two cells: bodies walked
+    through them. So a pair of open neighbours with a closed 연 tile on the line between their
+    middles (or their feet) has one of them closed: the one with more wall in it.
+    """
+    h, w = len(blk), len(blk[0])
+
+    def b(px, py):
+        x, y = int(px) // T, int(py) // T
+        return x < 0 or y < 0 or x >= w or y >= h or blk[y][x]
+
+    def wall(gx, gy):
+        n = 0
+        for py in range(gy * G, gy * G + G, 8):
+            for px in range(gx * G, gx * G + G, 8):
+                n += b(px + 4, py + 4)
+        return n
+
+    cells = [[not (b(gx * G + G // 2, gy * G + G // 2) or b(gx * G + G // 2, gy * G + G - 6)) for gx in range(cols)] for gy in range(rows)]
+    for _ in range(4):
+        changed = 0
+        for gy in range(rows):
+            for gx in range(cols):
+                if not cells[gy][gx]:
+                    continue
+                for nx, ny in ((gx + 1, gy), (gx, gy + 1)):
+                    if nx >= cols or ny >= rows or not cells[ny][nx]:
+                        continue
+                    ax, ay, bx, by = gx * G + G // 2, gy * G + G // 2, nx * G + G // 2, ny * G + G // 2
+                    cut = False
+                    for k in range(0, G + 1, 4):
+                        if nx != gx:
+                            cut = cut or b(ax + k, ay) or b(ax + k, ay + G // 2 - 6)
+                        else:
+                            cut = cut or b(ax, ay + k) or b(ax, ay + k + G // 2 - 6)
+                    if cut:
+                        if wall(nx, ny) > wall(gx, gy):
+                            cells[ny][nx] = False
+                        else:
+                            cells[gy][gx] = False
+                        changed += 1
+                        if not cells[gy][gx]:
+                            break
+        if not changed:
+            break
+    # Pockets cut off from the field (a yard walled round, a corner behind a roof): closed too, so
+    # no one is placed where it can never walk out of.
+    comp, best = {}, None
+    for gy in range(rows):
+        for gx in range(cols):
+            if not cells[gy][gx] or (gx, gy) in comp:
+                continue
+            part, st = [(gx, gy)], [(gx, gy)]
+            comp[(gx, gy)] = part
+            while st:
+                x, y = st.pop()
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < cols and 0 <= ny < rows and cells[ny][nx] and (nx, ny) not in comp:
+                        comp[(nx, ny)] = part
+                        part.append((nx, ny))
+                        st.append((nx, ny))
+            if best is None or len(part) > len(best):
+                best = part
+    for (x, y), part in comp.items():
+        if part is not best:
+            cells[y][x] = False
+    return [''.join('.' if c else '#' for c in row) for row in cells]
+
+
 def main():
     dec, out = sys.argv[1], sys.argv[2]
     if '--assets' in sys.argv:
         props(dec, out)
         units(dec, out)
     preview = '--preview' in sys.argv
+    walk_only = '--walk' in sys.argv
     d = os.path.join(out, 'ywar')
     os.makedirs(d, exist_ok=True)
     index = {}
+    if walk_only:
+        with open(os.path.join(d, 'index.json'), encoding='utf-8') as f:
+            index = json.load(f)
     full_cache = {}
     for war, (bundle, name, (x0, y0, x1, y1)) in WARS.items():
         b = os.path.join(dec, bundle)
         data, _ = yeon_maps.load_map(b, name)
-        W = data['width']
+        if walk_only:
+            v = index[war]
+            v['walk'] = walk_grid(blocked32(data, (x0, y0, x1, y1)), v['cols'], v['rows'])
+            print(war, 'walk', sum(r.count('#') for r in v['walk']), 'closed of', v['cols'] * v['rows'])
+            continue
         if (b, name) not in full_cache:
             full_cache[(b, name)] = yeon_maps.render(b, name)
         full = full_cache[(b, name)]
@@ -136,15 +269,8 @@ def main():
             for cx in range(0, -(-w // CH)):
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
                     os.path.join(d, f'{war}_{cx}_{cy}.png'), optimize=True)
-        mv = data['movables']
         cols, rows = w // G, h // G
-        walk = []
-        for gy in range(rows):
-            row = ''
-            for gx in range(cols):
-                mx, my = x0 + (gx * G + G // 2) // T, y0 + (gy * G + G // 2) // T
-                row += '.' if mv[my * W + mx] else '#'
-            walk.append(row)
+        walk = walk_grid(blocked32(data, (x0, y0, x1, y1)), cols, rows)
         index[war] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'map': name, 'crop': [x0, y0, x1, y1]}
         print(war, name, (w, h), (cols, rows))
         if preview:
