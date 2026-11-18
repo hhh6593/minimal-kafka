@@ -239,7 +239,7 @@ export const CRAFTS = [
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
   { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
+  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', base: { mage: [309203, '주작선장'] }, /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
@@ -250,7 +250,7 @@ export const CRAFTS = [
 ];
 for (const c of CRAFTS) {
   const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
-    gyeok: CRAFT_GYEOK[c.id] || null };
+    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
   // Put the look on every class's line now, so the loader fetches its sheets with the rest.

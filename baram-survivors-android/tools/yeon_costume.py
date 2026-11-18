@@ -580,6 +580,28 @@ def main():
                     if only:
                         print(iid, cl, 'no picture', d is None)
                     continue
+                # A few looks the game must have (주작선장, the 사신수 staff) draw no frame of an
+                # attack clip: those frames take the same direction's nearest drawn frame of
+                # another clip (cast, then stand, then any), so the staff stays in hand.
+                if iid in (cfg.get('fill_bare') or []):
+                    def donor(f):
+                        dirn = f[0].split('_')[-1]
+                        for pre in ('cast', 'magic', 'stand', 'idle', 'walk', ''):
+                            for k in sorted(d):
+                                if k[0].endswith(dirn) and k[0].startswith(pre) and d.get(k):
+                                    return d[k]
+                        return None
+                    need_all = set().union(*[own[c].get(kind, set()) | own[c].get('wback', set()) for c in cl])
+                    for f in need_all:
+                        if not d.get(f):
+                            g = donor(f)
+                            if g:
+                                d[f] = g
+                                for k in lk:
+                                    if draws[k] is not None and not draws[k].get(f):
+                                        dk = [kk for kk in sorted(draws[k]) if kk[0].endswith(f[0].split('_')[-1]) and draws[k].get(kk)]
+                                        if dk:
+                                            draws[k][f] = draws[k][dk[0]]
                 metas = {}
                 for cls in cl:
                     need = {(k, i) for k, i in own[cls].get('head', ()) if k != 'dead'} if whole else own[cls].get(kind, set())
