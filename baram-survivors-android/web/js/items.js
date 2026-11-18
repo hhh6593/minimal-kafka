@@ -379,7 +379,7 @@ export const ABYSS_SWING = {
     heavy: [['k_ab_spree', 1, 0, 0]] },
 };
 // size (× the layers' own), seconds between strikes' effects, the heavy blow every hcd s.
-export const SWING_OF = { scale: 1.05, cd: 0.3, heavy: 1, hcd: 1.2 };
+export const SWING_OF = { scale: 1.05, cd: 0.45, heavy: 1, hcd: 2 };
 // A far weapon's flying spells and arrows leave a trail: puffs of black smoke and embers behind
 // them, every cd seconds while they fly.
 // The strike effects' size against the hero (a blow of the weapon, not a spell of its own).
