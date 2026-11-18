@@ -540,7 +540,18 @@
   body.yeon #chat p.party { color: #9aff8a; }
   body.yeon #chat p.warn { color: #ff8a6a; }
   body.yeon #map-tab { top: 4px; background: none; border: 0; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
-  body.yeon #keys { right: 10px; bottom: 10px; flex-direction: row; align-items: flex-end; }
+  /* The small keys (현황·모여 / 메뉴·사냥) stand two by two over the 필살기 button, each big
+     enough for a thumb and apart from it (in a row beside it they were small and a press often
+     went to the wrong one), all inside the 100px the skill bar leaves at the right. */
+  body.yeon #keys { right: 8px; bottom: 8px; display: grid; grid-template-columns: 42px 42px; gap: 5px;
+      justify-items: stretch; align-items: end; }
+  body.yeon #keys > button { touch-action: manipulation; }
+  body.yeon #keys > button:not(#ult) { height: 32px; width: auto !important; min-width: 0; padding: 0 2px;
+      font-size: 12px !important; line-height: 28px; white-space: nowrap;
+      background: rgba(0,0,0,0.78) !important; color: #fff !important; border: 2px solid rgb(148,48,219) !important; }
+  body.yeon #keys > #war-call-btn { border-color: rgb(88,168,60) !important; color: #c8f0b0 !important; }
+  body.yeon #keys > #speed-btn { grid-column: 1 / -1; }
+  body.yeon #keys > #ult { grid-column: 1 / -1; justify-self: end; margin-top: 2px; }
   body.yeon #ult { width: 58px; height: 58px; background: #000 no-repeat center 4px / 40px 40px; border: 3px solid rgb(148,48,219);
       outline: 1px solid #000; color: #fff; font-size: 9px; display: flex; flex-direction: column; justify-content: flex-end;
       padding-bottom: 1px; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }

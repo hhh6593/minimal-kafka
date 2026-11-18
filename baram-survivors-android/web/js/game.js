@@ -5775,7 +5775,10 @@ function drawSkillBar() {
   const yeon = document.body.classList.contains('yeon'), dpr = canvas.width / cr.width;
   const sz = Math.round((yeon ? 38 : 30) * u), gap = Math.round(5 * u);
   // 연: two rows of four at the bottom right, left of the 필살기 button; else a row at the bottom left.
-  const x0 = yeon ? W - (100 * dpr) - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
+  // 연: ends left of the keys (현황·모여 / 메뉴·사냥 over the 필살기), wherever their grid stands.
+  const kr = yeon && $('#keys') ? $('#keys').getBoundingClientRect() : null;
+  const right = kr && kr.width ? Math.min(W - 100 * dpr, (kr.left - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
+  const x0 = yeon ? right - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
   G.skills.slice(0, 8).forEach((s, i) => {
     const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap), y = y0 + (yeon && i >= 4 ? sz + gap : 0);
     // 연's slot: a purple frame in a black line.
