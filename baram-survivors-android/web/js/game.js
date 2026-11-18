@@ -7,6 +7,7 @@ import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
+import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -972,6 +973,7 @@ function applyGear() {
   p.gearHp = hp;
   p.armor = G.cls.armor + (hasShield(G.cls.id) ? Math.max(0, pow('shield') + 1) : Math.max(0, Math.floor(pow('armor') / 2) + 1)) + Math.round(extra('cape') / 3) + 3 * (bonus.guard || 0) + cs.armor;
   p.gearPower = (1 + 0.12 * pow('weapon')) * (1 + 0.15 * (bonus.power || 0)) * (1 + cs.dmg) * (1 + PROMO_BONUS.dmg * promo);
+  p.bootPct = bootsPct(progress); // 신발 (boots.js): 이동속도, worn by every class
   // 격: what the worn pieces loose by themselves (gyeok.js), and the statuses the shields ward off.
   const gy = [];
   p.wards = new Set();
@@ -1302,6 +1304,57 @@ function wear(kind, tier, sp = null) {
   } else if (T && T.cls === cls && hasAvatars()) T.av = dressed(cls, g);
 }
 
+/** 이동속도 of a class as the equipment window shows it (in a hunt with its 민첩 too), and its 경공. */
+function moveInfo(cls, bootId) {
+  const g = savedGear(cls), spd = ['weapon', 'armor', 'shield', 'helmet', 'cape'].filter(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] && SPECIAL[g[k + 'Sp']].opt.id === 'speed').length;
+  const base = (1 + 0.08 * (G && G.cls === cls ? G.passives.speed : 0)) * (1 + 0.1 * spd);
+  const st = bootsState(progress), id = bootId === undefined ? st.worn : bootId;
+  return moveBonus(base, id ? BOOT[id].pct : 0);
+}
+function moveText(cls) {
+  const m = moveInfo(cls);
+  return `이동속도 +${m.pct}%${m.lvl ? ` (${KYEONGGONG[m.lvl - 1].name})` : ''}`;
+}
+
+/** The equipment window's 신발 row (boots.js): the pairs found, each with its 이동속도 against the worn. */
+function bootsRow(box) {
+  const cls = G ? G.cls : chosenClass, st = bootsState(progress), now = moveInfo(cls);
+  const h = document.createElement('h4');
+  h.textContent = '신발';
+  h.title = '이동속도 · 모든 직업 공용';
+  box.append(h);
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  const top = st.have.reduce((a, id) => (!a || BOOT[id].pct > BOOT[a].pct ? id : a), null);
+  for (const id of [null, ...BOOTS.map(b => b.id).filter(x => st.have.includes(x))]) {
+    const b = id && BOOT[id], btn = document.createElement('button');
+    btn.className = 'equip' + (st.worn === id ? ' on' : '');
+    const icon = b && picture(b.name);
+    btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${b ? b.name : '벗기'}</span>` + (b ? `<small>이동 +${b.pct}%</small>` : '');
+    const d = moveInfo(cls, id).pct - now.pct, em = document.createElement('em');
+    em.className = 'cmp ' + (st.worn === id ? 'worn' : d > 0 ? 'up' : d < 0 ? 'down' : 'same');
+    em.textContent = st.worn === id ? (b ? '착용 중' : '비어 있음') : d > 0 ? `▲이동 ${d}%` : d < 0 ? `▼이동 ${-d}%` : '같음';
+    btn.append(em);
+    if (id && id === top && st.worn !== id) btn.classList.add('best');
+    btn.onclick = () => wearBoots(id);
+    row.append(btn);
+  }
+  box.append(row);
+  const note = document.createElement('div');
+  note.className = 'boots-note';
+  note.style.cssText = 'grid-column:1 / -1;font:10px G9, monospace;color:#6a3e16;line-height:1.5;margin:0 0 4px';
+  note.innerHTML = KYEONGGONG.map((k, i) => `<div style="opacity:${now.lvl > i ? 1 : 0.55}">${now.lvl > i ? '●' : '○'} +${k.at}% ${k.name}: ${k.text}</div>`).join('')
+    + `<div style="opacity:0.7">신발은 모든 직업이 함께 씁니다${st.have.length < BOOTS.length ? " · 사냥터 보스, 대장장이 조합, 레이드 상점에서 얻습니다" : ""}.</div>`;
+  box.append(note);
+}
+
+function wearBoots(id) {
+  bootsState(progress).worn = id;
+  saveJson('bs_progress', progress);
+  if (G) applyGear();
+  buildEquip();
+}
+
 /** The 격 and wards of a set of gear, as lines for the equipment window. */
 function wornGyeok(cls, g) {
   const lines = [];
@@ -1449,13 +1502,14 @@ function buildEquip() {
     }
     box.append(row);
   }
+  bootsRow(box);
   const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]) + 0.5 * (starOf(cls, `${k}:${g[k]}`) - 1));
   const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
   const ex = k => (g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
   $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
     + ` · 방어 +${(hasShield(cls.id) ? Math.max(0, pw('shield') + 1) : Math.max(0, Math.floor(pw('armor') / 2) + 1)) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
-    + (opts.length ? ` · ${opts.join(' · ')}` : '');
+    + (opts.length ? ` · ${opts.join(' · ')}` : '') + ` · ${moveText(cls)}`;
   // The 격 worn, each with its rule (gyeok.js), and the statuses warded.
   const gys = wornGyeok(cls, g);
   let gl = $('#equip-gyeok');
@@ -1647,6 +1701,34 @@ function openCraft(sink = null) {
       say(`${MATS[id].name} ${n}개로 바꿨습니다.`, 'sys');
     });
   }
+  // 신발 (boots.js): the smith's pairs, the raid shop's, and 극'열반 made from 열반. Shared by every class.
+  head('신발 (이동속도 · 모든 직업 공용)');
+  const bst = bootsState(progress);
+  for (const bt of BOOTS.filter(x => !x.drop)) {
+    const got = bst.have.includes(bt.id), baseOk = !bt.from || bst.have.includes(bt.from);
+    const ok = !got && baseOk && (bt.coins ? (progress.coins || 0) >= bt.coins
+      : Object.entries(bt.mats).every(([id, n]) => (mats[id] || 0) >= n) && (progress.gold || 0) >= bt.gold);
+    icon = picture(bt.name);
+    meta = bt.coins ? { opt: `이동속도 +${bt.pct}%`, got } : { mats: bt.mats, gold: bt.gold, base: bt.from ? BOOT[bt.from].name : null, opt: `이동속도 +${bt.pct}%`, got };
+    row(`${bt.name} (이동속도 +${bt.pct}%)`, bt.coins ? `레이드주화 ${bt.coins}개` : `${bt.from ? BOOT[bt.from].name + ' + ' : ''}`
+      + Object.entries(bt.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(bt.gold)}`,
+    got ? '가짐' : bt.coins ? '교환' : '조합', ok, () => {
+      if (bt.coins) progress.coins -= bt.coins;
+      else {
+        progress.gold -= bt.gold;
+        for (const [id, n] of Object.entries(bt.mats)) mats[id] -= n;
+        progress.mats = mats;
+      }
+      if (bt.from) {
+        bst.have = bst.have.filter(x => x !== bt.from);
+        if (bst.worn === bt.from) bst.worn = null;
+      }
+      bst.have.push(bt.id);
+      if (!bst.worn || BOOT[bst.worn].pct < bt.pct) bst.worn = bt.id;
+      say(`${josa(bt.name, '을', '를')} 얻었습니다! (이동속도 +${bt.pct}%)`, 'sys');
+      banner(`신발 · ${bt.name}`);
+    });
+  }
   head('조합 · 재료 장비');
   const have = m => Object.entries(m).every(([id, n]) => (mats[id] || 0) >= n);
   const matText = m => Object.entries(m).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ');
@@ -1772,7 +1854,7 @@ $('#equip-craft').onclick = () => openForge();
 // with what is held and where it drops, and the button.
 let forgeTab = null, forgePick = null;
 const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['각인', /각인/],
-  ['강화', /강화/], ['레이드 상점', /레이드 상점/]];
+  ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
   const t = FORGE_TABS.find(([, re]) => re.test(sec));
   return t ? t[0] : '기타';
@@ -2085,16 +2167,24 @@ function stepHero(dx, dy, dt) {
     p.moving = false;
     p.pushT = 0;
     p.turnT = 0;
+    p.inDx = p.inDy = 0;
     return;
   }
   const walking = p.moving;
+  // A direction the player has just pressed (not one held on while a spell turned the hero to
+  // its target: before, every cast while the hero stood turned it back and started the turn
+  // again, and a hero casting often — a 격투가 by the boss — could not step off the red at all).
+  const fresh = p.inDx !== dx || p.inDy !== dy;
+  p.inDx = dx;
+  p.inDy = dy;
   if (p.fdx !== dx || p.fdy !== dy) {
     p.fdx = dx;
     p.fdy = dy;
     if (dx) p.face = dx;
-    p.pushT = 0;
+    if (fresh) p.pushT = 0;
     // Standing, a new direction first turns the hero (to aim a spell); walking, it turns as it goes.
-    if (!walking) {
+    // (경공 1단계: on the boss's red the hero sets off at once.)
+    if (!walking && fresh && !(heroMove().lvl >= 1 && onRed(p.tx, p.ty))) {
       p.turnT = 0.1;
       return;
     }
@@ -2134,10 +2224,22 @@ function stepHero(dx, dy, dt) {
   p.pushT = 0;
   p.sfx = p.tx;
   p.sfy = p.ty;
-  p.tx = nx;
-  p.ty = ny;
+  // 경공 on the boss's red: steps a fifth quicker (1단계); once in four seconds a step of two
+  // tiles (3단계, 질풍보) when the tile beyond is open and off the red.
+  const mv = heroMove(), red = mv.lvl >= 1 && onRed(p.tx, p.ty);
+  let tx = nx, ty = ny;
+  if (red && mv.lvl >= 3 && !there && G.t - (G.galeAt || -9) >= 4) {
+    const fx = nx + dx, fy = ny + dy;
+    if (free(fx, fy) && !onRed(fx, fy) && (!G.war || War.open(fx, fy))) {
+      tx = fx;
+      ty = fy;
+      G.galeAt = G.t;
+    }
+  }
+  p.tx = tx;
+  p.ty = ty;
   p.st = 0;
-  p.sdur = TILE / heroSpeed();
+  p.sdur = TILE / heroSpeed() * (red ? 0.8 : 1);
   p.stepping = p.moving = true;
   if (rest > 0 && rest < p.sdur) stepHero(dx, dy, rest);
 }
@@ -2146,8 +2248,20 @@ function stepHero(dx, dy, dt) {
 function heroSpeed() {
   const p = G.player;
   const held = p.sts && (heroStatusOn('stun') || heroStatusOn('para') || heroStatusOn('freeze')) ? 0.3 : p.sts && heroStatusOn('slow') ? 0.65 : 1;
-  return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed'))
+  return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed')) * heroMove().k
     * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held;
+}
+
+/**
+ * The hero's 이동속도 (boots.js): the 민첩 passive and the option as before, the worn boots on
+ * top (up to the cap), and the 경공 step it opens.
+ */
+function heroMove() {
+  const p = G.player, base = (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed')), bp = p.bootPct || 0;
+  const c = p.moveC;
+  if (c && c.base === base && c.bp === bp) return c.v;
+  p.moveC = { base, bp, v: moveBonus(base, bp) };
+  return p.moveC.v;
 }
 
 function update(dt) {
@@ -2158,6 +2272,7 @@ function update(dt) {
 
   if (!G.dead) {
     const [dx, dy] = input();
+    if (dx || dy) G.steerAt = G.t;
     if (G.war && (dx || dy)) War.moved(); // 대항전·공대: the player is at the keys (not 자리비움)
     if (settings.tiles || G.war) stepHero(dx, dy, dt);
     else {
@@ -2588,36 +2703,84 @@ function raidPattern(b, kind) {
     tiles.push(...plusTiles(b.tx, b.ty, 9));
     for (const [dx, dy] of DIRS) add(p.tx + dx, p.ty + dy);
   }
-  const warn = [1.4, 1.2, 1][G.phase];
+  // The warning lasts at least as long as a person needs to step off the red at the slowest
+  // class's own pace: a moment to see it, a turn, and a step for each tile of the deepest red
+  // (a melee hero beside the boss is three tiles inside 혼의 고리; at the third phase's one
+  // second it could not get out).
+  const warn = Math.max([1.4, 1.2, 1][G.phase], MARK_REACT + MARK_STEP * redDepth(tiles, b));
   // A share of the hero's health, so a robed caster and an armoured warrior fear it alike.
   const share = [0.3, 0.35, 0.4][G.phase] * raidK();
   G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share });
   b.lunge = 0.3;
 }
 
+// A person's moment to see the red and turn (0.45 s and the 0.1 s turn), and the slowest class's
+// step (전사·도깨비, speed 66: 0.24 s × 70 / 66).
+const MARK_REACT = 0.55, MARK_STEP = 0.255;
+
+/** The most steps any tile of the red needs to its edge (four ways; the boss's own tile is no way out). */
+function redDepth(tiles, b) {
+  const K = (x, y) => (x + 1000) * 10000 + (y + 1000);
+  const red = new Set(tiles.map(([x, y]) => K(x, y)));
+  const dist = new Map();
+  let q = [];
+  for (const [x, y] of tiles) {
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy, k = K(nx, ny);
+      if (red.has(k) || (b && nx === b.tx && ny === b.ty)) continue;
+      if (!dist.has(K(x, y))) { dist.set(K(x, y), 1); q.push([x, y]); }
+    }
+  }
+  let d = q.length ? 1 : 0;
+  while (q.length) {
+    const nq = [];
+    for (const [x, y] of q) for (const [dx, dy] of DIRS) {
+      const k = K(x + dx, y + dy);
+      if (!red.has(k) || dist.has(k)) continue;
+      dist.set(k, d + 1);
+      nq.push([x + dx, y + dy]);
+    }
+    if (nq.length) d++;
+    q = nq;
+  }
+  return d;
+}
+
 /** Marked tiles fall due: the hero standing on one is struck. */
 function raidMarks() {
   const p = G.player;
+  // 경공 2단계 (이동속도 +20%): the red falls on the hero a moment after the rest.
+  const grace = heroMove().lvl >= 2 ? 0.2 : 0;
   for (const mk of G.marks) {
     if (mk.done || G.t < mk.at) continue;
-    mk.done = true;
-    G.shake = Math.max(G.shake, 0.2);
-    const fx = M.fx['new_' + G.stage.id] ? 'new_' + G.stage.id : G.stage.fx;
-    mk.tiles.filter((_, i) => i % Math.max(1, Math.floor(mk.tiles.length / 10)) === 0).forEach(([x, y]) =>
-      addFx(fx, x * TILE + TILE / 2, y * TILE + TILE / 2, { scale: 0.7 }));
-    // The red floor is the boss's blow, but one that could be stepped off: not counted as tanking.
-    const boss = G.enemies.find(e => e.kind === 'boss'), floor = { kind: 'boss', floor: true, name: boss ? boss.name : G.stage.name, m: boss && boss.m };
-    for (const m of G.party) if (!m.down && mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) {
-      hurtMember(m, m.maxHp * mk.share, floor);
-      if (G.war) G.war.stat.markHits++;
+    if (!mk.fell) {
+      mk.fell = true;
+      partyMarks(mk);
     }
+    if (G.t < mk.at + grace) continue;
+    mk.done = true;
     if (!G.dead && mk.tiles.some(([x, y]) => x === p.tx && y === p.ty)) {
       p.inv = 0;
       hurtPlayer(mk.dmg, null, true);
       say('붉은 칸에 맞았습니다!', 'warn');
+      if (G.war && G.war.stat) G.war.stat.heroHits = (G.war.stat.heroHits || 0) + 1;
     }
   }
   G.marks = G.marks.filter(mk => !mk.done);
+}
+
+/** A mark falls on the party (and shows): the raiders on its tiles are struck. */
+function partyMarks(mk) {
+  G.shake = Math.max(G.shake, 0.2);
+  const fx = M.fx['new_' + G.stage.id] ? 'new_' + G.stage.id : G.stage.fx;
+  mk.tiles.filter((_, i) => i % Math.max(1, Math.floor(mk.tiles.length / 10)) === 0).forEach(([x, y]) =>
+    addFx(fx, x * TILE + TILE / 2, y * TILE + TILE / 2, { scale: 0.7 }));
+  // The red floor is the boss's blow, but one that could be stepped off: not counted as tanking.
+  const boss = G.enemies.find(e => e.kind === 'boss'), floor = { kind: 'boss', floor: true, name: boss ? boss.name : G.stage.name, m: boss && boss.m };
+  for (const m of G.party) if (!m.down && mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) {
+    hurtMember(m, m.maxHp * mk.share, floor);
+    if (G.war) G.war.stat.markHits++;
+  }
 }
 
 /** 계속 사냥: the field keeps growing (40 and half a monster more each second, to 220), a
@@ -3439,17 +3602,37 @@ function drawShocks() {
 }
 
 /**
- * 대항전: while the hero stands in a 거점's circle (or by the cart, or on a watch post it is
- * taking), a technique that carries it to a foe (쇄혼비무's dash, 비영승보, 파천검무, 돌진, the
- * 필살기's leap) does not carry it out: it goes only as far as the circle's edge, or strikes from
- * where the hero stands. In 연 such a leap pulled the hero off the point it was taking (the
- * circle lost, the count started again); here the blow lands and the hero keeps the point. Only
- * in a war: a hunt and a raid leap as before.
+ * Whether a technique that carries the hero to a foe (쇄혼비무's dash, 비영승보, 파천검무, 돌진,
+ * the 필살기's leap) should leave it where it stands (it strikes from there, or stops short)
+ * rather than carry it to (tx, ty):
+ * - 대항전: the hero stands in a 거점's circle (or by the cart, or on a watch post it is taking)
+ *   and the spot is outside it. In 연 such a leap pulled the hero off the point it was taking.
+ * - The boss's red tiles (a raid): the spot is on a red tile not yet fallen. A leap that landed
+ *   the hero in the blow the player was stepping out of made the patterns hard to dodge.
+ * - The menu's 돌진 기술: 제자리 — never carried anywhere, on any ground.
+ * A hunt on 자동 (the default) leaps as before.
  */
-function warHold(tx, ty) {
+function holdGround(tx, ty) {
+  if (settings.dashMode === 'stay') return true;
+  if (onRed(tx, ty)) return true;
   if (!G.war || G.war.raid) return false;
   const z = War.anchor();
   return !!z && Math.hypot(tx - z.x, ty - z.y) > z.r;
+}
+
+/** A tile under one of the boss's red marks not yet fallen. */
+function onRed(tx, ty) {
+  for (const mk of G.marks) if (!mk.done && mk.tiles.some(([x, y]) => x === tx && y === ty)) return true;
+  return false;
+}
+
+/**
+ * 돌진 (the melee classes' own close-in) waits in a raid while the player steers, or while the
+ * hero stands on red: the player's own dodge wins over a leap back to the boss.
+ */
+function steering() {
+  if (!G.marks.length && !(G.war && G.war.raid)) return false;
+  return G.t - (G.steerAt || -9) < 0.6 || onRed(G.player.tx, G.player.ty);
 }
 
 /**
@@ -3604,6 +3787,7 @@ function killEnemy(e) {
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
     dropGear(e, -12);
     dropGear(e, 12);
+    if (!G.stage.raid) bootsDrop();
     say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다!`);
     fieldFalls();
     clearStage();
@@ -3618,6 +3802,24 @@ function killEnemy(e) {
 function fieldFalls() {
   const rest = G.enemies.slice();
   rest.forEach((o, i) => later(0.02 * i % 2, () => { if (o.hp > 0) killEnemy(o); }));
+}
+
+/**
+ * 신발 (boots.js) from a hunting ground's boss: the ground's pair, half the time, until it is
+ * found (once found, nothing more: boots have no stars). Put on at once when better.
+ */
+function bootsDrop() {
+  const bt = bootsForRank(G.level), st = bootsState(progress);
+  if (!bt || st.have.includes(bt.id) || Math.random() >= 0.5) return;
+  st.have.push(bt.id);
+  if (!st.worn || BOOT[st.worn].pct < bt.pct) {
+    st.worn = bt.id;
+    G.player.bootPct = bt.pct;
+  }
+  saveJson('bs_progress', progress);
+  (G.gained = G.gained || []).push(bt.name);
+  say(`신발 ${josa(bt.name, '을', '를')} 얻었습니다! (이동속도 +${bt.pct}%)`, 'sys');
+  later(0.8, () => banner(`신발 · ${bt.name}`));
 }
 
 /** A piece of the class's gear on the ground, about as good as the ground is deep. */
@@ -3692,7 +3894,7 @@ function clearStage() {
   const end = () => {
     // 공대: a hero lying down waits for its feet (it gets up at the camp), not for nothing.
     if (G !== run || (G.dead && !G.war) || G.over) return;
-    if (G.choosing || G.pendingLevels || G.dead) setTimeout(end, 500);
+    if (G.choosing || G.pendingLevels || (G.dead && !(G.war && G.war.heroOut))) setTimeout(end, 500);
     else showResults(`${G.stage.name} 정복!`);
   };
   setTimeout(end, 6000);
@@ -3997,8 +4199,8 @@ function cast(skill, st) {
         let k = 2;
         while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
-        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && warHold(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
-          // 대항전, on a point: the flurry reaches out to the foe; the hero stays in the circle.
+        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && holdGround(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
+          // Held (a war's point, the red floor, 제자리): the flurry reaches the foe; the hero stays.
           if (fxid) fxOn(fxid, b);
           smite(b, st.dmg * 1.6, [fx0, fy0]);
           meleeSlash(b.tx, b.ty, fx0, fy0, 0);
@@ -4067,7 +4269,7 @@ function cast(skill, st) {
       const bx = e.tx + fx0, by = e.ty + fy0;
       // 연's picture for the way it goes (up, down, left; right the left turned over).
       const [bf, bflip] = dirFx(fxid, skill.id, fx0, fy0);
-      if (ahead[0] && !occ.has(key(bx, by)) && !warHold(bx, by)) {
+      if (ahead[0] && !occ.has(key(bx, by)) && !holdGround(bx, by)) {
         addFx(bf, p.x, p.y - 26, { scale: 0.7, flip: bflip });
         const x0 = p.x, y0 = p.y;
         p.x = bx * TILE + TILE / 2;
@@ -4253,7 +4455,7 @@ function cast(skill, st) {
         // Through the row to the farthest open tile along it.
         for (let k = def.depth + 1; k >= 1; k--) {
           const tx = p.tx + dx * k, ty = p.ty + dy * k;
-          if (occ.has(key(tx, ty)) || warHold(tx, ty)) continue; // (in a war's point, not past its edge)
+          if (occ.has(key(tx, ty)) || holdGround(tx, ty)) continue; // (not past a war's point, not onto red)
           p.tx = tx;
           p.ty = ty;
           p.x = tx * TILE + TILE / 2;
@@ -4530,7 +4732,7 @@ function castUlt() {
       if (MELEE.has(G.cls.id)) {
         const spot = DIRS.map(([dx, dy]) => [target.tx + dx, target.ty + dy]).filter(([x, y]) => free(x, y))
           .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-        if (spot && !warHold(spot[0], spot[1])) {
+        if (spot && !holdGround(spot[0], spot[1])) {
           const x0 = p.x, y0 = p.y;
           p.x = spot[0] * TILE + TILE / 2;
           p.y = spot[1] * TILE + TILE - 6;
@@ -5605,10 +5807,10 @@ function classFlourish(def, skill, st) {
   if (MELEE.has(cls)) {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
     const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); });
-    if (near && !beside && !p.stepping && G.t - (G.dashAt || -9) > 1.5 && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
+    if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > 1.5 && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
       const spot = DIRS.map(([dx, dy]) => [near.tx + dx, near.ty + dy]).filter(([x, y]) => free(x, y))
         .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-      if (spot && !warHold(spot[0], spot[1])) {
+      if (spot && !holdGround(spot[0], spot[1])) {
         G.dashAt = G.t;
         // Landing in the crowd, the hero is untouchable for a moment (it chose the fight, not the blows).
         p.inv = Math.max(p.inv, 0.5);
@@ -5681,7 +5883,8 @@ function drawLootFeed() {
   if (!G.feed.length) return;
   const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
   // Right of it the 상태창 tab; above it the 연속 처치 count.
-  const xr = canvas.width - 26 * d, y0 = 96 * d, h = 16 * d, gap = 19 * d;
+  // In a war or raid, under its kill feed (which is under the 연속 처치 count), not across it.
+  const xr = canvas.width - 26 * d, y0 = Math.max(96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0), h = 16 * d, gap = 19 * d;
   ctx.save();
   ctx.textAlign = 'left';
   ctx.font = `${Math.round(10 * d)}px G9`;
@@ -8200,7 +8403,7 @@ ultBtn.addEventListener('pointerdown', e => {
 });
 
 function togglePause(force) {
-  if (!G || G.over || G.choosing || G.dead) return false;
+  if (!G || G.over || G.choosing || (G.dead && !(G.war && G.war.heroOut))) return false; // (out of revives in a raid: the menu, to go home)
   G.paused = force ?? !G.paused;
   $('#pause').hidden = !G.paused;
   if (G.paused) syncSettings();
@@ -8214,6 +8417,7 @@ function syncSettings() {
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
   $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
+  $('#opt-dash').textContent = '돌진 기술: ' + (settings.dashMode === 'stay' ? '제자리' : '자동');
   $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
@@ -8311,6 +8515,13 @@ $('#opt-tiles').onclick = () => {
     p.x = p.tx * TILE + TILE / 2;
     p.y = p.ty * TILE + TILE - 6;
   }
+};
+// 돌진 기술: 자동 (dashes, blinks and the 필살기's leap carry the hero to the foe, as always) or
+// 제자리 (they strike from where the hero stands). Raids keep the hero off the red either way.
+$('#opt-dash').onclick = () => {
+  settings.dashMode = settings.dashMode === 'stay' ? 'auto' : 'stay';
+  saveJson('bs_settings', settings);
+  syncSettings();
 };
 $('#opt-info').onclick = () => {
   settings.battleInfo = settings.battleInfo === false;
