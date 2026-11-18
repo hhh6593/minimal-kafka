@@ -203,6 +203,8 @@ function injectUi() {
   #war-sb .wr-cols { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   body.war #map-tab { display: none; }
   #war-sb-btn { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #2a1606; border: 2px solid rgb(148,48,219); }
+  #war-call-btn { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #1a2a10; border: 2px solid rgb(88,168,60); }
+  body:not(.war) #war-call-btn { display: none; }
   `;
   document.head.append(st);
   const board = document.createElement('div');
@@ -228,6 +230,13 @@ function injectUi() {
     b.textContent = '현황';
     b.onclick = () => toggleBoard();
     keys.prepend(b);
+    // 집결: the hero calls the allies near to follow it (대항전·레이드; shown with the war's keys).
+    const c = document.createElement('button');
+    c.id = 'war-call-btn';
+    c.textContent = '모여';
+    c.title = '주변 아군을 불러 따라오게 한다';
+    c.onclick = () => heroCall();
+    b.after(c);
   }
 }
 
@@ -513,6 +522,8 @@ function mkFighter(W, team, role, squad) {
     dodge: rnd(0.65, 0.97), react: rnd(0.1, 0.35),
   };
   f.hp = f.maxHp;
+  persona(f);
+  f.style = warStyle(W, f);
   W.bodies.push(f);
   return f;
 }
@@ -800,8 +811,10 @@ function update(dt) {
   W.cmdT = (W.cmdT || 0) - dt;
   if (W.cmdT <= 0) {
     W.cmdT = 1;
+    warPhase(W);
     orders(W, 0);
     orders(W, 1);
+    heroLead(W);
   }
   W.ghosts = W.ghosts.filter(g => !g.b.dead ? false : G.t < g.until);
   W.feed = W.feed.filter(f => G.t - f.t < 6);
@@ -828,6 +841,7 @@ function tickBody(W, b, dt) {
   // Health back slowly; quickly at the camp.
   const home = W.teams[b.team].spawn, atBase = Math.abs(b.tx - home[0]) + Math.abs(b.ty - home[1]) <= 4;
   b.hp = Math.min(b.maxHp, b.hp + b.maxHp * (atBase ? 0.08 : 0.006) * dt);
+  if (b.mp < 1) b.mp = Math.min(1, b.mp + (atBase ? 0.1 : 0.022) * dt);
   if (W.diag && !W.raid && b.team === 0 && !b.troop && !b.cmdr) {
     // Standing about the camp more than five seconds after rising there, with no foe near and not
     // mending (the 1분대 that keeps a 거점 or the 진영대장 by the camp is at its post, not idle).
@@ -966,7 +980,7 @@ function pickFoe(W, b, r) {
     if (e.hero && G.buffs.stealth > G.t) continue;
     const d = d2(b, e);
     if (d > r) continue;
-    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0);
+    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
     if (s < bs) { bs = s; best = e; }
   }
   return best;
@@ -978,14 +992,14 @@ function think(W, b) {
   const G = A.G();
   if (b.cmdr) return thinkCmdr(W, b);
   if (b.troop) return thinkTroop(W, b);
-  const sq = b.squad, order = sq.order || { x: W.teams[b.team].spawn[0], y: W.teams[b.team].spawn[1], kind: 'hold' };
+  const sq = b.squad, order = myOrder(W, b);
   const k = hpk(b);
   // Taunted: the taunter is the target for a while.
   if (b.taunt && b.taunt.until > G.t && alive(b.taunt.by)) b.target = b.taunt.by;
   // Low: back to a healer or the camp; back in once mended.
   if (b.state !== 'retreat' && (k < (b.role === 'tank' ? 0.2 : 0.3)) && !b.carry) {
     b.state = 'retreat';
-    if (Math.random() < 0.4) talk(W, b, ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐', '저 죽어요!']);
+    chat(W, b, 'low', ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐', '저 죽어요!'], { every: 10, p: 0.5, emo: Math.random() < 0.3 ? 'dizzy' : null });
   }
   if (b.state === 'retreat') {
     if (k > 0.75) { b.state = 'go'; b.retreatTo = undefined; }
@@ -1006,6 +1020,13 @@ function think(W, b) {
   // The squad's focus: the leader picks, the members follow.
   if (b.leader) leaderPick(W, b, order);
   if (b.role === 'healer') return thinkHealer(W, b, order);
+  // Following the hero and well behind it: on to it, striking only what is in reach on the way.
+  if (order.kind === 'follow' && Math.abs(b.tx - order.x) + Math.abs(b.ty - order.y) > 5 && !b.carry) {
+    const t = nearest(W, b, b.kit.range + 0.5);
+    if (t) act(W, b, t);
+    b.dest = [order.x, order.y];
+    return;
+  }
   if (b.role === 'support') supportBuffs(W, b);
   // Jobs: a free supporter (or any idle one near) carries a crate; the scout zones are taken.
   if (b.carry) { b.dest = dropPoint(W, b.team); const t = nearest(W, b, b.kit.range + 0.5); if (t) act(W, b, t); return; }
@@ -1013,6 +1034,8 @@ function think(W, b) {
     const c = W.crates.find(c => !c.by && Math.abs(c.x - b.tx) + Math.abs(c.y - b.ty) < 14);
     if (c && !nearest(W, b, 4)) { b.dest = [c.x, c.y]; return; }
   }
+  // Its own play over the field: a hunter's prey, a diver's healer, the cautious one's retreat.
+  if (soloThink(W, b, order)) return;
   // A target: a peel for the healers first (tanks), the squad's focus, else the nearest.
   let t = null;
   if (b.role === 'tank') {
@@ -1053,7 +1076,8 @@ function think(W, b) {
     else b.dest = null;
     if (dist <= range + 0.5) act(W, b, t);
     // A fighter does not chase far from its order.
-    if (Math.abs(b.tx - order.x) + Math.abs(b.ty - order.y) > 14 && !t.gate && !t.cmdr) b.dest = [order.x, order.y];
+    // (One that chases a kill goes further, and lags behind its squad.)
+    if (Math.abs(b.tx - order.x) + Math.abs(b.ty - order.y) > (b.greedy && hpk(t) < 0.4 ? 20 : 14) && !t.gate && !t.cmdr) b.dest = [order.x, order.y];
     return;
   }
   // Nothing to fight: to the order's spot, in a loose formation by role.
@@ -1097,8 +1121,12 @@ function leaderPick(W, b, order) {
   }
   if (best !== sq.target) {
     sq.target = best;
-    if (b.team === 0 && G.t - sq.said > 7 && Math.random() < 0.6) {
+    // Called in the chat by a leader near the hero, now and then (five squads calling every focus
+    // filled the four lines of the chat).
+    if (b.team === 0 && G.t - sq.said > 7 && Math.random() < 0.6 && d2(b, W.hero) < 14 && G.t - (W.chatT || -99) >= 4 && G.t - ((W.chatK || {}).focus || -99) >= 10) {
       sq.said = G.t;
+      W.chatT = G.t;
+      (W.chatK = W.chatK || {}).focus = G.t;
       const who = best.role === 'healer' ? '적 힐러' : best.carry ? '보급 든 놈' : best.hero ? best.name : best.cls ? `${best.cls.name} ${best.name}` : best.name;
       A.say(`★${b.name}: ${who}부터 잡아요!`, 'party');
     }
@@ -1121,6 +1149,8 @@ function thinkHealer(W, b, order) {
   // Revive a fallen mate close by.
   const ghost = b.cd.r <= 0 && W.ghosts.find(g => g.b.team === b.team && !g.b.cmdr && !g.b.hero && d2(g, b) < (W.raid ? 7 : 5) && A.G().t - g.t < (W.raid ? 12 : 6));
   if (ghost) { revive(W, b, ghost); return; }
+  // The hero raised, a buff on a mate, mana (see partyCasts).
+  if (!close && partyCasts(W, b)) return;
   // Whom to mend: the most in need near, the tank first while it is being struck (the hero too,
   // as any of the guild). Before, the tank only came first by a twentieth of its life, and the
   // healers stood by their squad's leader — in the hero's squad, with the hero as its tank, the
@@ -1132,12 +1162,13 @@ function thinkHealer(W, b, order) {
     const d = d2(m, b);
     if (d > 9) continue;
     const struck = G.t - (m.lastHitT || -9) < 2.5;
-    const k = hpk(m) - (m.squad === sq ? 0.04 : 0) - (m.role === 'tank' ? (struck ? 0.2 : 0.06) : 0) - (struck ? 0.04 : 0) + (m.troop ? 0.15 : 0) + (d > 7 ? 0.05 : 0);
+    const k = hpk(m) - (m.squad === sq ? 0.04 : 0) - (m.role === 'tank' ? (struck ? 0.2 : 0.06) : 0) - (struck ? 0.04 : 0) + (m.troop ? 0.15 : 0) + (d > 7 ? 0.05 : 0) - (m.hero ? 0.04 : 0);
     if (k < lk) { lk = k; low = m; }
   }
   const hurt = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 5 && hpk(m) < 0.7).length;
-  if (hurt >= 3 && b.cd.d <= 0) {
+  if (hurt >= 3 && b.cd.d <= 0 && b.mp >= 0.1) {
     b.cd.d = 12;
+    b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
     castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
@@ -1145,14 +1176,16 @@ function thinkHealer(W, b, order) {
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
   } else if (low && b.cd.a <= 0 && d2(low, b) <= 7) {
-    b.cd.a = 3.2;
-    const hid = b.kit.heal || 'c_heal';
+    b.cd.a = b.mp < 0.1 ? 4.4 : 3.2;
+    b.mp = Math.max(0, b.mp - 0.05);
+    // Its class's own 기원 (누리의 기원's grade by its level, a poet's 천공·생명의 기원 …).
+    const hid = b.party && b.party.heals.length ? pick(b.party.heals) : b.kit.heal || 'c_heal';
     const n = low.maxHp * (0.08 + 0.02 * b.pw);
-    A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => healBody(W, b, low, n) });
+    A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => { healBody(W, b, low, n); if (low.hero && b.team === 0 && !A.G().dead) heroMended(W, b, hid); } });
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk()) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
+      if (fx && fxOk() && !low.hero) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1189,6 +1222,7 @@ function thinkHealer(W, b, order) {
  * guild's tank nearest its squad's order, else a mate of its squad. */
 function healerAnchor(W, b, sq, order) {
   const G = A.G();
+  if (order.kind === 'follow' && !G.dead) return W.hero;
   let best = null, bd = 1e9;
   for (const m of W.alive[b.team]) {
     if (m.role !== 'tank' || m.cmdr || m.troop || m.gate || m === b) continue;
@@ -1216,16 +1250,19 @@ function thinkHealerRaid(W, b, order) {
   // Revive a fallen mate close by.
   const ghost = b.cd.r <= 0 && W.ghosts.find(g => g.b.team === b.team && !g.b.cmdr && !g.b.hero && d2(g, b) < (W.raid ? 7 : 5) && A.G().t - g.t < (W.raid ? 12 : 6));
   if (ghost) { revive(W, b, ghost); return; }
+  // The hero raised, a buff on a mate, mana (see partyCasts).
+  if (!close && partyCasts(W, b)) return;
   // The lowest of the near allies (the hero too).
   let low = null, lk = 0.85;
   for (const m of W.alive[b.team]) {
-    if (m.gate || m.cmdr || d2(m, b) > 7) continue;
-    const k = hpk(m) - (m.squad === sq ? 0.05 : 0) - (m.role === 'tank' ? 0.05 : 0);
+    if (m.gate || m.cmdr || d2(m, b) > (m.hero ? 8.5 : 7)) continue;
+    const k = hpk(m) - (m.squad === sq ? 0.05 : 0) - (m.role === 'tank' ? 0.05 : 0) - (m.hero ? 0.08 : 0);
     if (k < lk) { lk = k; low = m; }
   }
   const hurt = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 5 && hpk(m) < 0.7).length;
-  if (hurt >= 3 && b.cd.d <= 0) {
+  if (hurt >= 3 && b.cd.d <= 0 && b.mp >= 0.1) {
     b.cd.d = 12;
+    b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
     castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
@@ -1233,14 +1270,16 @@ function thinkHealerRaid(W, b, order) {
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
   } else if (low && b.cd.a <= 0) {
-    b.cd.a = 3.2;
-    const hid = b.kit.heal || 'c_heal';
+    b.cd.a = b.mp < 0.1 ? 4.4 : 3.2;
+    b.mp = Math.max(0, b.mp - 0.05);
+    // Its class's own 기원 (누리의 기원's grade by its level, a poet's 천공·생명의 기원 …).
+    const hid = b.party && b.party.heals.length ? pick(b.party.heals) : b.kit.heal || 'c_heal';
     const n = low.maxHp * (0.08 + 0.02 * b.pw);
-    A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => healBody(W, b, low, n) });
+    A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => { healBody(W, b, low, n); if (low.hero && b.team === 0 && !A.G().dead) heroMended(W, b, hid); } });
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk()) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
+      if (fx && fxOk() && !low.hero) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1255,9 +1294,10 @@ function thinkHealerRaid(W, b, order) {
     const t = nearest(W, b, 5);
     if (t && b.cd.e <= 0) act(W, b, t);
   }
-  // Stand behind the squad's front, three tiles back from the nearest foe.
+  // Stand behind the squad's front, three tiles back from the nearest foe (behind the hero when
+  // it follows the hero).
   if (!b.dest || Math.random() < 0.3) {
-    const front = sq.members.find(m => m.role === 'tank' && !m.dead) || sq.leader;
+    const front = order.kind === 'follow' && !G.dead ? W.hero : sq.members.find(m => m.role === 'tank' && !m.dead) || sq.leader;
     const foe = nearest(W, b, 9);
     let at = front && !front.dead ? [front.tx, front.ty] : [order.x, order.y];
     if (foe) {
@@ -1270,6 +1310,7 @@ function thinkHealerRaid(W, b, order) {
 
 function supportBuffs(W, b) {
   const G = A.G();
+  if (partyCasts(W, b)) return;
   if (b.cd.b <= 0) {
     const mates = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 4);
     if (mates.length >= 2 && nearest(W, b, 7)) {
@@ -1440,6 +1481,7 @@ function taunt(W, b) {
 }
 function guard(W, m, sec) {
   const G = A.G();
+  if (m.hero) supCount(W, 'buff');
   if (m.hero) G.buffs.shield = Math.max(G.buffs.shield, G.t + sec);
   else m.shield = G.t + sec;
 }
@@ -1474,7 +1516,8 @@ function talk(W, b, lines) {
   b.talked = G.t;
   const text = pick(lines);
   b.bubble = { text, t: G.t };
-  if (b.team === 0 && d2(b, W.hero) < 14) A.say(`${b.name}: ${text}`, 'party');
+  // In the chat when near the hero and the guild's last line is a few seconds old (it keeps four).
+  if (b.team === 0 && d2(b, W.hero) < 14 && G.t - (W.chatT || -99) >= 3) { W.chatT = G.t; A.say(`${b.name}: ${text}`, 'party'); }
 }
 
 // ---------------------------------------------------------------- blows and deaths
@@ -1490,6 +1533,7 @@ function hit(W, src, t, dmg) {
     if (t.hero) { const w = W.diag.heroWhy = W.diag.heroWhy || {}, k = src.target === t ? src.tWhy || (src.troop ? 'troop' : src.cmdr ? 'cmdr' : '?') : 'splash'; w[k] = (w[k] || 0) + 1; }
   }
   dmg *= rnd(0.9, 1.1);
+  if (src.powT > G.t) dmg *= src.powK || 1.15;
   if (t.curse > 0) dmg *= 1.25;
   if (t.shield > G.t) dmg *= 0.75;
   if (t.role === 'tank' && !t.hero) dmg *= 0.7;
@@ -1554,6 +1598,7 @@ function healBody(W, src, m, n) {
     const before = G.player.hp;
     A.heal(hn, false, true);
     const got = (G.player.hp - before) / G.player.maxHp * W.refHp;
+    if (!src.hero) supCount(W, 'heal', (G.player.hp - before) / G.player.maxHp);
     credit(src, 'heal', got);
     if (W.diag && !src.hero && m.team === 0 && !W.raid) W.diag.heal.hero += got / W.refHp;
     return;
@@ -1566,6 +1611,14 @@ function healBody(W, src, m, n) {
   num(W, m, n, true);
 }
 
+/** Test counters (__warState().sup): what the allies cast on the hero — heals (and how much of
+ * its life), buffs, revives. */
+function supOf(W) { return W.sup || (W.sup = { heal: 0, healAmt: 0, buff: 0, revive: 0, names: {} }); }
+function supCount(W, kind, n = 0) {
+  const s = supOf(W);
+  s[kind]++;
+  if (kind === 'heal') s.healAmt += n;
+}
 function credit(b, what, n) {
   if (!b || !b.stats || !(n > 0)) return;
   if (b.hero) {
@@ -1676,6 +1729,7 @@ function kill(W, f, killer) {
   // a sweep that grazed it does not count): kills and assists.
   const by = killer && killer.team !== f.team ? killer : f.lastHitBy;
   if (by && by.stats) { credit(by, 'kills', 1); W.teams[by.team].kills++; }
+  if (W.diag && by) { const k = by.style === 'hunter' ? 'hunterKills' : by.style === 'diver' && f.role === 'healer' ? 'diverKills' : null; if (k) W.diag[k] = (W.diag[k] || 0) + 1; if (f.duel && f.duel.with === by && f.duel.until > G.t) W.diag.duelKills = (W.diag.duelKills || 0) + 1; }
   const dealt = f.dmgBy || new Map();
   for (const [who, t] of f.hitBy) if (who !== by && who.team !== f.team && G.t - t < 6 && (dealt.get(who) || 0) >= f.maxHp * 0.1) credit(who, 'assists', 1);
   f.hitBy.clear();
@@ -1695,7 +1749,7 @@ function kill(W, f, killer) {
     if (W.mode === 'capture') W.score[1 - f.team] += 40;
     if (W.mode === 'escort' && W.cart && f.team !== W.attacker) W.cart.boost = G.t + 15;
   } else if (by && by.team === 0 && by.stats && by !== W.hero && Math.random() < 0.12) talk(W, by, ['하나 잡았다!', '처치!', 'ㅋㅋ 잡음', '나이스!']);
-  else if (f.team === 0 && f.squad && f.squad.leader === f && Math.random() < 0.5) A.say(`★${f.name}(공대장) 쓰러짐! 다시 모여요!`, 'warn');
+  else if (f.team === 0 && f.squad && f.squad.leader === f && Math.random() < 0.5 && (f.squad === W.hero.squad || d2(f, W.hero) < 14) && G.t - (W.chatT || -99) >= 3) { W.chatT = G.t; A.say(`★${f.name}(${W.raid ? '파티장' : '분대장'}) 쓰러짐! 다시 모여요!`, 'warn'); }
 }
 
 function respawn(W, b) {
@@ -1729,7 +1783,8 @@ function revive(W, healer, g) {
   credit(healer, 'revives', 1);
   shout(W, healer, '부활');
   if (onScreen(b)) A.addFx(A.FX.revive, b.x, b.y + 2, { anchor: 'bottom' });
-  if (healer.team === 0 && Math.random() < 0.5) talk(W, healer, ['부활 갑니다!', '일어나요!']);
+  if (healer.team === 0) chat(W, healer, 'revive', ['부활 갑니다!', '일어나요!', '부활!'], { every: 10, p: 0.6 });
+  thanks(W, b, healer);
 }
 
 // ---------------------------------------------------------------- the hero in the war
@@ -1804,6 +1859,7 @@ function heroRole(W, dt) {
       if (fx) A.addFx(fx, low.x, low.y - 26, { scale: 0.9 });
       healBody(W, h, low, low.maxHp * 0.08 * W.roleK);
       A.floatText(low.x, low.y - 70, '기원', '#fff', true);
+      if (lk < 0.45) chat(W, low, 'thxHeal', ['힐 감사요!', '감사합니다 ㅎㅎ', '살았다 ㄳ'], { every: 25, p: 0.5, emo: Math.random() < 0.4 ? 'cute' : null });
     }
   } else if (W.role === 'support') {
     W.roleT = 8;
@@ -2057,6 +2113,16 @@ function gateBreak(W, by) {
 // ---------------------------------------------------------------- commanders: orders to the squads
 
 function orders(W, team, loud = false) {
+  ordersMode(W, team, loud);
+  // The war's pace over the plan: patrols over the field early, everyone on one point at the end.
+  const set = (sq, x, y, kind, obj = null) => {
+    const theirs = W.teams[1 - team].spawn, [sx, sy] = snap(W, x, y);
+    sq.order = { x: sx, y: sy, kind, obj, face: [Math.sign(theirs[0] - sx), Math.sign(theirs[1] - sy)] };
+  };
+  if (W.phase === 'spread') spreadOrders(W, team, set, W.teams[team].squads);
+  else if (W.phase === 'final') finalOrders(W, team, set, W.teams[team].squads);
+}
+function ordersMode(W, team, loud = false) {
   const G = A.G(), T = W.teams[team], foe = W.teams[1 - team];
   const squads = T.squads;
   const mine = T.spawn, theirs = foe.spawn;
@@ -2067,6 +2133,7 @@ function orders(W, team, loud = false) {
     sq.order = { x: sx, y: sy, kind, obj, face };
     if (changed && say && team === 0 && (loud || G.t - W.cmdSaid > 9)) {
       W.cmdSaid = G.t;
+      W.chatT = G.t;
       A.say(`[${T.name} 지휘] ${say}`, 'party');
     }
   };
@@ -2074,25 +2141,10 @@ function orders(W, team, loud = false) {
   // The main body: every squad but the first goes where the guild's weight is needed.
   const blob = (x, y, kind, obj, text) => { for (let i = 1; i < squads.length; i++) set(squads[i], x + ((i % 3) - 1) * 1.5, y + (i > 2 ? 1 : -1), kind, obj, i === 1 ? text : null); };
   if (W.mode === 'capture') {
-    const fl = W.flags.slice().sort((a, b) => Math.hypot(a.x - mine[0], a.y - mine[1]) - Math.hypot(b.x - mine[0], b.y - mine[1]));
-    const [near, mid, far] = fl;
-    const threat = fl.find(f => f.owner === team && countAt(W, f.x, f.y, 4)[1 - team] >= 2);
-    const behind = W.score[team] < W.score[1 - team] - 15;
-    set(squads[0], near.x, near.y, 'capture', null, `${near.name} 거점 지켜요`);
-    if (threat && threat !== mid) blob(threat.x, threat.y, 'capture', null, `${threat.name} 거점이 공격받아요! 다 같이!`);
-    else if (mid.owner === team && (ahead >= -2 || behind)) {
-      blob(far.x, far.y, 'capture', null, `${far.name} 거점 다 같이 칩니다!`);
-      set(squads[squads.length - 1], mid.x, mid.y, 'capture', null, null);
-    } else blob(mid.x, mid.y, 'capture', null, `${mid.name} 거점으로 다 모여요!`);
+    // The guild's plan (capturePlan): keepers on our points, the rest gather and push a point.
+    capturePlan(W, team, set, squads);
   } else if (W.mode === 'commander') {
-    const myC = T.cmd, theirC = foe.cmd;
-    const mid = W.def.mid;
-    const underAttack = W.alive[1 - team].filter(e => d2(e, myC) < 7).length >= 3;
-    const push = ahead >= 2 || W.left < 200 || W.score[team] < W.score[1 - team] - 5;
-    set(squads[0], myC.home[0] + Math.sign(mid[0] - myC.home[0]) * 3, myC.home[1], 'defend', null, '대장 곁을 지킵니다');
-    if (underAttack) blob(myC.tx, myC.ty, 'defend', null, '대장이 공격받아요! 전원 복귀!');
-    else if (push && !theirC.dead) blob(theirC.tx, theirC.ty, 'assault', theirC, '적 진영대장 돌격! 다 같이!');
-    else blob(mid[0], mid[1], 'hold', null, '중앙에 모여 밀어요');
+    commanderPlan(W, team, set, squads, blob);
   } else if (W.mode === 'escort') {
     const c = W.cart, attack = team === W.attacker;
     const at = k => W.path[Math.min(W.path.length - 1, Math.floor(c.i) + k)];
@@ -2119,6 +2171,797 @@ function orders(W, team, loud = false) {
       for (let i = 0; i < squads.length; i++) set(squads[i], g.tx + (i % 3 - 1) * 1.5, i < 3 ? g.y1 + 2 : g.y0 - 2, 'hold', null, i === 0 ? '성문 앞으로 나가 막아요!' : null);
     } else for (const sq of squads) set(sq, dc.home[0], dc.home[1] + 2, 'defend', null, sq === squads[0] ? '대장 지켜요! 전원 본진!' : null);
   }
+}
+
+// ---------------------------------------------------------------- the guild's people
+// What makes the AI fighters play like people: each its own hand (quick or slow to follow an
+// order, keen or not to follow the hero, one that chases a kill), the guild's plans that change
+// over a war (capture: some squads push a point after gathering, some keep ours, more push when
+// behind), the hero followed when it heads somewhere with purpose (or calls), the 기원 and
+// buffs of the healers and supporters cast on the hero, and a few words in the chat at the
+// moments that matter (rate-limited, the speech bubbles by the 말풍선 setting).
+
+/** A fighter's own hand: set once when it is made. */
+function persona(f) {
+  f.skill = rnd(0.6, 1.15);
+  f.heed = Math.random();                  // how readily it follows the hero
+  f.lagK = rnd(0.2, 2.6) / f.skill;        // seconds it takes to act on a new order
+  f.chatty = rnd(0.15, 1);
+  f.greedy = Math.random() < 0.18;          // chases a kill further than it should
+  f.mp = 1;                                 // a caster's mana (healers and supporters spend it)
+  f.party = partyKit(f.cls, f.lv);
+  // A good hand reads the red floor better and sooner, a poor one worse (on the whole as before).
+  f.dodge = clamp(f.dodge + (f.skill - 0.875) * 0.3, 0.5, 0.98);
+  f.react = clamp(f.react * 0.875 / f.skill, 0.08, 0.45);
+}
+
+// The buffs a class casts on others (바람's 보호·무장, the poet's 가호, the magus's 보호부 …):
+// kind 'buff' spells of its class that make sense on another. 공력증강 gives its caster mana back.
+const PARTY_BUFFS = {
+  poet: ['p_protect', 'p_wargod', 'p_aegis', 'p_reflect', 'p_dragongod', 'p_guard'],
+  mage: ['m_arm', 'm_hoche'],
+  magus: ['md_enhance', 'md_amulet'],
+  celestial: ['cl_yeorae'],
+  reaper: ['rp_barrier'],
+};
+function partyKit(cls, lv) {
+  if (!cls || !SK) return { heals: [], buffs: [] };
+  // Its class's 기원 that are cast on another (누리의 기원 for anyone who has none: a 운공체식 or
+  // 귀체 is the caster's own), the best few it knows by its level.
+  const heals = Object.entries(SK).filter(([, d]) => d.kind === 'heal' && d.cls === cls.id && (d.req || 1) <= lv && !d.evolved && /기원|희원/.test(d.name))
+    .sort((a, b) => (b[1].req || 1) - (a[1].req || 1)).slice(0, 2).map(([id]) => id);
+  if (!heals.length || cls.id === 'poet') heals.push('c_heal');
+  const buffs = (PARTY_BUFFS[cls.id] || []).filter(id => SK[id] && (SK[id].req || 1) <= lv + 6);
+  return { heals, buffs, mana: cls.id === 'mage' && SK.m_gongryeok ? 'm_gongryeok' : null };
+}
+/** A spell's name as the caster knows it (누리의 기원's grades by level). */
+function spellName(id, lv) {
+  const d = SK[id];
+  if (!d) return '기원';
+  return d.names ? d.names[Math.min(d.names.length - 1, Math.floor((lv || 1) / 6))] : d.name;
+}
+function spellFx(id, lv) {
+  const d = SK[id];
+  if (!d) return null;
+  const fx = d.fxs ? d.fxs[Math.min(d.fxs.length - 1, Math.floor((lv || 1) / 6))] : d.fx;
+  return fx && A.M().fx[fx] ? fx : null;
+}
+
+// ------------------------------------------------ words: the chat and the bubbles
+
+/**
+ * A fighter speaks: a bubble over its head (drawn near the hero, by the 말풍선 setting) and, when
+ * it is near the hero or in its squad and the chat is not busy, a line in the party chat. Each
+ * kind of line has its own wait, the guild's lines are a few seconds apart, and a quiet one
+ * speaks less.
+ */
+function chat(W, b, kind, lines, o = {}) {
+  const G = A.G();
+  if (!b || b.dead || b.team !== 0 || !lines.length) return false;
+  const kinds = W.chatK || (W.chatK = {});
+  if (G.t - (kinds[kind] || -99) < (o.every || 14)) return false;
+  if (!o.must && Math.random() > (o.p === undefined ? 1 : o.p) * (0.4 + 0.6 * (b.chatty || 0.5))) return false;
+  if (G.t - (b.talked || -99) < 6) return false;
+  kinds[kind] = G.t;
+  b.talked = G.t;
+  const text = typeof lines === 'string' ? lines : pick(lines);
+  b.bubble = { text: text.length > 14 ? text.slice(0, 13) + '…' : text, t: G.t };
+  if (o.emo) emo(b, o.emo);
+  const near = d2(b, W.hero) < 14 || b.squad === W.hero.squad;
+  if (near && G.t - (W.chatT || -99) >= (o.gap || 3.5)) {
+    W.chatT = G.t;
+    A.say(`${b.name}: ${text}`, 'party');
+    if (W.diag) W.diag.lines = (W.diag.lines || 0) + 1;
+  }
+  return true;
+}
+/** One of the official emoticons over a fighter (the 말풍선 setting hides them). */
+function emo(b, key) {
+  const G = A.G();
+  if (!A.settings().bubbles || !A.M().emote || !A.M().emote[key]) return;
+  if (b.emo && G.t - b.emo.t < 2.2) return;
+  b.emo = { key, t: G.t };
+}
+function drawEmo(b, y) {
+  const G = A.G(), e = b.emo;
+  if (!e || !A.settings().bubbles) return;
+  const age = G.t - e.t, def = A.M().emote && A.M().emote[e.key], im = A.images[`emote/${e.key}.png`];
+  if (age > 2.2 || !def || !im || !im.width) return;
+  const ctx = A.ctx, f = Math.floor((age * 1000) / def.dur) % def.n, s = 40 * (0.6 + 0.4 * Math.min(1, age / 0.12));
+  ctx.save();
+  ctx.globalAlpha = age < 1.9 ? 1 : Math.max(0, 1 - (age - 1.9) / 0.3);
+  ctx.drawImage(im, f * 64, 0, 64, 64, Math.round(b.x - s / 2), Math.round(y - s), Math.round(s), Math.round(s));
+  ctx.restore();
+}
+/** A few of the guild answer the hero's call, one after another. */
+function answers(W, who, lines, n) {
+  const G = A.G();
+  const pool = who.filter(b => !b.dead).sort(() => Math.random() - 0.5).slice(0, n);
+  pool.forEach((b, i) => A.later(rnd(0.5, 1.2) + i * rnd(0.6, 1.4), () => {
+    if (W.over || b.dead) return;
+    b.talked = -99;
+    const text = pick(lines);
+    b.bubble = { text, t: A.G().t };
+    if (i === 0 || Math.random() < 0.5) { W.chatT = A.G().t; A.say(`${b.name}: ${text}`, 'party'); }
+    if (Math.random() < 0.4) emo(b, pick(['ready', 'bros', 'gains']));
+  }));
+}
+
+// ------------------------------------------------ orders as each one hears them
+
+/**
+ * The order a fighter acts on: its squad's, or the hero's lead when it follows the hero; a new
+ * one heard after its own moment (some at once, some seconds late), so a squad does not turn in
+ * lockstep.
+ */
+function myOrder(W, b) {
+  const G = A.G(), sq = b.squad;
+  let o = sq.order || { x: W.teams[b.team].spawn[0], y: W.teams[b.team].spawn[1], kind: 'hold' };
+  if (b.team === 0 && following(W, b)) o = W.lead.order;
+  if (!b.ord) { b.ord = o; return o; }
+  // (Once it follows the hero, it keeps up with it.)
+  const far = b.ord.kind !== o.kind || (o.kind !== 'follow' && Math.abs(b.ord.x - o.x) + Math.abs(b.ord.y - o.y) > 6);
+  if (far) {
+    const p = b.pend;
+    if (!p || p.kind !== o.kind || Math.abs(p.x - o.x) + Math.abs(p.y - o.y) > 6) { b.pend = o; b.ordAt = G.t + (b.lagK || 0.5) * rnd(0.4, 1) * (o.kind === 'follow' ? 0.6 : 1); }
+    // A call of the hero's is heard sooner.
+    if (G.t < b.ordAt && !(o.kind === 'follow' && W.callUntil > G.t && G.t > b.ordAt - 1.2)) return b.ord;
+  }
+  b.pend = null;
+  b.ord = o;
+  return o;
+}
+function following(W, b) {
+  const G = A.G(), L = W.lead;
+  if (!L || !L.on || !L.order) return false;
+  if (b.squad === W.hero.squad) return b.heed > 0.12 || W.callUntil > G.t;
+  return b.followT > G.t;
+}
+
+// ------------------------------------------------ the hero leads
+
+/** Where the hero is heading with purpose: a point not ours, the cart, the enemy's 진영대장 or gate, the boss. */
+function heroObjective(W) {
+  const G = A.G(), p = G.player;
+  const near = (x, y, r) => Math.hypot(p.tx - x, p.ty - y) <= r;
+  if (W.raid) {
+    const bs = W.boss;
+    if (bs && near(bs.tx, bs.ty, 7)) return { x: bs.tx, y: bs.ty, kind: 'boss' };
+    return null;
+  }
+  if (W.flags) for (const f of W.flags) if (f.owner !== 0 && near(f.x, f.y, 4)) return { x: f.x, y: f.y, kind: 'flag', f };
+  if (W.mode === 'escort' && W.cart && near(W.cart.tx, W.cart.ty, 4)) return { x: W.cart.tx, y: W.cart.ty, kind: 'cart' };
+  const ec = W.teams[1].cmd;
+  if (ec && !ec.dead && near(ec.tx, ec.ty, 7)) return { x: ec.tx, y: ec.ty, kind: 'cmdr' };
+  if (W.gate && !W.gateDown && W.gate.team === 1 && near(W.gate.tx, W.gate.y1 + 1, 4)) return { x: W.gate.tx, y: W.gate.y1 + 1, kind: 'gate' };
+  const es = W.teams[1].spawn;
+  if (near(es[0], es[1], 12)) return { x: p.tx, y: p.ty, kind: 'deep' };
+  return null;
+}
+
+/**
+ * Once a second: is the hero leading? It is when it calls (집결), when it stands on an objective
+ * of the enemy's or walks off with purpose away from where its squad was sent (not when it walks
+ * home). Its squad follows (bar one now and then), allies near join in by their own will; a
+ * squad keeping a point stays unless called.
+ */
+function heroLead(W) {
+  const G = A.G(), p = G.player, h = W.hero, sq = h.squad;
+  const L = W.lead || (W.lead = { on: false, trail: [], order: null, onT: 0, pend: 0, stillT: 0, lastWant: 0, n: 0 });
+  L.trail.push([p.tx, p.ty]);
+  if (L.trail.length > 5) L.trail.shift();
+  // The hero fallen on the way: those following go on to where it was heading a while.
+  if (G.dead && L.on && !W.over) {
+    if (!L.deadT) L.deadT = G.t + (L.objKind === 'move' ? 4 : 10);
+    if (G.t < L.deadT) return;
+  }
+  L.deadT = 0;
+  if (G.dead || W.over || (W.countdown || 0) > 0) { if (L.on) { L.on = false; L.off = 'dead'; } L.pend = 0; return; }
+  const called = W.callUntil > G.t;
+  const base = sq.order;
+  const sp = W.teams[0].spawn;
+  const dBase = base ? Math.abs(p.tx - base.x) + Math.abs(p.ty - base.y) : 0;
+  const dHome = Math.abs(p.tx - sp[0]) + Math.abs(p.ty - sp[1]);
+  const t0 = L.trail[0];
+  const moved = Math.abs(p.tx - t0[0]) + Math.abs(p.ty - t0[1]);
+  const homeward = dHome < Math.abs(t0[0] - sp[0]) + Math.abs(t0[1] - sp[1]) - 2;
+  const obj = heroObjective(W);
+  if (moved > 0) L.stillT = G.t;
+  const lazy = G.t - L.stillT > 25 && !obj;     // stood about long, nowhere in particular
+  const want = called || (!W.raid && dHome > 7 && !homeward && !lazy && (obj ? dBase > 3 : dBase > 7 && (moved >= 4 || (L.on && dBase > 5))))
+    || (W.raid && !homeward && !lazy && dBase > 6 && (moved >= 4 || (L.on && dBase > 4)) && (!W.boss || d2(h, W.boss) > 5));
+  if (want) { L.lastWant = G.t; if (!L.pend) L.pend = G.t; } else L.pend = 0;
+  const go = want && (called || obj || G.t - L.pend >= 1);
+  const face = [Math.sign(W.teams[1].spawn[0] - p.tx), Math.sign(W.teams[1].spawn[1] - p.ty)];
+  if (L.on && !go && (homeward || dBase <= 3 || lazy || G.t - L.lastWant > 4)) { L.on = false; L.off = homeward ? 'home' : dBase <= 3 ? 'base' : lazy ? 'lazy' : 'want'; }
+  if (go || L.on) {
+    if (L.on && obj) L.objKind = obj.kind;
+    const at = obj && obj.kind === 'flag' ? [obj.x, obj.y] : [p.tx, p.ty];
+    const prev = L.order;
+    // Kept still while the hero is within a few tiles of it (a new spot each step was a new
+    // path for every follower).
+    if (!prev || !L.on || Math.abs(prev.x - at[0]) + Math.abs(prev.y - at[1]) > 2) L.order = { x: at[0], y: at[1], kind: 'follow', obj: null, face };
+  }
+  if (go) {
+    if (!L.on) {
+      L.on = true;
+      L.onT = G.t;
+      L.n++;
+      L.objKind = obj ? obj.kind : called ? 'call' : 'move';
+      const mates = sq.members.filter(m => !m.hero && !m.dead);
+      const lines = W.raid ? ['같이 가요!', '따라갈게요', 'ㄱㄱ'] : !obj ? ['어디 가요? 따라감', '같이 가요!', 'ㄱㄱ 따라갑니다'] : obj.kind === 'flag' ? ['거점 먹으러 가요!', '같이 먹어요 ㄱㄱ', '따라갈게요!']
+        : obj.kind === 'cmdr' ? ['대장 잡으러 가요?', '따라갑니다!'] : obj.kind === 'cart' ? ['수레 붙어요!', '같이 밀어요'] : ['같이 가요!', '따라갈게요'];
+      if (!called && mates.length) chat(W, pick(mates), 'follow', lines, { every: 20, p: 0.8, emo: Math.random() < 0.5 ? 'ready' : null });
+    }
+    // Allies near (not those keeping a point) join by their own will, each asked once a lead.
+    const r = called ? 14 : obj ? 9 : 6;
+    for (const b of W.alive[0]) {
+      const ask = L.n * 1000 + Math.floor(G.t / 10) + (called ? 0.5 : 0);
+      if (b.hero || b.troop || b.cmdr || b.gate || b.squad === sq || b.leadAsk === ask || b.followT > G.t) continue;
+      if (Math.abs(b.tx - p.tx) + Math.abs(b.ty - p.ty) > r) continue;
+      if (b.squad.keep && !called) continue;
+      b.leadAsk = ask;
+      if (Math.random() < b.heed * (called ? 1.2 : obj ? 0.8 : 0.5)) b.followT = G.t + rnd(14, 26);
+    }
+  }
+  if (W.diag) W.diag.leadT = (W.diag.leadT || 0) + (L.on ? 1 : 0);
+}
+
+/** The 집결 key (대항전·레이드): the hero calls those near to follow it. */
+function heroCall() {
+  const G = A.G(), W = G && G.war;
+  if (!W || W.over || G.dead || (W.countdown || 0) > 1) return;
+  if (G.t - (W.callT || -99) < 6) return;
+  W.callT = G.t;
+  W.callUntil = G.t + 22;
+  const p = G.player;
+  const text = pick(W.raid ? ['다들 이쪽으로 모여요!', '모여요!'] : ['따라와요!', '모여요! 같이 가요', '여기로 모여요!']);
+  G.bubble = { text, t: G.t };
+  A.say(`${W.hero.name}: ${text}`, 'party');
+  W.chatT = G.t;
+  heroLead(W);
+  const near = W.alive[0].filter(b => !b.hero && !b.troop && !b.cmdr && !b.gate && Math.abs(b.tx - p.tx) + Math.abs(b.ty - p.ty) <= 14);
+  answers(W, near.filter(b => following(W, b)), ['ㅇㅋ', '갑니다!', '넵 따라감', '가요 가요', 'ㄱㄱ'], 2);
+  if (W.diag) W.diag.calls = (W.diag.calls || 0) + 1;
+}
+
+// ------------------------------------------------ the guild's plans (wars)
+
+/** How hard a guild pushes: more when behind, less when well ahead (0.15 .. 0.95). */
+function aggression(W, team) {
+  const lead = W.score[team] - W.score[1 - team];
+  const scale = W.mode === 'capture' ? 70 : 8;
+  let a = 0.55 - lead / scale;
+  if (W.left < 90 && lead < 0) a += 0.25;
+  if (W.left < 60 && lead > (W.mode === 'capture' ? 25 : 4)) a -= 0.2;
+  return clamp(a, 0.15, 0.95);
+}
+
+/**
+ * 거점 점령: the guild's plan, made again every twenty seconds or so and when its point falls:
+ * how many squads keep our points (none when far behind, two when well ahead), which point the
+ * rest take (the neutral or the weakly held first), gathered first a few tiles short of it and
+ * then pushed together, a squad sometimes sent round to another; a push that is broken falls
+ * back to gather again.
+ */
+function capturePlan(W, team, set, squads) {
+  const G = A.G(), T = W.teams[team], mine = T.spawn, them = 1 - team;
+  const P = (W.plans = W.plans || [null, null])[team] || (W.plans[team] = { t: 0, target: null, flank: null, pushing: false, stagedAt: 0, nDef: 1, brokeT: 0, a: 0.5 });
+  const a = P.a = aggression(W, team);
+  const byNear = W.flags.slice().sort((x, y) => Math.hypot(x.x - mine[0], x.y - mine[1]) - Math.hypot(y.x - mine[0], y.y - mine[1]));
+  const owned = byNear.filter(f => f.owner === team), notMine = byNear.filter(f => f.owner !== team);
+  const foesAt = (f, r = 5) => countAt(W, f.x, f.y, r)[them];
+  const friendsAt = (f, r = 5) => countAt(W, f.x, f.y, r)[team];
+  if (G.t >= P.t || !P.target || P.target.owner === team || (P.flank && P.flank.owner === team)) {
+    P.t = G.t + rnd(16, 26);
+    P.nDef = !owned.length ? 0 : a > 0.75 ? 0 : a > 0.42 ? 1 : 2;
+    let best = null, bs = 1e9;
+    for (const f of notMine) {
+      const s = Math.hypot(f.x - mine[0], f.y - mine[1]) * 0.25 + foesAt(f, 6) * 1.5 - (f.owner === -1 ? 4 : 0) + (f === P.target ? -1 : 0);
+      if (s < bs) { bs = s; best = f; }
+    }
+    if (!best) best = byNear.slice().sort((x, y) => foesAt(y, 7) - foesAt(x, 7))[0] || byNear[byNear.length - 1];
+    if (best !== P.target) { P.target = best; P.pushing = false; P.stagedAt = G.t; P.called = false; }
+    const other = notMine.filter(f => f !== best);
+    P.flank = other.length && a > 0.5 && Math.random() < 0.35 ? other[0] : null;
+  }
+  // The hero on a point not ours with its squad behind it: the guild makes it its target (most
+  // of the time; a guild far ahead may keep to its own plan).
+  const L = W.lead;
+  if (team === 0 && L && L.on && L.objKind === 'flag' && !A.G().dead) {
+    const hf = W.flags.find(f => f.owner !== 0 && Math.hypot(f.x - G.player.tx, f.y - G.player.ty) <= 4);
+    if (hf && hf !== P.target && G.t - (P.heroT || -99) > 15 && Math.random() < 0.4 + 0.6 * a) {
+      P.heroT = G.t;
+      P.target = hf;
+      P.flank = null;
+      P.pushing = true;
+      P.pushT = G.t;
+      P.t = G.t + rnd(20, 30);
+      const ld = squads.map(q => q.leader).find(l => l && !l.dead && !l.hero && l.squad !== W.hero.squad);
+      chat(W, ld, 'heroPoint', [`${W.hero.name.replace('(나)', '')}님 ${hf.name} 거점 갔어요! 다 같이 가요!`, `${hf.name} 거점 지원 갑니다!`, `${hf.name} 쪽으로 다 붙어요!`], { every: 15, must: true, gap: 1.5, emo: 'ready' });
+    }
+  }
+  const target = P.target;
+  // Squads: those keeping a point (the first, then the last ones), and the rest pushing. The
+  // hero's squad (team 0's second) pushes with the main body unless the hero leads it elsewhere.
+  // Our points by need: under attack first, then nearest the enemy; the point by our own camp
+  // only when it is our last or foes are about it (a squad kept there idle was the guild
+  // "standing about its camp").
+  const es = W.teams[them].spawn;
+  const guard = owned.filter(f => f !== byNear[0] || owned.length === 1 || foesAt(f, 9) > 0)
+    .sort((x, y) => (foesAt(y, 6) - foesAt(x, 6)) || (Math.hypot(x.x - es[0], x.y - es[1]) - Math.hypot(y.x - es[0], y.y - es[1])));
+  const order = [0, 4, 3, 2, 1].map(i => squads[i]).filter(Boolean);
+  const keepers = order.slice(0, Math.min(P.nDef, guard.length));
+  const pushers = squads.filter(q => !keepers.includes(q));
+  keepers.forEach((q, i) => { q.keep = true; const f = guard[i]; set(q, f.x, f.y, 'capture', null, null); });
+  for (const q of pushers) q.keep = false;
+  // A point of ours falling with nobody on it: the nearest pushers turn back when we cannot spare it.
+  const falling = owned.find(f => foesAt(f, 3) >= 2 && friendsAt(f, 4) < foesAt(f, 3));
+  if (falling && (a < 0.6 || owned.length === 1) && pushers.length > 1) {
+    const back = pushers.filter(q => q !== W.hero.squad).slice(0, 2);
+    back.forEach((q, i) => set(q, falling.x, falling.y, 'capture', null, i === 0 ? `${falling.name} 거점 뺏겨요! 돌아가서 막아요!` : null));
+    pushers.splice(0, pushers.length, ...pushers.filter(q => !back.includes(q)));
+  }
+  // Gather a few tiles short of the target, then go in together.
+  const [sx, sy] = stagePoint(W, target, pushers, mine);
+  const alivePush = pushers.flatMap(q => q.members.filter(m => (m.hero ? !G.dead : !m.dead)));
+  const close = alivePush.filter(m => Math.hypot(m.tx - target.x, m.ty - target.y) < 7).length;
+  if (!P.pushing) {
+    const gathered = alivePush.filter(m => Math.hypot(m.tx - sx, m.ty - sy) <= 4.5 || Math.hypot(m.tx - target.x, m.ty - target.y) <= 5).length;
+    if (gathered >= Math.max(3, alivePush.length * (0.75 - 0.25 * a)) || G.t - P.stagedAt > 6 + 6 * (1 - a) || close >= alivePush.length * 0.6) {
+      P.pushing = true;
+      P.pushT = G.t;
+      if (team === 0) pushCall(W, pushers, target, P);
+    }
+  } else if (G.t - P.pushT > 8) {
+    // Broken: few of ours left by the point, many of theirs: back to gather.
+    const foes = foesAt(target, 5), ours = alivePush.filter(m => Math.hypot(m.tx - target.x, m.ty - target.y) <= 5).length;
+    if (ours <= 2 && foes >= 5 && target.owner !== team) {
+      if (!P.brokeT) P.brokeT = G.t;
+      if (G.t - P.brokeT > 3) {
+        P.pushing = false;
+        P.stagedAt = G.t;
+        P.brokeT = 0;
+        if (team === 0) {
+          const ld = pushers.map(q => q.leader).find(l => l && !l.dead && !l.hero);
+          chat(W, ld, 'fallback', ['밀려요! 뒤로 빠져서 다시 모여요!', '한 번 빠졌다가 다시 가요!', '많아요 빠져요 빠져!'], { every: 25, must: true, emo: 'gone' });
+        }
+      }
+    } else P.brokeT = 0;
+  }
+  const flank = P.flank && pushers.length >= 3 ? pushers[pushers.length - 1] : null;
+  pushers.forEach((q, i) => {
+    if (q === flank) { set(q, P.flank.x, P.flank.y, 'capture', null, null); return; }
+    if (P.pushing) set(q, target.x + ((i % 3) - 1) * 1.2, target.y + (i > 2 ? 1 : -1) * 0.8, 'capture', null, null);
+    else set(q, sx + ((i % 3) - 1) * 1.5, sy + (i > 2 ? 1 : -1), 'stage', null, null);
+  });
+}
+/** A spot about six tiles short of a point, on the side the pushers come from. */
+function stagePoint(W, f, pushers, mine) {
+  const G = A.G();
+  let cx = 0, cy = 0, n = 0;
+  for (const q of pushers) for (const m of q.members) if (m.hero ? !G.dead : !m.dead) { cx += m.tx; cy += m.ty; n++; }
+  if (!n) { cx = mine[0]; cy = mine[1]; n = 1; }
+  cx /= n; cy /= n;
+  const dx = cx - f.x, dy = cy - f.y, L = Math.hypot(dx, dy) || 1, r = Math.min(6, L);
+  return snap(W, f.x + dx / L * r, f.y + dy / L * r);
+}
+function pushCall(W, pushers, target, P) {
+  const G = A.G(), ld = pushers.map(q => q.leader).find(l => l && !l.dead && !l.hero) || pushers.flatMap(q => q.members).find(m => !m.dead && !m.hero);
+  if (!ld || G.t - (W.cmdSaid || -99) < 6) return;
+  const lines = target.owner === -1 ? [`${target.name} 거점 비었어요! 먹어요!`, `다 모였죠? ${target.name} 갑니다!`] : [`다 모였죠? ${target.name} 거점 칩니다!`, `${target.name} 거점 들어가요! 붙어요!`, `하나 둘 셋 ${target.name} 가요!`];
+  if (chat(W, ld, 'push', lines, { every: 12, must: true, gap: 1.5, emo: 'ready' })) W.cmdSaid = G.t;
+}
+
+/**
+ * 대장전: gather at the middle, then go for the enemy's 진영대장 together; a broken assault falls
+ * back to the middle; more stay by our own 대장 when ahead, all come back when it is struck.
+ */
+function commanderPlan(W, team, set, squads, blob) {
+  const G = A.G(), T = W.teams[team], foe = W.teams[1 - team], myC = T.cmd, theirC = foe.cmd, mid = W.def.mid;
+  const P = (W.plans = W.plans || [null, null])[team] || (W.plans[team] = { phase: 'gather', at: 0, t: 0 });
+  const a = P.a = aggression(W, team);
+  const underAttack = W.alive[1 - team].filter(e => d2(e, myC) < 7).length >= 3;
+  squads[0].keep = true;
+  set(squads[0], myC.home[0] + Math.sign(mid[0] - myC.home[0]) * 3, myC.home[1], 'defend', null, '대장 곁을 지킵니다');
+  if (a < 0.3 && squads[4]) { squads[4].keep = true; set(squads[4], myC.home[0] + Math.sign(mid[0] - myC.home[0]) * 5, myC.home[1] + 2, 'defend'); }
+  else if (squads[4]) squads[4].keep = false;
+  const main = squads.filter(q => !q.keep);
+  const blobOn = (x, y, kind, obj, text) => main.forEach((q, i) => set(q, x + ((i % 3) - 1) * 1.5, y + (i > 1 ? 1 : -1), kind, obj, i === 0 ? text : null));
+  if (underAttack) { P.phase = 'gather'; P.at = G.t; return blobOn(myC.tx, myC.ty, 'defend', null, '대장이 공격받아요! 전원 복귀!'); }
+  if (theirC.dead) return blobOn(mid[0], mid[1], 'hold', null, null);
+  const alive = main.flatMap(q => q.members.filter(m => (m.hero ? !G.dead : !m.dead)));
+  const L = W.lead;
+  if (team === 0 && P.phase === 'gather' && L && L.on && L.objKind === 'cmdr' && !G.dead && Math.random() < 0.4 + 0.6 * a) {
+    P.phase = 'assault';
+    P.at = G.t;
+    const ld = main.map(q => q.leader).find(l => l && !l.dead && !l.hero && l.squad !== W.hero.squad);
+    chat(W, ld, 'heroPoint', ['대장 쪽으로 갔어요! 다 같이 들어가요!', '지원 갑니다! 대장 점사!'], { every: 15, must: true, gap: 1.5, emo: 'ready' });
+  }
+  if (P.phase === 'gather') {
+    const there = alive.filter(m => Math.hypot(m.tx - mid[0], m.ty - mid[1]) < 6).length;
+    const ready = W.t > 25 + 25 * (1 - a) && (there >= alive.length * (0.7 - 0.2 * a) || G.t - P.at > 14);
+    if (ready) {
+      P.phase = 'assault';
+      P.at = G.t;
+      const ld = main.map(q => q.leader).find(l => l && !l.dead && !l.hero);
+      if (team === 0) chat(W, ld, 'push', ['다 모였죠? 적 대장 갑니다!', '대장 잡으러 들어가요! 붙어요!', '지금 들어가요! 대장 점사!'], { every: 15, must: true, gap: 1.5, emo: 'ready' });
+    }
+    return blobOn(mid[0], mid[1], 'hold', null, '중앙에 모여요');
+  }
+  // The assault: broken (few of ours near their 대장, many of theirs) or too long: back to the middle.
+  const near = alive.filter(m => d2(m, theirC) < 8).length, foes = W.alive[1 - team].filter(e => d2(e, theirC) < 8).length;
+  if ((G.t - P.at > 12 && near <= 2 && foes >= 5) || G.t - P.at > 50) {
+    P.phase = 'gather';
+    P.at = G.t;
+    const ld = main.map(q => q.leader).find(l => l && !l.dead && !l.hero);
+    if (team === 0) chat(W, ld, 'fallback', ['밀려요! 중앙으로 빠져서 다시!', '빠져요 빠져! 중앙 집결!'], { every: 25, must: true, emo: 'gone' });
+    return blobOn(mid[0], mid[1], 'hold', null, null);
+  }
+  blobOn(theirC.tx, theirC.ty, 'assault', theirC, '적 진영대장 돌격! 다 같이!');
+}
+
+// ------------------------------------------------ support casts: 기원, buffs, revives
+
+/**
+ * A healer's or supporter's casts besides its mends: a buff of its class on a mate near that
+ * lacks it (the hero first, as one would for the party one sees), its mana back with
+ * 공력증강, the fallen hero raised where it lies. True when it cast (its turn is spent).
+ */
+function partyCasts(W, b) {
+  const G = A.G(), pk = b.party;
+  if (!pk) return false;
+  // The hero lying near: raised where it fell (a healer only, after a moment's notice).
+  if (b.team === 0 && b.role === 'healer' && G.dead && b.cd.r <= 0) {
+    const g = W.ghosts.find(x => x.b === W.hero);
+    if (g && Math.hypot(g.tx - b.tx, g.ty - b.ty) < (W.raid ? 7 : 6) && G.t - g.t > 1 + (b.lagK || 1) * 0.6 && (!W.raid || !G.over)) {
+      if (Math.hypot(g.tx - b.tx, g.ty - b.ty) > 3) { b.dest = snap(W, g.tx, g.ty); return true; }
+      reviveHero(W, b, g);
+      return true;
+    }
+  }
+  // Mana: low, it says so (now and then) and takes its time; 공력증강 brings it back.
+  if (b.mp < 0.22) {
+    chat(W, b, 'mana', ['마나 없어요 ㅠ', '엠 없어요 잠깐만요', '마나가 바닥…', '공증 좀 할게요'], { every: 35, p: 0.6, emo: Math.random() < 0.4 ? 'dizzy' : null });
+    if (pk.mana && b.cd.m === undefined) b.cd.m = 0;
+    if (pk.mana && b.cd.m <= 0) {
+      b.cd.m = 30;
+      b.mp = Math.min(1, b.mp + 0.5);
+      shout(W, b, spellName(pk.mana, b.lv));
+      pose(b, 'cast');
+      return true;
+    }
+  }
+  if (!pk.buffs.length || b.mp < 0.15) return false;
+  if (b.cd.f === undefined) b.cd.f = rnd(3, 8);
+  if (b.cd.f > 0) return false;
+  // A mate near that lacks it; the hero first while it is in reach.
+  const id = pick(pk.buffs), d = SK[id], kind = d.buff;
+  if (kind === 'guard' && (b.team !== 0 || !(G.player.hp / G.player.maxHp < 0.35 && G.t - (W.hero.lastHitT || -9) < 2))) return false;
+  let to = null;
+  const has = m => m.hero ? G.buffs[kind === 'guard' ? 'guard' : kind] > G.t + 1 : (kind === 'power' ? m.powT > G.t + 1 : m.shield > G.t + 1);
+  if (b.team === 0 && !G.dead && d2(W.hero, b) <= 6 && !has(W.hero) && (Math.random() < 0.7 || W.raid)) to = W.hero;
+  else for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && !m.troop && !m.hero && d2(m, b) <= 5 && !has(m) && (!to || (m.lastHitT || 0) > (to.lastHitT || 0))) to = m;
+  if (!to) { b.cd.f = 2; return false; }
+  b.cd.f = rnd(9, 15) / Math.max(0.7, b.skill || 1);
+  b.mp -= 0.07;
+  castBuff(W, b, to, id);
+  return true;
+}
+
+/** A buff of the caster's class on a mate: its real effect (the hero's own buffs), its picture, its name. */
+function castBuff(W, b, to, id) {
+  const G = A.G(), d = SK[id], name = spellName(id, b.lv), fx = spellFx(id, b.lv);
+  const dur = Math.min(6, d.duration || 4);
+  if (to.hero) {
+    const p = G.player;
+    if (d.buff === 'power') {
+      // Not over a stronger one of the hero's own.
+      if (!(G.buffs.power > G.t) || (G.buffs.powerK || 0) <= (d.power || 0.4)) G.buffs.powerK = Math.min(0.6, d.power || 0.4);
+      G.buffs.power = Math.max(G.buffs.power, G.t + dur);
+    } else if (d.buff === 'guard') G.buffs.guard = Math.max(G.buffs.guard, G.t + Math.min(1.5, d.duration || 1.5));
+    else G.buffs[d.buff] = Math.max(G.buffs[d.buff] || 0, G.t + dur);
+    if (fx && fxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.8 });
+    A.floatText(p.x, p.y - 84, name, '#bfe8ff', true);
+    supCount(W, 'buff');
+    (W.sup.names[name] = (W.sup.names[name] || 0) + 1);
+    chat(W, b, 'buffHero', [`${name} 걸어드림`, `${name} 드려요~`, `${name}!`, '버프 받으세요'], { every: 18, p: 0.7 });
+  } else {
+    if (d.buff === 'power') { to.powT = G.t + dur; to.powK = 1.15; }
+    else to.shield = Math.max(to.shield || 0, G.t + dur);
+    if (fx && fxOk() && onScreen(to)) A.fxOn(fx, to, { scale: 0.6 });
+  }
+  shout(W, b, name);
+  pose(b, 'cast');
+  face(b, to);
+}
+
+/** A healer's mend has reached the hero: the 기원's picture over it, its name, a word now and then. */
+function heroMended(W, b, hid) {
+  const G = A.G(), p = G.player, name = spellName(hid, b.lv), fx = spellFx(hid, b.lv);
+  if (fx && fxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.85 });
+  if (G.t - (W.mendSaidT || -99) > 2.5) { W.mendSaidT = G.t; A.floatText(p.x, p.y - 84, name, '#c8ffc0', true); }
+  const names = supOf(W).names;
+  names[name] = (names[name] || 0) + 1;
+  const low = p.hp / p.maxHp < 0.45;
+  chat(W, b, low ? 'mendLow' : 'mendHero', low ? ['힐 갑니다! 버텨요!', '피 채워 드릴게요!', `${name}!`] : [`${name} 들어가요`, '힐 갑니다~', `${name} 드림`, '기원 걸어드림'], { every: low ? 12 : 20, p: low ? 0.8 : 0.45 });
+}
+
+/** The hero raised by a healer where it fell. */
+function reviveHero(W, healer, g) {
+  const G = A.G(), p = G.player;
+  healer.cd.r = 18;
+  G.dead = false;
+  W.heroBack = 0;
+  W.hero.dead = false;
+  p.hp = Math.max(1, p.maxHp * 0.4);
+  G.buffs.guard = Math.max(G.buffs.guard, G.t + 1.5);
+  W.ghosts = W.ghosts.filter(x => x !== g);
+  credit(healer, 'revives', 1);
+  if (W.raid && W.stat) W.stat.revives++;
+  supCount(W, 'revive');
+  shout(W, healer, '부활');
+  A.addFx(A.FX.revive, 0, 2, { follow: true, anchor: 'bottom' });
+  A.say(`${healer.name}님이 부활시켜 주었습니다.`, 'sys');
+  chat(W, healer, 'reviveHero', ['부활 갑니다!', '일어나세요!', '부활! 정신 차려요'], { every: 6, must: true });
+  G.bubble = { text: pick(['감사합니다!', '고마워요!', '살았다 ㅠ']), t: G.t + 0.6 };
+}
+
+/** A fighter raised by an ally: thanks, now and then. */
+function thanks(W, b, by) {
+  if (b.team !== 0 || !by) return;
+  const G = A.G();
+  A.later(rnd(0.6, 1.4), () => {
+    if (W.over || b.dead) return;
+    b.talked = -99;
+    chat(W, b, 'thanks', by.hero ? ['감사합니다!', '부활 감사요 ㅠ', '고마워요!!'] : ['감사요!', '살았다 ㅋㅋ', '고마워요'], { every: by.hero ? 4 : 16, p: by.hero ? 1 : 0.5, emo: Math.random() < 0.5 ? 'cute' : 'gains', must: !!by.hero });
+  });
+}
+
+
+/**
+ * 레이드: the raiders' own words between the raid leader's calls — the boss turned on the hero,
+ * the floor under the hero's party, healers lying, the boss's great blow coming.
+ */
+function raidBanter(W) {
+  const G = A.G(), boss = W.boss;
+  if (!boss || G.over) return;
+  const near = W.alive[0].filter(m => !m.hero && d2(m, W.hero) < 9);
+  if (!near.length) return;
+  const by = role => near.filter(m => m.role === role)[0] || pick(near);
+  if (G.aggro === G.player && W.role !== 'tank' && W.lastAggro !== G.player) chat(W, by('tank'), 'aggroHero', ['보스 그쪽 봐요! 도발 갑니다', '어그로 튀었어요! 잡을게요', '딜 조금만 쉬어요 어그로!'], { every: 20, p: 0.8 });
+  W.lastAggro = G.aggro;
+  const last = G.marks.length ? G.marks[G.marks.length - 1] : null;
+  if (last && last !== W.lastMark && !last.done) {
+    W.lastMark = last;
+    if (last.tiles.some(([x, y]) => Math.abs(x - G.player.tx) + Math.abs(y - G.player.ty) <= 2)) chat(W, pick(near), 'markHero', ['발밑 장판!', '피해요 피해!', '빨간 데 나와요!'], { every: 12, p: 0.5, gap: 2 });
+  }
+  if (G.blast && W.lastBlast !== G.blast) { W.lastBlast = G.blast; chat(W, pick(near), 'blastBanter', ['광역 온다! 뭉쳐서 힐 받아요', '힐러님 광역 대비요!', '마비 누가 좀!'], { every: 25, p: 0.6, emo: Math.random() < 0.4 ? 'surprise' : null }); }
+  const downH = W.bodies.filter(b => b.role === 'healer' && b.dead).length;
+  if (downH >= 3) chat(W, pick(near), 'healersDown', ['힐러 다 누웠어요!! 부활 좀!', '힐러가 없어요 ㅠㅠ', '힐 없음 버텨요!'], { every: 30, p: 0.8, emo: 'gone' });
+}
+
+// ---------------------------------------------------------------- the war across the field (쟁)
+// A guild war is not one blob round the points: early on the guilds spread over the field —
+// patrols to the side paths, crates and watch posts, a squad or two on the points — and the
+// players play by their own kind: hunters (자객·사신 and the strong) seek out the strong or the
+// lone and kill them, divers go for the enemy's healers, the weak keep to their friends and run
+// from bad odds, two who meet alone fight it out while the rest let them be. Toward the end the
+// guilds gather on one decisive point (결전), called in the chat and on the screen.
+
+/** A fighter's way of playing the war, from its class, its strength and chance. */
+function warStyle(W, f) {
+  if (W.raid || f.role === 'tank' || f.role === 'healer') return 'obj';
+  const burst = ['rogue', 'reaper', 'dokkaebi', 'monk'].includes(f.cls.id);
+  const strong = f.pw > 1.04 || f.lv >= 36;
+  const weak = f.pw < 0.94 || f.lv <= 22;
+  const r = Math.random();
+  if (f.role === 'dps' && (burst ? r < 0.6 : strong && r < 0.3)) return 'hunter';
+  if (weak && r < 0.6) return 'cautious';
+  if (f.role === 'dps' && r < 0.5) return 'diver';
+  if (f.role === 'support' && r < 0.3) return 'diver';
+  return r < 0.75 ? 'skirm' : 'obj';
+}
+
+/** Spots over the whole field for patrols and flanks: points, crates, watch posts, and open ground between. */
+function roamSpots(W) {
+  if (W.roam) return W.roam;
+  const d = W.def, out = [];
+  const add = p => { if (p) out.push(snap(W, p[0], p[1])); };
+  for (const p of (d.flags || []).concat(d.crates || [], d.cratesOut || [], d.scouts || [])) add(p);
+  if (d.mid) add(d.mid);
+  // Open ground on a coarse grid, away from both camps.
+  const { cols, rows } = W.map, step = Math.max(6, Math.round(Math.min(cols, rows) / 5));
+  for (let y = 3; y < rows - 2; y += step)
+    for (let x = 3; x < cols - 2; x += step) {
+      if (!open(W, x, y)) continue;
+      if (W.teams.some(t => Math.abs(t.spawn[0] - x) + Math.abs(t.spawn[1] - y) < 8)) continue;
+      out.push([x, y]);
+    }
+  return (W.roam = out);
+}
+
+/** The war's pace: spread (skirmishes), then the guilds' plans, then the 결전 on one point. */
+function warPhase(W) {
+  const G = A.G(), T = W.def.time || 300, k = W.t / T;
+  let ph = k < 0.28 ? 'spread' : 'plan';
+  if (W.mode === 'capture' && (k >= 0.62 || Math.max(...W.score) >= W.def.target * 0.72)) ph = 'final';
+  else if (W.mode === 'commander' && k >= 0.62) ph = 'final';
+  else if (W.mode === 'escort' && W.cart && (W.cart.i >= (W.path.length - 1) * 0.65 || (W.round === 2 && W.left < 45))) ph = 'final';
+  else if (W.mode === 'siege') ph = W.gateDown ? 'final' : k < 0.2 ? 'spread' : 'plan';
+  if (W.phase === 'final' && ph !== 'final' && W.mode === 'escort' && W.finalRound === W.round) ph = 'final';
+  if (ph !== W.phase) {
+    W.phase = ph;
+    (W.phaseLog = W.phaseLog || []).push([Math.round(W.t), ph]);
+    if (ph === 'final') {
+      W.finalRound = W.round;
+      const at = finalPoint(W);
+      W.final = at;
+      const where = at.name || '';
+      if (W.mode !== 'siege') A.banner(`결전! ${where}`);
+      A.say(`[결전] ${where} — 양 길드가 모두 모입니다!`, 'warn');
+      const ld = W.teams[0].squads.map(q => q.leader).find(l => l && !l.dead);
+      if (ld) A.later(1.2, () => chat(W, ld, 'final', [`결전입니다! 전원 ${where}로!`, `다 모여요! ${where} 총력전!`], { every: 5, must: true, gap: 0, emo: 'ready' }));
+    }
+  }
+  if (ph === 'final') W.final = finalPoint(W, W.final);
+}
+/** The decisive point: capture — the point the guilds fight over (the middle one, else the most fought); commander — the leading side's 대장; escort — the cart; siege — the 수성대장. */
+function finalPoint(W, prev) {
+  if (W.mode === 'capture') {
+    if (prev && prev.f) return prev;
+    const mid = W.flags.slice().sort((a, b) => Math.hypot(a.x - (W.teams[0].spawn[0] + W.teams[1].spawn[0]) / 2, a.y - (W.teams[0].spawn[1] + W.teams[1].spawn[1]) / 2)
+      - Math.hypot(b.x - (W.teams[0].spawn[0] + W.teams[1].spawn[0]) / 2, b.y - (W.teams[0].spawn[1] + W.teams[1].spawn[1]) / 2))[0];
+    return { x: mid.x, y: mid.y, f: mid, name: `${mid.name} 거점` };
+  }
+  if (W.mode === 'commander') {
+    const lead = W.score[0] === W.score[1] ? (hpk(W.teams[0].cmd) >= hpk(W.teams[1].cmd) ? 0 : 1) : W.score[0] > W.score[1] ? 0 : 1;
+    if (prev && prev.team !== undefined) { const c = W.teams[prev.team].cmd; return { ...prev, x: c.tx, y: c.ty }; }
+    const c = W.teams[lead].cmd;
+    return { x: c.tx, y: c.ty, team: lead, name: `${W.teams[lead].name} 진영대장` };
+  }
+  if (W.mode === 'escort') return { x: W.cart.tx, y: W.cart.ty, name: '수레 마지막 길목' };
+  const c = W.teams[1 - W.attacker].cmd;
+  return { x: c.tx, y: c.ty, name: '수성대장' };
+}
+
+/**
+ * Squads' orders while the field is spread: a squad or two on the war's objective as planned,
+ * the others on patrols to spots over the field (a new one every twenty seconds or so, the side
+ * paths among them). Called after the plan, so the plan's keepers stay.
+ */
+function spreadOrders(W, team, set, squads) {
+  const G = A.G(), spots = roamSpots(W);
+  if (!spots.length) return;
+  const T = W.teams[team], es = W.teams[1 - team].spawn, ms = T.spawn;
+  const L = Math.hypot(es[0] - ms[0], es[1] - ms[1]) || 1;
+  // Spots on our half and the middle, more forward for the bold.
+  const fwd = s => ((s[0] - ms[0]) * (es[0] - ms[0]) + (s[1] - ms[1]) * (es[1] - ms[1])) / L / L;
+  const ok = spots.filter(s => fwd(s) > 0.1 && fwd(s) < 0.75);
+  squads.forEach((q, i) => {
+    if (q.keep || i === 1 && team === 0 && W.lead && W.lead.on) return;
+    // Half the squads keep to the plan (in an escort or a siege all but the last).
+    if ((W.mode === 'escort' || W.mode === 'siege') ? i !== squads.length - 1 : i % 2 === 0) return;
+    if (!q.patrol || G.t > q.patrolT || Math.abs(q.patrol[0] - (q.order ? q.order.x : 0)) > 99) {
+      q.patrol = pick(ok.length ? ok : spots);
+      q.patrolT = G.t + rnd(16, 28);
+    }
+    set(q, q.patrol[0], q.patrol[1], 'patrol', null, null);
+  });
+}
+
+/** The 결전: every squad (keepers too, all but one) onto the decisive point. */
+function finalOrders(W, team, set, squads) {
+  const f = W.final;
+  if (!f) return;
+  squads.forEach((q, i) => {
+    q.keep = false;
+    let x = f.x, y = f.y, kind = 'capture', obj = null;
+    if (W.mode === 'commander') { const c = W.teams[f.team].cmd; kind = f.team === team ? 'defend' : 'assault'; obj = f.team === team ? null : c; x = c.tx; y = c.ty; }
+    else if (W.mode === 'escort') kind = team === W.attacker ? 'escort' : 'intercept';
+    else if (W.mode === 'siege') { kind = team === W.attacker ? 'assault' : 'defend'; obj = team === W.attacker ? W.teams[1 - W.attacker].cmd : null; }
+    set(q, x + ((i % 3) - 1) * 1.3, y + (i > 2 ? 1 : -1) * 0.9, kind, obj, null);
+  });
+}
+
+/**
+ * A fighter's own play, by its style, when it is not following the hero or carrying: true when
+ * it acted (its target and its way chosen). Hunters roam for the strong and the lone, divers for
+ * the healers, the cautious keep to friends and run from bad odds; in the 결전 they all fight
+ * at the point.
+ */
+function soloThink(W, b, order) {
+  const G = A.G(), st = b.style;
+  if (!st || st === 'obj' || order.kind === 'follow' || W.phase === 'final') return false;
+  const foes = W.alive[1 - b.team], mates = W.alive[b.team];
+  const around = (who, list, r) => { let n = 0; for (const o of list) if (o !== who && !o.gate && Math.abs(o.tx - who.tx) + Math.abs(o.ty - who.ty) <= r) n++; return n; };
+  // The cautious: outnumbered near, back to the nearest group of friends.
+  if (st === 'cautious') {
+    const nf = around(b, foes, 5), nm = around(b, mates, 5);
+    if (nf >= 2 && nf > nm + 1) {
+      let best = null, bd = 1e9;
+      for (const m of mates) { if (m === b || m.gate || m.troop) continue; const d = d2(m, b); if (d > 3 && d < bd && around(m, mates, 3) >= 2) { bd = d; best = m; } }
+      const t = nearest(W, b, b.kit.range + 0.5);
+      if (t) act(W, b, t);
+      b.dest = best ? [best.tx, best.ty] : [W.teams[b.team].spawn[0], W.teams[b.team].spawn[1]];
+      b.hiding = G.t;
+      return true;
+    }
+    return false;
+  }
+  if (st !== 'hunter' && st !== 'diver') return false;
+  // Its prey, looked for every few seconds.
+  if (!b.prey || !alive(b.prey) || G.t > (b.preyT || 0) || (b.prey.hero && G.buffs.stealth > G.t)) {
+    b.preyT = G.t + rnd(3, 5);
+    let best = null, bs = -1e9;
+    const R = st === 'hunter' ? 22 : 18;
+    for (const e of foes) {
+      if (e.gate || e.troop || e.cmdr || (e.hero && (G.buffs.stealth > G.t || G.player.hp / G.player.maxHp > 0.5))) continue;
+      const d = d2(b, e);
+      if (d > R) continue;
+      let s = -d * 0.25;
+      if (st === 'diver') s += e.role === 'healer' ? 6 : e.role === 'support' ? 1 : -4;
+      else s += (around(e, W.alive[e.team], 4) === 0 ? 4 : 0) + (e.pw > 1.04 || e.leader ? 2 : 0) + (1 - hpk(e)) * 3 + (e.role === 'healer' ? 1.5 : 0) - (e.role === 'tank' ? 2 : 0);
+      // Not into a crowd of theirs.
+      s -= Math.max(0, around(e, W.alive[e.team], 4) - 1) * 1.5;
+      if (s > bs) { bs = s; best = e; }
+    }
+    if (best && bs < (st === 'diver' ? 0 : -2)) best = null;
+    if (best !== b.prey) {
+      b.prey = best;
+      if (best && st === 'diver' && best.role === 'healer') {
+        if (b.team === 1 && best.team === 0) {
+          const near = W.alive[0].filter(m => !m.hero && !m.troop && !m.cmdr && d2(m, best) < 8);
+          if (near.length) chat(W, pick(near), 'dive', [`${b.name}가 우리 힐러 노리는 중!`, `힐러 쪽에 ${b.cls.name} 붙었어요!`, '힐러 지켜요!!'], { every: 25, p: 0.7, emo: Math.random() < 0.4 ? 'surprise' : null });
+        } else if (b.team === 0) chat(W, b, 'diveGo', ['적 힐러 끊으러 갑니다', `${best.name} 힐러 잡으러 감`], { every: 30, p: 0.35 });
+      }
+      if (best && st === 'hunter' && b.team === 0) chat(W, b, 'hunt', [`${best.name} 혼자 있네 ㅋㅋ 잡으러 감`, '사냥 갑니다', `${best.cls ? best.cls.name : ''} 하나 따러 감`], { every: 30, p: 0.3 });
+    }
+  }
+  const t = b.prey;
+  if (!t) return false;
+  // Bad odds where the prey stands: give it up for now.
+  if (d2(b, t) < 7 && around(t, W.alive[t.team], 4) >= 3 + (st === 'hunter' && b.pw > 1.04 ? 1 : 0)) { b.prey = null; b.preyT = G.t + rnd(4, 7); return false; }
+  b.target = t;
+  b.tWhy = st;
+  const dist = d2(b, t), range = b.kit.range;
+  if (range > 1) b.dest = dist > range ? [t.tx, t.ty] : dist < 2 ? [clamp(b.tx + (Math.sign(b.tx - t.tx) || 1) * 2, 0, W.map.cols - 1), b.ty] : null;
+  else b.dest = dist > 1.1 ? [t.tx, t.ty] : null;
+  if (dist <= range + 0.5) {
+    act(W, b, t);
+    duelCheck(W, b, t);
+    // A dive that reached its healer (counted once a dive).
+    if (st === 'diver' && t.role === 'healer' && b.diveOn !== t) { b.diveOn = t; if (W.diag) W.diag.dives = (W.diag.dives || 0) + 1; }
+  }
+  return true;
+}
+
+/**
+ * Two who meet alone (no friend of either within four tiles) fight it out: the others near let
+ * them be a few seconds (pickFoe passes a duellist over), and someone calls it now and then.
+ */
+function duelCheck(W, b, t) {
+  const G = A.G();
+  if (b.duel && b.duel.until > G.t) return;
+  if (t.gate || t.cmdr || t.troop || (t.duel && t.duel.until > G.t)) return;
+  const alone = (x, list) => !list.some(o => o !== x && !o.gate && !o.troop && Math.abs(o.tx - x.tx) + Math.abs(o.ty - x.ty) <= 4);
+  if (!alone(b, W.alive[b.team]) || !alone(t, W.alive[t.team])) return;
+  const until = G.t + rnd(6, 10);
+  b.duel = { with: t, until };
+  t.duel = { with: b, until };
+  if (W.diag) W.diag.duels = (W.diag.duels || 0) + 1;
+  const ours = b.team === 0 ? b : t.team === 0 ? t : null;
+  if (ours) {
+    const near = W.alive[0].filter(m => m !== ours && !m.troop && !m.cmdr && !m.hero && d2(m, ours) < 12);
+    if (ours.hero) chat(W, pick(near.length ? near : [ours]), 'duel', ['1:1 붙었다! 구경 ㄱㄱ', '오 1:1 ㅋㅋ', '이겨라!!'], { every: 30, p: 0.8 });
+    else if (near.length) chat(W, pick(near), 'duel', [`${ours.name} 1:1 붙었다!`, '1:1 떴다 ㅋㅋ', '저기 1:1 중'], { every: 25, p: 0.6, emo: Math.random() < 0.5 ? 'popcorn' : null });
+    else if (d2(ours, W.hero) < 14) chat(W, ours, 'duel', ['1:1 하자 ㅋ', '덤벼!'], { every: 25, p: 0.5 });
+  }
+}
+/** A duellist the fighter should pass over (another's fight), true when so. */
+function inDuel(W, b, e) {
+  const d = e.duel;
+  return !!(d && d.until > A.G().t && d.with !== b && alive(d.with));
 }
 
 // ---------------------------------------------------------------- the end
@@ -2314,7 +3157,7 @@ function warState() {
       hero: { ...W.hero.stats, dead: G.dead, up: W.hero.aliveT / Math.max(1, W.t), afk: W.afkT || 0 }, stat: { ...W.stat }, U: W.U, Uh: W.Uh,
       heroRate: W.rawAll ? W.rawAll / Math.max(1, W.t) / W.Uh : 0, aggro: G.aggro ? (G.aggro === G.player ? 'hero' : G.aggro.role + ':' + G.aggro.name) : null,
       result: W.result && { tier: W.result.tier, k: W.result.tierK, coins: W.result.coins, gold: W.result.gold, rank: W.result.rank },
-      bodies: W.bodies.length,
+      bodies: W.bodies.length, sup: W.sup,
     };
   }
   return {
@@ -2323,7 +3166,7 @@ function warState() {
     gate: W.gate && { hp: Math.round(W.gate.hp / W.gate.maxHp * 100), down: W.gateDown },
     cmd: W.teams.map(t => Math.round(hpk(t.cmd) * 100)), alive: W.alive ? W.alive.map(a => a.length) : null,
     kills: W.teams.map(t => t.kills), hero: { ...W.hero.stats, role: W.role, dead: G.dead, afk: W.afkT || 0 }, result: W.result && { tier: W.result.tier, mats: W.result.mats, gold: W.result.gold, rank: W.result.rank },
-    bodies: W.bodies.length, dead: W.bodies.filter(b => b.dead).length, diag: W.diag, hlvl: G.player.lvl, startLvl: W.startLvl, tier: W.tier, foeK: W.foeK,
+    bodies: W.bodies.length, dead: W.bodies.filter(b => b.dead).length, diag: W.diag, sup: W.sup, hlvl: G.player.lvl, startLvl: W.startLvl, tier: W.tier, foeK: W.foeK,
   };
 }
 
@@ -2409,6 +3252,7 @@ function raidSetup() {
     const lv = best[c.id].lvl;
     f.cls = c; f.kit = kitFor(c); f.gear = A.savedGear(c); f.yvKey = null; f.speed = c.speed || 70; f.alt = true;
     f.name = A.altName(c); f.lv = lv; f.pw = 0.9 + 0.22 * Math.min(1, lv / 36);
+    f.party = partyKit(c, lv);
     f.maxHp = f.hp = W.refHp * fighterHpK(f.role, c) * f.pw;
     altNames.push(`${f.name}(${c.name})`);
   }
@@ -2466,8 +3310,10 @@ function updateRaid(dt) {
   if (W.cmdT <= 0) {
     W.cmdT = 1;
     raidOrders(W);
+    heroLead(W);
   }
   raidCalls(W, dt);
+  raidBanter(W);
   W.ghosts = W.ghosts.filter(g => !g.b.dead ? false : G.t < g.until);
   W.feed = W.feed.filter(f => G.t - f.t < 6);
   if (G.texts.length > 40) G.texts.splice(0, G.texts.length - 40);
@@ -2562,7 +3408,7 @@ function dodge(W, b) {
 
 function thinkRaid(W, b) {
   const G = A.G(), sq = b.squad, boss = W.boss;
-  const order = sq.order || { x: W.camp[0], y: W.camp[1], kind: 'hold' };
+  const order = myOrder(W, b);
   if (dodge(W, b)) return;
   const k = hpk(b);
   // Low: back to the healers (to the camp when none is near); in again once mended.
@@ -3004,7 +3850,8 @@ function drawBody(b) {
     const im = A.images['prop/war_cart3.png'];
     drawLabel('보급', b.x, b.y - top - 18, '#ffd27a');
   }
-  if (b.bubble && dh < 8 && G.t - b.bubble.t < 1.4) A.drawBubble(b.bubble.text, b.x, b.y - top - 14, G.t - b.bubble.t);
+  if (b.bubble && dh < 8 && G.t - b.bubble.t < 1.4 && G.t >= b.bubble.t) A.drawBubble(b.bubble.text, b.x, b.y - top - 14, G.t - b.bubble.t);
+  if (b.emo && dh < 9) drawEmo(b, b.y - top - (b.bubble && G.t - b.bubble.t < 1.4 ? 38 : 10));
   // Held: 연's own stun icon over the head (a word over every held fighter of a crowd was a wall of text).
   if (b.stun > 0.3) {
     const im = A.images['hud/st_icon_stun.png'];
