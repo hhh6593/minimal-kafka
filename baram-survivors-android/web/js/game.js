@@ -2374,7 +2374,17 @@ function update(dt) {
         s.timer = Math.max(0, s.timer);
         continue;
       }
-      if (s.timer <= 0) fireSkill(s, 1);
+      if (s.timer <= 0) {
+        // A blow with no foe in its own reach is not thrown (in a 대항전 the hero swung 초혼비무
+        // at empty ground while walking between the fights): it waits, ready, for the first foe
+        // to come within that skill's reach. Heals, buffs and summons still go out.
+        const st0 = stats(s), rch = st0.dmg && !SKILLS[s.id].heal ? skillReach(SKILLS[s.id], st0) : 0;
+        if (rch && !G.enemies.some(e => tdist(e, p) <= rch)) {
+          s.timer = 0;
+          continue;
+        }
+        fireSkill(s, 1);
+      }
     }
     if (chain.length && !G.chainRun && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
@@ -4025,6 +4035,22 @@ function sweepField() {
 //
 // Spells land on their target at once, as in the game: no flying bolts. Sizes are in tiles.
 
+/** How far (tiles) a damaging skill reaches from the hero, by its kind: a foe must be within it
+ *  for the skill to be thrown. 0: no such check (summons, auras). */
+function skillReach(d, st) {
+  const r = st.radius ?? d.radius ?? 0, rg = st.range ?? d.range;
+  switch (d.kind) {
+    case 'nova': return r + 1.5;
+    case 'cleave': return r + 2;
+    case 'slash': return typeof d.dash === 'number' ? d.dash + 1 : 2;
+    case 'blink': return (rg || 4) + 1;
+    case 'strike': return (rg || 6) + r;
+    case 'spell': case 'spell4': return rg || 6;
+    case 'line': return 6;
+    case 'screen': return 9;
+    default: return 0;
+  }
+}
 function nearestEnemies(n, range, from = G.player) {
   return G.enemies
     .map(e => [e, tdist(e, from)])
@@ -4912,7 +4938,7 @@ function updatePet(dt) {
   if (pet.state === 'leap') {
     const k = Math.min(1, pet.t / 0.35);
     pet.x = pet.fx + (pet.tx - pet.fx) * k;
-    pet.y = pet.fy + (pet.ty - pet.fy) * k - Math.sin(k * Math.PI) * 40;
+    pet.y = pet.fy + (pet.ty - pet.fy) * k - Math.sin(k * Math.PI) * 32;
     pet.f = PET_POUNCE[Math.min(PET_POUNCE.length - 1, Math.floor(k * PET_POUNCE.length))];
     if (k >= 1) {
       // The landing: the claws round about, 연's 백호 hit.
@@ -4924,8 +4950,9 @@ function updatePet(dt) {
       }
       G.allyHitting = false;
       if (fxBudget('pet', 2)) {
-        // 연's white-tiger strike (skill_effect_transform_backho): claws, then the roaring head.
-        if (M.fx.g_tf_backho) addFx('g_tf_backho', pet.x, pet.y, { scale: 1.1 });
+        // The strike's own claw marks only (tools/yeon_claws.py): its leaping tiger and roaring
+        // head were bigger than the hero and hid the fight.
+        if (M.fx.g_tf_backho_claw) addFx('g_tf_backho_claw', pet.x, pet.y - 10, { scale: 0.5, flip: pet.face > 0 });
       }
       G.shake = Math.max(G.shake, 0.06);
       audio.play('kill');
@@ -4961,7 +4988,7 @@ function townTiger(dt) {
 function tigerFollow(pet, x, y, walkDx, belowPet, speed, dt) {
   if (walkDx) pet.side = -Math.sign(walkDx); // behind the way the hero walks
   const side = pet.side || -1;
-  const hx = x + side * 66, hy = y + (belowPet ? -18 : 4);
+  const hx = x + side * 54, hy = y + (belowPet ? -18 : 4);
   const dx = hx - pet.x, dy = hy - pet.y, d = Math.hypot(dx, dy);
   if (d > TILE * 8) { pet.x = hx; pet.y = hy; pet.walking = false; return; }
   // Walking starts past 12px and stops under 3 (no flicker between the two at one distance).
@@ -4986,7 +5013,7 @@ function tigerFollow(pet, x, y, walkDx, belowPet, speed, dt) {
 function drawPet(pet) {
   const f = M.fx.g_pet_baekho, im = images['fx/g_pet_baekho.png'];
   if (!f || !im || !im.width) return;
-  const k = 1.0 * (f.k || 1); // 연's 사신수 at its own size: a beast bigger than the hero, not a pup at its heel
+  const k = 0.78 * (f.k || 1); // a beast about the hero's size: at 연's full size it towered over the hero
   ctx.save();
   ctx.translate(Math.round(pet.x), Math.round(pet.y));
   // The sheet's tiger faces left; turned for the right.
@@ -4994,7 +5021,7 @@ function drawPet(pet) {
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(0, -2, 36, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -2, 28, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.drawImage(im, pet.f * f.w, 0, f.w, f.h, -f.ax * k, -f.ay * k, f.w * k, f.h * k);
