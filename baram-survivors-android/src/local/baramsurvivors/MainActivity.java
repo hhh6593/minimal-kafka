@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
     private static LocalServer server;
 
     private WebView web;
+    private NativeMusic music;
     private long lastBack;
 
     @Override
@@ -78,6 +79,10 @@ public class MainActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         // The game's files come with the APK: never serve an older copy after an update.
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+
+        // Music outside the WebView, so it never takes the audio focus (see NativeMusic).
+        music = new NativeMusic(START_URL);
+        web.addJavascriptInterface(music, "BaramMusic");
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -131,6 +136,7 @@ public class MainActivity extends Activity {
             web.onPause();
             web.pauseTimers();
         }
+        if (music != null) music.hold(true);
     }
 
     @Override
@@ -142,6 +148,7 @@ public class MainActivity extends Activity {
             // Sound comes back; the hunt stays on its menu until the player resumes it.
             web.evaluateJavascript("window.__appPause&&__appPause(false)", null);
         }
+        if (music != null) music.hold(false);
     }
 
     @Override
@@ -167,6 +174,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (music != null) music.release();
         if (web != null) {
             web.destroy();
             web = null;

@@ -184,7 +184,9 @@ export class Audio {
     if (this.music && this.musicFile === file) return;
     this.stopBgm();
     this.musicFile = file;
-    this.music = new window.Audio('assets/' + file);
+    // In the app the music plays natively (NativeMusic.java), taking no audio focus, so a video
+    // watched in picture-in-picture keeps playing beside the game; in a browser, an <audio>.
+    this.music = window.BaramMusic ? nativeMusic('assets/' + file, this.bgmVolume) : new window.Audio('assets/' + file);
     this.music.loop = true;
     this.music.volume = this.bgmVolume;
     if (this.bgmOn && !this.halted) this.music.play().catch(() => {});
@@ -205,7 +207,7 @@ export class Audio {
   }
 
   stopBgm() {
-    if (this.music) this.music.pause();
+    if (this.music) (this.music.stop || this.music.pause).call(this.music);
     this.music = null;
     this.musicFile = null;
   }
@@ -232,4 +234,18 @@ export class Audio {
       if (this.music && this.bgmOn) this.music.play().catch(() => {});
     }
   }
+}
+
+/** The app's native music as the few bits of an <audio> the game uses (play, pause, paused, volume). */
+function nativeMusic(path, vol) {
+  const N = window.BaramMusic;
+  let v = vol;
+  return {
+    loop: true, paused: true,
+    play() { this.paused = false; N.play(path, v); return Promise.resolve(); },
+    pause() { this.paused = true; N.pause(); },
+    stop() { this.paused = true; N.stop(); },
+    get volume() { return v; },
+    set volume(x) { v = x; N.setVolume(x); },
+  };
 }

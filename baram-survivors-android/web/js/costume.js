@@ -233,15 +233,19 @@ export function updateCosPet(holder, hero, clsId, dt, speed = 160) {
   const tx = hero.x - fx / n * 26 + (fy ? 14 : 0), ty = hero.y - fy / n * 18 + (fx ? 8 : 0);
   const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
   if (d > 260) { p.x = tx; p.y = ty; p.moving = false; return; }
-  if (d > 4) {
-    const v = Math.min(d, speed * (d > 60 ? 1.6 : 1.1) * dt);
+  // Walks past 10px off its spot, stops under 3 (no flicker at one distance), and turns only on a
+  // clear heading: a side row while it goes mostly sideways, front or back only when clearly up or
+  // down — it flipped between front and side each step as the hero's tile steps pulled it.
+  p.moving = p.moving ? d > 3 : d > 10;
+  if (p.moving) {
+    const v = Math.min(d, Math.max(speed * 0.6, Math.min(speed * 1.6, d * 5)) * dt);
     p.x += dx / d * v;
     p.y += dy / d * v;
-    p.fdx = Math.abs(dx) > 1 ? Math.sign(dx) : 0;
-    p.fdy = Math.abs(dy) > Math.abs(dx) * 1.2 ? Math.sign(dy) : 0;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    if (ay > ax * 2) { p.fdy = Math.sign(dy); p.fdx = 0; }
+    else if (ax > ay * 1.2 && ax > 4) { p.fdx = Math.sign(dx); p.fdy = 0; }
     if (!p.fdy && !p.fdx) p.fdy = 1;
-    p.moving = true;
-  } else p.moving = false;
+  }
   p.y0 = p.y;
 }
 
