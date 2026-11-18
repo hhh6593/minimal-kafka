@@ -3416,7 +3416,12 @@ function hud() {
   // Top, as 연's duels show it: each guild's bar either side of the timer box.
   const left = Math.max(0, Math.ceil(W.left));
   const prog = sideProgress(W);
-  const boxW = 54 * u, boxH = 18 * u, bx = cw / 2 - boxW / 2, by0 = 4 * u, barW = Math.min(190 * u, cw / 2 - boxW / 2 - 12 * u);
+  // The bars stop short of 연's HP/MP panel at the top left (it ends 189 CSS px in, drawYeonStatus),
+  // which on a narrow phone they ran under.
+  const d = cw / (A.canvas.getBoundingClientRect().width || cw);
+  const room = cw / 2 - 27 * u - 4 * u - 196 * d;
+  const boxW = 54 * u, boxH = 18 * u, bx = cw / 2 - boxW / 2, by0 = 4 * u,
+    barW = Math.min(190 * u, cw / 2 - boxW / 2 - 12 * u, Math.max(room, 60 * d));
   for (const t of [0, 1]) {
     const x = t === 0 ? bx - 4 * u - barW : bx + boxW + 4 * u;
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
