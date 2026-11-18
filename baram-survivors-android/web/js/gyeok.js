@@ -44,7 +44,7 @@ export const GYEOK = {
   jiok: { name: "극'지옥격", on: 'hit', chance: 0.15, cd: 15, dmg: 3, targets: 4, fx: 'g_hell_weapon' },
   nakroe: { name: '낙뢰격', on: 'hit', chance: 0.1, cd: 25, dmg: 4, targets: 2, fx: 'g_harrzud', self: ['pierce', 3, 0.25] },
   // 상태이상 격 (연 Buff 5015-5025, 8000-8070).
-  hwaryun: { name: '화륜옥쇄 격', on: 'hit', chance: 0.1, cd: 40, dmg: 5, area: 1, fx: 'g_china', st: ['para', 1] },
+  hwaryun: { name: '화륜옥쇄 격', on: 'hit', chance: 0.15, cd: 20, dmg: 5, area: 1, fx: 'g_china', st: ['para', 1.5] },
   saseong: { name: '사성격', on: 'hit', chance: 0.1, cd: 25, dmg: 2.5, fx: 'g_grade4', st: ['bleed', 5, 1] },
   hwasin: { name: '화신축융 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_god_of_fire', st: ['stun', 1.5] },
   ilwol: { name: '일월남매 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_sunmoon', st: ['curse', 5] },
@@ -78,7 +78,7 @@ export const GYEOK = {
   hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fx: 'g_sw_hyunmu', fx2: 'g_tf_hyunmu', fxK: 1.8, st: ['stun', 2], self: ['ward', 4, 0.4] },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),
   // in 연's own 청룡 신수 weapon effect (Sinsu_Weapon_Chungryong: the dragon's splash and its orbs).
-  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_sinsu_cheong', fx2: 'g_sinsu_cheong_orb', fxK: 1.8, st: ['curse', 5], st2: ['slow', 5], drain: 0.03 },
+  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_sinsu_cheong', fx2: 'g_sinsu_cheong_orb', fxK: 1.8, st: ['curse', 5], st2: ['slow', 5], drain: 0.4 },
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])
@@ -202,7 +202,9 @@ export const CRAFT_GYEOK = {
 // 용마제일격 2,500 … 제구격 250,000, chance rising with the number), and the class's core spell
 // sooner at 제구 (−35%) and 제십 (−50%); the 주술사's 용랑 and the 도사's 용겸 also lay their 주
 // (방어 약화 = 저주) with it.
-export const DRAGON_CORE = { warrior: ['w_frenzy'], rogue: ['r_heaven'], mage: ['m_sammae'], poet: ['p_baekho', 'p_baekho2'] };
+export const DRAGON_CORE = { warrior: ['w_frenzy'], rogue: ['r_heaven'], mage: ['m_sammae'], poet: ['p_baekho', 'p_baekho2'],
+  // The seven later classes: each its signature strike of the middle 승급.
+  archer: ['a_inferno'], lancer: ['l_annihil'], monk: ['mk_kyokushin'], magus: ['md_bloodbat'], celestial: ['cl_ego'], dokkaebi: ['dk_super'], reaper: ['rp_deadly'] };
 export function dragonGyeok(cls, step) {
   const head = { warrior: '용마', rogue: '용천', mage: '용랑', poet: '용겸', archer: '용섬', lancer: '용무', monk: '용비', magus: '용화', celestial: '용주', dokkaebi: '용린', reaper: '용라' }[cls] || '용';
   const num = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'][step];

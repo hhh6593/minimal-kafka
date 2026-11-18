@@ -1532,6 +1532,7 @@ function talk(W, b, lines) {
 function hit(W, src, t, dmg) {
   const G = A.G();
   if (!alive(t) || W.over) return;
+  if (src.team === 0 && !src.hero && A.auraK) dmg *= A.auraK(src); // 주작의 기운 (game.js auraK): the hero's aura on its side
   if (W.raid && !t.war && !t.hero) return raidHit(W, src, t, dmg);
   if (src.dead && !src.cmdr) dmg *= 0.5;
   if (W.diag && src.team === 1 && !t.gate) {

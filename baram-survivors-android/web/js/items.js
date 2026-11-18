@@ -96,7 +96,7 @@ export function specialName(sp, cls) {
 /** A special counts a rank above its base, and half a rank more for a 격 or a ward. */
 export function specialPower(sp, cls) {
   if (sp.craft) return sp.craft.pow + (sp.gyeok ? 0.5 : 0);
-  if (sp.rarity) return gearPower(cls, sp.kind, specialBase(sp, cls)) + RARITY[sp.rarity].pow;
+  if (sp.rarity) return abyssPower(sp.rank) + RARITY[sp.rarity].pow;
   return gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0);
 }
 
@@ -196,7 +196,7 @@ export const CRAFTS = [
   { id: 'cr_maryeong_shield', kind: 'shield', name: '고대마령의방패', look: '주술방패', pow: 10, opt: 'guard',
     mats: { soul: 10, scroll: 1 }, gold: 5000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon', kind: 'weapon', name: { warrior: '구곡검', rogue: '협가검', mage: '영후단봉', poet: '대모홍접선', archer: '흑월신궁', lancer: '화첨창', monk: '백운권갑', magus: '흑염곤봉', celestial: '녹옥방천극', dokkaebi: '화룡퇴', reaper: '신월태도' },
-    look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 11, opt: 'power', mats: { gold: 12, scroll: 1 }, gold: 6000,
+    look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_gold_armor', kind: 'armor', name: { warrior: '금린천화갑', rogue: '금린천화갑', mage: '금린천추갑', poet: '금린천추갑', archer: '금린천화갑', lancer: '금린천화갑', monk: '금린천화갑', magus: '금린천추갑', celestial: '금린천추갑', dokkaebi: '금린천화갑', reaper: '금린천화갑' },
     look: { warrior: '곤룡포', rogue: '곤룡포', mage: '남자신관복', poet: '남자신관복', archer: '혈귀혼궁포', lancer: '지박귀남자경갑', monk: '지박귀남자대련복', magus: '은현복', celestial: '금고급천의', dokkaebi: '지박귀귀의', reaper: '사저의복' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
@@ -204,7 +204,7 @@ export const CRAFTS = [
   { id: 'cr_gold_shield', kind: 'shield', name: '금린방패', look: '여신의방패', pow: 11, opt: 'guard',
     mats: { gold: 10, scroll: 1 }, gold: 6000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_steel_weapon', kind: 'weapon', name: { warrior: '진일신검', rogue: '청일기창', mage: '황염곤봉', poet: '적염곤봉', archer: '한별가온궁', lancer: '백일신창', monk: '섬월권갑', magus: '금홍단봉', celestial: '청월표창', dokkaebi: '백일퇴', reaper: '신일태도' },
-    look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 12, opt: 'haste', mats: { steel: 14, scroll: 1 }, gold: 8000,
+    look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 12, opt: 'speed', mats: { steel: 14, scroll: 1 }, gold: 8000,
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_steel_armor', kind: 'armor', name: { warrior: '태염무신장갑', rogue: '태염무신장갑', mage: '태광천신의복', poet: '태광천신의복', archer: '태염무신장갑', lancer: '태염무신장갑', monk: '태염무신장갑', magus: '태광천신의복', celestial: '태광천신의복', dokkaebi: '태염무신장갑', reaper: '태염무신장갑' },
     look: { warrior: '궁중무사갑주', rogue: '궁중무사갑주', mage: '여자성광법의', poet: '남자성광법의', archer: '숲의군주궁포', lancer: '금고급남자경갑', monk: '숲의군주남자대련복', magus: '상급마도현복', celestial: '숲의군주천의', dokkaebi: '숲의군주귀의', reaper: '지박귀흑의' }, pow: 12, opt: 'mana', mats: { steel: 14, scroll: 1 }, gold: 8000,
@@ -225,7 +225,7 @@ export const CRAFTS = [
   { id: 'cr_dragon_helm', kind: 'helmet', name: { warrior: "용아투구'마", rogue: "용아투구'천", mage: "용아천관'랑", poet: "용아천관'겸", archer: "용아투구'섬", lancer: "진용아투구'무", monk: "진용아투구'비", magus: "진용아천관'화", celestial: "진용아천관'주", dokkaebi: "진용아투구'린", reaper: "진용아투구'영" }, look: { warrior: "용아투구'마1성", rogue: "용아투구'천1성", mage: "용아천관'랑1성", poet: "용아천관'겸1성", archer: "용아투구'천1성", lancer: "용아투구'천1성", monk: "용아투구'천1성", magus: "용아천관'겸1성", celestial: "용아천관'겸1성", dokkaebi: "용아투구'천1성", reaper: "용아투구'천1성" }, pow: 13, opt: 'power', mats: { essence: 12, scale: 15, pearl: 1 }, gold: 15000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon2', kind: 'weapon', name: { warrior: '마곡검', rogue: '패협검', mage: '백선마봉', poet: '암혈홍접선', archer: '흑일신궁', lancer: "화첨창'청", monk: "진'백운권갑", magus: "진'흑염곤봉", celestial: '흑옥방천극', dokkaebi: '멸룡퇴', reaper: '사혼태도' },
-    look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 13, opt: 'boss', from: 'cr_gold_weapon',
+    look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 13, opt: 'guard', from: 'cr_gold_weapon',
     mats: { gold: 20, kalpa: 15, scroll: 2 }, gold: 15000, pic: 'name', legend: true },
   { id: 'cr_dragon_armor2', kind: 'armor', name: { warrior: '용마멸아갑', rogue: '용천멸아갑', mage: '용랑멸아의', poet: '용겸멸아의', archer: '용섬멸아복', lancer: '용무멸아갑', monk: '용비멸아갑', magus: '용화멸아의', celestial: '용주멸아단', dokkaebi: '용린멸아갑', reaper: '용라멸아갑' },
     look: '용왕의용포', pow: 13, opt: 'life', from: 'cr_dragon_armor', mats: { essence: 15, scale: 20, pearl: 2 }, gold: 20000,
@@ -233,13 +233,13 @@ export const CRAFTS = [
   { id: 'cr_brit_shield', kind: 'shield', name: '브리트라한의방패', look: '천성대방패', pow: 13, opt: 'regen', from: 'cr_steel_shield',
     mats: { essence: 10, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_steel_weapon2', kind: 'weapon', name: { warrior: "극'진일신검", rogue: "극'청일기창", mage: "극'황염곤봉", poet: "극'적염곤봉", archer: "극'한별가온궁", lancer: "극'백일신창", monk: "섬월권갑'폭", magus: "금홍단봉'화", celestial: "극'청월표창", dokkaebi: "진'백일퇴", reaper: "극'신일태도" },
-    look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 14, opt: 'power', from: 'cr_steel_weapon',
+    look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 13, opt: 'haste', from: 'cr_steel_weapon',
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
-  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 14, opt: 'life', pic: 'name', picTop: "진'청룡신검",
+  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 14, opt: 'mana', pic: 'name', picTop: "진'주작선장",
+  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
@@ -338,7 +338,7 @@ export function starCost(star) {
 // ({ id: { kind, rarity: 'unique', rank, u } }) and registered as a special ('sp:ab…' in the bag,
 // weaponSp when worn), so the bag, the equip window, the forge's stars and the 전투력 take it as
 // they take any special. color: its beam and name in the dark, ui: its name on the parchment
-// windows. Its power stays under the raid sets: the plain top weapon + pow. (An old save's 마법 and
+// windows. Its power is its depth's (abyssPower), under the 용무기 제십's: ABYSS_HUNT is its edge. (An old save's 마법 and
 // 희귀 pieces, from when there were three grades, load as 고유: loadAbyssLoot.)
 export const RARITY = {
   unique: { name: '고유', color: '#d8a64a', ui: '#a0601a', pow: 2 },
@@ -392,9 +392,9 @@ export const ABYSS_UNIQUES = [
   { u: 'raven', name: '피의 까마귀 발톱', opts: ['power', 'speed'], gyeok: 'saseong' },
   { u: 'andariel', name: '안다리엘의 독니', opts: ['power', 'regen'], gyeok: 'maengdok' },
   { u: 'mephisto', name: '메피스토의 증오', opts: ['haste', 'mana', 'power'], gyeok: 'binggyeol' },
-  { u: 'diablo', name: '공포의 군주의 뿔', opts: ['power', 'boss', 'life'], gyeok: 'yeomryeong' },
+  { u: 'diablo', name: '공포의 군주의 뿔', opts: ['power', 'life'], gyeok: 'yeomryeong' },
   { u: 'baal', name: '바알의 세계석 조각', opts: ['power', 'haste', 'guard'], gyeok: 'jiok' },
-  { u: 'tyrael', name: '티리엘의 맹세', opts: ['boss', 'speed', 'regen'], gyeok: 'nakroe' },
+  { u: 'tyrael', name: '티리엘의 맹세', opts: ['speed', 'regen', 'haste'], gyeok: 'nakroe' },
   { u: 'cow', name: '소 왕의 뿔', opts: ['power', 'magnet'], gyeok: 'gijeol' },
 ];
 const OPT_BY = Object.fromEntries(OPTIONS.map(o => [o.id, o]));
@@ -440,4 +440,69 @@ export function rollAbyssItem(loot, rank, uniq = null) {
 
 function abyssName(sp) {
   return sp.abName;
+}
+
+// ---------------------------------------------------------------- weapon families
+// Each family has its place, none best at everything (README "무기 계열"):
+//   용무기 — the growth line: the most raw power at its step, its 용X격, the core spell sooner at
+//            제구·제십: the single target, a boss, a raid.
+//   사신수 — each its 신수's way: 청룡 curse and control with a drain, 주작 fire round and an aura
+//            that strengthens the allies near, 백호 the pouncing tiger, 현무 the shell: group play.
+//   심연 고유 — less raw power, but the crowd: more to plain monsters, more in the abyss, kills
+//            bursting in dark fire: hunts and the abyss.
+//   전설 — 금린 paralyses (a war's fighters too), 무신 turns the spells faster with a bleed.
+// ---- weapon family tuning (retune here) ----
+// 용무기: each step 제일→제십 adds DRAGON_STEP of a rank (other pieces' stars add half a rank).
+export const DRAGON_STEP = 0.8;
+// The 끝없는 지옥's uniques: a rank by the depth they fell at (지하 묘지 23 … 세계석 요새 26),
+// RARITY's +2 on top, the same for every class.
+export const ABYSS_POW = { base: 8, perRank: 0.5 };
+export function abyssPower(rank) {
+  return ABYSS_POW.base + ABYSS_POW.perRank * Math.max(0, Math.min(3, (rank || 23) - 23));
+}
+// Their hunt: mob — more to plain monsters and champions (not bosses, leaders or a war's
+// fighters); abyss — more again to all in the 끝없는 지옥; burst — a kill may burst in dark fire
+// round the fallen (격 power dmg on the tiles within area; cd seconds).
+export const ABYSS_HUNT = { mob: 0.2, abyss: 0.15, burst: { chance: 0.2, cd: 0.5, dmg: 2.5, area: 1, fx: 'k_ab_darkburst' } };
+// 주작의 기운: allies (companions, raiders, the guild in a war) within r tiles of the wearer
+// strike k harder, perStar more for each star above ★1; the 용무기 제십 that took the 주작, dragonK.
+export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
+
+// The families as the equipment window tells them: name, role, where they are best, the trade.
+export const WEAPON_FAMILY = {
+  plain: { name: '일반 장비', role: '기본', best: '초반 사냥', text: '사냥터에서 나오는 기본 무기. 별마다 반 등급.' },
+  raid: { name: '레이드 장비', role: '레이드 보상', best: '그 레이드 단계', text: '레이드 보상 상자의 무기. 격·옵션 없이 등급만.' },
+  special: { name: '스페셜', role: '보스의 격', best: '격에 따라', text: '보스의 격 하나와 옵션 하나, 한 등급 반 위. 아주 드물게 떨어짐.' },
+  craft: { name: '조합 장비', role: '재료 조합', best: '중반', text: '재료로 만드는 장비. 옵션과 격이 정해져 있음.' },
+  dragon: { name: '용무기', role: '성장형 단일 화력', best: '보스·레이드 딜',
+    text: '같은 단계 최고의 기본 공격력(제일 10 → 제십 17.2등급). 용X제N격 고정 피해, 제구·제십은 핵심 기술 재사용 -35%/-50%, 제십은 사신수 하나. 광역·보조 효과는 없음.' },
+  cheong: { name: '사신수 · 청룡', role: '제어·저주 + 흡혈', best: '레이드·길드전 (저주 걸린 적은 아군에게 더 아픔)',
+    text: '청린수폭이 자주 터져 저주·둔화를 걸고 준 피해의 10%를 흡혈. 기본 등급은 용무기보다 낮음.' },
+  jujak: { name: '사신수 · 주작', role: '화상 광역 + 아군 공격력 오라', best: '레이드·길드전·동료 사냥',
+    text: '주작비상 격(넓은 화상, 내 공격 +30%)과 주작의 기운: 주변 4칸 안의 동료·공대원·길드원 공격력 +12%(★5 +15%). 혼자일 때는 오라가 쓸모없음.' },
+  baekho: { name: '사신수 · 백호', role: '공격·백호 덮치기', best: '사냥·보스 폭딜',
+    text: '망토 자리. 백호가 따라다니며 덮치고, 백호의 맹렬 격이 공격을 올림. 무기 자리를 쓰지 않음.' },
+  hyeonmu: { name: '사신수 · 현무', role: '방어·보호막', best: '생존·탱커',
+    text: '갑옷 자리. 맞을 때 현무의 철옹: 주변 기절과 받는 피해 -40%.' },
+  abyss: { name: '심연 고유', role: '사냥 청소·어둠 폭발', best: '사냥·끝없는 지옥',
+    text: '일반 몬스터·챔피언에게 피해 +20%, 끝없는 지옥에서 +15% 더, 처치 시 20% 어둠 폭발(주변 피해). 보스·우두머리·대인전에는 이 힘이 없고 등급도 낮음(최대 13.5).' },
+  gold: { name: '전설 · 금린', role: '제압(마비)·대인전', best: '길드전 PvP',
+    text: '화륜옥쇄 격: 주변 큰 피해와 마비(길드전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
+  steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
+    text: '사성격 출혈(일반 몬스터)과 이동·기술 재사용 옵션. 보스에게는 출혈이 듣지 않음.' },
+};
+const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
+  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel' };
+/** A piece's family (a key of WEAPON_FAMILY): sp its special (or null); dragon: the 용무기; raid: a raid's piece. */
+export function familyOf(sp, dragon = false, raid = false) {
+  if (dragon) return 'dragon';
+  if (!sp) return raid ? 'raid' : 'plain';
+  if (sp.rarity) return 'abyss';
+  if (sp.craft) return FAMILY_OF_CRAFT[sp.id] || 'craft';
+  return 'special';
+}
+/** One line for the equipment window: "[용무기] 성장형 단일 화력 — 강점: 보스·레이드 딜". */
+export function familyLine(key) {
+  const f = WEAPON_FAMILY[key];
+  return f ? `[${f.name}] ${f.role} — 강점: ${f.best}` : '';
 }
