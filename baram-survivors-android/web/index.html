@@ -61,6 +61,8 @@
   body.ytitle #title .note { color: #fff; text-shadow: 1px 1px 0 #000, 0 0 4px #000; }
   #heroes img { height: 92px; }
 
+  /* The class list scrolls when it is taller than the screen (eleven classes on a short phone). */
+  #select { overflow-y: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; }
   #classes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: min(100%, 820px); }
   .card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; text-align: center; }
   .card .slot { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 78px;
