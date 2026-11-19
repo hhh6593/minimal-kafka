@@ -462,7 +462,7 @@ function buildCoordi() {
   const cls = A.cls(), items = costumeItems(), p = A.progress();
   $('#coordi-title').textContent = `코디 · ${cls.name}`;
   const total = Object.values(items).filter(it => !isFree(it)).length;
-  $('#coordi-gold').textContent = `${A.won(p.gold || 0)} · 레이드주화 ${p.coins || 0} · 수집 ${ownedCount()}/${total}`;
+  $('#coordi-gold').innerHTML = (A.walletHTML ? A.walletHTML(p.gold, p.coins) : `${A.won(p.gold || 0)} · 레이드주화 ${p.coins || 0}`) + `<span class="wcollect">수집 ${ownedCount()}/${total}</span>`;
   const tb = $('#coordi-tabs');
   tb.innerHTML = '';
   const kinds = KINDS.filter(([k]) => k === 'pet' || Object.values(items).some(it => it.kind === k && canWear(cls, it)));

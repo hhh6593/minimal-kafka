@@ -190,8 +190,18 @@
   #town button { pointer-events: auto; }
   .town-top { display: flex; justify-content: space-between; padding: 2px 8px; font-weight: 700; color: #f6e6c0;
       background: rgba(30, 16, 8, .85); border: 1px solid #a0602a; align-self: center; gap: 24px; }
-  #town-gold { color: #ffe070; }
-  #town-coins { color: #9fd8ff; margin-left: 10px; }
+  /* The purse: two chips, a coin picture before each number, light on dark (it was a faint line). */
+  .wallet { display: inline-flex; gap: 6px; align-items: center; vertical-align: middle; }
+  .wchip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px 1px 3px; border-radius: 9px;
+      background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 220, 140, .45); font: 700 13px/18px G11, monospace;
+      text-shadow: 1px 1px 0 #000; white-space: nowrap; }
+  .wchip img { width: 16px; height: 16px; image-rendering: pixelated; }
+  .wchip small { font: 11px G9, monospace; margin-left: 2px; color: #f6e6c0 !important; opacity: 1; }
+  #coordi-gold { font-size: inherit; color: inherit; }
+  #coordi-title { color: #ffe0a0; text-shadow: 1px 1px 0 #000; }
+  .wchip.gold { color: #ffe070; }
+  .wchip.coin { color: #9fe0ff; }
+  .wcollect { margin-left: 8px; font: 700 12px G11, monospace; color: #fff2d0; text-shadow: 1px 1px 0 #000; }
   #town-back { position: absolute; left: max(8px, env(safe-area-inset-left)); bottom: 8px; min-width: 0; }
   .town-tip { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); white-space: nowrap;
       font: 10px G9, monospace; color: #f6e6c0; text-shadow: 1px 1px 0 #000;
@@ -621,7 +631,7 @@
 </div>
 
 <div id="town" class="screen" hidden>
-  <div class="town-top"><span id="town-name"></span><span id="town-gold"></span><span id="town-coins"></span></div>
+  <div class="town-top"><span id="town-name"></span><span id="town-gold"></span></div>
   <button id="town-back" class="btn">직업 선택</button>
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
   <button id="talk" class="btn" hidden></button>

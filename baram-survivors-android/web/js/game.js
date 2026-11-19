@@ -1791,7 +1791,7 @@ function openCraft(sink = null) {
       sink.push({ sec, name, desc, label, can, icon, meta, act: () => {
         act();
         saveJson('bs_progress', progress);
-        if ($('#town-gold')) $('#town-gold').textContent = `${won(progress.gold || 0)}`;
+        if ($('#town-gold')) $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
         if (G) applyGear();
         refreshAvatars();
         openForge();
@@ -1812,7 +1812,7 @@ function openCraft(sink = null) {
     btn.onclick = () => {
       act();
       saveJson('bs_progress', progress);
-      if ($('#town-gold')) $('#town-gold').textContent = `${won(progress.gold || 0)}`;
+      if ($('#town-gold')) $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
       if (G) applyGear();
       refreshAvatars();
       openCraft();
@@ -2027,7 +2027,7 @@ function openForge() {
   const tabs = FORGE_TABS.map(([n]) => n).filter(n => list.some(e => forgeTabOf(e.sec) === n));
   if (!tabs.includes(forgeTab)) forgeTab = tabs[0];
   $('#forge-title').textContent = `조합 · ${cls.name}`;
-  $('#forge-gold').textContent = `${won(progress.gold || 0)} · 레이드주화 ${progress.coins || 0}`;
+  $('#forge-gold').innerHTML = walletHTML(progress.gold, progress.coins);
   const tb = $('#forge-tabs');
   tb.innerHTML = '';
   for (const t of tabs) {
@@ -5083,8 +5083,7 @@ function townWallet() {
   const g = progress.gold || 0, c = progress.coins || 0, key = g + '/' + c;
   if (key === walletShown) return;
   walletShown = key;
-  $('#town-gold').textContent = `${won(g)}`;
-  if ($('#town-coins')) $('#town-coins').textContent = `레이드주화 ${c.toLocaleString()}`;
+  $('#town-gold').innerHTML = walletHTML(g, c);
 }
 /** In town too, 백호환령부's tiger walks at the hero's heel (it was seen only on the hunting grounds). */
 function townTiger(dt) {
@@ -5605,7 +5604,7 @@ function openQuests() {
     b.className = 'btn';
     b.textContent = label;
     b.disabled = !can;
-    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').textContent = `${won(progress.gold)}`; openQuests(); };
+    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins); openQuests(); };
     r.append(b);
     box.append(r);
   };
@@ -5667,7 +5666,7 @@ function openTrade(who) {
       progress.gold -= cost;
       buy();
       saveJson('bs_progress', progress);
-      $('#town-gold').textContent = `${won(progress.gold)}`;
+      $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
       openTrade(who);
     };
     r.append(b);
@@ -7659,6 +7658,12 @@ function goldFont() {
 /** Life (green) or mana (blue) given back, in 연's digits over the one healed, as its clips show them. */
 /** Money as 연 writes it: 1,500전. */
 function won(n) { return Math.round(+n || 0).toLocaleString('ko-KR') + '전'; }
+/** The purse as two plain chips, each with its coin: 전 (엽전) and 레이드주화 (the medal). */
+function walletHTML(gold, coins) {
+  const n = v => Math.round(+v || 0).toLocaleString('ko-KR');
+  return `<span class="wallet"><span class="wchip gold"><img src="assets/hud/ui_icon_gold2.png" alt="">${n(gold)}<small>전</small></span>`
+    + `<span class="wchip coin"><img src="assets/hud/ui_Icon_Medal_Gold_01.png" alt="">${n(coins)}<small>레이드주화</small></span></span>`;
+}
 
 function healText(b, n, up = 64, mana = false) {
   if (M.hud && M.hud.font_dmgk_g && dmgkFont()) {
@@ -9615,7 +9620,7 @@ const War = initWar({
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.
 initCostume({
-  M: () => M, progress: () => progress, save: () => saveJson('bs_progress', progress), say, won,
+  M: () => M, progress: () => progress, save: () => saveJson('bs_progress', progress), say, won, walletHTML,
   cls: () => (G ? G.cls : chosenClass), savedGear, yGearVariants,
   changed: () => { if (G && G.player && G.player.gear) G.player.gear.cos = wornCostume(G.cls.id); },
 });
