@@ -205,7 +205,7 @@ const OPT = id => OPTIONS.find(o => o.id === id);
 // tint: how far toward the original's colours (the hand and gold hilt are never touched). water: the
 // strike frames' sweep turned to the original's swing, a crescent of blue water (game.js waterPixel).
 export const SINSU_DRESS = {
-  cheong: { pal: 'cheong', tint: 0.6, glow: 0.3, glowColor: '#3f9dff', flames: 0, fsc: 0, water: true },
+  cheong: { pal: 'cheong', tint: 0.6, glow: 0.3, glowColor: '#3f9dff', flames: 0, fsc: 0, water: true, standIn: true },
   hyeonmu: { pal: 'hyeonmu', tint: 0.8, armor: true },
 };
 export const CRAFTS = [
@@ -287,28 +287,31 @@ export const CRAFTS = [
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
-  // 청룡신검 and 현무불괴갑 are not in 연: each is worn as 연's own piece nearest the original's
-  // picture, recoloured to it (SINSU_DRESS, game.js dressedSheet); the icon stays the original's.
-  // 청룡신검 (a broad hooked falchion: dark blade, white edge, blue runes along the spine): 연's
-  // 백사월도(치장용) (코디 309106, the same hooked blade), blued, its red spine and ribbon turned blue.
-  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', base: { warrior: [309106, '백사월도'] }, dress: SINSU_DRESS.cheong, pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
+  // 청룡신검 and 현무불괴갑 are not in 연. worn: the original's own pieces as its dress room renders
+  // them worn, laid on 연's heroes (tools/sinsu_worn.py, layers "s_<piece>"): 청룡신검's blade in
+  // the hand (its swing the original's blue water), 현무불괴갑's gold-and-teal wings on the back.
+  // The icon stays the original's picture. Without those layers (a build without the renders):
+  // 연's nearest piece recoloured to the original (SINSU_DRESS, game.js dressedSheet) —
+  // 청룡신검 the 백사월도(치장용) (코디 309106, the same hooked blade), blued.
+  { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', base: { warrior: [309106, '백사월도'] }, dress: SINSU_DRESS.cheong, worn: { warrior: 's_cheong' }, pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
   { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', base: { mage: [309203, '주작선장'] }, /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
     mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
-  // 현무불괴갑 (silver-white plates, gold trims and winged shoulders): 연's 얼음의경갑(치장용) (코디
-  // 7100492, plate drawn for every class's rig), its pale-blue plates silver-white, its blue trims
-  // gold. (The look names: a build without 연's heroes.)
+  // 현무불괴갑 (silver-white plates, gold trims, red gems, gold-and-teal wings): the body 연's
+  // 얼음의경갑(치장용) (코디 7100492, plate drawn for every class's rig), its pale-blue plates
+  // silver-white, its blue trims gold; the original's own wings on its back (wornBack, every class).
+  // (The look names: a build without 연's heroes.)
   { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑', pic: 'name', picTop: "진'현무불괴갑",
-    base: Object.fromEntries(CLASSES.map(k => [k.id, [7100492, '얼음의경갑']])), dress: SINSU_DRESS.hyeonmu,
+    base: Object.fromEntries(CLASSES.map(k => [k.id, [7100492, '얼음의경갑']])), dress: SINSU_DRESS.hyeonmu, wornBack: 's_hyeonmu',
     look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주', lancer: '감시자남자경갑', monk: '혈귀혼남자대련복', magus: '금고급현복', celestial: '파수꾼천의', dokkaebi: '혈귀혼귀의', reaper: '해태 흑의' }, pow: 14, opt: 'life',
     mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
 for (const c of CRAFTS) {
   const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
-    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress };
+    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress, worn: c.worn, wornBack: c.wornBack };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
   // Put the look on every class's line now, so the loader fetches its sheets with the rest.
