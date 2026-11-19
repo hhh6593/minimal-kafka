@@ -435,6 +435,9 @@ export const ABYSS_UNIQUES = [
 // weapon 연 draws for them that suits them (금홍단봉, 청월표창, 신일태도 are old 바람's too; the
 // 도깨비 the 청룡의검, the 창술사 the long 흑단화염장). The 궁사 and 권사 have no old weapon 연 draws:
 // their 일본 line's (흑일 bow, 섬월권갑).
+// The first four wear old 바람's own picture of the weapon (TAECHO_CLASSIC: the item render, no 성),
+// laid each frame along where 연's drawing of it is held (game.js classicSheet), so it swings as 연's.
+export const TAECHO_CLASSIC = { warrior: '진일신검', rogue: '청일기창', mage: '황염곤봉', poet: '적염곤봉' };
 export const TAECHO_BASE = {
   warrior: [1171, '진일신검'], rogue: [1272, '청일기창'], mage: [1372, '황염곤봉'], poet: [1471, '적염곤봉'],
   archer: [220077, "극'흑일신궁"], lancer: [1324, '흑단화염장'], monk: [70025, '섬월권갑'], magus: [330064, '금홍단봉'],
@@ -443,7 +446,7 @@ export const TAECHO_BASE = {
 // pal: the recolour (pale gold, the weapon's own shading kept); glowColor and the white core; the
 // sparks along the blade are 연's own fire tongues turned to gold-white light; fx: the strike's
 // effects (the abyss ones) in gold-white.
-export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
+export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, classicTint: 0.12, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
     // the dark ones (smoke, the dark burst) turned over first: their black becomes light
     k_ab_smoke: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)',
     k_ab_darkburst: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)' } };
@@ -458,7 +461,7 @@ function registerAbyss(id, d) {
   SPECIAL[id] = { id, src: 'abyss', srcName: '끝없는 지옥', raid: false, kind: d.kind, rank: d.rank, rarity: d.rarity,
     opts, opt: { id: opts[0], text: opts.map(o => OPT_BY[o].text).join(' · ') }, gyeok: un.gyeok,
     ward: null, abName: T ? Object.fromEntries(Object.entries(TAECHO_BASE).map(([c, [, n]]) => [c, '태초의 ' + n])) : un.name,
-    taecho: !!T,
+    taecho: !!T, classic: T ? TAECHO_CLASSIC : null,
     // The look on the hero (a plain weapon's) and the strike's effect.
     lookTier: ABYSS_LOOK_TIER.dark, base: T ? TAECHO_BASE : ABYSS_BASE, dress: T ? TAECHO_DRESS : ABYSS_DRESS, swing: SWING_OF };
   return SPECIAL[id];

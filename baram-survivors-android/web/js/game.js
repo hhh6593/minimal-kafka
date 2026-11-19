@@ -1302,11 +1302,39 @@ function yItemIcon(cls, kind, t, spId) {
   const f = key && idx[key];
   return f ? 'assets/yitemicon/' + f : null;
 }
+/** A picture in 태초's light (gold halo, white core), as a data URL. */
+function glowIcon(pic, dz) {
+  const pad = 8, c = document.createElement('canvas');
+  c.width = pic.width + pad * 2;
+  c.height = pic.height + pad * 2;
+  const g = c.getContext('2d');
+  for (const [col, blur, al] of [[dz.glowColor, 4, 0.9], [dz.core, 1, 0.9]]) {
+    const r = document.createElement('canvas');
+    r.width = c.width; r.height = c.height;
+    const rg = r.getContext('2d');
+    rg.drawImage(pic, pad, pad);
+    rg.globalCompositeOperation = 'source-in';
+    rg.fillStyle = col;
+    rg.fillRect(0, 0, r.width, r.height);
+    g.save(); g.filter = `blur(${blur}px)`; g.globalAlpha = al; g.drawImage(r, 0, 0); g.drawImage(r, 0, 0); g.restore();
+  }
+  g.drawImage(pic, pad, pad);
+  return c.toDataURL();
+}
 /** 태초의 무기's icon: the very weapon the hero wears (its 연 layer, standing, facing down) in its
  *  gold-white dress and light, cut to the weapon. Made once a class; null until the sheet is in. */
 const taechoIcons = {};
 function taechoIcon(cls, sp) {
   if (taechoIcons[cls.id]) return taechoIcons[cls.id];
+  // The first four: old 바람's picture itself, in the same light (what the hero holds).
+  const cn = sp.classic && sp.classic[cls.id];
+  if (cn && M.gear && M.gear[cn]) {
+    const pp = `gear/${M.gear[cn].id}.png`;
+    if (!(pp in images)) loadImage(pp);
+    const pic = images[pp];
+    if (!pic || !pic.complete || !pic.width) return null;
+    return (taechoIcons[cls.id] = glowIcon(pic, sp.dress));
+  }
   const H = M.yhero2 && M.yhero2[cls.id], ab = sp.base && sp.base[cls.id];
   const meta = H && ab && H.layers.weapon[String(ab[0])];
   if (!meta) return null;
@@ -8374,7 +8402,11 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
       if (kind === 'body' || kind === 'head') return false;
       continue;
     }
-    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(im, path, dz.tint, dz.pal) : im, meta };
+    // 태초 of the first four: old 바람's picture laid where 연's weapon is held (classicSheet).
+    const cl = dz && kind === 'weapon' && classicOf(cls, gear);
+    const src = cl ? classicSheet(im, path, cl, H, meta) : null;
+    if (cl && !src) continue;
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal) : im, meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
@@ -8425,6 +8457,95 @@ const heroFrames = new Map();
 // as the hero's are) gets a red glow under the weapon and its blade points: a few spots spread along
 // the weapon's long axis in that very cell, so the fire follows the blade in every direction and frame.
 const dressSheets = new Map();
+/** The old 바람 picture the worn special lays over 연's weapon (TAECHO_CLASSIC), when the build has it. */
+function classicOf(cls, gear) {
+  const sp = gear && gear.weaponSp && SPECIAL[gear.weaponSp];
+  const n = sp && sp.classic && sp.classic[cls.id];
+  return n && M.gear && M.gear[n] ? n : null;
+}
+/**
+ * 연's weapon sheet with old 바람's picture in its place: in each cell the drawn weapon's long axis
+ * (its solid pixels, not the faint swing trail) gives the hand's end (the one nearer the body) and
+ * the tip's; the picture (upright, handle down) is turned and sized onto that line. The trail stays
+ * behind it and the hand's own pixels over it, so it is held and swings as 연's weapon does.
+ */
+const classicSheets = new Map();
+function classicSheet(im, path, name, H, meta) {
+  const key = path + '|' + name;
+  let c = classicSheets.get(key);
+  if (c) return c;
+  const pp = `gear/${M.gear[name].id}.png`;
+  if (!(pp in images)) loadImage(pp);
+  const pic = images[pp];
+  if (!pic || !pic.complete || !pic.width) return null;
+  const cw = meta.cell ? meta.cell[0] : H.cell[0], ch = meta.cell ? meta.cell[1] : H.cell[1];
+  const ffx = meta.foot ? meta.foot[0] : H.foot[0], ffy = meta.foot ? meta.foot[1] : H.foot[1];
+  c = document.createElement('canvas');
+  c.width = im.width;
+  c.height = im.height;
+  const g = c.getContext('2d');
+  const src = document.createElement('canvas');
+  src.width = im.width;
+  src.height = im.height;
+  const sg = src.getContext('2d');
+  sg.drawImage(im, 0, 0);
+  let d;
+  try { d = sg.getImageData(0, 0, im.width, im.height); } catch (e) { return null; }
+  const p = d.data, W = im.width;
+  const skin = i => p[i] > 170 && p[i + 1] > 115 && p[i + 1] < 228 && p[i + 2] < 175 && p[i] - p[i + 2] > 45;
+  // The picture's own line: its handle the bottom middle, its tip the top.
+  const ph = pic.height, pw = pic.width;
+  const trail = document.createElement('canvas'), hand = document.createElement('canvas');
+  trail.width = hand.width = W;
+  trail.height = hand.height = im.height;
+  const td = sg.createImageData(W, im.height), hd = sg.createImageData(W, im.height);
+  for (let i = 0; i < p.length; i += 4) {
+    const a = p[i + 3];
+    if (!a) continue;
+    const t = a < 170 ? td.data : skin(i) ? hd.data : null;
+    if (t) { t[i] = p[i]; t[i + 1] = p[i + 1]; t[i + 2] = p[i + 2]; t[i + 3] = a; }
+  }
+  trail.getContext('2d').putImageData(td, 0, 0);
+  hand.getContext('2d').putImageData(hd, 0, 0);
+  g.drawImage(trail, 0, 0);
+  const rows = Math.round(im.height / ch), cols = Math.round(W / cw);
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const x0 = q * cw, y0 = r * ch, xs = [], ys = [];
+    for (let y = y0; y < y0 + ch; y++) for (let x = x0; x < x0 + cw; x++) {
+      const i = (y * W + x) * 4;
+      if (p[i + 3] >= 170 && !skin(i)) { xs.push(x); ys.push(y); }
+    }
+    if (xs.length < 8) continue;
+    let mx = 0, my = 0;
+    for (let k = 0; k < xs.length; k++) { mx += xs[k]; my += ys[k]; }
+    mx /= xs.length; my /= xs.length;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (let k = 0; k < xs.length; k++) { const dx = xs[k] - mx, dy = ys[k] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(th), uy = Math.sin(th);
+    let lo = 1e9, hi = -1e9;
+    for (let k = 0; k < xs.length; k++) { const t = (xs[k] - mx) * ux + (ys[k] - my) * uy; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+    const A = [mx + ux * lo, my + uy * lo], B = [mx + ux * hi, my + uy * hi];
+    // The hand's end: nearer the body's middle (the feet, half a body up).
+    const bx = x0 + ffx, by = y0 + ffy - 24;
+    const [grip, tip] = Math.hypot(A[0] - bx, A[1] - by) <= Math.hypot(B[0] - bx, B[1] - by) ? [A, B] : [B, A];
+    const len = Math.max(10, Math.hypot(tip[0] - grip[0], tip[1] - grip[1])) * CLASSIC_REACH;
+    const k = len / ph, ang = Math.atan2(tip[1] - grip[1], tip[0] - grip[0]) + Math.PI / 2;
+    g.save();
+    g.beginPath();
+    g.rect(x0, y0, cw, ch);
+    g.clip();
+    // The grip a fifth of the way up the picture from its handle's end.
+    g.translate(grip[0] + (tip[0] - grip[0]) * -0.18, grip[1] + (tip[1] - grip[1]) * -0.18);
+    g.rotate(ang);
+    g.drawImage(pic, -pw * k / 2, -ph * k, pw * k, ph * k);
+    g.restore();
+  }
+  g.drawImage(hand, 0, 0);
+  classicSheets.set(key, c);
+  return c;
+}
+// How much longer the old picture is laid than 연's weapon it stands for (its handle reaches past the hand).
+const CLASSIC_REACH = 1.22;
 function dressedSheet(im, path, t, pal) {
   const k = path + '|' + t + '|' + (pal || '');
   let c = dressSheets.get(k);
