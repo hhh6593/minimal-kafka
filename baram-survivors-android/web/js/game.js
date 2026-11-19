@@ -7,6 +7,7 @@ import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
+import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
 import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet, costumeItems } from './costume.js';
 import {
@@ -541,6 +542,7 @@ function unlocked(i) {
 
 let mapTab = 'world_1';
 let pickedStage = null;
+let pickedMode = 'conquer'; // 사냥 기믹: 정복 / 보스 직행 / 소탕 on a ground conquered before
 
 function buildStages() {
   if (!pickedStage) {
@@ -650,6 +652,16 @@ function stageInfo() {
     <div class="boss">보스: <b>${boss.name}</b></div>
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
       : open ? '도전할 수 있는 사냥터' : `잠김: ${lockReason(i)}`}</div>`;
+  // 사냥 기믹: a ground conquered before, three ways in; its 숙련 ★.
+  if (!progress.cleared[s.id] || settings.legacyPace) pickedMode = 'conquer';
+  else {
+    const row = document.createElement('div'), star = (progress.mastery || {})[s.id] || 0;
+    row.className = 'modes';
+    row.innerHTML = `<small>숙련 ${'★'.repeat(star)}${'☆'.repeat(3 - star)}</small>` + Object.entries(Hunt.MODES)
+      .map(([k, m]) => `<button class="btn${k === pickedMode ? ' on' : ''}" data-mode="${k}" title="${m.desc}">${m.name}</button>`).join('');
+    for (const b of row.querySelectorAll('button')) b.onclick = () => { pickedMode = b.dataset.mode; stageInfo(); };
+    $('#stage-info').append(row);
+  }
   pactRow(buildStages);
   $('#go').disabled = !open;
   $('#go').textContent = open ? `${josa(chosenClass.name, '으로', '로')} 입장` : '잠긴 사냥터';
@@ -882,7 +894,8 @@ function jostle(b, dt) {
 function free(tx, ty) {
   const p = G.player;
   return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
-    && !(p.stepping && p.sfx === tx && p.sfy === ty);
+    && !(p.stepping && p.sfx === tx && p.sfy === ty)
+    && (!G.arena || Hunt.open(tx, ty)); // 사냥 기믹: a ground fought on 연's own map
 }
 
 /** The tile under the hero's feet. */
@@ -971,9 +984,14 @@ function startRun(cls, stage, training = false) {
   G.player.y = TILE - 6;
   heroTile();
   applyGear();
+  Hunt.start(G); // 사냥 기믹 (hunt.js)
+  $('#dash-btn').hidden = !G.hunt;
   // A run starts with the weapon's plain attack only; the first card comes at once.
-  G.pendingLevels = 1;
-  G.firstCard = true;
+  // (사냥 기믹 보스 직행: the build comes made, as a raid's.)
+  if (!(G.hunt && G.hunt.mode === 'rush')) {
+    G.pendingLevels = 1;
+    G.firstCard = true;
+  }
   showScreen(null);
   if (audio) audio.play('enter'); // 연's own 'into the world' sting
   audio.bgm(huntMusic());
@@ -2933,7 +2951,7 @@ function stepHero(dx, dy, dt) {
   }
   const nx = p.tx + dx, ny = p.ty + dy, there = occ.get(key(nx, ny));
   // 대항전 (war.js): the castle's walls and the enemy's gate stop the hero; its own guild does not.
-  if (G.war && !War.open(nx, ny)) {
+  if ((G.war && !War.open(nx, ny)) || (G.arena && !Hunt.open(nx, ny))) {
     p.moving = false;
     return;
   }
@@ -2990,7 +3008,8 @@ function heroSpeed() {
   const held = p.sts && (heroStatusOn('stun') || heroStatusOn('para') || heroStatusOn('freeze')) ? 0.3 : p.sts && heroStatusOn('slow') ? 0.65 : 1;
   return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed')) * heroMove().k
     * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held
-    * (G.buffs.swift > G.t ? 1 + PROCS.swift.k : 1) * (G.buffs.chosang > G.t ? 1 + UTIL.chosang.speed : 1);
+    * (G.buffs.swift > G.t ? 1 + PROCS.swift.k : 1) * (G.buffs.chosang > G.t ? 1 + UTIL.chosang.speed : 1)
+    * (G.hunt ? Hunt.speedK() : 1); // 사냥 기믹: 기세 1단
 }
 
 /**
@@ -3010,6 +3029,7 @@ function update(dt) {
   if (G.war && War.hold(dt)) return;
   G.t += dt;
   const p = G.player;
+  if (G.pace) Hunt.tick(dt); // 사냥 기믹: the tempo record, the boss's measure
 
   if (!G.dead) {
     const [dx, dy] = input();
@@ -3022,8 +3042,10 @@ function update(dt) {
       p.fdx = dx;
       p.fdy = dy;
       if (dx) p.face = dx;
+      const ox = p.x, oy = p.y;
       p.x += dx * heroSpeed() * dt;
       p.y += dy * heroSpeed() * dt;
+      if (G.arena && !Hunt.open(Math.floor(p.x / TILE), Math.floor((p.y - TILE / 2 + 6) / TILE))) { p.x = ox; p.y = oy; } // 사냥 기믹: the map's walls
       p.walkT += dt * 1000;
       p.phase += (heroSpeed() * dt / (TILE / 2)) * Math.PI;
       heroTile();
@@ -3048,7 +3070,7 @@ function update(dt) {
     const opener = stalk && G.t >= stalk.at + AMBUSH.stalk && G.t < stalk.at + AMBUSH.stalk + AMBUSH.grace ? ambushOpener() : null;
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
-      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste'));
+      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste')) * (G.hunt ? Hunt.cdK() : 1); // 사냥 기믹: 기세 2단
       // A spell in the 기술 연계 waits, ready, for the others of the chain.
       if (chain.includes(s) && !stalk) {
         s.timer = Math.max(0, s.timer);
@@ -3128,8 +3150,9 @@ function ringTile(must = false) {
       tx = p.tx + (Math.random() < 0.5 ? -v.w : v.w);
       ty = p.ty + Math.floor(rand(-v.h, v.h + 1));
     }
-    if (free(tx, ty)) return [tx, ty];
+    if (free(tx, ty) && (!G.arena || Hunt.reach(tx, ty))) return [tx, ty];
   }
+  if (G.arena) return Hunt.spawnTile(); // 사냥 기믹: the rim all wall: an open tile within reach
   if (must) {
     // A boss comes even when the edge of the view is all rock: the nearest open tile 4 away.
     for (let r = 4; r < 20; r++)
@@ -3677,7 +3700,7 @@ function raidPattern(b, kind, follow = false) {
   G.seqTill = G.t + 20;
   raidSeq(b, waves, () => {
     if (more) {
-      const list = G.stage.patterns.filter(k => COMMON_PATTERNS.includes(k));
+      const list = (G.stage.patterns || []).filter(k => COMMON_PATTERNS.includes(k)); // (a hunting ground's boss has no list)
       raidPattern(b, list.length ? list[Math.floor(Math.random() * list.length)] : 'meteor', true);
       return;
     }
@@ -3753,7 +3776,7 @@ function raidMark(b, raw, nth, onFall) {
   // (A later wave strikes a little lighter: the blow is several.)
   // (Softened with the bosses' own blows: [0.3, 0.35, 0.4] and later waves 0.8 had the raiders on
   // the high raids struck 25~60% more, 흑술사's raid 57 downs.)
-  const share = [0.28, 0.32, 0.36][G.phase] * raidK() * (nth ? 0.7 : 1);
+  const share = [0.28, 0.32, 0.36][G.phase] * raidK() * (nth ? 0.7 : 1) * (G.hunt ? Hunt.PACE.share : 1);
   G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share, onFall });
   b.lunge = 0.3;
 }
@@ -3867,14 +3890,21 @@ function partyMarks(mk) {
 /** 계속 사냥: the field keeps growing (40 and half a monster more each second, to 220), a
  *  champion pack every minute; monsters already grow tougher with time. */
 function endlessSpawn(dt) {
-  const t = G.t, floor = Math.min(FIELD_MAX, 40 + (t - G.clearT) * 0.5);
+  // 사냥 기믹 소탕: the fullest field at once, for two and a half minutes.
+  if (G.endEnd && G.t >= G.endEnd && !G.over) {
+    sweepField();
+    G.endEnd = 0;
+    later(3, () => { if (G && !G.over && !G.dead) showResults(`${G.stage.name} 소탕 완료`); });
+    return;
+  }
+  const t = G.t, floor = G.endEnd !== undefined ? Math.min(220, 90 + (t - G.clearT) * 2) : Math.min(FIELD_MAX, 40 + (t - G.clearT) * 0.5);
   G.spawnT -= dt;
   if (G.spawnT <= 0) {
     G.spawnT = 0.5;
     for (let i = 0; i < 3 && G.enemies.length < floor; i++) addEnemy(pickMonster(Math.random() < 0.3));
   }
   if (t >= G.endlessChamp) {
-    G.endlessChamp = t + 60;
+    G.endlessChamp = t + (G.endEnd ? 30 : 60);
     const m = pickMonster(true), pack = ++G.packs;
     for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
     say('챔피언 무리가 나타났습니다!', 'warn');
@@ -3929,6 +3959,11 @@ function spawn(dt) {
     raidMarks();
     return;
   }
+  // 사냥 기믹 (hunt.js): 토벌도, the three acts and the boss's fight (not with legacyPace).
+  if (G.hunt) {
+    Hunt.spawn(dt);
+    return;
+  }
   const t = G.t, boss = G.bossT !== undefined;
   const floor = Math.round((boss ? 25 : floorCount(t)) * (pactOn('horde') ? 1.35 : 1));
   // Up to the floor at once, a few a frame.
@@ -3948,6 +3983,7 @@ function spawn(dt) {
         say(press === 3 ? '몬스터들이 사방에서 몰려듭니다!' : '몬스터들이 더 몰려듭니다!', 'warn');
         if (press >= 2) banner(press === 3 ? '압박 최고조!' : '몬스터가 몰려든다!');
       }
+      if (press > (G.press || 0)) Hunt.note('press' + press);
       G.press = press;
       const extra = (t >= 180 ? 4 : t >= 120 ? 3 : t >= 60 ? 2 : t >= 15 ? 1 : 0) + press;
       // Never far past the floor: a field that is not being thinned does not keep swelling.
@@ -3959,6 +3995,7 @@ function spawn(dt) {
       const m = pickMonster(true), pack = ++G.packs;
       for (let i = 0; i < 3; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
       say(`챔피언 무리가 나타났습니다!`, 'warn');
+      Hunt.note('champ');
       if (Math.random() < 0.6) emote('surprise');
     }
     if (G.minis.length && t >= G.minis[0] && addEnemy(G.mini.m, 'mini', G.mini)) {
@@ -3966,6 +4003,7 @@ function spawn(dt) {
       for (let i = 0; i < 3; i++) addEnemy(pickMonster(), 'minion');
       say(`${josa(G.mini.name, '이', '가')} 나타났습니다!`, 'warn');
       banner(`${G.mini.name} 등장`);
+      Hunt.note('mini');
     }
     if (G.events.length && t >= G.events[0].at) huntEvent(G.events.shift().kind);
   }
@@ -3998,6 +4036,7 @@ function spawn(dt) {
     bo.hp = bo.maxHp = bo.maxHp * grow;
     bo.guardT = t + 2;
     bo.capPerSec = 0.08;
+    Hunt.note('boss');
     audio.play('boss');
     audio.bgm('boss');
     G.shake = 0.6;
@@ -4041,6 +4080,7 @@ function eventPlan() {
 
 function huntEvent(kind) {
   const p = G.player, v = viewTiles();
+  Hunt.note('event:' + kind);
   if (kind === 'march') {
     // From one side, a row of thirteen, walking straight across and on out of sight.
     const [dx, dy] = DIRS[Math.floor(Math.random() * 4)];
@@ -4084,7 +4124,7 @@ function huntEvent(kind) {
 
 function pickMonster(strong = false) {
   if (strong) return G.pool[Math.max(0, G.pool.length - 1 - Math.floor(Math.random() * 3))];
-  const c = Math.min(1, G.t / (BOSS_AT * 0.9));
+  const c = Math.min(1, (G.hunt ? Hunt.clock() : G.t) / (BOSS_AT * 0.9));
   const r = Math.min(1, Math.max(0, c + (Math.random() - 0.7) * 0.5));
   return G.pool[Math.round(r * (G.pool.length - 1))];
 }
@@ -4092,11 +4132,12 @@ function pickMonster(strong = false) {
 function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   const at = spot || ringTile(kind === 'boss' || kind === 'mini');
   if (!at) return null;
-  const t = G.t;
+  // 사냥 기믹: the monsters grow with the 토벌도 and the act, not the clock.
+  const t = G.hunt ? Hunt.clock() : G.t;
   // Monsters toughen with time: x2.5 by 5:00 (matched to spells growing 15% a 단).
   // A ground may be eased a little (stage.ease, e.g. 흉가: its 99-level monsters were a wall).
   const ease = G.stage.ease || 1;
-  const tough = (1 + G.level * 0.1) * (1 + t / 133) * (G.cleared ? 1.5 : 1) * ease;
+  const tough = (1 + G.level * 0.1) * (G.hunt ? Hunt.tough() : 1 + t / 133) * (G.cleared ? 1.5 : 1) * ease;
   const rank = kind ? 1 : m.rank;
   // On a ground of big monsters a big one is no tougher than the others' biggest.
   const area = G.stage.big ? Math.min(m.area, 5200) : m.area;
@@ -4122,7 +4163,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     lunge: 0, hits: new Map(), temper: kind && kind !== 'minion' ? (kind === 'champ' ? 'fierce' : 'normal') : temperOf(m),
   };
   const tp = TEMPERS[e.temper];
-  e.stepTime *= tp.step * (pactOn('swift') ? 0.83 : 1);
+  e.stepTime *= tp.step * (pactOn('swift') ? 0.83 : 1) * (G.hunt ? Hunt.stepK() : 1);
   if (!kind && !G.stage.raid && !G.endless) {
     e.hp = e.maxHp = e.hp * HORDE.hp;
     e.dmg *= HORDE.dmg * (1 + 0.12 * (G.press || 0));
@@ -4136,6 +4177,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
 
 /** Directions toward a tile, best first: the longer way, then the shorter, then around. */
 function towards(b, tx, ty) {
+  if (G.arena) { const f = Hunt.flowDirs(b, tx, ty); if (f) return f; } // 사냥 기믹: round the map's walls
   const dx = Math.sign(tx - b.tx), dy = Math.sign(ty - b.ty);
   const horiz = Math.abs(tx - b.tx) >= Math.abs(ty - b.ty);
   const first = horiz ? [dx, 0] : [0, dy], second = horiz ? [0, dy] : [dx, 0];
@@ -4153,7 +4195,7 @@ const PACTS = {
   fang: { name: '날카로운이빨', desc: '몬스터 피해 +35%', reward: 0.2 },
 };
 function pactOn(id) {
-  return !!(settings.pacts && settings.pacts[id]);
+  return !!(settings.pacts && settings.pacts[id]) || !!(G && G.pacts && G.pacts[id]); // 사냥 기믹: a pact taken at the 갈림길
 }
 function pactReward() {
   return 1 + Object.keys(PACTS).filter(pactOn).reduce((a, id) => a + PACTS[id].reward, 0);
@@ -4210,6 +4252,7 @@ function moveEnemies(dt) {
       if (e.hp < e.maxHp * 0.5) e.hp = e.maxHp;
       continue;
     }
+    if ((e.goal || e.hunt) && G.hunt && !e.stun && Hunt.move(e)) continue; // 사냥 기믹: the objective's monsters
     // 공대: twenty-five can hold a boss for ever; a raid's boss shakes a hold off within 1.2 s and
     // cannot be held again for four more (its blast is still cut by the hold that lands).
     if (e.kind === 'boss' && e.stun > 0 && G.war && G.war.raid) {
@@ -4355,6 +4398,7 @@ function barred(e) {
 }
 
 function hurtPlayer(dmg, from = null, pierce = false) {
+  if (G.hunt && !G.dead && !(G.player.inv > 0)) { Hunt.hurtTaken(dmg); Hunt.hurtBy(from); } // 사냥 기믹: 받은 피해, 정예 속성
   const p = G.player;
   if (G.buffs.guard > G.t || p.inv > 0) return;
   // 방어: a share of each blow, not a flat amount (taken off flat, a good shield turned every
@@ -4411,6 +4455,7 @@ function hurtEnemy(e, dmg, push = null) {
   e.provoked = true;
   if (e.hp <= 0) return 0;
   if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
+  if (G.hunt && Hunt.tryExecute(e)) return e.maxHp; // 사냥 기믹: 처형
   // A heavy blow on a big one stops the world for a blink.
   // Not in a raid, where the party's blows fall all the time, and not more than once in 0.6 s.
   if (e.kind && dmg > 40 && !G.stage.raid && G.t - (G.hitstopAt || -9) > 0.6) {
@@ -4434,7 +4479,8 @@ function hurtEnemy(e, dmg, push = null) {
     * ((p.abyssHunt || p.taecho) && !G.allyHitting ? abyssEdge(e) : 1)
     // 태초's first blow (items.js TAECHO_EDGE.fresh): a foe at its full health, never a war's fighter.
     * (p.taecho && own && !G.procHitting && !e.war && e.hp >= e.maxHp ? 1 + TAECHO_EDGE.fresh : 1)
-    * (p.judge && own ? 1 + p.judge : 1); // 심판의낫 (items.js JUDGE_EDGE): every foe alike
+    * (p.judge && own ? 1 + p.judge : 1) // 심판의낫 (items.js JUDGE_EDGE): every foe alike
+    * (G.hunt ? Hunt.takeK(e) * (own ? Hunt.react(e) : 1) : 1); // 사냥 기믹: 그로기, 폭주, 속성 반응
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
   const lucky = Math.random() < 0.1 + (own ? GEAR_OPT.crit * opt('crit') : 0);
@@ -4464,6 +4510,7 @@ function hurtEnemy(e, dmg, push = null) {
   const RW = G.war && G.war.raid;
   if (RW) dmg = War.raidScale(dmg);
   e.hp -= dmg;
+  if (G.hunt) Hunt.hurt(e, dmg); // 사냥 기믹: 그로기, the boss's measure
   // 흡혈 (an armour's line): a share of the hero's own blows back, at most vampCap a second (update).
   if (own && opt('vamp') && !G.procHitting) p.vampAcc = (p.vampAcc || 0) + dmg * GEAR_OPT.vamp * opt('vamp');
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
@@ -4881,6 +4928,8 @@ function killEnemy(e) {
   const at = G.enemies.indexOf(e);
   if (at < 0) return;
   G.kills++;
+  if (G.hunt) Hunt.kill(e); // 사냥 기믹: 토벌도
+  if (G.endEnd) Hunt.sweepKill(e); // 사냥 기믹: 소탕's spoils
   if (G.player.abyssHunt && !G.allyHitting) abyssBurst(e);
   gearProc('kill', e);
   // 이동기 한방컷 (연's 차사): a foe felled just after a dash brings the next dash sooner.
@@ -4956,7 +5005,7 @@ function killEnemy(e) {
     fieldFalls();
     clearStage();
   } else if (G.t >= G.plainDropAt && roll < 0.02) {
-    G.plainDropAt = G.t + 180;
+    G.plainDropAt = G.t + (G.hunt ? 100 : 180); // 사냥 기믹: a shorter run, the same pieces a minute
     dropGear(e);
   } else if (roll < 0.035) G.drops.push({ x: e.x, y: e.y, kind: 'heal' });
   else if (roll < 0.07) G.drops.push({ x: e.x, y: e.y, kind: 'coin' });
@@ -5004,6 +5053,8 @@ function clearStage() {
   audio.bgm(huntMusic());
   if (G.cleared) return;
   G.cleared = true;
+  G.clearT = G.t;
+  Hunt.note('clear');
   audio.play('win');
   emote(G.stage.raid ? 'godgame' : ['godgame', 'gains', 'cute'][Math.floor(Math.random() * 3)]);
   const st = qstats();
@@ -5047,6 +5098,7 @@ function clearStage() {
     if (Math.random() < 0.4 + 0.03 * G.level) dropCostume(G.level >= 10 ? [1, 2] : [0, 1, 2], '레이드 보상');
   } else {
     progress.cleared[G.stage.id] = true;
+    if (G.hunt) Hunt.cleared(); // 사냥 기믹: the slow moment, the 갈림길's spoils
     promote();
     if (G.stage.id === 'cheolsang' && !progress.abyss && st.clears.cheolsang >= 3) {
       progress.abyss = true;
@@ -5205,7 +5257,12 @@ function fireSkill(s, k) {
   // The first blow out of 투명 is the 암습 (AMBUSH).
   const ambush = G.ambush && G.buffs.stealth > G.t && st.dmg > 0 && !SKILLS[s.id].heal;
   if (ambush) { st.dmg *= G.ambush.k || AMBUSH.k; G.ambushShow = G.t + AMBUSH.show; G.ambushKill = promoOf(G.cls.id) >= 5 ? G.t + 0.8 : 0; }
+  G.castCd = st.cd; // 사냥 기믹: a heavy blow fills the boss's 그로기 twice; its element reacts
+  G.castElem = G.hunt ? Hunt.elemOf(SKILLS[s.id]) : null;
+  G.castDmg = st.dmg || 0;
   cast(s, st);
+  G.castCd = 0;
+  G.castElem = null;
   if (ambush) ambushStrike(s);
   // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
   // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
@@ -5239,10 +5296,11 @@ function chainSkills() {
 function startChain(chain) {
   const melee = MELEE.has(G.cls.id);
   const lead = melee ? lure() : 0;
+  const power = G.hunt ? Hunt.chainPower(CHAIN_POWER) : CHAIN_POWER; // 사냥 기믹: 일망타진
   G.chainRun = { ids: chain.map(s => s.id), at: G.t + lead, done: 0, end: G.t + lead + chain.length * CHAIN_GAP + 1 };
   chain.forEach((s, i) => later(lead + i * CHAIN_GAP, () => {
     if (G.dead || !G.skills.includes(s)) return;
-    fireSkill(s, CHAIN_POWER);
+    fireSkill(s, power);
     if (G.chainRun) G.chainRun.done = i + 1;
   }));
   later(lead + chain.length * CHAIN_GAP + 1, () => { G.chainRun = null; });
@@ -5804,7 +5862,8 @@ function plainAttack(dt) {
   if (G.training && !G.training.plain) return;
   const p = G.player;
   p.atkT = (p.atkT || 0) - dt;
-  if (p.atkT > 0 || (!G.training && G.t - (G.lastHit || -9) < 1.5)) return;
+  const dashCancel = G.hunt && Hunt.cancel(); // 사냥 기믹: 질주 → the plain swing at once
+  if (!dashCancel && (p.atkT > 0 || (!G.training && G.t - (G.lastHit || -9) < 1.5))) return;
   if (G.buffs.stealth > G.t) return; // 투명: no plain swing gives the hero away
   const t = [[p.tx, p.ty], ...DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy])]
     .map(([x, y]) => occ.get(key(x, y))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
@@ -7836,7 +7895,7 @@ function classFlourish(def, skill, st) {
   if (MELEE.has(cls)) {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
     const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); });
-    if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > 1.5 && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
+    if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > (G.dashUsed ? 3 : 1.5) && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
       const spot = DIRS.map(([dx, dy]) => [near.tx + dx, near.ty + dy]).filter(([x, y]) => free(x, y))
         .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
       if (spot && !holdGround(spot[0], spot[1])) {
@@ -8612,6 +8671,7 @@ function gainXp(v) {
   // Alone, the hero grows a little faster: more cards, sooner.
   v *= 1.7;
   v *= 1 + GEAR_OPT.exp * opt('exp'); // 경험치 (an armour's line)
+  if (G.hunt) v *= Hunt.xpK(); // 사냥 기믹: experience by act
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   const got = v * pactReward(), of = p.next;
@@ -8752,19 +8812,26 @@ function nextChoice() {
     return;
   }
   G.pendingLevels--;
+  const first = G.firstCard, tune = G.tuneCard;
+  G.tuneCard = false;
   const picks = drawCards();
   if (!picks.length) picks.push({ type: 'heal' }, { type: 'gold' });
+  // 사냥 기믹: only a pick with something new in it (a new spell, a 계승, a 정비 pick) stops the
+  // hunt; a pick of raises only is taken as the 자동 선택 would, named in the feed.
+  const stop = !G.hunt || first || tune || Hunt.stops(picks);
+  if (tune && G.hunt) G.rerolls++; // 정비: a free deal again
+  if (G.pace) { G.pace.cards++; if (stop) G.pace.manual++; }
   G.choosing = true;
   audio.play('levelup');
   addFx(FX.levelup, 0, -26, { follow: true });
   // 자동 선택: the hunt goes on, as 연's auto hunting does; the pick is named in the feed.
-  if (settings.autoPick && !G.banishing) {
+  if ((settings.autoPick || !stop) && !G.banishing) {
     const o = bestCard(picks);
     lootFeed(`자동 선택 · ${cardName(o)}`);
     choose(o);
     return;
   }
-  $('#lv-title').textContent = `레벨 ${G.player.lvl}`;
+  $('#lv-title').textContent = tune && G.hunt ? `정비 · 레벨 ${G.player.lvl}` : `레벨 ${G.player.lvl}`;
   const box = $('#choices');
   box.innerHTML = '';
   for (const o of picks) {
@@ -8926,6 +8993,7 @@ function choose(o) {
     }
   } else if (o.type === 'heal') heal(50, true);
   else G.gold += 100;
+  if (G.hunt && Hunt.cardBonus(o)) lootFeed(`카드 무게 · ${cardName(o)} +1`); // 사냥 기믹: past Lv 20, two steps
   $('#levelup').hidden = true;
   G.choosing = false;
   if (G.pendingLevels) nextChoice();
@@ -9046,6 +9114,9 @@ function showResults(title) {
   clearTimeout(banner.t);
   G.choosing = false;
   G.pendingLevels = 0;
+  // 사냥 기믹: 스타일 등급 — money ×1.0~1.3 by the grade.
+  const style = G.hunt && G.cleared && !G.dead ? Hunt.grade() : null;
+  if (style) G.gold = Math.round(G.gold * style.k);
   bankGold();
   keepBuild();
   progress.tradeBuys = {}; // the merchant restocks its materials
@@ -9066,7 +9137,9 @@ function showResults(title) {
     + `쓰러뜨린 몬스터 ${G.kills}마리 · ${won(G.gold)}<br>`
     + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
     + (G.gained && G.gained.length ? `<br><b class="promo">얻은 것: ${gainedSummary(G.gained)}</b>` : '')
-    + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '');
+    + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '')
+    + (style ? `<br><b class="grade g${style.g}">스타일 ${style.g}</b> 최고 기세 ${style.best}단 · 처형 ${style.execs} · 일망타진 ${style.sweeps} · 반응 ${style.reactions} · 돈 ×${style.k}`
+      + (style.stars ? ` · 숙련 ${'★'.repeat(style.stars)}${style.newStar ? ' (새 ★)' : ''}` : '') : '');
   // A conquered ground can be hunted on, harder and harder, for its specials.
   $('#keep').hidden = !(G.cleared && !G.dead && !G.stage.raid);
   showScreen('over');
@@ -9099,8 +9172,10 @@ function bankGold() {
 function record() {
   if (G.war) return; // a war's floored level is not the class's record
   const r = best[G.cls.id];
-  if (!r || G.player.lvl > r.lvl || (G.player.lvl === r.lvl && G.kills > r.kills)) {
-    best[G.cls.id] = { lvl: G.player.lvl, kills: G.kills };
+  // 사냥 기믹: a card past Lv 20 weighs two steps; the record counts the level those make.
+  const lvl = G.player.lvl + (G.hunt ? G.hunt.bonusLv : 0);
+  if (!r || lvl > r.lvl || (lvl === r.lvl && G.kills > r.kills)) {
+    best[G.cls.id] = { lvl, kills: G.kills };
     saveJson('bs_best', best);
   }
 }
@@ -9276,6 +9351,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   if (e.code === 'Space') castUlt();
   if (e.code === 'KeyQ') castUtil();
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') Hunt.dash(); // 사냥 기믹: 질주
 });
 addEventListener('keyup', e => keys.delete(e.code));
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
@@ -10301,6 +10377,7 @@ function render(now) {
   let camX = Math.round(p.x - VW / 2), camY = Math.round(p.y - 30 - VH / 2);
   // 대항전 (war.js): the camera stays on the battlefield's map.
   if (G.war) [camX, camY] = War.cam(camX, camY);
+  if (G.arena) [camX, camY] = Hunt.cam(camX, camY); // 사냥 기믹: held inside the map
   // 수련장: the hero and the dummy in the middle of what the panel leaves free.
   if (G.training) camX -= trainShift();
   if (G.shake > 0) {
@@ -10313,7 +10390,8 @@ function render(now) {
   if (G.war && !G.war.raid) {
     War.drawMap(camX, camY);
     War.drawGround();
-  } else {
+  } else if (G.arena) Hunt.drawMap(ctx, camX, camY); // 사냥 기믹: 연's own map of the ground
+  else {
     ctx.fillStyle = G.ground;
     ctx.fillRect(camX, camY, VW, VH);
     if (G.war) War.drawGround(); // 공대: the arena's edge and the camp
@@ -10340,6 +10418,7 @@ function render(now) {
     ctx.drawImage(im, Math.round(d.x - im.width / 2), Math.round(d.y - im.height - 2 + Math.sin(now * 4) * 1.5));
   }
 
+  if (G.hunt) Hunt.ground(ctx); // 사냥 기믹: the objective, the bog
   // A raid boss's marked tiles, blinking red until they are struck.
   for (const mk of G.marks) {
     const blink = Math.floor((G.t - mk.made) * 8) % 2;
@@ -10363,7 +10442,7 @@ function render(now) {
   if (p.aura && !G.dead) drawAuraRing(p);
 
   // Bodies, back to front.
-  const seenProps = G.war && !G.war.raid ? [] : propsInView(camX, camY);
+  const seenProps = (G.war && !G.war.raid) || G.arena ? [] : G.broken ? propsInView(camX, camY).filter(b => !G.broken.has(b.x + ',' + b.y)) : propsInView(camX, camY); // 사냥 기믹: broken jars
   G.seenProps = seenProps;
   const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(seenProps) : War.props()) : seenProps, G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
   bodies.push(p);
@@ -10595,10 +10674,11 @@ function render(now) {
     } else if (e.alertAt !== undefined) drawAlert(e.x, e.y - e.m.h * e.scale - 6, G.t - e.alertAt);
   }
 
+  if (G.hunt) Hunt.world(ctx); // 사냥 기믹: 처형 marks, the objective
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (G.stage.abyss) drawAbyss((p.x - camX) * Z, (p.y - 22 - camY) * Z, camX, camY);
   // (the abyss has its own darkness: no second vignette over it)
-  const dark = !G.stage.abyss && DARK[G.stage.terrain];
+  const dark = !G.stage.abyss && !G.hunt && DARK[G.stage.terrain]; // 사냥 기믹: the group's own light (hunt.js)
   if (dark) {
     // Caves and houses are dim away from the hero, as in the old game's dungeons.
     const cx = canvas.width / 2, cy = canvas.height / 2;
@@ -10616,6 +10696,7 @@ function render(now) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
+  if (G.hunt) Hunt.ambient(ctx, canvas, camX, camY); // 사냥 기믹: light, colour, weather
   // A 필살기's blink of white over the whole screen.
   if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.32) {
     ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - (G.t - G.whiteAt) / 0.32)})`;
@@ -10671,6 +10752,7 @@ function render(now) {
   drawChain();
   drawLootFeed();
   drawBattleInfo();
+  if (G.hunt) Hunt.hud(ctx, canvas); // 사냥 기믹: 토벌도, 그로기, the boss's warning
   if (G.war) War.hud();
   drawJoystick();
 }
@@ -10991,7 +11073,8 @@ function syncUlt() {
   syncUtil();
   put('#ult-mode', ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스');
   put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
-  put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock((G.stage.raid ? RAID_BOSS_AT : BOSS_AT) - G.t)}`
+  const hc = G.hunt && Hunt.clockText(); // 사냥 기믹: 토벌도 in place of the clock
+  put('#boss-clock', hc !== null && hc !== undefined && G.hunt ? hc : G.bossDue ? `${G.boss.name}까지 ${clock((G.stage.raid ? RAID_BOSS_AT : BOSS_AT) - G.t)}`
     : G.stage.raid && !G.cleared ? `남은 시간 ${clock(Math.max(0, RAID_LIMIT - G.t))}` : '');
   // The boss's bar across the top, as a raid shows it: also for leaders on any ground.
   const big = G.training ? null : G.enemies.find(e => e.kind === 'boss') || G.enemies.find(e => e.kind === 'mini');
@@ -11116,6 +11199,7 @@ function syncSettings() {
   $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
   $('#opt-dash').textContent = '돌진 기술: ' + (settings.dashMode === 'stay' ? '제자리' : '자동');
   $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
+  $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
@@ -11161,14 +11245,22 @@ $('#start-btn').onclick = () => {
 };
 $('#back-title').onclick = () => showScreen('title');
 $('#back-select').onclick = () => enterTown(chosenClass);
-$('#go').onclick = () => startRun(chosenClass, pickedStage);
+$('#go').onclick = () => {
+  startRun(chosenClass, pickedStage);
+  if (G && G.hunt && G.hunt.mode === 'conquer' && pickedMode === 'sweep' && progress.cleared[G.stage.id]) Hunt.sweep(G); // 사냥 기믹: 소탕
+};
 $('#pause-btn').onclick = () => togglePause();
 $('#resume').onclick = () => togglePause(false);
 $('#quit').onclick = () => {
   $('#pause').hidden = true;
   leaveHunt();
 };
-$('#again').onclick = () => startRun(G.cls, G.stage);
+$('#again').onclick = () => {
+  const sw = G.hunt && G.hunt.mode === 'sweep';
+  pickedMode = G.hunt ? (sw ? 'sweep' : G.hunt.mode) : pickedMode;
+  startRun(G.cls, G.stage);
+  if (sw && G.hunt) Hunt.sweep(G);
+};
 // 계속 사냥: back into the conquered ground; the field grows until the hero falls.
 $('#keep').onclick = () => {
   if (!G || !G.cleared || G.dead) return;
@@ -11178,10 +11270,12 @@ $('#keep').onclick = () => {
   G.endless = true;
   G.clearT = G.t;
   G.endlessChamp = G.t + 60;
+  // 사냥 기믹: 소탕 in its place — two and a half minutes, champions every half minute.
+  if (G.hunt) Hunt.sweep(G);
   showScreen(null);
   audio.bgm(huntMusic());
-  say('계속 사냥합니다. 갈수록 몬스터가 늘고 강해집니다.', 'sys');
-  banner('계속 사냥');
+  say(G.hunt ? '소탕합니다. 2분 30초 동안 몬스터가 가장 많이 몰려옵니다.' : '계속 사냥합니다. 갈수록 몬스터가 늘고 강해집니다.', 'sys');
+  banner(G.hunt ? '소탕 2:30' : '계속 사냥');
 };
 $('#to-select').onclick = () => leaveHunt();
 $('#ult-mode').onclick = e => { e.stopPropagation(); toggleUltMode(); };
@@ -11276,6 +11370,13 @@ const toggleAuto = () => {
   }
 };
 $('#opt-auto').onclick = toggleAuto;
+$('#dash-btn').onclick = () => Hunt.dash(); // 사냥 기믹: 질주
+// 사냥 기믹: the old four-minute script, kept for comparison (takes effect from the next hunt).
+$('#opt-pace').onclick = () => {
+  settings.legacyPace = !settings.legacyPace;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
 $('#lv-auto').onclick = toggleAuto;
 $('#opt-num').onclick = () => {
   settings.numbers = !settings.numbers;
@@ -11762,7 +11863,7 @@ window.__silentSkills = () => {
 window.__game = () => G;
 window.__images = () => images; // test: the loaded pictures
 window.__clear = () => clearStage();
-window.__start = (c, s) => startRun(CLASSES[c], STAGES[s]);
+window.__start = (c, s, m) => { pickedMode = m || 'conquer'; startRun(CLASSES[c], STAGES[s]); if (m === 'sweep' && G.hunt) Hunt.sweep(G); };
 window.__enterTown = c => enterTown(CLASSES[c]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
@@ -11792,6 +11893,17 @@ const War = initWar({
   // 공대 (the raid on the war's fighters)
   strike: allyStrike, auraK, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
   altName: c => (PARTY[c.id] ? PARTY[c.id].names[0] : c.name), raidFail: title => showResults(title),
+});
+
+// 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
+const Hunt = initHunt({
+  G: () => G, settings: () => settings, progress: () => progress, saveSettings: () => saveJson('bs_settings', settings), audio: () => audio,
+  say, banner, emote, josa, floatText, outline, lootFeed, addEnemy, pickMonster, floorCount, huntEvent, pactOn, PACTS,
+  raidPattern, raidWave, raidMarks, killEnemy, clearStage, promoOf, nextChoice, rollMats, dropGear, levelCap, MAX_PASSIVE_LEVEL,
+  M: () => M, images, occ, TILE, MELEE, free, bodiesAt, heroTile, dashFrom, stats, hurtEnemy, applyStatus, around, later, addFx, fxBudget,
+  walled: (tx, ty) => !!(G.arena && !Hunt.open(tx, ty)),
+  heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
+  VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
 });
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.

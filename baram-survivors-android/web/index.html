@@ -25,7 +25,7 @@
 
   /* Windows share the side panel's materials: a carved wooden frame around parchment, dark ink,
      raised tan keys. Text that sits straight on the game view stays light with a dark edge. */
-  #pause-box, #lv-box, #over-box, #sounds-box, #stage-info {
+  #pause-box, #lv-box, #cr-box, #over-box, #sounds-box, #stage-info {
     color: #2a1606; background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
     box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; border-radius: 0; }
   .card, .choice {
@@ -38,7 +38,7 @@
   .caption { margin: -2px -2px 6px; padding: 2px 8px; font-weight: 700; color: #f6e6c0; background: #6a3a18;
       border-bottom: 2px solid #2a1004; text-shadow: 1px 1px 0 #2a1004; }
 
-  .screen, #levelup, #pause, #loading { position: fixed; inset: 0; display: flex; flex-direction: column;
+  .screen, #levelup, #crossroad, #pause, #loading { position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 8px; padding: max(8px, env(safe-area-inset-top))
       max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
   .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -179,11 +179,11 @@
   #stage-info .state { font: 10px G9, monospace; color: #6a4a2a; }
   #stage-info .state.done { color: #1a6a10; }
 
-  #levelup, #pause { background: rgba(0, 0, 0, .5); z-index: 10; }
+  #levelup, #crossroad, #pause { background: rgba(0, 0, 0, .5); z-index: 10; }
   /* In a hunt, windows open over the play view, not over the side panel. */
-  body.hunting #levelup, body.hunting #pause { right: var(--side); }
-  #lv-box, #pause-box, #over-box { padding: 0 8px 8px; width: min(100%, 480px); }
-  #choices { display: flex; flex-direction: column; gap: 4px; }
+  body.hunting #levelup, body.hunting #crossroad, body.hunting #pause { right: var(--side); }
+  #lv-box, #cr-box, #pause-box, #over-box { padding: 0 8px 8px; width: min(100%, 480px); }
+  #choices, #cr-choices { display: flex; flex-direction: column; gap: 4px; }
   .lv-keys { margin-top: 6px; }
   .lv-keys .btn { min-width: 0; flex: 1; padding: 3px 6px; font-size: 11px; }
   .choice { display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; }
@@ -456,6 +456,10 @@
   .branches i { font-style: normal; opacity: .55; }
   .branches i.open { opacity: 1; color: #2a1606; }
   .branches sup { font-size: 8px; color: #8a4a1a; }
+  #stage-info .modes { display: flex; gap: 3px; align-items: center; margin-top: 4px; }
+  #stage-info .modes small { color: #7a1800; margin-right: 4px; }
+  #stage-info .modes .btn { flex: 1 1 0; min-width: 0 !important; width: auto !important; padding: 1px 4px !important; font-size: 11px !important; }
+  #stage-info .modes .btn.on { border-color: #ffd040; color: #7a1800; }
   .pacts { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 4px; }
   .pacts small { font: 10px G9, monospace; color: #6a3e16; margin-right: 2px; }
   .pact { font: 10px G9, monospace; padding: 2px 5px; background: #e8d0a0; color: #5a3010; border: 1px solid #a0602a; cursor: pointer; }
@@ -660,6 +664,12 @@
   body.yeon #banner { background: none; border: 0; top: 22%; font-size: 15px; color: #ff4a3a;
       text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000; }
   /* The 필살기's way (사냥 / 보스), switched with a tap beside the button. */
+  #keys #dash-btn { width: 92px; height: 28px; }
+  body.yeon #keys > button#dash-btn { position: absolute; right: 0; bottom: 146px; width: 88px !important; height: 30px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
+  #keys #dash-btn.ready { border-color: #ffd040 !important; }
+  #keys #dash-btn.glow { box-shadow: 0 0 8px 3px #ffd040; }
+  #over-stats .grade { font-size: 15px; }
+  #over-stats .gS { color: #ff8a20; } #over-stats .gA { color: #e8c040; } #over-stats .gB { color: #a0c8ff; }
   #ult-mode { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #2a1606; border: 2px solid rgb(148,48,219); }
 </style>
 </head>
@@ -764,6 +774,13 @@
   </div>
 </div>
 
+<div id="crossroad" hidden>
+  <div id="cr-box">
+    <div class="caption">갈림길 · 어느 길로 갈까</div>
+    <div id="cr-choices"></div>
+  </div>
+</div>
+
 <div id="pause" hidden>
   <div id="pause-box">
     <div class="caption">메뉴</div>
@@ -780,6 +797,7 @@
       <button id="opt-dash" class="btn"></button>
       <button id="opt-auto" class="btn"></button>
       <button id="opt-info" class="btn"></button>
+      <button id="opt-pace" class="btn"></button>
     </div>
   </div>
 </div>
@@ -787,7 +805,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="dash-btn" title="질주 (Shift)" hidden>질주</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>

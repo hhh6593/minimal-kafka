@@ -4,6 +4,8 @@ asset a ground of tools/yeon_grounds.json needs.
 
     yeon_grounds.py survey DEC_DIR OUT.json         every 연 hunting map and what it holds
     yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR [ID ...]   (only those grounds / raids)
+    yeon_grounds.py arena DEC_DIR GEAR_DIR [ID ...]      bounded fields from 연's maps (yhunt/)
+    yeon_grounds.py ambient DEC_DIR GEAR_DIR             weather particles from 연's FXs (yamb/)
 
 DEC_DIR holds the decrypted bundles (tools/yeon_dexor.py): Commons, Units, Image, Sounds and the
 Maps_* bundles.
@@ -292,11 +294,83 @@ def build(spec_path, dec, gear, audio, *only):
     print('grounds', len(grounds))
 
 
+# 사냥 대개편 P4: grounds fought on 연's own map, a bounded field (walls, bridges, cliffs, lava).
+# ground id -> bundle, map, crop in 연 tiles (x0, y0, x1, y1): the walkable body of the map, the
+# blurred rim and the far pockets left out (a crop by hand, as the wars' are).
+ARENAS = {
+    'baekdu': ('Maps_412001.unity3d', 'kow_baekdusan_01_baekduvillage_02_01_daegakbong1', (8, 6, 64, 76)),
+    'hwatang': ('Maps_414001.unity3d', 'kow_hell_01_underworld_02_02_hwatangjiok3', (6, 6, 74, 98)),
+    'wreck': ('Maps_409180.unity3d', 'kow_ship_dragonpalace_07_04_shipgraveyard_01', (9, 6, 52, 50)),
+    'sandolim': ('Maps_415501.unity3d', 'kow_skybelow_01_first_01_01_sandolim_canyon_01', (14, 10, 78, 64)),
+}
+
+
+def arena(dec, gear, only=None):
+    """GEAR_DIR/yhunt/<id>_<cx>_<cy>.png (1024-pixel pieces of the crop, every tile layer) and
+    GEAR_DIR/yhunt/index.json: {"<id>": {"w", "h", "chunk", "cols", "rows", "walk", "start", "map",
+    "crop"}} - walk is the 48-pixel walk grid (tools/yeon_war.py walk_grid, the wars' rules), start
+    the open cell nearest the middle, where the hero comes in."""
+    import yeon_maps
+    import yeon_war
+    from PIL import Image
+    T, G, CH = 32, 48, 1024
+    d = os.path.join(gear, 'yhunt')
+    os.makedirs(d, exist_ok=True)
+    ip = os.path.join(d, 'index.json')
+    index = json.load(open(ip, encoding='utf-8')) if os.path.isfile(ip) else {}
+    for gid, (bundle, name, (x0, y0, x1, y1)) in ARENAS.items():
+        if only and gid not in only:
+            continue
+        b = os.path.join(dec, bundle)
+        data, _ = yeon_maps.load_map(b, name)
+        full = yeon_maps.render(b, name)
+        img = Image.new('RGBA', ((x1 - x0) * T, (y1 - y0) * T), (0, 0, 0, 255))
+        img.alpha_composite(full.crop((x0 * T, y0 * T, x1 * T, y1 * T)))
+        img = img.convert('RGB')
+        w, h = img.size
+        for cy in range(-(-h // CH)):
+            for cx in range(-(-w // CH)):
+                img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
+                    os.path.join(d, f'{gid}_{cx}_{cy}.png'), optimize=True)
+        cols, rows = w // G, h // G
+        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1)), cols, rows)
+        cells = [(x, y) for y in range(rows) for x in range(cols) if walk[y][x] == '.']
+        start = min(cells, key=lambda c: (c[0] - cols / 2) ** 2 + (c[1] - rows / 2) ** 2)
+        index[gid] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'start': list(start),
+                      'map': name, 'crop': [x0, y0, x1, y1]}
+        print(gid, name, (w, h), (cols, rows), 'open', len(cells))
+    with open(ip, 'w', encoding='utf-8') as f:
+        json.dump(index, f, ensure_ascii=False, separators=(',', ':'))
+
+
+# 사냥 대개편 P5: 연's own weather particles (FXs.unity3d textures) for the hunting grounds' groups.
+AMBIENT = ['weather_snow', 'csg04_rain', 'bubble_blue', 'csg04_leaf', 'weather_tachukbo', 'fog3']
+
+
+def ambient(dec, gear):
+    """GEAR_DIR/yamb/<name>.png: the snow, rain, bubble, leaf, dust and fog textures of 연's FXs."""
+    import UnityPy
+    d = os.path.join(gear, 'yamb')
+    os.makedirs(d, exist_ok=True)
+    env = UnityPy.load(os.path.join(dec, 'FXs.unity3d'))
+    for k, v in env.container.items():
+        base = k.rsplit('/', 1)[-1]
+        if base.endswith('.png') and base[:-4] in AMBIENT:
+            o = v.read()
+            if type(o).__name__ == 'Texture2D':
+                o.image.save(os.path.join(d, base))
+                print('ambient', base, o.image.size)
+
+
 def main():
     if sys.argv[1] == 'survey':
         survey(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'build':
         build(*sys.argv[2:])
+    elif sys.argv[1] == 'ambient':
+        ambient(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == 'arena':
+        arena(sys.argv[2], sys.argv[3], sys.argv[4:] or None)
     else:
         raise SystemExit(__doc__)
 

@@ -957,6 +957,24 @@ def main():
                 shutil.copyfile(os.path.join(wdir, n), os.path.join(out, "ywar", n))
         with open(os.path.join(wdir, "index.json"), encoding="utf-8") as f:
             manifest["ywar"] = json.load(f)
+    # 사냥 대개편: hunting grounds fought on 연's own map (GEAR_DIR/yhunt/ from tools/yeon_grounds.py
+    # arena: 1024-pixel pieces and walk grids). Loaded when such a ground starts.
+    hdir = os.path.join(gear_src, "yhunt") if gear_src else None
+    if hdir and os.path.isfile(os.path.join(hdir, "index.json")):
+        os.makedirs(os.path.join(out, "yhunt"), exist_ok=True)
+        for n in os.listdir(hdir):
+            if n.endswith(".png"):
+                shutil.copyfile(os.path.join(hdir, n), os.path.join(out, "yhunt", n))
+        with open(os.path.join(hdir, "index.json"), encoding="utf-8") as f:
+            manifest["yhunt"] = json.load(f)
+    # 사냥 대개편: the grounds' weather (GEAR_DIR/yamb/ from tools/yeon_grounds.py ambient).
+    adir = os.path.join(gear_src, "yamb") if gear_src else None
+    if adir and os.path.isdir(adir):
+        os.makedirs(os.path.join(out, "yamb"), exist_ok=True)
+        names = sorted(n[:-4] for n in os.listdir(adir) if n.endswith(".png"))
+        for n in names:
+            shutil.copyfile(os.path.join(adir, n + ".png"), os.path.join(out, "yamb", n + ".png"))
+        manifest["yamb"] = names
     tdir = os.path.join(gear_src, "ytitle") if gear_src else None
     if tdir and os.path.isfile(os.path.join(tdir, "title_bg.jpg")):
         shutil.copyfile(os.path.join(tdir, "title_bg.jpg"), os.path.join(out, "ui", "title_bg.jpg"))
