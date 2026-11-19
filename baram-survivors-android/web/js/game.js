@@ -435,6 +435,7 @@ function showScreen(name) {
   resize();
   if (name === 'title') audio.bgm('title');
   if (name !== 'town' && name !== null && !['equip', 'trade'].includes(name)) $('#talk').hidden = true;
+  if (name !== null) $('#train').hidden = true; // 수련장's panel goes with the hunt view
   if (name === 'select' || name === 'stages') audio.bgm(audio.pickBgm('select') ? 'select' : 'title');
   if (name === 'select') buildSelect();
   if (name === 'stages') buildStages();
@@ -890,7 +891,7 @@ function tdist(a, b) {
   return Math.hypot(a.tx - b.tx, a.ty - b.ty);
 }
 
-function startRun(cls, stage) {
+function startRun(cls, stage, training = false) {
   const hero = M.heroes.find(h => h.id === cls.hero);
   const gear = savedGear(cls);
   const mons = stageMonsters(stage);
@@ -932,6 +933,11 @@ function startRun(cls, stage) {
   if (stage.raid) raidSetup();
   if (stage.war) War.setup();
   G.wasCleared = stage.raid ? !!(progress.raids || {})[stage.id] : !!progress.cleared[stage.id];
+  // 수련장: no cards, no crowd; the dummy and the spell panel instead.
+  if (training) {
+    setupTraining();
+    return;
+  }
   syncSpeed();
   nextChoice();
 }
@@ -1170,6 +1176,7 @@ function tickStatus(e) {
  *  companion's apart. */
 function tally(e, d) {
   const t = G.dealt || (G.dealt = { all: 0, big: 0, ally: 0 });
+  if (G.training) trainHit(d, G.allyHitting || G.procHitting);
   if (G.allyHitting) { t.ally = (t.ally || 0) + d; return; }
   t.all += d;
   if (e.kind === 'boss' || e.kind === 'mini') t.big += d;
@@ -2745,6 +2752,7 @@ function update(dt) {
   }
   G.texts = G.texts.filter(t => t.t < 1.1);
   if (G.bubble && G.t - G.bubble.t > 1.3) G.bubble = null;
+  if (G.training) trainTick();
 }
 
 // ---------------------------------------------------------------- monsters
@@ -3843,6 +3851,11 @@ function moveEnemies(dt) {
     e.curse = Math.max(0, e.curse - dt);
     if (e.st) tickStatus(e);
     if (e.hp <= 0) continue;
+    // 수련장's dummy stands where it is put and strikes no one; its life never runs down.
+    if (e.still) {
+      if (e.hp < e.maxHp * 0.5) e.hp = e.maxHp;
+      continue;
+    }
     // 공대: twenty-five can hold a boss for ever; a raid's boss shakes a hold off within 1.2 s and
     // cannot be held again for four more (its blast is still cut by the hold that lands).
     if (e.kind === 'boss' && e.stun > 0 && G.war && G.war.raid) {
@@ -4084,7 +4097,7 @@ function hurtEnemy(e, dmg, push = null) {
   if (RW) War.raidCredit(e, dmg, e.hp <= 0);
   // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
   // orange for a heavy blow, grey for a light one.
-  if (crit || settings.numbers) {
+  if (crit || settings.numbers || G.training) {
     // 연's way: every blow its own line, the lines of a quick burst stacked in a column over
     // the struck (up to eight), white (a 치명타 orange and larger); a companion's blows smaller.
     e.numN = G.t - (e.numT || -9) < 0.7 ? ((e.numN || 0) + 1) % 8 : 0;
@@ -5398,6 +5411,7 @@ function cast(skill, st) {
  * makes it stronger.
  */
 function plainAttack(dt) {
+  if (G.training) return; // 수련장: only the spell being tried strikes the dummy
   const p = G.player;
   p.atkT = (p.atkT || 0) - dt;
   if (p.atkT > 0 || G.t - (G.lastHit || -9) < 1.5) return;
@@ -5800,6 +5814,294 @@ const YTOWN_NAME = { smith: '털보', merchant: '떼보', inn: '왈숙 이모', 
 // warp), and its gates are portals to the hunting grounds — each opens the grounds of its region.
 const WARP_R = 18;
 
+// ---- the ways out, in one row
+// The market's ways out stood where 연's map has its gates — the 남문's opening, the hall's far
+// end, a corner — far apart and marked by a 장승 alone, so it was hard to tell where a way out
+// was. They stand now in one row across the square's south side, an even step apart, each a
+// swirling gate (연's own 귀문 effect, k_rp_gate) under its name; the hero starts just below the
+// middle one, just inside the 남문. The guardian statue (the raids) and the training ground's gate are in the row too.
+// In the market's own pixels (its 1664×1568 at 32-pixel tiles); a build with another market keeps
+// its own ways out, the training ground's gate added by the spawn.
+const PORTAL_ROW_Y = 1304, PORTAL_STEP = 224, PORTAL_MID = 800;
+const PORTAL_ROW = [
+  { tab: 'raid', label: '영웅의 석상', sub: '레이드', art: 'statue', tint: 'hue-rotate(-30deg) saturate(1.6)' },
+  { tab: 'world_4', label: '환상의 섬', sub: '사냥터', tint: 'hue-rotate(170deg) saturate(1.5) brightness(1.5)' },
+  { tab: 'gungnae', label: '국내성', sub: '사냥터', tint: null },
+  { tab: 'world_1', label: '대륙', sub: '사냥터', tint: 'hue-rotate(28deg) saturate(1.8) brightness(1.35)' },
+  { tab: 'training', label: '수련장', sub: '허수아비', tint: 'hue-rotate(95deg) saturate(1.5) brightness(1.1)' },
+];
+const PORTAL_FX = 'k_rp_gate';
+let portalCache = null;
+/** The market's ways out (cached per build). */
+function townPortals() {
+  const yt = M.ui.ytown;
+  if (!yt) return [];
+  if (portalCache) return portalCache;
+  const m = yt.areas.market;
+  if (m.w === 1664 && m.h === 1568) {
+    portalCache = PORTAL_ROW.map((p, i) => ({ ...p, x: PORTAL_MID + (i - 2) * PORTAL_STEP, y: PORTAL_ROW_Y, r: p.art === 'statue' ? 26 : 30 }));
+  } else {
+    portalCache = yt.portals.map(p => ({ ...p, sub: '', tint: null }));
+    portalCache.push({ tab: 'training', label: '수련장', sub: '허수아비', x: m.spawn[0] + 96, y: m.spawn[1], r: 30, tint: PORTAL_ROW[4].tint });
+  }
+  return portalCache;
+}
+/** Where the hero comes into the market: just inside the 남문, under the row's middle gate, facing it. */
+function townSpawn() {
+  const m = M.ui.ytown.areas.market;
+  return m.w === 1664 && m.h === 1568 ? [PORTAL_MID, PORTAL_ROW_Y + 50] : m.spawn;
+}
+
+/** The swirl of a way out on the floor: a few of 연's 귀문 frames laid flat and turning, lit, with
+ *  a faint standing glow over it. Drawn once into a sheet of 48 steps per colour and size (turned and
+ *  scaled sprites drawn live, three a gate, were most of the town's frame on a phone). */
+const PORTAL_K = 48, PORTAL_COLS = 8;
+const portalSprites = new Map();
+function portalSprite(tint, size, upright) {
+  const key = (tint || '') + '|' + size + '|' + (upright ? 1 : 0);
+  let c = portalSprites.get(key);
+  if (c) return c;
+  const f = M.fx[PORTAL_FX], im0 = images[`fx/${PORTAL_FX}.png`];
+  if (!f || !im0 || !im0.complete || !im0.width) return null;
+  const im = tint ? tinted(im0, tint) : im0;
+  const R = 2, top = upright ? size * 0.95 : size * 0.3, W = Math.ceil(size * R), H = Math.ceil((top + size * 0.3) * R);
+  c = document.createElement('canvas');
+  c.width = W * PORTAL_COLS;
+  c.height = H * Math.ceil(PORTAL_K / PORTAL_COLS);
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.globalCompositeOperation = 'lighter';
+  const n = f.n || (f.durs ? f.durs.length : 1), lo = Math.floor(n * 0.4), hi = Math.max(lo + 1, Math.floor(n * 0.72)), cols = f.cols || 1e9;
+  for (let k = 0; k < PORTAL_K; k++) {
+    const i = lo + k % (hi - lo), sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h, th = k / PORTAL_K * Math.PI * 2;
+    g.save();
+    g.translate((k % PORTAL_COLS) * W + W / 2, Math.floor(k / PORTAL_COLS) * H + top * R);
+    g.scale(R, R);
+    g.save();
+    g.scale(1, 0.48);
+    g.rotate(th);
+    g.drawImage(im, sx, sy, f.w, f.h, -size / 2, -size / 2, size, size);
+    // A second turn of it the other way, a little smaller: the swirl reads at a glance.
+    g.rotate(-2 * th);
+    g.globalAlpha = 0.7;
+    g.drawImage(im, sx, sy, f.w, f.h, -size * 0.36, -size * 0.36, size * 0.72, size * 0.72);
+    g.restore();
+    if (upright) {
+      // A faint standing glow over it, so the gate is seen from across the square.
+      g.globalAlpha = 0.35 + 0.15 * Math.sin(th * 3);
+      g.drawImage(im, sx, sy, f.w, f.h, -size * 0.32, -size * 0.95, size * 0.64, size * 0.8);
+    }
+    g.restore();
+  }
+  c.fw = W;
+  c.fh = H;
+  c.top = top;
+  portalSprites.set(key, c);
+  return c;
+}
+function drawPortalFx(x, y, size, tint, now, upright) {
+  const c = portalSprite(tint, size, upright);
+  if (!c) return false;
+  const k = Math.floor(now * 12) % PORTAL_K;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(c, (k % PORTAL_COLS) * c.fw, Math.floor(k / PORTAL_COLS) * c.fh, c.fw, c.fh, Math.round(x - size / 2), Math.round(y - c.top), size, c.fh / 2);
+  ctx.restore();
+  return true;
+}
+
+const plateW = new Map();
+/** A way out's name plate over it: the place, and what it is under it. */
+function portalPlate(text, sub, x, y, color) {
+  ctx.font = 'bold 12px G11';
+  ctx.textAlign = 'center';
+  let w = plateW.get(text);
+  if (!w) plateW.set(text, w = Math.ceil(ctx.measureText(text).width) + 12);
+  ctx.fillStyle = 'rgba(20,10,4,0.72)';
+  ctx.fillRect(Math.round(x - w / 2), Math.round(y - 13), w, sub ? 26 : 16);
+  ctx.strokeStyle = 'rgba(255,210,122,0.75)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(Math.round(x - w / 2) + 0.5, Math.round(y - 13) + 0.5, w - 1, (sub ? 26 : 16) - 1);
+  outline(text, x, y, color);
+  if (sub) {
+    ctx.font = '8px G7';
+    outline(sub, x, y + 10, '#e8d8b0');
+  }
+}
+
+// ---- the town's life: people and riders walking the square's roads, a word now and then
+// 연's own figures only: passing adventurers in 연's class sprites (yhero2, plain gear of a few
+// steps), and 연's mounted units (the 고원 riders: a mounted archer and a horseman) as the guard's
+// horse patrol. (연's riderless 말 is not in the build, so no horse walks alone.) They step a
+// tile at a time along the roads, stop, look about and say something; few, so the town stays cheap.
+const TOWN_ROADS = [
+  // [tx0, ty0, tx1, ty1] in the market's tiles: the top road under the hall, the road between the
+  // halls, the square's south side, the west and east sides.
+  [3, 13, 48, 14], [3, 28, 48, 29], [3, 39, 48, 42], [3, 13, 5, 42], [46, 13, 48, 42], [43, 31, 48, 38],
+];
+const TOWN_WALKERS = [
+  { name: '떠돌이 검객', cls: 'warrior', gear: { armor: 2, weapon: 3, shield: 1, helmet: -1, cape: -1 },
+    lines: ['남문 밖 토끼굴은 초보들 차지라네.', '백호령 한 번이면 칼끝이 달라지지.', '대장간 털보 영감 솜씨 하나는 고구려 제일이야.'] },
+  { name: '견습 도적', cls: 'rogue', gear: { armor: 1, weapon: 2, shield: -1, helmet: -1, cape: -1 },
+    lines: ['쉿, 투명 쓰고 지나가는 중이오.', '흉가 귀신이 요새 부쩍 늘었다던데.', '떼보네 갑옷점 물건이 오늘 좋더군.'] },
+  { name: '방랑 주술사', cls: 'mage', gear: { armor: 2, weapon: 2, shield: -1, helmet: -1, cape: -1 },
+    lines: ['마력이 바닥나면 주막에서 쉬어 가게.', '헬파이어 한 방이면 다 끝나지.', '수련장 허수아비한테 마법을 시험해 봤소?'] },
+  { name: '마을 도사', cls: 'poet', gear: { armor: 1, weapon: 1, shield: -1, helmet: -1, cape: -1 },
+    lines: ['다친 데 있으면 말하게. 기원 한 번이면 낫는다네.', '부여성까지 걸어가려니 다리가 후들거리는군.', '영웅의 석상 앞에 모이면 공대를 꾸린다네.'] },
+  { name: '사냥꾼 궁사', cls: 'archer', gear: { armor: 1, weapon: 2, shield: -1, helmet: -1, cape: -1 },
+    lines: ['화살이 떨어져서 장터에 왔소.', '대륙 쪽 길은 짐승이 사나우니 조심하시오.', '왈숙 이모네 국밥이 일품이지.'] },
+  { name: '기마 순라꾼', unit: 'y616004', scale: 0.8, speed: 58, rider: true,
+    lines: ['길 비키시오! 순라 도는 중이오.', '해 지면 성문 밖으로 나가지 마시오.', '도둑이 들면 바로 알리시오.'] },
+  { name: '기마 궁수', unit: 'y616002', scale: 0.8, speed: 64, rider: true,
+    lines: ['이랴! 고원에서 막 달려 왔소.', '국내성 장터는 언제 와도 붐비는군.', '말에게 먹일 꼴 파는 데 아시오?'] },
+];
+const TOWN_GOSSIP = ['오늘 장터가 꽤 붐비는구먼.', '레이드 갔던 공대가 돌아왔다더군!', '알림판에 새 의뢰가 붙었다오.'];
+
+let roadGrid = null;
+/** The market's road tiles a walker may step on: on a road, walkable, away from the gates and folk. */
+function townRoads() {
+  if (roadGrid) return roadGrid;
+  const m = M.ui.ytown.areas.market, yt = M.ui.ytown;
+  const g = roadGrid = new Uint8Array(m.cols * m.rows);
+  const folk = Object.values(yt.spots).filter(s => s.area === 'market');
+  for (const [x0, y0, x1, y1] of TOWN_ROADS) {
+    for (let ty = y0; ty <= Math.min(y1, m.rows - 1); ty++) for (let tx = x0; tx <= Math.min(x1, m.cols - 1); tx++) {
+      if (m.walk[ty][tx] !== '.') continue;
+      const cx = tx * m.tile + m.tile / 2, cy = ty * m.tile + m.tile - 4;
+      if (townPortals().some(p => Math.abs(p.x - cx) < 64 && Math.abs(p.y - cy) < 48)) continue;
+      if (yt.doors.some(d => Math.hypot(d.x - cx, d.y - cy) < 40)) continue;
+      if (folk.some(s => Math.hypot(s.x - cx, s.y - cy) < 40)) continue;
+      g[ty * m.cols + tx] = 1;
+    }
+  }
+  return g;
+}
+function onRoad(tx, ty) {
+  const m = M.ui.ytown.areas.market;
+  return tx >= 0 && ty >= 0 && tx < m.cols && ty < m.rows && townRoads()[ty * m.cols + tx] === 1;
+}
+
+/** The walkers of a visit to town, each on a road tile of its own, its first word a while off. */
+function makeWalkers() {
+  const yt = M.ui.ytown;
+  if (!yt || !yt.areas.market.walk) return [];
+  const m = yt.areas.market, out = [], taken = new Set();
+  const tiles = [];
+  for (let ty = 0; ty < m.rows; ty++) for (let tx = 0; tx < m.cols; tx++) if (onRoad(tx, ty)) tiles.push(ty * m.cols + tx);
+  if (!tiles.length) return out;
+  for (const def of TOWN_WALKERS) {
+    if (def.unit && !(M.yunit && M.yunit[def.unit])) continue;
+    if (def.cls && !(M.yhero2 && M.yhero2[def.cls])) continue;
+    let k = tiles[Math.floor(Math.random() * tiles.length)];
+    for (let tries = 0; tries < 20 && taken.has(k); tries++) k = tiles[Math.floor(Math.random() * tiles.length)];
+    taken.add(k);
+    const tx = k % m.cols, ty = Math.floor(k / m.cols);
+    const w = { walker: true, def, name: def.name, x: tx * m.tile + m.tile / 2, y: ty * m.tile + m.tile - 4, tx, ty,
+      fdx: 0, fdy: 1, mdx: 0, mdy: 1, moving: false, walkT: 0, wait: 0.5 + Math.random() * 3, steps: 0, gx: 0, gy: 0,
+      talk: 3 + Math.random() * 12, say: null, sayT: 0, seed: Math.floor(Math.random() * 1000),
+      cls: def.cls ? CLASSES.find(c => c.id === def.cls) : null, gear: null, m: def.unit ? { id: def.unit } : null };
+    if (w.cls) {
+      w.gear = Object.assign({}, def.gear);
+      Object.defineProperty(w.gear, 'cos', { value: null, enumerable: false, writable: true });
+    }
+    out.push(w);
+  }
+  return out;
+}
+
+const WALK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+/** A walker's next few tiles: on along its way most of the time, else a turn; never back at once. */
+function walkerTurn(w) {
+  const ahead = onRoad(w.tx + w.mdx, w.ty + w.mdy) && (w.mdx || w.mdy);
+  if (ahead && Math.random() < 0.7) return true;
+  const start = Math.floor(Math.random() * 4);
+  for (let k = 0; k < 4; k++) {
+    const [dx, dy] = WALK_DIRS[(start + k) % 4];
+    if (dx === -w.mdx && dy === -w.mdy && (w.mdx || w.mdy)) continue;
+    if (onRoad(w.tx + dx, w.ty + dy)) { w.mdx = dx; w.mdy = dy; return true; }
+  }
+  if (onRoad(w.tx - w.mdx, w.ty - w.mdy)) { w.mdx = -w.mdx; w.mdy = -w.mdy; return true; }
+  return false;
+}
+
+let townSaying = 0;
+function updateWalkers(dt) {
+  const ws = T.walkers;
+  if (!ws || T.area !== 'market') return;
+  const m = M.ui.ytown.areas.market, tile = m.tile;
+  townSaying = 0;
+  for (const w of ws) if (w.say) townSaying++;
+  for (const w of ws) {
+    // A word now and then: never more than two talking at once; a passer-by near the hero sooner.
+    if (w.say) {
+      w.sayT += dt;
+      if (w.sayT > 3.4) { w.say = null; townSaying--; }
+    } else {
+      w.talk -= dt * (Math.hypot(w.x - T.x, w.y - T.y) < 90 ? 3 : 1);
+      if (w.talk <= 0 && townSaying < 2) {
+        const ls = w.def.lines, gossip = Math.random() < 0.2;
+        w.say = gossip ? TOWN_GOSSIP[Math.floor(Math.random() * TOWN_GOSSIP.length)] : ls[Math.floor(Math.random() * ls.length)];
+        w.sayT = 0;
+        w.talk = 9 + Math.random() * 12;
+        townSaying++;
+        // A rider pulls up to say it; one on foot stops too.
+        if (!w.moving) w.wait = Math.max(w.wait, 2.2);
+      }
+    }
+    if (w.moving) {
+      const sp = (w.def.speed || 42) * dt;
+      const dx = w.gx - w.x, dy = w.gy - w.y, d = Math.abs(dx) + Math.abs(dy);
+      if (d <= sp) {
+        w.x = w.gx;
+        w.y = w.gy;
+        w.tx += w.mdx;
+        w.ty += w.mdy;
+        w.moving = false;
+        if (--w.steps <= 0) w.wait = 1.2 + Math.random() * 3.5;
+      } else {
+        w.x += Math.sign(dx) * sp;
+        w.y += Math.sign(dy) * sp;
+        w.walkT += dt * 1000;
+        continue;
+      }
+    }
+    if (w.wait > 0) {
+      w.wait -= dt;
+      if (w.say && w.wait <= 0) w.wait = 0.3; // stands while it speaks
+      continue;
+    }
+    if (w.steps <= 0) w.steps = 2 + Math.floor(Math.random() * 5);
+    if (!walkerTurn(w)) { w.wait = 1 + Math.random() * 2; w.steps = 0; continue; }
+    w.fdx = w.mdx;
+    w.fdy = w.mdy;
+    w.gx = (w.tx + w.mdx) * tile + tile / 2;
+    w.gy = (w.ty + w.mdy) * tile + tile - 4;
+    w.moving = true;
+  }
+}
+
+/** A walker as 연 draws it: an adventurer in its class's figure, or a mounted unit's own frames. */
+function drawTownWalker(w, now) {
+  let top = 64;
+  if (w.cls) {
+    if (!drawYhero2(w.cls, w.gear, w, w.x, w.y, w.moving ? 'walk' : 'idle', 1)) return;
+  } else {
+    const yu = yunit(w.m);
+    if (!yu) return;
+    const u = yu.u, dir = w.mdx ? 'side' : w.mdy < 0 ? 'up' : 'down';
+    const a = (w.moving ? u.anims['walk_' + dir] : u.anims['idle_' + dir]) || u.anims.walk_down;
+    if (!a) return;
+    const f = Math.floor((now * 1000 + w.seed) / a.ms) % a.n, s = w.def.scale || 1;
+    drawYunit(yu, w, w.x, w.y, s, 1, a.row, f, dir === 'side' && w.mdx > 0);
+    top = u.foot[1] * s - 4;
+  }
+  ctx.font = '8px G7';
+  ctx.textAlign = 'center';
+  outline(w.name, w.x, w.y + 10, '#c8e0ff');
+  if (w.say) drawBubble(w.say, w.x, w.y - top, w.sayT > 3.1 ? 1 + (w.sayT - 3.1) : 0);
+}
+
+
 /** The town's people of the area the hero is in, where they stand (feet). */
 function townFolk(area) {
   const yt = M.ui.ytown;
@@ -5840,10 +6142,16 @@ function enterTown(cls) {
   }
   const gear = savedGear(cls);
   const yt = M.ui.ytown;
-  const sp = yt ? yt.areas.market.spawn : [7.5 * TOWN_TILE, 5 * TOWN_TILE - 6];
+  const sp = yt ? townSpawn() : [7.5 * TOWN_TILE, 5 * TOWN_TILE - 6];
   T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: sp[0], y: sp[1], fdx: 0, fdy: yt ? -1 : 1, moving: false,
     walkT: 0, near: null, area: 'market' };
   T.folk = townFolk('market');
+  T.walkers = yt ? makeWalkers() : [];
+  // The gates' swirls drawn once now, as the town opens, not in the middle of a walk.
+  if (yt) {
+    for (const pt of townPortals()) portalSprite(pt.tint, pt.art === 'statue' ? 70 : 84, pt.art !== 'statue');
+    portalSprite(DOOR_TINT, 58, true);
+  }
   showScreen('town');
   audio.bgm('town');
   walletShown = '';
@@ -5857,7 +6165,7 @@ function townBlocked(x, y) {
     const tx = Math.floor(x / m.tile), ty = Math.floor((y - 2) / m.tile);
     if (tx < 0 || ty < 0 || tx >= m.cols || ty >= m.rows || m.walk[ty][tx] !== '.') return true;
     // The guardian statue stands on its base: the hero walks up to it, not through it.
-    if (T.area === 'market' && M.ui.ytown.portals.some(pt => pt.art === 'statue' && Math.abs(pt.x - x) < 16 && y < pt.y - 12 && y > pt.y - 40)) return true;
+    if (T.area === 'market' && townPortals().some(pt => pt.art === 'statue' && Math.abs(pt.x - x) < 16 && y < pt.y - 12 && y > pt.y - 40)) return true;
     return T.folk.some(n => Math.abs(n.x - x) < 14 && y > n.y - 14 && y < n.y + 6);
   }
   const tx = Math.floor(x / TOWN_TILE), ty = Math.floor((y - 4) / TOWN_TILE);
@@ -5867,6 +6175,7 @@ function townBlocked(x, y) {
 
 /** A portal's gate opens the hunting grounds of its region, its tab chosen. */
 function openPortal(tab) {
+  if (tab === 'training') return startTraining(T ? T.cls : chosenClass);
   showScreen('stages');
   const b = document.querySelector(`#map-tabs button[data-map="${tab}"]`);
   if (b) b.click();
@@ -5879,7 +6188,7 @@ function townWarps() {
   const on = (x, y) => Math.hypot(x - T.x, y - T.y) < WARP_R;
   let hit = null;
   if (T.area === 'market') {
-    for (const pt of yt.portals) if (Math.hypot(pt.x - T.x, pt.y - T.y) < (pt.r || WARP_R)) hit = () => openPortal(pt.tab);
+    for (const pt of townPortals()) if (Math.hypot(pt.x - T.x, pt.y - T.y) < (pt.r || WARP_R)) hit = () => openPortal(pt.tab);
     for (const d of yt.doors) {
       if (d.area === T.area && on(d.x, d.y)) {
         const ex = yt.exits[d.to] || { x: yt.areas[d.to].spawn[0], y: yt.areas[d.to].spawn[1] + 40 };
@@ -5918,6 +6227,8 @@ function updateTown(dt) {
     T.walkT += dt * 1000;
   }
   townWarps();
+  if (!T) return; // a gate taken (the training ground) leaves the town
+  updateWalkers(dt);
   updateCosPet(T, T, T.cls.id, dt, (TILE / 0.24) * (T.cls.speed / 70));
   townTiger(dt);
   townWallet();
@@ -5932,11 +6243,11 @@ function updateTown(dt) {
   }
 }
 
-/** A way out of town as 연 marks one: a 장승 by the road with the place's name, or the guardian
- * statue on its base; a door or a house's way out shows only its name. */
+/** A way out of town: a gate's swirl on the floor (연's 귀문) under its name plate, the guardian
+ * statue standing on its own; a door into a house or a house's way out, a smaller cool swirl. */
+const DOOR_TINT = 'hue-rotate(185deg) saturate(1.3)';
+const PLATE_UP = 94; // every gate's name plate at one height over the row (above the statue's head)
 function drawWayOut(pt, now) {
-  ctx.font = '8px G7';
-  ctx.textAlign = 'center';
   if (pt.art === 'statue') {
     const im = images['ytown/statue.png'];
     const fy = pt.y - 12;
@@ -5947,15 +6258,23 @@ function drawWayOut(pt, now) {
       ctx.fill();
       ctx.drawImage(im, Math.round(pt.x - im.width / 2), Math.round(fy - im.height));
     }
-    outline(pt.label, pt.x, fy + 10, '#ffd27a');
+    if (pt.sub !== undefined) portalPlate(pt.label, pt.sub, pt.x, pt.y - PLATE_UP, '#ffd27a');
+    else {
+      ctx.font = '8px G7';
+      ctx.textAlign = 'center';
+      outline(pt.label, pt.x, fy + 10, '#ffd27a');
+    }
     return;
   }
-  const sign = images['ytown/sign.png'];
-  if (pt.sign && sign && sign.width) {
-    const [sx, sy] = pt.sign;
-    ctx.drawImage(sign, Math.round(sx - sign.width / 2), Math.round(sy - sign.height));
-    outline(pt.label, sx, sy + 10, '#ffd27a');
-  } else outline(pt.label, pt.x, pt.y - 14, '#ffd27a');
+  if (pt.door) {
+    drawPortalFx(pt.x, pt.y, 58, DOOR_TINT, now + pt.x * 0.01, true);
+    ctx.font = '8px G7';
+    ctx.textAlign = 'center';
+    outline(pt.label, pt.x, pt.y - 60, '#bfe6ff');
+    return;
+  }
+  drawPortalFx(pt.x, pt.y, 84, pt.tint, now + pt.x * 0.01, true);
+  portalPlate(pt.label, pt.sub, pt.x, pt.y - PLATE_UP, '#ffd27a');
 }
 
 // 연's minimap at the top right: the area small, the hero, its people and the ways out on it.
@@ -5997,7 +6316,7 @@ function drawTownMinimap() {
     }
   };
   if (T.area === 'market') {
-    for (const pt of yt.portals) dot(pt.x, pt.y, '#ffb43a', 4 * d, pt.label.split(' · ')[0]);
+    for (const pt of townPortals()) dot(pt.x, pt.y, pt.tab === 'training' ? '#7aff8a' : '#ffb43a', 4 * d, pt.label);
     for (const dr of yt.doors) dot(dr.x, dr.y, '#7ad0ff', 3 * d, dr.label);
   } else if (yt.exits[T.area]) dot(yt.exits[T.area].x, yt.exits[T.area].y, '#7ad0ff', 3 * d, '장터');
   for (const n of T.folk) dot(n.x, n.y, '#ffe070', 3 * d, n.label);
@@ -6025,14 +6344,30 @@ function drawTown(now) {
   if (map && map.width) ctx.drawImage(map, 0, 0);
   if (yt) {
     if (T.area === 'market') {
-      for (const pt of yt.portals) if (pt.art !== 'statue') drawWayOut(pt, now);
-      for (const d of yt.doors) drawWayOut({ x: d.x, y: d.y + 4, label: d.label }, now);
-    } else if (yt.exits[T.area]) drawWayOut({ x: yt.exits[T.area].x, y: yt.exits[T.area].y + 4, label: '장터로' }, now);
+      // The statue's own gate swirl under it too (the statue itself stands among the bodies).
+      for (const pt of townPortals()) if (pt.art !== 'statue') drawWayOut(pt, now);
+      else if (pt.sub !== undefined) drawPortalFx(pt.x, pt.y - 6, 70, pt.tint, now, false);
+      for (const d of yt.doors) {
+        if (!d.pt) d.pt = { x: d.x, y: d.y + 4, label: d.label, door: true };
+        drawWayOut(d.pt, now);
+      }
+    } else if (yt.exits[T.area]) {
+      const ex = yt.exits[T.area];
+      if (!ex.pt) ex.pt = { x: ex.x, y: ex.y + 4, label: '장터로', door: true };
+      drawWayOut(ex.pt, now);
+    }
   }
   const bodies = T.folk.map(n => ({ n, y: n.y })).concat([{ hero: true, y: T.y }], T.cpet ? [{ cpet: T.cpet, y: T.cpet.y }] : [], T.tiger ? [{ tiger: T.tiger, y: T.tiger.y }] : []);
-  if (yt && T.area === 'market') for (const pt of yt.portals) if (pt.art === 'statue') bodies.push({ statue: pt, y: pt.y - 12 });
+  if (yt && T.area === 'market') {
+    for (const pt of townPortals()) if (pt.art === 'statue') bodies.push({ statue: pt, y: pt.y - 12 });
+    for (const w of T.walkers) bodies.push(w);
+  }
   bodies.sort((a, b) => a.y - b.y);
   for (const b of bodies) {
+    if (b.walker) {
+      drawTownWalker(b, now);
+      continue;
+    }
     if (b.statue) {
       drawWayOut(b.statue, now);
       continue;
@@ -6083,6 +6418,7 @@ window.__townWalk = (x, y) => !townBlocked(x, y);
 /** The town's shortcut buttons: an errand by the NPC's id, or the raid list. */
 function townErrand(id) {
   if (id === 'war') return War.openBoard();
+  if (id === 'training') return startTraining(T ? T.cls : chosenClass);
   if (id === 'coordi') return openCoordi();
   if (id === 'raid') {
     mapTab = 'raid';
@@ -6112,6 +6448,281 @@ function talk() {
     $('#equip').hidden = false;
   } else openTrade(n.id);
 }
+
+// ---------------------------------------------------------------- 수련장
+//
+// The town's training ground: a 허수아비 that never falls, and the class's spells to try on it one
+// at a time — the spell's name and what it does, its effect, the numbers of every blow over it,
+// and the damage it deals (each blow, a second over the last five seconds, all of it). Built on
+// the hunt itself (startRun with no cards and no crowd, G.dummy as window.__dummyBoss uses it), so
+// what is seen is what the spell does on a hunt. 연 has no 허수아비 of its own in the build: the
+// dummy is 연's own 장승 (the town's wooden post, ytown/sign.png).
+
+const TRAIN_WINDOW = 5; // seconds of the recent DPS
+const TRAIN_RING = 1024;
+const trainT = new Float64Array(TRAIN_RING), trainD = new Float64Array(TRAIN_RING);
+const TRAIN_KIND = { slash: '근접 연타', cleave: '정면 베기', nova: '주위 공격', screen: '화면 전체', spell: '마법', strike: '내려치기',
+  line: '직선 공격', blink: '이동 공격', buff: '강화', heal: '회복', summon: '소환', aura: '오라', passive: '패시브' };
+
+function startTraining(cls) {
+  chosenClass = cls;
+  // The first ground's floor, at its easiest; the dummy alone on it.
+  startRun(cls, { ...STAGES[0], level: 0, name: '국내성 수련장', intro: '허수아비는 쓰러지지 않습니다. 왼쪽에서 기술을 골라 시험해 보세요.' }, true);
+}
+
+/** The class's spells for the panel: all of them (a locked one marked), the 필살기 apart. */
+function trainSkills(cls) {
+  return Object.entries(SKILLS).filter(([, d]) => (d.cls === cls.id || d.cls === 'all') && d.kind !== 'ult' && d.kind !== 'passive')
+    .sort((a, b) => (a[1].promo || 0) - (b[1].promo || 0) || skillReq(a[1]) - skillReq(b[1])).map(([id]) => id);
+}
+
+function setupTraining() {
+  const p = G.player, rec = best[G.cls.id];
+  G.training = { id: null, lv: MAX_SKILL_LEVEL, auto: true, total: 0, other: 0, n: 0, max: 0, last: 0, t0: G.t, head: 0, len: 0, shown: '' };
+  G.dummy = true; // spawn() adds no one (as window.__dummyBoss)
+  G.bossDue = false;
+  G.pendingLevels = 0;
+  G.firstCard = false;
+  G.skills = [];
+  // The hero at its best level (its spells' reach and the 격 grow with it).
+  p.lvl = Math.max(1, rec ? rec.lvl : 1);
+  p.next = xpFor(p.lvl);
+  $('#speed-btn').hidden = true;
+  placeDummy();
+  $('#train').hidden = false;
+  buildTrainPanel();
+}
+
+/** The dummy beside the hero, the hero turned to it. */
+function placeDummy() {
+  const p = G.player;
+  for (const e of G.enemies.slice()) { G.enemies.splice(G.enemies.indexOf(e), 1); leave(e); }
+  const im = images['ytown/sign.png'];
+  const m = { id: 'dummy', name: '허수아비', img: im, w: im ? im.width : 40, h: im ? im.height : 80, area: 3000, rank: 0, pages: [] };
+  m.area = m.w * m.h;
+  let at = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0]]) if (free(p.tx + dx, p.ty + dy)) { at = [p.tx + dx, p.ty + dy]; break; }
+  if (!at) return null;
+  const e = addEnemy(m, 'boss', { name: '수련장 허수아비', scale: 0.8 }, 0, at);
+  if (!e) return null;
+  e.hp = e.maxHp = 1e12;
+  e.still = true;
+  e.temper = 'normal';
+  // Turned toward it, so a blow that goes ahead of the hero lands.
+  const dx = at[0] - p.tx, dy = at[1] - p.ty;
+  p.fdx = Math.sign(dx);
+  p.fdy = dx ? 0 : Math.sign(dy);
+  if (p.fdx) p.face = p.fdx;
+  return e;
+}
+
+/** Each blow on the dummy (from tally): the spell's own, or another's (a 격, a summon). */
+function trainHit(d, other) {
+  const tr = G.training;
+  if (!(d > 0)) return;
+  if (other) { tr.other += d; return; }
+  tr.total += d;
+  tr.n++;
+  tr.last = d;
+  if (d > tr.max) tr.max = d;
+  const i = (tr.head + tr.len) % TRAIN_RING;
+  trainT[i] = G.t;
+  trainD[i] = d;
+  if (tr.len < TRAIN_RING) tr.len++;
+  else tr.head = (tr.head + 1) % TRAIN_RING;
+}
+
+/** The meter back to nothing (and the dummy back in its place). */
+function trainReset(replace = true) {
+  const tr = G.training;
+  tr.total = tr.other = tr.n = tr.max = tr.last = 0;
+  tr.head = tr.len = 0;
+  tr.t0 = G.t;
+  tr.shown = '';
+  tr.shownAt = -9;
+  G.dealt = { all: 0, big: 0, ally: 0 };
+  // What the last spell still had on its way (its later hits, its arrows, its pictures) goes with
+  // it: those blows would count for the next.
+  timers.length = 0;
+  G.shots.length = 0;
+  G.fxs.length = 0;
+  G.texts.length = 0;
+  G.chainRun = null;
+  if (replace) placeDummy();
+  const s = G.skills[0];
+  if (s) {
+    s.timer = G.training.auto ? 0.15 : 1e9;
+    s.readyAt = 0;
+  }
+}
+
+/** Picks the spell to try (and its 단): it alone in the hero's hands, cast at once. */
+function trainPick(id, lv) {
+  const tr = G.training, d = SKILLS[id];
+  if (!d) return;
+  tr.id = id;
+  if (lv) tr.lv = lv;
+  const level = d.evolved ? 1 : Math.max(1, Math.min(MAX_SKILL_LEVEL, tr.lv));
+  G.skills = [{ id, lv: level, timer: 0 }];
+  G.buffs.power = G.buffs.stealth = G.buffs.guard = G.buffs.shield = G.buffs.haste = 0;
+  G.ambush = null;
+  trainReset(false);
+  if (!tr.auto) trainCast();
+  syncTrainPanel();
+}
+
+/** Casts the spell now (the 시전 key with 자동 off): once its wait is over. */
+function trainCast() {
+  const s = G.skills[0];
+  if (!s || G.paused) return;
+  if (G.t < (s.readyAt || 0)) return;
+  s.timer = 0;
+  fireSkill(s, 1);
+  if (!G.training.auto) { s.readyAt = G.t + (s.cdMax || 1); s.timer = 1e9; }
+}
+
+function buildTrainPanel() {
+  const box = $('#train-skills');
+  box.innerHTML = '';
+  const tier = promoOf(G.cls.id);
+  for (const id of trainSkills(G.cls)) {
+    const d = SKILLS[id], b = document.createElement('button');
+    b.className = 'tsk' + ((d.promo || 0) > tier ? ' locked' : '');
+    b.dataset.id = id;
+    b.title = d.name;
+    b.append(skillIcon(id, d.fxs ? d.fxs[d.fxs.length - 1] : d.fx));
+    const n = document.createElement('span');
+    n.textContent = d.name;
+    b.append(n);
+    b.onclick = () => trainPick(id);
+    box.append(b);
+  }
+  const lv = $('#train-lv');
+  lv.innerHTML = '';
+  for (let i = 1; i <= MAX_SKILL_LEVEL; i++) {
+    const b = document.createElement('button');
+    b.textContent = i + '단';
+    b.dataset.lv = i;
+    b.onclick = () => { if (G.training.id) trainPick(G.training.id, i); else { G.training.lv = i; syncTrainPanel(); } };
+    lv.append(b);
+  }
+  $('#train-cls').textContent = `${G.cls.name} · ${tier ? tier + '차 승급' : '승급 전'} · Lv ${G.player.lvl}`;
+  $('#train-meter').innerHTML = '';
+  syncTrainPanel();
+}
+
+/** The chosen spell's card: its name at that 단, what it is, its numbers. */
+function syncTrainPanel() {
+  const tr = G.training, id = tr.id, d = id && SKILLS[id];
+  for (const b of $('#train-skills').children) b.classList.toggle('on', b.dataset.id === id);
+  for (const b of $('#train-lv').children) b.classList.toggle('on', +b.dataset.lv === tr.lv);
+  $('#train-auto').textContent = tr.auto ? '자동 시전: 켬' : '자동 시전: 끔';
+  $('#train-cast').hidden = tr.auto;
+  if (!d) {
+    $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>허수아비에게 쓰면 이펙트와 피해 숫자가 나옵니다. 아직 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
+    return;
+  }
+  const s = G.skills[0], st = stats(s), tier = promoOf(G.cls.id);
+  const tags = [TRAIN_KIND[d.kind] || d.kind];
+  if (d.elem && ELEMENTS[d.elem]) tags.push(ELEMENTS[d.elem][0] + ' 속성');
+  if (d.promo) tags.push(d.promo + '차 승급' + (d.promo > tier ? ' 필요 (잠김)' : ''));
+  if (d.evolved) tags.push('완성 기술');
+  const nums = [];
+  if (st.dmg) nums.push(`위력 ${st.dmg.toFixed(1)}`);
+  nums.push(`재사용 ${st.cd.toFixed(1)}초`);
+  if (st.range) nums.push(`사거리 ${st.range}칸`);
+  if (st.radius) nums.push(`범위 ${st.radius}칸`);
+  if (st.count > 1 && st.dmg) nums.push(`대상 ${st.count}`);
+  if (st.duration) nums.push(`지속 ${st.duration.toFixed(1)}초`);
+  if (st.heal) nums.push(`회복 ${Math.round(st.heal)}`);
+  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  $('#train-info').innerHTML = `<b>${esc(skillName(id, s.lv))}</b> <small>${d.evolved ? '' : s.lv + '단'}</small>`
+    + `<em>${tags.map(esc).join(' · ')}</em><p>${esc(d.desc || '')}</p><i>${nums.join(' · ')}</i>`
+    + (st.dmg ? '' : '<p class="note">피해를 주지 않는 기술: 효과만 볼 수 있습니다.</p>');
+}
+
+/** How far the view moves over for the panel at its left (world pixels; measured when it changes). */
+function trainShift() {
+  const el = $('#train'), w = el.hidden ? 0 : el.offsetWidth, cw = canvas.clientWidth || 1;
+  const tr = G.training;
+  if (tr.shiftW !== w || tr.shiftCw !== cw) { tr.shiftW = w; tr.shiftCw = cw; tr.shift = Math.round((w + 8) / 2 * VW / cw); }
+  return tr.shift;
+}
+
+/** The meter, four times a second: the last blow, the recent and the whole DPS, the total. */
+function trainTick() {
+  const tr = G.training;
+  if (G.t - (tr.shownAt === undefined ? -9 : tr.shownAt) < 0.25) return;
+  tr.shownAt = G.t;
+  let recent = 0;
+  const from = G.t - TRAIN_WINDOW;
+  for (let k = 0; k < tr.len; k++) {
+    const i = (tr.head + k) % TRAIN_RING;
+    if (trainT[i] >= from) recent += trainD[i];
+  }
+  const span = Math.max(0.5, G.t - tr.t0);
+  const dps = recent / Math.min(TRAIN_WINDOW, span), avg = tr.total / span;
+  const s = G.skills[0];
+  const wait = s && !tr.auto ? Math.max(0, (s.readyAt || 0) - G.t) : 0;
+  const html = `<div class="wide"><span>초당 피해 (최근 ${TRAIN_WINDOW}초)</span><b class="hot">${shownNum(dps)}</b></div>`
+    + `<div><span>마지막</span><b>${shownNum(tr.last)}</b></div>`
+    + `<div><span>최대</span><b>${shownNum(tr.max)}</b></div>`
+    + `<div><span>타수</span><b>${tr.n}</b></div>`
+    + `<div><span>평균 DPS</span><b>${shownNum(avg)}</b></div>`
+    + `<div class="wide"><span>총 피해 (${span.toFixed(1)}초)</span><b>${shownNum(tr.total)}</b></div>`
+    + (tr.other ? `<div class="wide"><span>그 외 (격·소환)</span><b>${shownNum(tr.other)}</b></div>` : '');
+  if (html !== tr.shown) {
+    tr.shown = html;
+    $('#train-meter').innerHTML = html;
+  }
+  const c = $('#train-cast');
+  const label = wait > 0 ? `시전 (${wait.toFixed(1)}초)` : '시전';
+  if (c.textContent !== label) c.textContent = label;
+}
+
+/** Back to town from the training ground: nothing of it is kept (no record, no spoils). */
+function leaveTraining() {
+  const cls = G.cls;
+  G = null;
+  $('#train').hidden = true;
+  $('#pause').hidden = true;
+  enterTown(cls);
+  // Back at the training ground's gate, not at the town's middle.
+  const pt = townPortals().find(x => x.tab === 'training');
+  if (pt && T) { T.x = pt.x; T.y = pt.y + 50; T.fdx = 0; T.fdy = -1; T.warpLock = true; }
+}
+
+$('#train-reset').onclick = () => { if (G && G.training) trainReset(); };
+$('#train-auto').onclick = () => {
+  if (!G || !G.training) return;
+  const tr = G.training;
+  tr.auto = !tr.auto;
+  const s = G.skills[0];
+  if (s) { s.timer = tr.auto ? 0 : 1e9; s.readyAt = 0; }
+  syncTrainPanel();
+};
+$('#train-cast').onclick = () => { if (G && G.training) trainCast(); };
+$('#train-ult').onclick = () => {
+  if (!G || !G.training) return;
+  G.player.mp = G.player.maxMp;
+  G.ultAt = undefined;
+  castUlt();
+};
+$('#train-close').onclick = () => { if (G && G.training) leaveTraining(); };
+
+// Test: the training ground (a class by its index), a spell picked, the meter as numbers.
+window.__training = c => startTraining(CLASSES[c]);
+window.__trainPick = (id, lv) => trainPick(id, lv);
+window.__trainSkills = () => (G && G.training ? trainSkills(G.cls) : []);
+window.__trainRead = () => {
+  const tr = G && G.training;
+  if (!tr) return null;
+  let recent = 0;
+  for (let k = 0; k < tr.len; k++) { const i = (tr.head + k) % TRAIN_RING; if (trainT[i] >= G.t - TRAIN_WINDOW) recent += trainD[i]; }
+  return { id: tr.id, lv: G.skills[0] && G.skills[0].lv, n: tr.n, total: tr.total, max: tr.max, last: tr.last, other: tr.other,
+    recentDps: recent / Math.min(TRAIN_WINDOW, Math.max(0.5, G.t - tr.t0)), t: G.t - tr.t0, fxs: G.fxs.length,
+    dummy: G.enemies.filter(e => e.still).length, texts: G.texts.filter(t => t.num).length };
+};
 
 // ---------------------------------------------------------------- 의뢰 and 칭호
 //
@@ -7918,6 +8529,7 @@ function showResults(title) {
 }
 
 function leaveHunt() {
+  if (G && G.training) return leaveTraining();
   if (G) {
     if (!G.over) gatherGear();
     record();
@@ -8462,7 +9074,9 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   ctx.globalAlpha = alpha;
   // The layers composited once per frame and kept: six draws from big sheets each frame (연's
   // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
-  const key = cls.id + JSON.stringify(want) + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
+  // (The worn looks' part of the key made once per look, not each frame: the town's walkers too.)
+  if (b.yvKeyOf !== want || b.yvKeyCls !== cls.id) { b.yvKeyOf = want; b.yvKeyCls = cls.id; b.yvKey = cls.id + JSON.stringify(want); }
+  const key = b.yvKey + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
     + (dz ? '|d' + dz.tint + (dz.pal || '') : '');
   let pic = heroFrames.get(key);
   if (!pic) {
@@ -9048,6 +9662,8 @@ function render(now) {
   let camX = Math.round(p.x - VW / 2), camY = Math.round(p.y - 30 - VH / 2);
   // 대항전 (war.js): the camera stays on the battlefield's map.
   if (G.war) [camX, camY] = War.cam(camX, camY);
+  // 수련장: the hero and the dummy in the middle of what the panel leaves free.
+  if (G.training) camX -= trainShift();
   if (G.shake > 0) {
     // Harder blows shake harder.
     const a = Math.min(5, 1 + G.shake * 12);
@@ -9712,7 +10328,7 @@ function syncUlt() {
   put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock((G.stage.raid ? RAID_BOSS_AT : BOSS_AT) - G.t)}`
     : G.stage.raid && !G.cleared ? `남은 시간 ${clock(Math.max(0, RAID_LIMIT - G.t))}` : '');
   // The boss's bar across the top, as a raid shows it: also for leaders on any ground.
-  const big = G.enemies.find(e => e.kind === 'boss') || G.enemies.find(e => e.kind === 'mini');
+  const big = G.training ? null : G.enemies.find(e => e.kind === 'boss') || G.enemies.find(e => e.kind === 'mini');
   $('#bossbar').hidden = !big;
   if (big) {
     put('#bb-name', big.name + (G.stage.raid ? ['', ' · 분노', ' · 광폭'][G.phase || 0] : ''));
