@@ -64,6 +64,20 @@
   /* The class list scrolls when it is taller than the screen (eleven classes on a short phone). */
   #select { overflow-y: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; }
   #classes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: min(100%, 820px); }
+  /* 동료 설정: the classes as cards, like 직업 선택; the picked ones marked with their order. */
+  #party-pick { position: fixed; inset: 0; z-index: 26; background: rgba(10, 12, 20, 0.92); display: flex; flex-direction: column;
+    align-items: center; gap: 4px; padding: 6px 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #party-pick[hidden] { display: none; }
+  #party-pick h2 { margin: 0; color: #ffd27a; font-size: 16px; }
+  #party-pick p { margin: 0; font: 11px G9, monospace; color: #e8d8b0; text-align: center; }
+  #pp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 5px; width: min(100%, 1100px); }
+  #pp-cards .card { position: relative; }
+  #pp-cards .card.on { outline: 3px solid #ffcf3a; box-shadow: 0 0 10px #ffcf3a; }
+  #pp-cards .card.me { opacity: 0.45; }
+  #pp-cards .card i { position: absolute; top: 4px; left: 6px; font: bold 18px G9, monospace; font-style: normal; color: #fff;
+    background: #c02010; border-radius: 50%; width: 24px; height: 24px; line-height: 24px; }
+  #pp-cards .card .slot { height: 70px; }
+  #pp-cards .card .hero { height: 62px; image-rendering: pixelated; }
   .card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; text-align: center; }
   .card .slot { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 78px;
       background: url(assets/ui/wback.png) center 70% / cover; border: 1px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
@@ -699,6 +713,12 @@
   </div>
 </div>
 
+<div id="party-pick" hidden>
+  <h2>동료 설정</h2>
+  <p id="pp-note"></p>
+  <div id="pp-cards"></div>
+  <div class="row"><button id="pp-clear" class="btn">모두 빼기</button><button id="pp-close" class="btn">닫기</button></div>
+</div>
 <div id="trade" hidden>
   <div id="trade-box">
     <div class="caption"><span id="trade-title"></span> <small id="trade-gold"></small></div>
@@ -758,7 +778,7 @@
   <div id="train-lv"></div>
   <div id="train-info"></div>
   <div id="train-meter"></div>
-  <div class="row"><button id="train-auto" class="btn"></button><button id="train-cast" class="btn" hidden>시전</button><button id="train-ult" class="btn">필살기</button><button id="train-reset" class="btn">초기화</button></div>
+  <div class="row"><button id="train-auto" class="btn"></button><button id="train-cast" class="btn" hidden>시전</button><button id="train-plain" class="btn"></button><button id="train-ult" class="btn">필살기</button><button id="train-reset" class="btn">초기화</button></div>
 </div>
 
 <div id="side" hidden><div id="panel">

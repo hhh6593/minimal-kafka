@@ -463,10 +463,16 @@ function buildSelect() {
 }
 
 /** A class's look as saved (gear and 코디), standing facing down: a data URL, or null without 연's heroes. */
+const lookPics = new Map();
 async function lookPicture(cls) {
   const H = M.yhero2 && M.yhero2[cls.id];
   if (!H) return null;
   const want = yGearVariants(cls, savedGear(cls) || {});
+  const key = cls.id + JSON.stringify(want);
+  if (!lookPics.has(key)) lookPics.set(key, drawLook(cls, H, want));
+  return lookPics.get(key);
+}
+async function drawLook(cls, H, want) {
   const sheets = {};
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind] && H.layers[kind][v];
@@ -5455,10 +5461,11 @@ function cast(skill, st) {
  * makes it stronger.
  */
 function plainAttack(dt) {
-  if (G.training) return; // 수련장: only the spell being tried strikes the dummy
+  // 수련장: the plain swing only when its key is on (to try the weapon's 격), and then always.
+  if (G.training && !G.training.plain) return;
   const p = G.player;
   p.atkT = (p.atkT || 0) - dt;
-  if (p.atkT > 0 || G.t - (G.lastHit || -9) < 1.5) return;
+  if (p.atkT > 0 || (!G.training && G.t - (G.lastHit || -9) < 1.5)) return;
   if (G.buffs.stealth > G.t) return; // 투명: no plain swing gives the hero away
   const t = [[p.tx, p.ty], ...DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy])]
     .map(([x, y]) => occ.get(key(x, y))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
@@ -6524,7 +6531,7 @@ function trainSkills(cls) {
 
 function setupTraining() {
   const p = G.player, rec = best[G.cls.id];
-  G.training = { id: null, lv: MAX_SKILL_LEVEL, auto: true, total: 0, other: 0, n: 0, max: 0, last: 0, t0: G.t, head: 0, len: 0, shown: '' };
+  G.training = { id: null, lv: MAX_SKILL_LEVEL, auto: true, plain: false, total: 0, other: 0, n: 0, max: 0, last: 0, t0: G.t, head: 0, len: 0, shown: '' };
   G.dummy = true; // spawn() adds no one (as window.__dummyBoss)
   G.bossDue = false;
   G.pendingLevels = 0;
@@ -6587,6 +6594,7 @@ function trainReset(replace = true) {
   tr.shown = '';
   tr.shownAt = -9;
   G.dealt = { all: 0, big: 0, ally: 0 };
+  G.gyeokCount = {};
   // What the last spell still had on its way (its later hits, its arrows, its pictures) goes with
   // it: those blows would count for the next.
   timers.length = 0;
@@ -6663,6 +6671,7 @@ function syncTrainPanel() {
   for (const b of $('#train-skills').children) b.classList.toggle('on', b.dataset.id === id);
   for (const b of $('#train-lv').children) b.classList.toggle('on', +b.dataset.lv === tr.lv);
   $('#train-auto').textContent = tr.auto ? '자동 시전: 켬' : '자동 시전: 끔';
+  $('#train-plain').textContent = tr.plain ? '기본 공격: 켬' : '기본 공격: 끔';
   $('#train-cast').hidden = tr.auto;
   if (!d) {
     $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>송백인형에게 쓰면 이펙트와 피해 숫자가 나옵니다. 아직 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
@@ -6716,7 +6725,8 @@ function trainTick() {
     + `<div><span>타수</span><b>${tr.n}</b></div>`
     + `<div><span>평균 DPS</span><b>${shownNum(avg)}</b></div>`
     + `<div class="wide"><span>총 피해 (${span.toFixed(1)}초)</span><b>${shownNum(tr.total)}</b></div>`
-    + (tr.other ? `<div class="wide"><span>그 외 (격·소환)</span><b>${shownNum(tr.other)}</b></div>` : '');
+    + (tr.other ? `<div class="wide"><span>그 외 (격·소환)</span><b>${shownNum(tr.other)}</b></div>` : '')
+    + trainGyeokLine();
   if (html !== tr.shown) {
     tr.shown = html;
     $('#train-meter').innerHTML = html;
@@ -6748,6 +6758,17 @@ $('#train-auto').onclick = () => {
   syncTrainPanel();
 };
 $('#train-cast').onclick = () => { if (G && G.training) trainCast(); };
+$('#train-plain').onclick = () => {
+  if (!G || !G.training) return;
+  G.training.plain = !G.training.plain;
+  syncTrainPanel();
+};
+/** The 격 that went off since the reset, by name and count (skills and the plain swing both set them off). */
+function trainGyeokLine() {
+  const n = Object.entries(G.gyeokCount || {}).filter(([, k]) => k);
+  if (!n.length) return '';
+  return `<div class="wide"><span>격 발동</span><b>${n.map(([id, k]) => `${(GYEOK[id] && GYEOK[id].name) || id} ${k}회`).join(' · ')}</b></div>`;
+}
 $('#train-ult').onclick = () => {
   if (!G || !G.training) return;
   G.player.mp = G.player.maxMp;
@@ -10630,32 +10651,33 @@ $('#opt-sfx').onclick = () => {
   syncSettings();
 };
 $('#opt-party-pick').onclick = () => openPartyPick();
-/** 동료 설정: who joins in 동료 모드, in order (up to three); an empty place goes to a class at random. */
+/** 동료 설정: who joins in 동료 모드, in order (up to three); an empty place goes to a class at random.
+ *  The classes as cards like 직업 선택's, each in its own look; a tap puts it in or takes it out. */
 function openPartyPick() {
-  const box = $('#trade-rows'), picks = (settings.partyPick || []).slice();
+  const box = $('#pp-cards'), picks = (settings.partyPick || []).slice();
+  $('#pp-note').textContent = `고른 동료 ${picks.length}/3 · 빈 자리는 무작위 · 사냥 중 레벨 3·9·15에 고른 순서대로 합류`
+    + (chosenClass ? ` · 지금 직업(${chosenClass.name})은 빠집니다` : '');
   box.innerHTML = '';
-  $('#trade-title').textContent = '동료 설정';
-  $('#trade-gold').textContent = `고른 동료 ${picks.length}/3 · 빈 자리는 무작위`;
   for (const c of CLASSES) {
     const at = picks.indexOf(c.id), pr = promoOf(c.id), rec = best[c.id];
-    const r = document.createElement('div');
-    r.className = 'trade-row';
-    r.innerHTML = `<div><b>${at >= 0 ? `${at + 1}. ` : ''}${c.name}</b><span>${rec ? `최고 Lv ${rec.lvl}` : '기록 없음'}${pr ? ` · ${pr}차 승급` : ''}`
-      + `${rec || pr ? ' · 함께 깬 사냥터는 이 직업 기록에도' : ''}</span></div>`;
     const b = document.createElement('button');
-    b.className = 'btn';
-    b.textContent = at >= 0 ? '빼기' : '넣기';
+    b.className = 'card' + (at >= 0 ? ' on' : '') + (chosenClass && chosenClass.id === c.id ? ' me' : '');
+    b.innerHTML = `${at >= 0 ? `<i>${at + 1}</i>` : ''}<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
+      <b>${c.name}</b><em>${PARTY[c.id] ? PARTY[c.id].role : ''}</em>
+      <small>${rec ? `최고 Lv ${rec.lvl}` : '기록 없음'}${pr ? ` · ${pr}차 승급` : ''}</small>`;
     b.disabled = at < 0 && picks.length >= 3;
     b.onclick = () => {
       settings.partyPick = at >= 0 ? picks.filter(x => x !== c.id) : picks.concat(c.id);
       saveJson('bs_settings', settings);
       openPartyPick();
     };
-    r.append(b);
-    box.append(r);
+    box.append(b);
+    lookPicture(c).then(url => { if (url) b.querySelector('.hero').src = url; });
   }
-  $('#trade').hidden = false;
+  $('#party-pick').hidden = false;
 }
+$('#pp-close').onclick = () => { $('#party-pick').hidden = true; };
+$('#pp-clear').onclick = () => { settings.partyPick = []; saveJson('bs_settings', settings); openPartyPick(); };
 $('#opt-party').onclick = () => {
   settings.party = !settings.party;
   saveJson('bs_settings', settings);
