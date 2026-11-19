@@ -12,7 +12,7 @@ import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, cost
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
-  RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
+  RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
 } from './items.js';
 import {
@@ -8493,8 +8493,9 @@ function classicSheet(im, path, name, H, meta) {
   try { d = sg.getImageData(0, 0, im.width, im.height); } catch (e) { return null; }
   const p = d.data, W = im.width;
   const skin = i => p[i] > 170 && p[i + 1] > 115 && p[i + 1] < 228 && p[i + 2] < 175 && p[i] - p[i + 2] > 45;
-  // The picture's own line: its handle the bottom middle, its tip the top.
-  const ph = pic.height, pw = pic.width;
+  // The picture's own line (CLASSIC_AXIS), else upright with its handle at the bottom.
+  const ax = CLASSIC_AXIS[name] || [pic.width / 2, pic.height, pic.width / 2, 0];
+  const pl = Math.hypot(ax[2] - ax[0], ax[3] - ax[1]), pa = Math.atan2(ax[3] - ax[1], ax[2] - ax[0]);
   const trail = document.createElement('canvas'), hand = document.createElement('canvas');
   trail.width = hand.width = W;
   trail.height = hand.height = im.height;
@@ -8528,20 +8529,24 @@ function classicSheet(im, path, name, H, meta) {
     // The hand's end: nearer the body's middle (the feet, half a body up).
     const bx = x0 + ffx, by = y0 + ffy - 24;
     const [grip, tip] = Math.hypot(A[0] - bx, A[1] - by) <= Math.hypot(B[0] - bx, B[1] - by) ? [A, B] : [B, A];
+    // (A rod 연 holds pointing down, turned up about the hand: the old staff by the shoulder.)
+    if (ax[5] && tip[1] > grip[1]) tip[1] = grip[1] - (tip[1] - grip[1]);
     // (Never shorter than CLASSIC_MIN: 연's rods are short, old 바람's staffs stand to the shoulder.)
     const dl = Math.max(1, Math.hypot(tip[0] - grip[0], tip[1] - grip[1]));
-    const len = Math.max(CLASSIC_MIN, dl * CLASSIC_REACH);
+    const len = Math.max(CLASSIC_MIN * (ax[4] || 1), dl * CLASSIC_REACH * (ax[4] || 1));
     // a short drawing lengthened: the grip stays, the tip goes out along the same line
-    if (len > dl * CLASSIC_REACH) { tip[0] = grip[0] + (tip[0] - grip[0]) * len / (dl * CLASSIC_REACH); tip[1] = grip[1] + (tip[1] - grip[1]) * len / (dl * CLASSIC_REACH); }
-    const k = len / ph, ang = Math.atan2(tip[1] - grip[1], tip[0] - grip[0]) + Math.PI / 2;
+    { const r = len / dl; tip[0] = grip[0] + (tip[0] - grip[0]) * r; tip[1] = grip[1] + (tip[1] - grip[1]) * r; }
+    const k = len / pl, ang = Math.atan2(tip[1] - grip[1], tip[0] - grip[0]);
     g.save();
     g.beginPath();
     g.rect(x0, y0, cw, ch);
     g.clip();
-    // The grip a fifth of the way up the picture from its handle's end.
+    // The handle's end a little behind the hand, the tip out along 연's line.
     g.translate(grip[0] + (tip[0] - grip[0]) * -0.18, grip[1] + (tip[1] - grip[1]) * -0.18);
-    g.rotate(ang);
-    g.drawImage(pic, -pw * k / 2, -ph * k, pw * k, ph * k);
+    g.rotate(ang - pa);
+    g.scale(k, k);
+    g.translate(-ax[0], -ax[1]);
+    g.drawImage(pic, 0, 0);
     g.restore();
   }
   g.drawImage(hand, 0, 0);

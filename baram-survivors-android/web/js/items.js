@@ -435,9 +435,19 @@ export const ABYSS_UNIQUES = [
 // weapon 연 draws for them that suits them (금홍단봉, 청월표창, 신일태도 are old 바람's too; the
 // 도깨비 the 청룡의검, the 창술사 the long 흑단화염장). The 궁사 and 권사 have no old weapon 연 draws:
 // their 일본 line's (흑일 bow, 섬월권갑).
-// The first four wear old 바람's own picture of the weapon (TAECHO_CLASSIC: the item render, no 성),
+// The first four wear old 바람's own picture of the weapon (TAECHO_CLASSIC: its old item picture, one only),
 // laid each frame along where 연's drawing of it is held (game.js classicSheet), so it swings as 연's.
-export const TAECHO_CLASSIC = { warrior: '진일신검', rogue: '청일기창', mage: '황염곤봉', poet: '적염곤봉' };
+// (Off: laid by machine the old pictures did not sit well in 연's hands, so 태초 wears 연's own
+// drawing of the weapon. Fill this in to bring them back.)
+export const TAECHO_CLASSIC = {};
+// Each old picture's line, in its own pixels: [handle's end x, y, tip x, y, size, up] (they lie every
+// way: the spear and staff flat, the sword and the rod aslant). size: against 연's weapon's length
+// (진일신검's lightning blade spreads wide, so less); up: the tip turned upward where 연 holds the
+// weapon pointing down (the 주술사's rod), so the old staff stands by the shoulder, not behind the body.
+export const CLASSIC_AXIS = {
+  '진일신검1성': [39, 28, 9, 0, 0.62, false], '청일기창1성': [105, 5, 0, 5, 1, false],
+  '황염곤봉1성': [83, 9, 0, 9, 1, true], '적염곤봉1성': [2, 31, 21, 0, 1, false],
+};
 export const TAECHO_BASE = {
   warrior: [1171, '진일신검'], rogue: [1272, '청일기창'], mage: [1372, '황염곤봉'], poet: [1471, '적염곤봉'],
   archer: [220077, "극'흑일신궁"], lancer: [1324, '흑단화염장'], monk: [70025, '섬월권갑'], magus: [330064, '금홍단봉'],
