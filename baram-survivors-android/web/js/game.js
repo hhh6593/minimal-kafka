@@ -5076,6 +5076,16 @@ function updatePet(dt) {
   }
   tigerFollow(pet, p.x, p.y, p.moving ? p.fdx : 0, !!G.cpet, heroSpeed(), dt);
 }
+/** The town's purse at the top: 전 and 레이드주화, kept current every frame (they were written
+ *  once on entering town, so what the smith, the shop, 코디 or 뽑기 spent did not show). */
+let walletShown = '';
+function townWallet() {
+  const g = progress.gold || 0, c = progress.coins || 0, key = g + '/' + c;
+  if (key === walletShown) return;
+  walletShown = key;
+  $('#town-gold').textContent = `${won(g)}`;
+  if ($('#town-coins')) $('#town-coins').textContent = `레이드주화 ${c.toLocaleString()}`;
+}
 /** In town too, 백호환령부's tiger walks at the hero's heel (it was seen only on the hunting grounds). */
 function townTiger(dt) {
   if (savedGear(T.cls).capeSp !== 'cr_sinsu_baekho' || !M.fx.g_pet_baekho) { T.tiger = null; return; }
@@ -5240,7 +5250,8 @@ function enterTown(cls) {
   T.folk = townFolk('market');
   showScreen('town');
   audio.bgm('town');
-  $('#town-gold').textContent = `${won(progress.gold || 0)}`;
+  walletShown = '';
+  townWallet();
   $('#town-name').textContent = `국내성 · ${cls.name}`;
 }
 
@@ -5313,6 +5324,7 @@ function updateTown(dt) {
   townWarps();
   updateCosPet(T, T, T.cls.id, dt, (TILE / 0.24) * (T.cls.speed / 70));
   townTiger(dt);
+  townWallet();
   // Who is close enough to talk to: the nearest within reach (across a shop's counter in a house).
   const reach = M.ui.ytown ? (T.area === 'market' ? 52 : 84) : TOWN_TILE * 1.6;
   const near = T.folk.map(n => [n, Math.hypot(n.x - T.x, n.y - T.y)]).filter(([, d]) => d < reach)

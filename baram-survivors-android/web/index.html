@@ -191,6 +191,7 @@
   .town-top { display: flex; justify-content: space-between; padding: 2px 8px; font-weight: 700; color: #f6e6c0;
       background: rgba(30, 16, 8, .85); border: 1px solid #a0602a; align-self: center; gap: 24px; }
   #town-gold { color: #ffe070; }
+  #town-coins { color: #9fd8ff; margin-left: 10px; }
   #town-back { position: absolute; left: max(8px, env(safe-area-inset-left)); bottom: 8px; min-width: 0; }
   .town-tip { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); white-space: nowrap;
       font: 10px G9, monospace; color: #f6e6c0; text-shadow: 1px 1px 0 #000;
@@ -620,7 +621,7 @@
 </div>
 
 <div id="town" class="screen" hidden>
-  <div class="town-top"><span id="town-name"></span><span id="town-gold"></span></div>
+  <div class="town-top"><span id="town-name"></span><span id="town-gold"></span><span id="town-coins"></span></div>
   <button id="town-back" class="btn">직업 선택</button>
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
   <button id="talk" class="btn" hidden></button>
