@@ -984,7 +984,7 @@ function nearest(W, b, r) {
   let best = null, bd = r;
   for (const e of W.alive[1 - b.team]) {
     if (e.gate) continue;
-    if (e.hero && A.G().buffs.stealth > A.G().t) continue;
+    if (unseenHid(e)) continue;
     const d = d2(b, e);
     if (d <= bd && !unseen(W, b, e, d)) { bd = d; best = e; }
   }
@@ -1002,7 +1002,7 @@ function pickFoe(W, b, r) {
   let best = null, bs = 1e9;
   for (const e of W.alive[1 - b.team]) {
     if (e.gate) continue;
-    if (e.hero && G.buffs.stealth > G.t) continue;
+    if (unseenHid(e)) continue;
     const d = d2(b, e);
     if (d > r || unseen(W, b, e, d)) continue;
     const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
@@ -1012,6 +1012,8 @@ function pickFoe(W, b, r) {
 }
 function hpk(b) { return b.hp / b.maxHp; }
 function alive(t) { return t && !t.dead && t.hp > 0 && !(t.gate && A.G().war.gateDown); }
+/** Gone 투명: the hero under its buff, or a fighter of the 도적 in its 잠행 — not to be chosen. */
+function unseenHid(e) { const G = A.G(); return e.hidden > G.t || (e.hero && G.buffs.stealth > G.t); }
 
 function think(W, b) {
   const G = A.G();
@@ -1078,8 +1080,8 @@ function think(W, b) {
   // Taunted: the taunter, while the taunt lasts.
   if (!t && b.taunt && b.taunt.until > G.t && alive(b.taunt.by) && d2(b, b.taunt.by) < 9) { t = b.taunt.by; why = 'taunt'; }
   // A target is held a few seconds, then looked at again.
-  if (!t && b.target && alive(b.target) && d2(b, b.target) < 9 && G.t < (b.retargetT || 0)) { t = b.target; why = b.tWhy || 'held'; }
-  if (!t && sq.target && alive(sq.target) && d2(b, sq.target) < 9) { t = sq.target; why = 'squad'; }
+  if (!t && b.target && alive(b.target) && !unseenHid(b.target) && d2(b, b.target) < 9 && G.t < (b.retargetT || 0)) { t = b.target; why = b.tWhy || 'held'; }
+  if (!t && sq.target && alive(sq.target) && !unseenHid(sq.target) && d2(b, sq.target) < 9) { t = sq.target; why = 'squad'; }
   if (!t) { t = pickFoe(W, b, b.role === 'tank' ? 6 : 7); why = 'pick'; }
   // The objective's own target: the gate, the commander, the cart's defenders.
   if (!t && order.obj && alive(order.obj) && order.obj.team !== b.team) { t = order.obj; why = 'order'; }
@@ -1436,6 +1438,29 @@ function act(W, b, t) {
     return;
   }
   face(b, t);
+  // The 도적's 투명 and 암습 (game.js AMBUSH): it fades (foes pass it over), closes in a moment, and
+  // its first blow out of hiding lands three times as hard, with 연's 암살 on the struck.
+  if (kit.stealth && !t.gate) {
+    if (b.hidden > G.t) {
+      if (G.t < b.stalk) return;
+      b.hidden = 0;
+      b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
+      hit(W, b, t, kit.basic[1] * W.U * 2.2 * b.pw * 3);
+      if (onScreen(t) && fxOk() && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, { scale: 0.6 });
+      if (Math.random() < 0.5) shout(W, b, '암습');
+      sound(W, b, 'skill_r_amsal', 'strike');
+      pose(b, 'attack');
+      return;
+    }
+    if (G.t > (b.stealthAt || 0) && !t.cmdr) {
+      b.stealthAt = G.t + rnd(12, 16);
+      b.hidden = G.t + 4;
+      b.stalk = G.t + 1.2;
+      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, { scale: 0.7 });
+      sound(W, b, 'skill_' + kit.stealth, 'buff');
+      return;
+    }
+  }
   const many = t.gate ? 0 : packNear(W, t, 1.5).length;
   const big = t.cmdr || t.gate || t.hero || t.kind === 'boss' || many >= 3;
   if (b.cd.d <= 0 && kit.ult[0] && (big || hpk(t) < 0.5)) {
@@ -3829,7 +3854,7 @@ function raidAggro() {
     if (m.hero) continue;
     for (let i = 0; i < (m.role === 'tank' ? 6 : 1); i++) pool.push(m);
   }
-  if (!G.dead) for (let i = 0; i < (W.role === 'tank' ? 6 : 1); i++) pool.push(G.player);
+  if (!G.dead && !(G.buffs.stealth > G.t)) for (let i = 0; i < (W.role === 'tank' ? 6 : 1); i++) pool.push(G.player);
   return pool.length ? pick(pool) : null;
 }
 

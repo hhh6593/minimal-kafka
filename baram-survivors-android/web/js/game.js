@@ -2278,8 +2278,93 @@ function might() {
   if (G.buffs.g_pierce > G.t) k *= 1 + (G.buffs.g_pierceK || 0);
   if (G.player.sts && heroStatusOn('despair')) k *= 0.8;
   if (G.buffs.power > G.t) k *= 1 + (G.buffs.powerK || 0.5);
-  if (G.buffs.stealth > G.t) k *= 3;
+  // 암습의 여세: for a moment after the 암습 every blow lands as from behind (연's 배후 공격 +50%).
+  if (G.buffs.ambushF > G.t) k *= AMBUSH.followK;
   return k;
+}
+
+// ---------------------------------------------------------------- 도적의 은신·암습 (바람의나라 연)
+// 연's 투명 (Skill 20210700): five seconds out of sight (it was 2.5 s at three times every blow), and
+// the 도적's great strikes deal half again from behind the foe (필살검무·백호검무·이기어검·필살검강·
+// 수효도검·암살: "대상 배후에서 타격 시, 기술 피해량이 50% 증가"); attacking ends 투명. Here:
+//   잠행 — 투명 cast: the hero fades (and the monsters lose it and wander); its blows are held for
+//          `stalk` seconds while it closes in, the gauge at its feet filling.
+//   암습 — then the strongest strike it has comes out of hiding first, `k` times as hard (`kLv` more a
+//          단 of 투명: 3.5배 at 1단, 5.25배 at 8단), every hit of it a 치명타 with 연's 암살 picture and sound; that ends 투명.
+//   여세 — for `follow` seconds after, every blow lands as from behind (+50%; 연's older 투명 record
+//          gave as much, "5초간 44% 추가 피해"); the strikes that were held go out together in it. 3차 승급 and up: the 여세 is longer. 5차 and up: a foe
+//          felled by the 암습 brings the next 투명 sooner (half its wait).
+// One fade and one strike a 투명 (no flicker on and off): the hero stays hidden through the 잠행.
+const AMBUSH = { stalk: 1.2, grace: 1.2, k: 3.5, kLv: 0.25, follow: 3, followLong: 4, followK: 1.5, show: 0.6 };
+
+/** The strike the 암습 opens with: the hardest single throw among the hero's ready (or soon) blows. */
+function ambushOpener() {
+  const left = G.buffs.stealth - G.t;
+  let best = null, bs = 0;
+  for (const s of G.skills) {
+    const def = SKILLS[s.id];
+    if (!def || ['ult', 'buff', 'aura', 'passive', 'heal'].includes(def.kind) || def.heal) continue;
+    const st = stats(s);
+    if (!(st.dmg > 0) || s.timer > left) continue;
+    const sc = st.dmg * (st.count || def.count || 1) * (['screen', 'nova', 'cleave', 'line'].includes(def.kind) ? 1.5 : 1);
+    if (sc > bs) { bs = sc; best = s; }
+  }
+  return best;
+}
+
+/** The 암습 lands: 투명 ends, its picture and sound on the nearest foe, the 여세 begins. */
+function ambushStrike(s) {
+  G.buffs.stealth = G.t;
+  G.ambush = null;
+  G.ambushes = (G.ambushes || 0) + 1;
+  G.buffs.ambushF = G.t + (promoOf(G.cls.id) >= 3 ? AMBUSH.followLong : AMBUSH.follow);
+  G.ambushShow = G.t + AMBUSH.show;
+  const t = nearestEnemies(1, 7)[0];
+  if (t) {
+    if (M.fx.k_r_amsal) fxOn('k_r_amsal', t, { scale: 0.75 });
+    if (M.fx.h_ml_cross) fxOn('h_ml_cross', t, { scale: 0.9, delay: 0.05 });
+  }
+  audio.play('skill_r_amsal', 'strike');
+  G.bubble = { text: `암습! ${skillName(s.id, s.lv)}`, t: G.t };
+  G.shake = Math.max(G.shake, 0.18);
+  if (!G.stage.raid && !G.war) { G.hitstop = Math.max(G.hitstop || 0, 0.04); G.hitstopAt = G.t; }
+  battleInfo('cast', null, () => `[암습] ${skillName(s.id, s.lv)}`);
+}
+
+/** The 잠행 gauge at the hero's feet: filling while it closes in, gold once the 암습 is ready, a red
+ *  ring running down through the 여세. Drawn under the hero (the hero itself is faded). */
+function drawAmbush(p) {
+  const hid = G.buffs.stealth > G.t && G.ambush, fol = G.buffs.ambushF > G.t;
+  if (!hid && !fol) return;
+  ctx.save();
+  ctx.translate(Math.round(p.x), Math.round(p.y + 2));
+  ctx.scale(1, 0.5);
+  ctx.lineWidth = 3;
+  if (hid) {
+    const k = Math.min(1, (G.t - G.ambush.at) / AMBUSH.stalk), ready = k >= 1;
+    ctx.strokeStyle = 'rgba(20,10,30,0.55)';
+    ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = ready ? `rgba(255,214,74,${0.7 + 0.3 * Math.sin(G.t * 14)})` : 'rgba(176,120,255,0.9)';
+    ctx.beginPath(); ctx.arc(0, 0, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+  } else {
+    const k = (G.buffs.ambushF - G.t) / (promoOf(G.cls.id) >= 3 ? AMBUSH.followLong : AMBUSH.follow);
+    ctx.strokeStyle = 'rgba(255,70,50,0.75)';
+    ctx.beginPath(); ctx.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+  }
+  ctx.restore();
+  // Hidden, the hero is 연's 투명 itself (Skill_Effect_0031): its green outline held over the faded
+  // figure, breathing a little, while it lasts (its cast plays the whole effect once).
+  if (hid && M.fx.k_r_stealth && G.t - G.ambush.at > 0.4) {
+    ctx.save();
+    ctx.globalAlpha = 0.45 + 0.15 * Math.sin(G.t * 5);
+    drawFx('k_r_stealth', p.x, p.y - 26, 0.2, 1, 0, 'center', false, p.face < 0);
+    ctx.restore();
+  }
+  if (hid && G.t - G.ambush.at >= AMBUSH.stalk) {
+    ctx.font = 'bold 10px G9';
+    ctx.textAlign = 'center';
+    outline('암습', p.x, p.y - 62, '#ffd84a');
+  }
 }
 
 function frame(now) {
@@ -2461,11 +2546,15 @@ function update(dt) {
   moveEnemies(dt);
   if (!G.dead) {
     const chain = chainSkills();
+    // 투명's 잠행 (AMBUSH): the blows wait for the 암습; a 투명 run out unspent is simply over.
+    if (G.ambush && !(G.buffs.stealth > G.t)) G.ambush = null;
+    const stalk = G.ambush;
+    const opener = stalk && G.t >= stalk.at + AMBUSH.stalk && G.t < stalk.at + AMBUSH.stalk + AMBUSH.grace ? ambushOpener() : null;
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
       s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste'));
       // A spell in the 기술 연계 waits, ready, for the others of the chain.
-      if (chain.includes(s)) {
+      if (chain.includes(s) && !stalk) {
         s.timer = Math.max(0, s.timer);
         continue;
       }
@@ -2478,10 +2567,21 @@ function update(dt) {
           s.timer = 0;
           continue;
         }
+        // 투명 is kept for a fight: not thrown with no foe within six tiles.
+        if (SKILLS[s.id].buff === 'stealth' && (stalk || !G.enemies.some(e => tdist(e, p) <= 6))) {
+          s.timer = 0;
+          continue;
+        }
+        // In the 잠행 every blow waits; then the strongest goes first (the others wait for it a
+        // moment more, then any blow in reach will do for the 암습).
+        if (stalk && rch && (G.t < stalk.at + AMBUSH.stalk || (opener && s !== opener))) {
+          s.timer = 0;
+          continue;
+        }
         fireSkill(s, 1);
       }
     }
-    if (chain.length && !G.chainRun && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
+    if (chain.length && !G.chainRun && !G.ambush && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
   }
   runTimers();
@@ -2807,7 +2907,8 @@ function raidSpawn(dt) {
   if (G.volleyT <= 0 && !G.blast) {
     G.volleyT = [2.8, 2.2, 1.7][G.phase] * (G.enraged ? 0.7 : 1);
     const face = G.war && G.war.raid ? War.raidTarget() : G.aggro && !G.aggro.down ? G.aggro : p;
-    const pool = partyBodies().filter(x => x !== face);
+    // (Not at a hero gone 투명: the bolt finds someone it can see.)
+    const pool = partyBodies().filter(x => x !== face && !(x === p && G.buffs.stealth > G.t));
     const tgt = pool.length ? pool[Math.floor(Math.random() * pool.length)] : face;
     b.lunge = 0.2;
     addShot(b, tgt, { color: '#c02838', glow: '#ff6a5a', size: 5, speed: 300, onHit: () => {
@@ -3362,7 +3463,7 @@ function moveEnemies(dt) {
       else {
         let bd = hidden ? 1e9 : Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) - 0.5;
         for (const m of G.party) {
-          if (m.down) continue;
+          if (m.down || m.hidden > G.t) continue; // (a companion gone 투명 is not seen)
           const d = Math.abs(e.tx - m.tx) + Math.abs(e.ty - m.ty);
           if (d < bd) { bd = d; tgt = m; }
         }
@@ -3407,6 +3508,9 @@ function moveEnemies(dt) {
     // Not in step with each other: a crowd that moves like one block looks stiff.
     e.cd = st * (0.85 + Math.random() * 0.35);
     const calm = e.temper === 'timid' && !e.provoked && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) > TEMPERS.timid.sight;
+    // 투명: a boss or its lieutenant holds its ground, looking about (it does not walk off and leave
+    // the hero striking air); the rest wander off.
+    if (hidden && (e.kind === 'boss' || e.kind === 'mini') && !G.dead) continue;
     if (hidden || calm) {
       wander(e, st);
       continue;
@@ -3501,8 +3605,17 @@ function hurtEnemy(e, dmg, push = null) {
     * (p.abyssHunt && !G.allyHitting ? abyssEdge(e) : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
-  const crit = Math.random() < 0.1;
-  if (crit) { dmg *= 1.8; audio.play('crit'); }
+  const lucky = Math.random() < 0.1;
+  if (lucky) dmg *= 1.8;
+  // The 암습's hits (AMBUSH) all show as 치명타 (their weight is already in the blow).
+  const crit = lucky || (G.ambushShow > G.t && !G.allyHitting && !G.procHitting);
+  if (crit) audio.play('crit');
+  // 5차+: a foe felled by the 암습 brings the next 투명 sooner.
+  if (G.ambushKill > G.t && e.hp - dmg <= 0) {
+    G.ambushKill = 0;
+    const sk = G.skills.find(x => SKILLS[x.id].buff === 'stealth');
+    if (sk) sk.timer = Math.min(sk.timer, (sk.cdMax || 10) * 0.5);
+  }
   tally(e, dmg);
   if (e.capPerSec) {
     // A hunt's boss: no more than its share of life a second, whatever lands on it.
@@ -4230,7 +4343,11 @@ function fireSkill(s, k) {
   // In a raid the 전사 is the party's main blade: its strikes cut the boss more than twice as deep
   // (its spells hit one or a few; the others' sweep the room, so a boss fight would drag).
   if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) st.dmg *= 1.8;
+  // The first blow out of 투명 is the 암습 (AMBUSH).
+  const ambush = G.ambush && G.buffs.stealth > G.t && st.dmg > 0 && !SKILLS[s.id].heal;
+  if (ambush) { st.dmg *= G.ambush.k || AMBUSH.k; G.ambushShow = G.t + AMBUSH.show; G.ambushKill = promoOf(G.cls.id) >= 5 ? G.t + 0.8 : 0; }
   cast(s, st);
+  if (ambush) ambushStrike(s);
   // 전사의 보스 집중: in a raid every strike of the 전사 also lands on the boss beside it
   // (its sweeps would otherwise go into the boss's servants, and the fight would drag).
   if (G.cls.id === 'warrior' && G.stage.raid && st.dmg) {
@@ -4794,6 +4911,11 @@ function cast(skill, st) {
     }
     case 'buff': {
       G.buffs[def.buff] = G.t + st.duration;
+      if (def.buff === 'stealth') {
+        // 투명: the 잠행 begins (AMBUSH); the monsters about lose the hero.
+        G.ambush = { at: G.t, k: AMBUSH.k + AMBUSH.kLv * (skill.lv - 1) };
+        for (const e of G.enemies) if (!e.kind && tdist(e, p) <= 8) e.lostAt = G.t;
+      }
       if (def.buff === 'power') G.buffs.powerK = def.power;
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       const [uf, uflip] = dirFx(fxid, skill.id, p.fdx, p.fdy);
@@ -4822,6 +4944,7 @@ function plainAttack(dt) {
   const p = G.player;
   p.atkT = (p.atkT || 0) - dt;
   if (p.atkT > 0 || G.t - (G.lastHit || -9) < 1.5) return;
+  if (G.buffs.stealth > G.t) return; // 투명: no plain swing gives the hero away
   const t = [[p.tx, p.ty], ...DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy])]
     .map(([x, y]) => occ.get(key(x, y))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
   if (!t) return;
@@ -4914,6 +5037,21 @@ function ultShown(cls) {
   return { name: ultLook(cls).name, icon: ultIcon(cls) };
 }
 
+// A 필살기 whose picture is a burst on each one struck, not one picture over the hero: the old
+// 파천검무 (GIF 144: a golden blast with the slashes through it, then a pillar of fire under black
+// smoke) goes off on each foe, along the row ahead first, at its own size and on its feet, as the
+// original played it. (Blown up to the screen's height over the hero, 연's narrow 67-pixel strip
+// of it stood as one blurred, squeezed column in the middle of the screen.)
+const ULT_ROW = { r_heaven: '144' };
+function ultRow(fx, seen) {
+  const p = G.player, dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = p.fdy || 0;
+  // Ahead along the way it faces (and the tiles either side), nearest first; then the rest.
+  const ahead = e => { const a = (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, side = Math.abs((e.tx - p.tx) * dy - (e.ty - p.ty) * dx); return a > 0 && a <= 7 && side <= 1; };
+  const byNear = (a, b) => tdist(a, p) - tdist(b, p);
+  const row = seen.filter(ahead).sort(byNear), rest = seen.filter(e => !ahead(e)).sort(byNear);
+  row.concat(rest).slice(0, 10).forEach((e, i) => addFx(fx, e.x, e.y + 6, { anchor: 'bottom', delay: 0.08 + i * 0.06 }));
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
@@ -4932,7 +5070,8 @@ function castUlt() {
   // The 필살기 fills the screen, as 연's great spells do: one picture as high as the screen over the
   // hero (it was a hand across, in ten small copies), and the screen goes white for a blink and
   // the world stops a frame or two (not in a raid or a war, where the party's blows go on).
-  if (ultMode(G.cls.id) === 'hunt') {
+  const rowLook = ultMode(G.cls.id) === 'hunt' && ULT_ROW[def.id] && M.fx[ULT_ROW[def.id]] ? ULT_ROW[def.id] : null;
+  if (ultMode(G.cls.id) === 'hunt' && !rowLook) {
     const [uf, uflip] = dirFx(grownFx(def.fx, 8), def.id, p.fdx, p.fdy);
     screenFx(uf, def.id, 1, uflip);
   }
@@ -4983,7 +5122,8 @@ function castUlt() {
     // On the struck a small hit of its own (헬파이어's burst) or the class's spark, not the great
     // picture again on each.
     const hitPic = M.fx['k_x_' + def.id + '_hit'] ? 'k_x_' + def.id + '_hit' : MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hit : sparkOf(def.id, def);
-    if (M.fx[hitPic]) seen.slice(0, 14).forEach((e, i) => fxOn(hitPic, e, { delay: 0.3 + i * 0.03, scale: SPARK_SCALE[hitPic] || (MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hs * 1.3 : 0.9) }));
+    if (rowLook) ultRow(rowLook, seen);
+    else if (M.fx[hitPic]) seen.slice(0, 14).forEach((e, i) => fxOn(hitPic, e, { delay: 0.3 + i * 0.03, scale: SPARK_SCALE[hitPic] || (MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hs * 1.3 : 0.9) }));
     later(0.4, () => seen.forEach(e => { if (e.hp > 0) hurtEnemy(e, base); }));
   }
   // What each class's 필살기 brings besides the blow.
@@ -6722,17 +6862,26 @@ function partyAct(m) {
       if (!t) break;
       face(t);
       if (m.cd.c <= 0) {
-        // 투명: gone from sight a moment; nothing strikes it, and its next blows land harder.
+        // 투명 (AMBUSH, as the hero's): out of sight, nothing strikes it; a moment closing in,
+        // then the 암습 — its first blow three times as hard — and it is seen again.
         m.cd.c = 12;
-        m.hidden = G.t + 2.5;
+        m.hidden = G.t + 4;
+        m.stalk = G.t + AMBUSH.stalk;
         addFx(SKILLS.r_stealth.fx, m.x, m.y - 26, { scale: 0.7 });
         audio.play('skill_r_stealth', 'buff');
         partySay(m, '투명');
       }
+      if (m.hidden > G.t && G.t < m.stalk) break;
+      const amb = m.hidden > G.t ? AMBUSH.k : 1;
+      if (amb > 1 && ((boss && m.cd.d <= 0) || m.cd.a <= 0)) {
+        m.hidden = 0;
+        if (M.fx.k_r_amsal) fxOn('k_r_amsal', t, { scale: 0.6 });
+        partySay(m, '암습');
+      }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 15;
         fxOn(SKILLS.r_ult.fx, t);
-        for (let i = 0; i < 4; i++) later(0.1 + i * 0.1, () => hurtEnemy(t, 15 * pw * (m.hidden > G.t ? 1.5 : 1)));
+        for (let i = 0; i < 4; i++) later(0.1 + i * 0.1, () => hurtEnemy(t, 15 * pw * (i === 0 ? amb : 1)));
         audio.play('skill_r_ult', 'ult');
         partySay(m, '필살검무');
         partyTalk(m, ['뒤 잡았다!', '필살 들어갑니다']);
@@ -6748,7 +6897,7 @@ function partyAct(m) {
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.6;
         fxOn(SKILLS.r_blink.fx, t);
-        hurtEnemy(t, 12 * pw * (m.hidden > G.t ? 2 : 1));
+        hurtEnemy(t, 12 * pw * amb);
         audio.play('skill_r_blink', 'blink');
         if (Math.random() < 0.25) partySay(m, '비영승보');
         pose('attack');
@@ -6949,7 +7098,8 @@ function drawCards() {
       // raised to 3단 first, which with every hunt starting over and the slots filling up was
       // hardly ever reached).
       if (d.pre && !G.skills.some(x => x.id === d.pre[0])) continue;
-      opts.push({ type: 'skill', id, lv: 1, w: 2.5 });
+      // The class's own way of fighting (the 도적's 투명) comes up more often.
+      opts.push({ type: 'skill', id, lv: 1, w: SIGNATURE[G.cls.id] === id ? 4 : 2.5 });
     }
   }
   const owned = Object.values(G.passives).filter(v => v > 0).length;
@@ -7078,6 +7228,9 @@ function cardName(o) {
  */
 const SUPPORT_KINDS = new Set(['buff', 'heal', 'blink']);
 const AREA_KINDS = new Set(['screen', 'nova', 'cleave', 'aura', 'line', 'spell4']);
+// A class's signature spell (its identity: the 도적's 투명, which opens every 암습): offered more
+// often, and the 자동 선택 takes it.
+const SIGNATURE = { rogue: 'r_stealth' };
 function cardScore(o) {
   const p = G.player, low = p.hp < p.maxHp * 0.45;
   const attacks = G.skills.filter(s => !SUPPORT_KINDS.has(SKILLS[s.id].kind)).length;
@@ -7091,6 +7244,7 @@ function cardScore(o) {
       if (o.lv >= 6) v += 2;
     } else {
       v = attack ? (attacks < 3 ? 12 : 8) : d.kind === 'heal' ? (low ? 9 : 5) : d.kind === 'blink' ? 3 : 5;
+      if (SIGNATURE[G.cls.id] === o.id) v = attacks >= 2 ? 13 : 7;
       v += (d.promo || 0) * 2;
       if (o.mastered) v += 2;
       // Keep room for the 승급 spells still to come: with six slots and every hunt starting over,
@@ -8328,6 +8482,7 @@ function render(now) {
       continue;
     }
     if (b === p) {
+      if (!G.dead) drawAmbush(p);
       drawHero(now, hidden);
       if (p.sts) drawHeroStatus(p);
       continue;
@@ -8531,9 +8686,15 @@ function render(now) {
     if (m.bubble) drawBubble(m.bubble.text, m.x, m.y - (m.av ? m.av.top : 50) - 12, G.t - m.bubble.t);
     drawEmote(m, m.x, m.y - (m.av ? m.av.top : 50) - (m.bubble ? 36 : 10));
   }
+  let lost = 0;
   for (const e of G.enemies) {
     if (e.bubble && G.t - e.bubble.t < 1.6 && G.t >= e.bubble.t) drawBubble(e.bubble.text, e.x, e.y - e.m.h * e.scale - 16, G.t - e.bubble.t);
-    else if (e.alertAt !== undefined) drawAlert(e.x, e.y - e.m.h * e.scale - 6, G.t - e.alertAt);
+    else if (e.lostAt !== undefined && G.t - e.lostAt < 1 && lost++ < 8) {
+      // 투명: the monsters that lost the hero look about (a grey "?", a few of them).
+      ctx.font = 'bold 13px G9';
+      ctx.textAlign = 'center';
+      outline('?', e.x, e.y - e.m.h * e.scale - 4 - 3 * Math.sin((G.t - e.lostAt) * 9), '#d8d8e8');
+    } else if (e.alertAt !== undefined) drawAlert(e.x, e.y - e.m.h * e.scale - 6, G.t - e.alertAt);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -8705,8 +8866,8 @@ function drawHero(now, hidden) {
     hx += (p.ldx || 0) * 9 * k;
     hy += (p.ldy || 0) * 6 * k;
   }
-  if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.35 : 1)) return;
-  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.35 : 1)) return;
+  if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
+  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
   // Struck, the hero does not flicker: the client showed a blow only in the health bar.
   if (!p.av) {
     drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
@@ -8953,7 +9114,7 @@ function syncUlt() {
   // The lettered list holds the learned spells, as the magic window lettered them.
   // The scroll's list: effects on the hero with the seconds left, as the client listed them,
   // then the spells learned.
-  const effects = [['power', '공격력증가'], ['stealth', '투명'], ['guard', '금강불체'], ['shield', '보호막']]
+  const effects = [['power', '공격력증가'], ['stealth', '투명'], ['ambushF', '암습 여세'], ['guard', '금강불체'], ['shield', '보호막']]
     .filter(([k]) => G.buffs[k] > G.t).map(([k, n]) => `<span>${n} <b>${Math.ceil(G.buffs[k] - G.t)}초</b></span>`);
   const magic = effects.join('') + G.skills.map(s => `<span>${skillName(s.id, s.lv)} <b>${s.lv}단</b></span>`).join('');
   if (shown.magic !== magic) {
