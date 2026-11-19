@@ -14,6 +14,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
+  GEAR_OPT, PROCS, optIds,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -1033,9 +1034,20 @@ function combatPower(cls) {
   const g = savedGear(cls), c = cls.id;
   const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 || g[k] === undefined ? 0 : gearPower(c, k, g[k]) + starPow(cls, `${k}:${g[k]}`));
-  const gear = pw('weapon') * 3 + pw('armor') * 2 + (hasShield(c) ? pw('shield') : pw('armor') / 2) + pw('helmet') + pw('cape');
+  const gear = pw('weapon') * 3 + pw('armor') * 2 + (hasShield(c) ? pw('shield') : pw('armor') / 2) + pw('helmet') + pw('cape') + extraPow(g);
   const set = cardSet(), rec = best[c];
   return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) * (1 + PROMO_BONUS.dmg * promoOf(c)) + set.hp * 20);
+}
+/** 방어구 보조 옵션 (items.js gearExtra) in 전투력: a second line counts 0.3 of a rank, a feature 0.5. */
+const EXTRA_POW = { line: 0.3, proc: 0.5 };
+function extraPow(g) {
+  let n = 0;
+  for (const k of ['armor', 'shield', 'helmet', 'cape']) {
+    const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+    if (k === 'shield' && g.shield < 0 && !g.shieldSp) continue;
+    if (sp) n += (sp.extra ? EXTRA_POW.line : 0) + (sp.proc ? EXTRA_POW.proc : 0);
+  }
+  return n;
 }
 function raidPower(r) {
   return 1200 * r.level + 3000;
@@ -1052,8 +1064,10 @@ function applyGear() {
   const bonus = p.bonus = {};
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
-    if (sp) for (const o of sp.opts || [sp.opt.id]) bonus[o] = (bonus[o] || 0) + 1;
+    if (sp) for (const o of optIds(sp)) bonus[o] = (bonus[o] || 0) + 1;
   }
+  // The features of the pieces besides the weapon (items.js PROCS): each once, however many carry it.
+  p.procs = new Set(['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] && SPECIAL[g[k + 'Sp']].proc).filter(Boolean));
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
   const cs = cardSet(), promo = promoOf(c), cb = costumeBonus(); // cb: 코디 수집
@@ -1141,6 +1155,63 @@ function gyeokProc(on, t) {
     if (g.on !== on || G.t < (G.gyeokCd[g.id] || 0) || Math.random() >= g.chance) continue;
     G.gyeokCd[g.id] = G.t + (g.cd || 0) * GYEOK_CD_K;
     fireGyeok(g, t);
+  }
+}
+
+/** The features of the pieces besides the weapon (items.js PROCS), on a blow taken or a kill. */
+function gearProc(on, t) {
+  const p = G.player;
+  if (!p.procs || !p.procs.size || G.dead) return;
+  const cd = (G.procCd = G.procCd || {});
+  const ready = id => p.procs.has(id) && G.t >= (cd[id] || 0);
+  if (on === 'kill' && ready('killheal') && Math.random() < PROCS.killheal.chance) {
+    cd.killheal = G.t + PROCS.killheal.cd;
+    if (p.hp < p.maxHp) {
+      heal(p.maxHp * PROCS.killheal.k, false, true);
+      if (M.fx[PROCS.killheal.fx] && fxBudget('proc', 2)) addFx(PROCS.killheal.fx, 0, -26, { follow: true, scale: 0.7 });
+    }
+  }
+  if (on !== 'hurt') return;
+  if (ready('shock')) {
+    const P = PROCS.shock, base = gyeokBase();
+    cd.shock = G.t + P.cd;
+    if (M.fx[P.fx]) addFx(P.fx, p.x, p.y - 10, { scale: 0.9 });
+    G.procHitting = true;
+    for (const e of G.enemies) if (e.hp > 0 && !(e.war && e.team === 0) && Math.abs(e.tx - p.tx) <= P.area && Math.abs(e.ty - p.ty) <= P.area) hurtEnemy(e, base * P.dmg);
+    G.procHitting = false;
+    floatText(p.x, p.y - 78, P.name, '#ffd27a', true);
+  }
+  if (ready('swift')) {
+    const P = PROCS.swift;
+    cd.swift = G.t + P.cd;
+    G.buffs.swift = G.t + P.sec;
+    if (M.fx[P.fx]) addFx(P.fx, 0, -26, { follow: true, scale: 0.7 });
+  }
+}
+/** Each frame: 흡혈's share paid out (capped a second), 호신강기's shield renewed, a 보호막 run out. */
+function gearTick(dt) {
+  const p = G.player;
+  if (p.vampAcc > 0) {
+    G.vampT = (G.vampT || 0) + dt;
+    if (G.vampT >= 1) {
+      G.vampT = 0;
+      const n = Math.min(p.vampAcc, p.maxHp * GEAR_OPT.vampCap);
+      p.vampAcc = 0;
+      if (n >= 1 && p.hp < p.maxHp) heal(n, false, true);
+    }
+  }
+  if (p.barrierUntil && G.t >= p.barrierUntil) { p.barrier = 0; p.barrierUntil = 0; }
+  if (p.procs && p.procs.has('barrier')) {
+    const cd = (G.procCd = G.procCd || {}), P = PROCS.barrier;
+    if (G.t >= (cd.barrier || P.cd * 0.5)) {
+      cd.barrier = G.t + P.cd;
+      const v = p.maxHp * P.k;
+      if (!(p.barrier >= v)) {
+        p.barrier = v;
+        p.barrierUntil = 0; // until broken
+        if (M.fx[P.fx]) addFx(P.fx, 0, -26, { follow: true, scale: 0.8 });
+      }
+    }
   }
 }
 
@@ -1613,7 +1684,7 @@ function wear(kind, tier, sp = null) {
 
 /** 이동속도 of a class as the equipment window shows it (in a hunt with its 민첩 too), and its 경공. */
 function moveInfo(cls, bootId) {
-  const g = savedGear(cls), spd = ['weapon', 'armor', 'shield', 'helmet', 'cape'].filter(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] && SPECIAL[g[k + 'Sp']].opt.id === 'speed').length;
+  const g = savedGear(cls), spd = ['weapon', 'armor', 'shield', 'helmet', 'cape'].filter(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] && optIds(SPECIAL[g[k + 'Sp']]).includes('speed')).length;
   const base = (1 + 0.08 * (G && G.cls === cls ? G.passives.speed : 0)) * (1 + 0.1 * spd);
   const st = bootsState(progress), id = bootId === undefined ? st.worn : bootId;
   return moveBonus(base, id ? BOOT[id].pct : 0);
@@ -1655,6 +1726,60 @@ function bootsRow(box) {
   box.append(note);
 }
 
+/** The equipment window's 보조 기술 row: the four techniques, the chosen one thrown by hand in a hunt. */
+function utilRow(box, cls) {
+  const h = document.createElement('h4');
+  h.textContent = '보조';
+  h.title = '보조 기술: 사냥·레이드에서 직접 눌러 쓰는 기술 (Q)';
+  box.append(h);
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  const now = utilOf(cls);
+  for (const id of UTIL_ORDER) {
+    const U = UTIL[id], btn = document.createElement('button');
+    btn.className = 'equip util' + (now === id ? ' on' : '');
+    btn.dataset.util = id;
+    btn.innerHTML = `<img src="assets/skillicon/${U.icon}.png" alt=""><span>${U.name}</span><small>${U.cd}초</small>`;
+    btn.title = U.text;
+    btn.onpointerenter = () => showUtilTip(id);
+    btn.onclick = () => {
+      progress.util = progress.util || {};
+      progress.util[cls.id] = id;
+      saveJson('bs_progress', progress);
+      equipTip = ['util', id];
+      buildEquip();
+    };
+    row.append(btn);
+  }
+  box.append(row);
+}
+let equipTip = null; // the piece (or 보조 기술) the window's card shows
+function showUtilTip(id) {
+  const U = UTIL[id], el = $('#equip-tip');
+  el.hidden = false;
+  el.innerHTML = `<b>${U.name}</b> <span class="sub">보조 기술 · 직접 눌러 사용 (Q) · 재사용 ${U.cd}초</span><div class="o1">${U.text}</div>`;
+}
+/** The window's card for a piece: its rank, its option lines, its feature and 격. */
+function showPieceTip(cls, kind, t, id) {
+  if (kind === 'util') return showUtilTip(t);
+  const el = $('#equip-tip'), sp = id && SPECIAL[id];
+  if (!sp && (t === undefined || t < 0)) { el.hidden = true; return; }
+  const st = starOf(cls, sp ? 'sp:' + id : `${kind}:${t}`);
+  const rank = sp ? specialPower(sp, cls.id) + 0.5 * (st - 1) : gearPower(cls.id, kind, t) + starPow(cls, `${kind}:${t}`);
+  const name = sp ? specialName(sp, cls.id) : pieceName(cls, kind, t);
+  const lines = [`<b${sp && sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${name}${st > 1 ? ` ★${st}` : ''}</b> <span class="sub">${KIND_NAME[kind]} · ${(Math.round(rank * 10) / 10)}등급${sp ? sp.craft ? ' · 조합' : sp.rarity ? ' · 고유' : sp.raid ? ' · 레이드 스페셜' : ' · 스페셜' : ''}</span>`];
+  if (sp) {
+    const [o1, ...more] = sp.optLines || [sp.opt.text];
+    lines.push(`<div class="o1">옵션: ${o1}</div>`);
+    for (const o of more) lines.push(`<div class="o2">보조 옵션: ${o}</div>`);
+    if (sp.proc) lines.push(`<div class="pr">특수 · ${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}</div>`);
+    if (sp.gyeok && GYEOK[sp.gyeok]) lines.push(`<div class="gy">${gyeokText(sp.gyeok)}</div>`);
+    if (sp.ward) lines.push(`<div class="gy">${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다</div>`);
+  }
+  el.hidden = false;
+  el.innerHTML = lines.join('');
+}
+
 function wearBoots(id) {
   bootsState(progress).worn = id;
   saveJson('bs_progress', progress);
@@ -1674,6 +1799,7 @@ function wornGyeok(cls, g) {
     if (!sp) continue;
     if (sp.gyeok && GYEOK[sp.gyeok]) lines.push(gyeokText(sp.gyeok));
     if (sp.ward) lines.push(`${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다`);
+    if (sp.proc && !lines.some(l => l.startsWith(PROCS[sp.proc].name + ':'))) lines.push(`${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}`);
   }
   if (!g.weaponSp && g.weapon === dragonTier(cls)) {
     const step = starOf(cls, `weapon:${g.weapon}`), dg = dragonGyeok(cls.id, step);
@@ -1818,7 +1944,9 @@ function buildEquip() {
       }
       if (kind === 'weapon' && t >= 0) btn.title = familyTitle(weaponFamilyOf(cls, t, null));
       markCompare(btn, cls, kind, t, null, now, rowTop[0] === t && rowTop[1] === null);
+      btn.onpointerenter = () => showPieceTip(cls, kind, t, null);
       btn.onclick = () => {
+        equipTip = [kind, t, null];
         wear(kind, t);
         buildEquip();
       };
@@ -1841,8 +1969,11 @@ function buildEquip() {
         tag.textContent = WEAPON_FAMILY[fam].name;
         btn.append(tag);
       }
+      if (sp.proc) btn.title += `\n${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}`;
       markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
+      btn.onpointerenter = () => showPieceTip(cls, kind, t, id);
       btn.onclick = () => {
+        equipTip = [kind, t, id];
         wear(kind, t, id);
         buildEquip();
       };
@@ -1851,6 +1982,9 @@ function buildEquip() {
     box.append(row);
   }
   bootsRow(box);
+  utilRow(box, cls);
+  if (equipTip) showPieceTip(cls, ...equipTip);
+  else $('#equip-tip').hidden = true;
   const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
     : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]) + starPow(cls, `${k}:${g[k]}`));
   const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
@@ -2274,6 +2408,7 @@ $('#forge-close').onclick = () => { $('#forge').hidden = true; if (!$('#equip').
 $('#equip-cards').onclick = () => openCards();
 
 $('#open-equip').onclick = () => {
+  equipTip = null;
   buildEquip();
   $('#equip').hidden = false;
 };
@@ -2636,7 +2771,9 @@ function stepHero(dx, dy, dt) {
   if (there && there.hp > 0 && !(G.war && there.team === 0)) {
     p.moving = false;
     p.pushT = (p.pushT || 0) + dt;
-    if (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr) return;
+    // 초상비 (보조 기술): through the crowd at once, not after half a second's shove.
+    const through = G.buffs.chosang > G.t && there.kind !== 'boss' && !there.cmdr;
+    if (!through && (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr)) return;
     // Pushed long enough, the hero and the monsters on the tile trade places (the whole heap of
     // a crowded tile goes together): never the hero and a monster on one tile.
     const k = key(nx, ny), heap = crowd.get(k) || [];
@@ -2683,7 +2820,8 @@ function heroSpeed() {
   const p = G.player;
   const held = p.sts && (heroStatusOn('stun') || heroStatusOn('para') || heroStatusOn('freeze')) ? 0.3 : p.sts && heroStatusOn('slow') ? 0.65 : 1;
   return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed')) * heroMove().k
-    * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held;
+    * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held
+    * (G.buffs.swift > G.t ? 1 + PROCS.swift.k : 1) * (G.buffs.chosang > G.t ? 1 + UTIL.chosang.speed : 1);
 }
 
 /**
@@ -2727,6 +2865,7 @@ function update(dt) {
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * (1 + 0.3 * opt('mana')) * dt);
     // Health comes back slowly by itself, as it did in the old game.
     p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * (1 + opt('regen')) * dt);
+    gearTick(dt);
   }
   G.shake = Math.max(0, G.shake - dt);
 
@@ -4068,6 +4207,18 @@ function hurtPlayer(dmg, from = null, pierce = false) {
     if (sg && Math.random() < (from.kind === 'champ' ? 0.1 : 0.2)) heroStatus(sg.st, from);
   }
   if (from && from.m) gyeokProc('hurt', from);
+  if (from && from.m) gearProc('hurt', from);
+  // 보호막 (보조 기술 보호, 호신강기): takes the blow first, as far as it holds.
+  if (p.barrier > 0 && G.t < (p.barrierUntil || Infinity)) {
+    const a = Math.min(p.barrier, taken);
+    p.barrier -= a;
+    taken -= a;
+    if (taken <= 0) {
+      p.inv = 0.25;
+      if (G.t - (p.barrierShown || -9) > 0.6) { p.barrierShown = G.t; floatText(p.x, p.y - 64, '흡수', '#9ad8ff'); }
+      return;
+    }
+  }
   // 반탄공: the blow comes back threefold.
   if (from && from.m && G.buffs.reflect > G.t) later(0.05, () => hurtEnemy(from, taken * 3));
   p.hp -= taken;
@@ -4103,14 +4254,20 @@ function hurtEnemy(e, dmg, push = null) {
   e.kickBig = false;
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
-  dmg *= (0.9 + Math.random() * 0.2) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
+  // The hero's own blows take the armour's lines (items.js GEAR_OPT): 최소 피해 lifts the low end
+  // of the roll, 최종 피해 the whole; 치명타 확률·피해 below. A companion's blows are its own.
+  const own = !G.allyHitting;
+  const lo = own ? Math.min(1.08, 0.9 + GEAR_OPT.floor * opt('floor')) : 0.9;
+  dmg *= (lo + Math.random() * (1.1 - lo)) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
+    * (own ? 1 + GEAR_OPT.final * opt('final') : 1)
     * (e.st && e.st.mark && e.st.mark.until > G.t ? 1 + e.st.mark.k : 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1)
     * (p.abyssHunt && !G.allyHitting ? abyssEdge(e) : 1);
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
-  const lucky = Math.random() < 0.1;
-  if (lucky) dmg *= 1.8;
+  const lucky = Math.random() < 0.1 + (own ? GEAR_OPT.crit * opt('crit') : 0);
+  if (lucky) dmg *= 1.8 + (own ? GEAR_OPT.critdmg * opt('critdmg') : 0);
+  if (G.critProbe) { G.critProbe.n++; if (lucky) G.critProbe.c++; }
   // The 암습's hits (AMBUSH) all show as 치명타 (their weight is already in the blow).
   const crit = lucky || (G.ambushShow > G.t && !G.allyHitting && !G.procHitting);
   if (crit) audio.play('crit');
@@ -4135,6 +4292,8 @@ function hurtEnemy(e, dmg, push = null) {
   const RW = G.war && G.war.raid;
   if (RW) dmg = War.raidScale(dmg);
   e.hp -= dmg;
+  // 흡혈 (an armour's line): a share of the hero's own blows back, at most vampCap a second (update).
+  if (own && opt('vamp') && !G.procHitting) p.vampAcc = (p.vampAcc || 0) + dmg * GEAR_OPT.vamp * opt('vamp');
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
   // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
   // 수련장: the dummy is struck many times a second; kept white it showed nothing but a white shape.
@@ -4550,6 +4709,7 @@ function killEnemy(e) {
   if (at < 0) return;
   G.kills++;
   if (G.player.abyssHunt && !G.allyHitting) abyssBurst(e);
+  gearProc('kill', e);
   // 이동기 한방컷 (연's 차사): a foe felled just after a dash brings the next dash sooner.
   if (G.dashAt !== undefined && G.t - G.dashAt < 0.6) G.dashAt -= 0.35;
   // 연속 처치: kills within three seconds of each other chain; the round numbers are called out.
@@ -5574,6 +5734,97 @@ function ultRow(fx, seen) {
   row.concat(rest).slice(0, 10).forEach((e, i) => addFx(fx, e.x, e.y + 6, { anchor: 'bottom', delay: 0.08 + i * 0.06 }));
 }
 
+// ---------------------------------------------------------------- 보조 기술
+// One utility technique the player chooses in town (장비 window, utilRow) and throws only by hand:
+// the button left of the 필살기 (or Q). It never goes off by itself, nor by the auto play. Each
+// wears 연's own icon (assets/skillicon) and effect (fx k_*) of the technique it stands for.
+// ---- utility skill tuning (retune here) ----
+const UTIL = {
+  chosang: { name: '초상비', icon: 'rp_walk', fx: 'k_rp_walk', cd: 25, sec: 5, speed: 0.7,
+    text: '5초 동안 이동속도 +70%, 몬스터를 밀치고 지나간다 (재사용 25초)' },
+  heal: { name: '회복', icon: 'c_heal', fx: 'k_c_heal', cd: 35, k: 0.3, text: '체력 30% 즉시 회복 (재사용 35초)' },
+  protect: { name: '보호', icon: 'p_protect', fx: 'k_p_protect', cd: 40, sec: 8, k: 0.25,
+    text: '8초 동안 최대 체력 25%만큼 피해를 막는 보호막 (재사용 40초)' },
+  blink: { name: '순간이동', icon: 'r_blink', fx: 'k_r_blink', cd: 20, range: 4,
+    text: '바라보는 쪽으로 최대 4칸 순간이동, 몬스터 너머로 (재사용 20초)' },
+};
+const UTIL_ORDER = ['chosang', 'heal', 'protect', 'blink'];
+function utilOf(cls) {
+  const id = ((progress.util || {})[cls.id]);
+  return UTIL[id] ? id : 'chosang';
+}
+/** Not in a 길드대항전 (its own keys), nor in the 수련장. */
+function utilHere() {
+  return !!G && !G.training && !(G.war && !G.war.raid);
+}
+function utilWait() {
+  if (!G || G.utilAt === undefined) return 0;
+  return Math.max(0, UTIL[utilOf(G.cls)].cd - (G.t - G.utilAt));
+}
+function castUtil() {
+  if (!G || G.over || G.dead || G.paused || G.choosing || !utilHere() || utilWait() > 0) return false;
+  const p = G.player, id = utilOf(G.cls), U = UTIL[id];
+  if (G.war) War.moved();
+  switch (id) {
+    case 'chosang':
+      G.buffs.chosang = G.t + U.sec;
+      if (M.fx[U.fx]) addFx(U.fx, 0, -26, { follow: true });
+      break;
+    case 'heal':
+      if (p.hp >= p.maxHp) { say('체력이 가득합니다.', 'warn'); return false; }
+      heal(p.maxHp * U.k, false, true);
+      if (M.fx[U.fx]) addFx(U.fx, 0, -26, { follow: true, scale: 1.3 });
+      break;
+    case 'protect':
+      p.barrier = Math.max(p.barrier || 0, p.maxHp * U.k);
+      p.barrierUntil = G.t + U.sec;
+      if (M.fx[U.fx]) addFx(U.fx, 0, -26, { follow: true, scale: 1.2 });
+      break;
+    case 'blink': {
+      const dx = p.fdx || 0, dy = dx ? 0 : p.fdy || 1;
+      let to = null;
+      for (let k = U.range; k >= 1 && !to; k--) {
+        const x = p.tx + dx * k, y = p.ty + dy * k;
+        if (!occ.has(key(x, y)) && !holdGround(x, y) && (!G.war || War.open(x, y))) to = [x, y];
+      }
+      if (!to) { say('갈 곳이 없습니다.', 'warn'); return false; }
+      if (M.fx[U.fx]) addFx(U.fx, p.x, p.y - 26, { scale: 0.9 });
+      const x0 = p.x, y0 = p.y;
+      p.x = to[0] * TILE + TILE / 2;
+      p.y = to[1] * TILE + TILE - 6;
+      heroTile();
+      p.stepping = p.moving = false;
+      dashFrom(x0, y0);
+      if (M.fx[U.fx]) addFx(U.fx, 0, -26, { follow: true, scale: 0.9 });
+      p.inv = Math.max(p.inv, 0.3);
+      break;
+    }
+  }
+  G.utilAt = G.t;
+  (G.utilUsed = G.utilUsed || {})[id] = (G.utilUsed[id] || 0) + 1;
+  G.bubble = { text: `${U.name}!`, t: G.t };
+  say(`${U.name}의 효과를 받습니다.`, 'sys');
+  audio.play('skill_' + U.icon, id === 'heal' ? 'heal' : 'buff', 1);
+  strikePose('magic');
+  return true;
+}
+/** The 보조 기술 button, kept in step with the hunt (its icon, the seconds left). */
+function syncUtil() {
+  const b = $('#util-btn');
+  if (!b) return;
+  const on = utilHere();
+  if (b.hidden === on) b.hidden = !on;
+  if (!on) return;
+  const U = UTIL[utilOf(G.cls)], w = utilWait();
+  put('#util-btn span', U.name);
+  put('#util-btn small', w > 0 ? `${Math.ceil(w)}초` : 'Q');
+  const ic = `url(assets/skillicon/${U.icon}.png)`;
+  if (shown.utilIcon !== ic) { shown.utilIcon = ic; b.style.backgroundImage = ic; }
+  b.classList.toggle('ready', w <= 0);
+  const k = w > 0 ? w / U.cd : 0, sh = `${(k * 100).toFixed(0)}%`;
+  if (shown.utilShade !== sh) { shown.utilShade = sh; b.style.setProperty('--wait', sh); }
+}
+
 function castUlt() {
   if (!G || G.over || G.dead || G.paused || G.choosing) return;
   const p = G.player;
@@ -6496,6 +6747,7 @@ function talk() {
   }
   else if (n.id === 'clerk') openQuests();
   else if (n.id === 'smith') {
+    equipTip = null;
     buildEquip();
     $('#equip').hidden = false;
   } else openTrade(n.id);
@@ -7352,7 +7604,10 @@ function drawSkillBar() {
   // 연: two rows of four at the bottom right, left of the 필살기 button; else a row at the bottom left.
   // 연: ends left of the keys (현황·모여 / 메뉴·사냥 over the 필살기), wherever their grid stands.
   const kr = yeon && $('#keys') ? $('#keys').getBoundingClientRect() : null;
-  const right = kr && kr.width ? Math.min(W - 100 * dpr, (kr.left - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
+  // The 보조 기술 button stands left of the 필살기, outside the keys' grid: the bar ends left of it too.
+  const ub = yeon && $('#util-btn') && !$('#util-btn').hidden ? $('#util-btn').getBoundingClientRect() : null;
+  const keyLeft = Math.min(kr && kr.width ? kr.left : Infinity, ub && ub.width ? ub.left : Infinity);
+  const right = keyLeft < Infinity ? Math.min(W - 100 * dpr, (keyLeft - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
   const x0 = yeon ? right - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
   G.skills.slice(0, 8).forEach((s, i) => {
     const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap), y = y0 + (yeon && i >= 4 ? sz + gap : 0);
@@ -8177,6 +8432,7 @@ function gainXp(v) {
   const p = G.player;
   // Alone, the hero grows a little faster: more cards, sooner.
   v *= 1.7;
+  v *= 1 + GEAR_OPT.exp * opt('exp'); // 경험치 (an armour's line)
   p.xp += v * pactReward();
   p.total = (p.total || 0) + v;
   const got = v * pactReward(), of = p.next;
@@ -8840,6 +9096,7 @@ addEventListener('keydown', e => {
   keys.add(e.code);
   if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   if (e.code === 'Space') castUlt();
+  if (e.code === 'KeyQ') castUtil();
 });
 addEventListener('keyup', e => keys.delete(e.code));
 const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
@@ -10445,6 +10702,7 @@ const TITLES = ['초보 사냥꾼', '사냥꾼', '숙련된 사냥꾼', '용사'
 function syncUlt() {
   if (!G) return;
   const p = G.player;
+  syncUtil();
   put('#ult-mode', ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스');
   put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
   put('#boss-clock', G.bossDue ? `${G.boss.name}까지 ${clock((G.stage.raid ? RAID_BOSS_AT : BOSS_AT) - G.t)}`
@@ -10546,6 +10804,11 @@ ultBtn.addEventListener('pointerdown', e => {
   e.preventDefault();
   e.stopPropagation();
   castUlt();
+});
+$('#util-btn').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  castUtil();
 });
 
 function togglePause(force) {
@@ -11148,6 +11411,22 @@ window.__benchWear = conf => {
   G.burstN = 0;
   return { name: sp ? specialName(SPECIAL[sp], c) : pieceName(cls, 'weapon', t), power: G.player.gearPower, fam: familyOf(sp && SPECIAL[sp], !sp && t === dragonTier(cls)) };
 };
+// Test (보조 옵션·보조 기술): an option line counted n times on the hero now (bench), the crit
+// count of the hero's blows, the 보조 기술 thrown and its state.
+window.__setOpt = (k, n) => { G.player.bonus[k] = n; };
+window.__critProbe = () => (G.critProbe = { n: 0, c: 0 });
+// n of the hero's own blows of dmg on the strongest foe (the dummy boss): the damage done, the crits.
+window.__strike = (n, dmg) => {
+  const e = G.enemies.find(x => x.kind === 'boss') || G.enemies[0];
+  if (!e) return null;
+  G.critProbe = { n: 0, c: 0 };
+  let sum = 0, lo = Infinity;
+  for (let i = 0; i < n; i++) { const h0 = e.hp; e.guardT = 0; hurtEnemy(e, dmg); const d = h0 - e.hp; sum += d; lo = Math.min(lo, d); e.capUsed = 0; }
+  return { avg: sum / n, min: lo, critRate: G.critProbe.c / G.critProbe.n, might: might() };
+};
+window.__util = () => castUtil();
+window.__utilState = () => ({ id: utilOf(G.cls), wait: utilWait(), used: G.utilUsed || {}, chosang: G.buffs.chosang > G.t, barrier: G.player.barrier || 0,
+  speed: heroSpeed(), hidden: $('#util-btn').hidden, procs: [...(G.player.procs || [])] });
 window.__benchRead = () => ({ dealt: G.dealt, gyeok: G.gyeokCount, burst: G.burstN || 0, hp: G.player.hp / G.player.maxHp, t: G.t });
 // For measuring: the hero grown to a level with its build (as a raid starts it), now.
 // For measuring single-target damage: the field cleared and the ground's boss alone, unkillable.
