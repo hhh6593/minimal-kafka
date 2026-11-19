@@ -475,7 +475,7 @@ async function lookPicture(cls) {
     let im = images[path];
     if (!im) im = await loadImage(path);
     else if (!im.complete) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
-    if (im && im.width) sheets[kind] = { im, meta };
+    if (im && im.width) sheets[kind] = { im: sinsuDressed(savedGear(cls) || {}, kind, im, path), meta };
   }
   if (!sheets.body) return null;
   const a = H.anims.idle_down || H.anims.walk_down;
@@ -1142,10 +1142,25 @@ function fireGyeok(g, t) {
   const p = G.player, base = gyeokBase();
   const hits = g.area ? G.enemies.filter(e => Math.abs(e.tx - t.tx) <= g.area && Math.abs(e.ty - t.ty) <= g.area)
     : g.targets ? [t, ...nearestEnemies(g.targets, 5, t).filter(e => e !== t).slice(0, g.targets - 1)] : [t];
-  if (g.fx && M.fx[g.fx] && fxBudget('gyeok', 3)) {
-    fxOn(g.fx, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) });
+  const fxId = M.fx[g.fx] ? g.fx : g.fxAlt && M.fx[g.fxAlt] ? g.fxAlt : null;
+  if (fxId && fxBudget('gyeok', 3)) {
+    // On the wearer (현무 standing over the one it guards, 주작 over the one it strengthens).
+    const self = M.fx[g.fxSelf] ? g.fxSelf : g.selfAlt && M.fx[g.selfAlt] ? g.selfAlt : null;
+    if (self) {
+      addFx(self, p.x, p.y + (g.selfDy || 0), { scale: (g.selfK || 1) * (self === g.fxSelf ? 1 : g.selfAltK || 1), anchor: 'bottom' });
+      // (seen through a little: the hero it stands over stays in sight)
+      const f = G.fxs[G.fxs.length - 1];
+      if (g.selfAlpha && f && f.id === self) f.alpha = g.selfAlpha;
+    }
+    fxOn(fxId, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1) });
+    // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water).
+    if (g.fxGrid && M.fx[g.fxGrid]) {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (dx || dy) addFx(g.fxGrid, t.x + dx * TILE * 0.85, t.y + dy * TILE * 0.7 + 6, { scale: g.gridK || 1, anchor: 'bottom', delay: 0.06 * (Math.abs(dx) + Math.abs(dy)), flip: dx > 0 });
+      }
+    }
     // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
-    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) fxOn(g.fx2, e, { scale: 0.8 * (g.fxK || 1) });
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) fxOn(g.fx2, e, { scale: 0.8 * (g.fx2K || g.fxK || 1) });
   }
   G.procHitting = true;
   let dealt = 0;
@@ -1477,6 +1492,11 @@ function pieceIcon(cls, kind, t, spId) {
   if (spId && SPECIAL[spId] && SPECIAL[spId].taecho) {
     const ic = taechoIcon(cls, SPECIAL[spId]);
     if (ic) return ic;
+  }
+  // 청룡신검·현무불괴갑: worn as a recoloured 연 stand-in (items.js SINSU_DRESS), shown as the original's own picture.
+  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId].dress) {
+    const pic = picture(craftPicture(SPECIAL[spId], cls.id, starOf(cls, 'sp:' + spId)));
+    if (pic) return pic;
   }
   // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
   const ab = spId && SPECIAL[spId] && SPECIAL[spId].base && SPECIAL[spId].base[cls.id];
@@ -9152,7 +9172,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     const cl = dz && kind === 'weapon' && classicOf(cls, gear);
     const src = cl ? classicSheet(im, path, cl, H, meta) : null;
     if (cl && !src) continue;
-    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal) : im, meta };
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal, dz.water && waterRows(H, meta)) : armorDressed(gear, kind, im, path), meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
@@ -9178,7 +9198,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   // (The worn looks' part of the key made once per look, not each frame: the town's walkers too.)
   if (b.yvKeyOf !== want || b.yvKeyCls !== cls.id) { b.yvKeyOf = want; b.yvKeyCls = cls.id; b.yvKey = cls.id + JSON.stringify(want); }
   const key = b.yvKey + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
-    + (dz ? '|d' + dz.tint + (dz.pal || '') : '');
+    + (dz ? '|d' + dz.tint + (dz.pal || '') : '') + (gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress ? '|a' + gear.armorSp : '');
   let pic = heroFrames.get(key);
   if (!pic) {
     const c = document.createElement('canvas');
@@ -9305,8 +9325,60 @@ function classicSheet(im, path, name, H, meta) {
 const CLASSIC_REACH = 1.22;
 // The shortest the old picture is laid (px of the hero's cell): about two thirds of a body.
 const CLASSIC_MIN = 34;
-function dressedSheet(im, path, t, pal) {
-  const k = path + '|' + t + '|' + (pal || '');
+/** One pixel of 청룡신검's or 현무불괴갑's stand-in turned toward the original's colours (items.js
+ *  SINSU_DRESS). The outline and warm colours (the hand, the skin, a gold hilt) are kept.
+ *  cheong (백사월도 → 청룡신검): its red spine and ribbon the dragon's blue, the rest blued steel,
+ *  dark navy in the shade, the edge near white. hyeonmu (얼음의경갑 → 현무불괴갑): its blue trims
+ *  gold, its pale-blue plates silver-white. */
+function sinsuPixel(p, i, t, pal) {
+  const r = p[i], g = p[i + 1], b = p[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const v = mx / 255, s = mx ? (mx - mn) / mx : 0;
+  if (v < 0.12) return;
+  const hsv = (h, ss, vv) => {
+    const f = (n, k = (n + h * 6) % 6) => vv - vv * ss * Math.max(0, Math.min(k, 4 - k, 1));
+    p[i] = f(5) * 255; p[i + 1] = f(3) * 255; p[i + 2] = f(1) * 255;
+  };
+  if (pal === 'cheong' && s > 0.5 && g < 0.45 * r && b < 0.6 * r) return hsv(0.585, Math.min(1, s * 0.95), Math.min(1, v * 1.15));
+  if (r > b + 25 && r >= g) return;
+  let h = 0;
+  if (mx !== mn) h = (mx === r ? (g - b) / (mx - mn) + 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4) / 6 % 1;
+  if (pal === 'hyeonmu' && h > 0.5 && h < 0.72 && s > 0.42) return hsv(0.115, Math.min(1, s * 1.15), Math.min(1, v * 1.12));
+  const l = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+  const [tr, tg, tb] = pal === 'cheong'
+    ? [12 + Math.pow(l, 1.35) * 235, 30 + Math.pow(l, 1.2) * 225, 62 + l * 200]
+    : [20 + l * 245, 20 + l * 245, 26 + l * 240];
+  p[i] = r + (Math.min(255, tr) - r) * t;
+  p[i + 1] = g + (Math.min(255, tg) - g) * t;
+  p[i + 2] = b + (Math.min(255, tb) - b) * t;
+}
+/** A pixel of a strike frame turned to water (the original 청룡신검's swing: blue-cyan crescents,
+ *  white crests): deep blue in the shade, cyan, near white at the top. The outline, the hand and
+ *  the hilt's gold are kept (false: left to sinsuPixel). */
+function waterPixel(p, i) {
+  const r = p[i], g = p[i + 1], b = p[i + 2], l = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+  if (Math.max(r, g, b) < 31 || (r > b + 25 && r >= g) || l < 0.38) return false;
+  const u = Math.min(1, (l - 0.38) / 0.58);
+  const ramp = [[16, 78, 214], [52, 160, 255], [206, 244, 255]];
+  const [a, c] = u < 0.55 ? [ramp[0], ramp[1]] : [ramp[1], ramp[2]], f = u < 0.55 ? u / 0.55 : (u - 0.55) / 0.45;
+  p[i] = a[0] + (c[0] - a[0]) * f; p[i + 1] = a[1] + (c[1] - a[1]) * f; p[i + 2] = a[2] + (c[2] - a[2]) * f;
+  return true;
+}
+/** The strike rows of a layer's sheet (its cell height and the rows of the atk clips). */
+function waterRows(H, meta) {
+  return { ch: meta.cell ? meta.cell[1] : H.cell[1], rows: new Set(['atk_down', 'atk_up', 'atk_side'].map(n => H.anims[n] && H.anims[n].row).filter(r => r !== undefined)) };
+}
+/** A worn layer as the hero wears it: 현무불괴갑's outfit recoloured (SINSU_DRESS with armor), else as it is. */
+function armorDressed(gear, kind, im, path) {
+  const az = (kind === 'armor' || kind === 'aback') && gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress;
+  return az && az.armor ? dressedSheet(im, path, az.tint, az.pal) : im;
+}
+/** The same for a still picture of the hero (the class card): 청룡신검's blade too. */
+function sinsuDressed(gear, kind, im, path) {
+  const w = (kind === 'weapon' || kind === 'wback') && gear.weaponSp && SPECIAL[gear.weaponSp];
+  return w && w.craft && w.dress ? dressedSheet(im, path, w.dress.tint, w.dress.pal) : armorDressed(gear, kind, im, path);
+}
+function dressedSheet(im, path, t, pal, swing) {
+  const k = path + '|' + t + '|' + (pal || '') + (swing ? '|w' : '');
   let c = dressSheets.get(k);
   if (c) return c;
   c = document.createElement('canvas');
@@ -9315,9 +9387,12 @@ function dressedSheet(im, path, t, pal) {
   const g = c.getContext('2d');
   g.drawImage(im, 0, 0);
   try {
-    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data, rowPx = c.width * 4;
     for (let i = 0; i < p.length; i += 4) {
       if (!p[i + 3]) continue;
+      // 청룡신검's swing (the strike rows): the blade's sweep a crescent of the blue dragon's water.
+      if (swing && swing.rows.has(Math.floor(i / rowPx / swing.ch))) { if (waterPixel(p, i)) continue; }
+      if (pal === 'cheong' || pal === 'hyeonmu') { sinsuPixel(p, i, t, pal); continue; }
       const l = (0.3 * p[i] + 0.59 * p[i + 1] + 0.11 * p[i + 2]) / 255;
       // 태초 (pal gold): pale gold, lighter, the shading kept; the abyss: black, blood and embers.
       const r = pal === 'gold' ? Math.min(255, 150 + l * 130) : Math.min(235, Math.max(8, Math.pow(l, 1.6) * 330));
@@ -11154,6 +11229,7 @@ window.__hurtPlayerFrom = (d, e) => hurtPlayer(d, e);
 window.__event = k => huntEvent(k);
 // For trying effects out: one of the build's effects at a place.
 window.__fx = (id, x, y, o) => addFx(id, x, y, o || {});
+window.__fireGyeok = (id, e) => fireGyeok({ id, ...GYEOK[id] }, e || G.enemies[0]); // test: a 격 goes off
 // For trying the abyss loot out: a unique (by name, else any) dropped beside the hero.
 window.__abyssDrop = u => {
   progress.abyssLoot = progress.abyssLoot || {};
