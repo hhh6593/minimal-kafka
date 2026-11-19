@@ -13,7 +13,7 @@ import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
-  DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine,
+  DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -1285,7 +1285,6 @@ function picture(name) {
 function pieceName(cls, kind, t) {
   return kind === 'weapon' && t === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${t}`)) : gearName(cls.id, kind, t);
 }
-/** A piece's icon: today's picture for the 용무기 and legendary pieces (by star), else the wardrobe's. */
 /** 연's own icon of a piece, keyed as its 연 look is (a special by id, the 용무기 by step, else tier). */
 function yItemIcon(cls, kind, t, spId) {
   const idx = M.yitemicon && M.yitemicon[cls.id] && M.yitemicon[cls.id][kind];
@@ -1295,14 +1294,42 @@ function yItemIcon(cls, kind, t, spId) {
   const f = key && idx[key];
   return f ? 'assets/yitemicon/' + f : null;
 }
+/**
+ * The icon of a piece as the hero wears it: where it is worn as one of 연's 치장용 looks (items.js
+ * base, DRAGON_LOOK, LOOK_FIX) that look's own icon, else 연's icon of the item its layer is
+ * (yItemIcon), so the picture in the bag, the codex and the smith is what the hero then wears.
+ * null without 연's heroes.
+ */
+function wornIcon(cls, kind, t, spId) {
+  if (!M.yhero2 || !M.yhero2[cls.id]) return null;
+  // 백호환령부 is not worn: the tiger walks beside the hero, its own picture is its icon.
+  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId].craft.pet) return null;
+  const g = { [kind]: t };
+  if (spId) g[kind + 'Sp'] = spId;
+  const v = (yGearVariants(cls, g) || {})[kind];
+  if (v && v[0] === 'c') {
+    const it = costumeItems()[v.slice(1)];
+    if (it && it.icon) return 'assets/' + it.icon;
+  }
+  return yItemIcon(cls, kind, t, spId);
+}
+/** The 용무기's icon at a step, as it is worn then. */
+function dragonIcon(cls, step) {
+  const H = M.yhero2 && M.yhero2[cls.id], dl = DRAGON_LOOK[cls.id] && DRAGON_LOOK[cls.id][step];
+  const it = dl && H && H.layers.weapon && H.layers.weapon['c' + dl] && costumeItems()[dl];
+  if (it && it.icon) return 'assets/' + it.icon;
+  const idx = M.yitemicon && M.yitemicon[cls.id] && M.yitemicon[cls.id].weapon;
+  return idx && idx['dragon' + step] ? 'assets/yitemicon/' + idx['dragon' + step] : null;
+}
+/** A piece's icon: what the hero wears with it (wornIcon); today's picture or the wardrobe's without 연's heroes. */
 function pieceIcon(cls, kind, t, spId) {
   // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
   const ab = spId && SPECIAL[spId] && SPECIAL[spId].base && SPECIAL[spId].base[cls.id];
   const abIt = ab && costumeItems()[ab[0]];
-  if (abIt && abIt.icon && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers.weapon['c' + ab[0]]) return 'assets/' + abIt.icon;
+  if (abIt && abIt.icon && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers[kind] && M.yhero2[cls.id].layers[kind]['c' + ab[0]]) return 'assets/' + abIt.icon;
   const lt = spId && SPECIAL[spId] && SPECIAL[spId].lookTier ? SPECIAL[spId].lookTier[cls.id] : undefined;
   if (lt !== undefined) return yItemIcon(cls, kind, lt, null) || (hasAvatars() ? gearIcon(cls.id, kind, lt) : null);
-  const y = yItemIcon(cls, kind, t, spId);
+  const y = wornIcon(cls, kind, t, spId);
   if (y) return y;
   if (spId && SPECIAL[spId]) {
     const sp = SPECIAL[spId];
@@ -1696,7 +1723,7 @@ function codexItems(cls) {
       const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
       const rc = craft && craftRecipe(cls.id);
       out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name: craft ? `${dragonName(cls.id, 1)} ~ ${dragonName(cls.id, DRAGON_MAX)}` : name,
-        icon: (craft && picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1))) || pieceIcon(cls, kind, t), pow: gearPower(cls.id, kind, t),
+        icon: (craft && (dragonIcon(cls, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1) || picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1)))) || pieceIcon(cls, kind, t), pow: gearPower(cls.id, kind, t),
         owned: b.includes(`${kind}:${t}`),
         from: craft ? `대장장이 조합: ${GEAR[cls.id].weapon[rc.base]} ★${rc.star} + 용의 비늘 ${rc.mats.scale} + 여의주 ${rc.mats.pearl}`
           : raid ? raid.name : tierSources(cls.id, kind, t) });
@@ -1709,7 +1736,7 @@ function codexItems(cls) {
     const from = sp.craft ? `대장장이 조합: ${sp.craft.from ? specialName(SPECIAL[sp.craft.from], cls.id) + ' ★5 + ' : ''}${Object.entries(sp.craft.mats).map(([id, n]) => `${MATS[id].name} ${n}`).join(' + ')} + ${won(sp.craft.gold)}`
       : sp.srcName;
     out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
-      icon: picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)) || pieceIcon(cls, sp.kind, t, sp.id),
+      icon: pieceIcon(cls, sp.kind, t, sp.id) || picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)),
       pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from,
       opt: [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : '', sp.ward ? `${STATUS[sp.ward].name} 막기` : ''].filter(Boolean).join(' · ') });
   }
@@ -1834,7 +1861,7 @@ function openCraft(sink = null) {
   const has = b.includes(`weapon:${dt}`);
   const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
     && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
-  icon = picture(dragonName(cls.id, 1)) || pieceIcon(cls, 'weapon', dragonTier(cls)); // 연's icon for classes without a dress-room picture
+  icon = dragonIcon(cls, 1) || picture(dragonName(cls.id, 1)); // as it is worn (연's), today's picture without 연's heroes
   meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) * DRAGON_STEP}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(rc.gold)}`,
@@ -1902,7 +1929,7 @@ function openCraft(sink = null) {
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
-    icon = picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1)) || pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id);
+    icon = pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id) || picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
     meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text, got };
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
     row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${won(c.gold)} · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}${famText}`,
@@ -1927,7 +1954,7 @@ function openCraft(sink = null) {
     progress.dragonSinsu = progress.dragonSinsu || {};
     for (const [sid, sn] of Object.entries(SINSU)) {
       const now = progress.dragonSinsu[cls.id] === sid, need = { [sn.mat]: 4, essence: 5 };
-      icon = picture(dragonName(cls.id, DRAGON_MAX)) || pieceIcon(cls, 'weapon', dragonTier(cls));
+      icon = dragonIcon(cls, DRAGON_MAX) || picture(dragonName(cls.id, DRAGON_MAX));
       meta = { mats: need, gold: 20000, gyeok: GYEOK[sn.gyeok], got: now };
       row(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(need)} + 20000전 · ${gyeokText(sn.gyeok)}${sid === 'jujak' ? ` · 주작의 기운: 주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.dragonK * 100)}%` : ''}`,
         now ? '새김' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
@@ -7948,8 +7975,15 @@ function yGearVariants(cls, gear) {
     if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
     else if (lt !== undefined && lt !== null && map['t' + lt]) v = map['t' + lt];
     else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
-    else if (kind === 'weapon' && t === dragonTier(cls)) v = map['dragon' + starOf(cls, `weapon:${t}`)] || map['t' + t];
-    else if (t !== undefined && t >= 0) v = map['t' + t];
+    else if (kind === 'weapon' && t === dragonTier(cls)) {
+      // A step the build's map has no sword of its own for: 연's 치장용 of that step (DRAGON_LOOK).
+      const step = starOf(cls, `weapon:${t}`), dl = DRAGON_LOOK[cls.id] && DRAGON_LOOK[cls.id][step];
+      v = dl && H.layers.weapon && H.layers.weapon['c' + dl] ? 'c' + dl : map['dragon' + step] || map['t' + t];
+    } else if (t !== undefined && t >= 0) v = map['t' + t];
+    // A look the build drew wrong or lacks, by its variant or the piece's name (items.js LOOK_FIX).
+    const fx = LOOK_FIX[cls.id] && LOOK_FIX[cls.id][kind];
+    const fid = fx && !(v && v[0] === 'c') && ((v && fx[v]) || (t >= 0 && fx[GEAR[cls.id][kind][t]]));
+    if (fid && H.layers[kind] && H.layers[kind]['c' + fid]) v = 'c' + fid;
     if (v && H.layers[kind] && H.layers[kind][v]) out[kind] = v;
   }
   // What of the weapon goes behind the body (the 무사's spear shaft, the 격투가's far fist).
