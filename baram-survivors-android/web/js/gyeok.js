@@ -52,8 +52,11 @@ export const GYEOK = {
   cheonja: { name: '천자의분노 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_anger_son', self: ['pierce', 5, 0.2] },
   // 기원 격: the blow that heals (연 8030 진청룡마령참 격: 체력·마력 50% 회복).
   maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', heal: 0.5 },
-  // 주작선장's own (연 8080 주작비상 격): fire around and the wearer's party strengthened.
-  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'g_zuzak_captain', st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true },
+  // 주작선장's own (연 8080 주작비상 격): fire around and the wearer's party strengthened. Drawn as
+  // 연 plays it (g_zuzak_kyeog: the whole prefab, the fire whirling up into a white flash and the
+  // phoenix in its blaze; the old g_zuzak_captain was its one texture) on the struck, and 연's 주작
+  // 신수 (g_zodiac_phoenix: the red bird spreading its wings) over the wearer it strengthens.
+  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'g_zuzak_kyeog', fxAlt: 'g_zuzak_captain', altK: 0.8, fxK: 1.25, fxSelf: 'g_zodiac_phoenix', selfK: 0.7, selfDy: -34, st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true },
   // The PC original's three common 격 (공식 지식인: 저주격 / 데미지격 / 노도성황격) and its
   // status 격 (연 skills 30701 저주, 30801 중독, 30901 마비, 31001 절망, 33101 혼마염, 3000271 흡혈).
   jeoju: { name: '저주격', on: 'hit', chance: 0.15, cd: 12, dmg: 1.5, fx: 'g_curse_zod', st: ['curse', 6] },
@@ -74,11 +77,18 @@ export const GYEOK = {
   cheongsinsok: { name: '청룡의 신속', on: 'hit', chance: 0.12, cd: 10, dmg: 1.5, fx: 'g_tf_chungryong', self: ['speed', 5, 0.35] },
   // 백호's own: 연's 백호 신수 weapon effect (Sinsu_Weapon_Backho: the ground torn, white flames) and its claws.
   baekmaeng: { name: '백호의 맹렬', on: 'hit', chance: 0.12, cd: 10, dmg: 4, area: 1, fx: 'g_tf_backho_claw', fxK: 0.55, self: ['power', 6, 0.2] }, // the 백호 strike's own claw marks only (tools/yeon_claws.py): its tiger and roaring head hid the hero
-  // 현무's own: 연's 현무 신수 weapon effect (Sinsu_Weapon_Hyunmu: the crystal shell closing round).
-  hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fx: 'g_sw_hyunmu', fx2: 'g_tf_hyunmu', fxK: 1.8, st: ['stun', 2], self: ['ward', 4, 0.4] },
+  // 현무불괴갑's (불괴: struck, it does not break): 연's own 현무 pictures — the 현무 신수 itself
+  // (g_zodiac_turtle: 연's 신수 각인 현무, the black tortoise and its snakes coming out of a white
+  // flash) standing over the wearer it guards, and the 현무 weapon effect (Sinsu_Weapon_Hyunmu: the
+  // crystal shell closing) on each who struck. (fxAlt / selfAlt: a build without tools/yeon_zodiac.py's
+  // strips draws 연's 신수 transforms instead.)
+  hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fxSelf: 'g_zodiac_turtle', selfAlt: 'g_tf_hyunmu', selfAltK: 0.48, selfK: 1.3, selfDy: -18, selfAlpha: 0.82, fx: 'g_sw_hyunmu', fx2: 'g_sw_hyunmu', fxK: 1.5, fx2K: 1.1, st: ['stun', 2], self: ['ward', 4, 0.4] },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),
-  // in 연's own 청룡 신수 weapon effect (Sinsu_Weapon_Chungryong: the dragon's splash and its orbs).
-  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_sinsu_cheong', fx2: 'g_sinsu_cheong_orb', fxK: 1.8, st: ['curse', 5], st2: ['slow', 5], drain: 0.4 },
+  // in 연's own 청룡 pictures: 연's 신수 각인 청룡 (g_zodiac_dragon: the blue dragon coiling out of a
+  // white flash) over the struck, its weapon effect's splash (Sinsu_Weapon_Chungryong) bursting on
+  // every tile of the 3x3 round it, and the effect's blue orbs on each struck (청린쇠약). (Not the
+  // 진청룡마령참 / 심판의낫 dragon: the original's 청린수폭 is water, not that coil.)
+  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_zodiac_dragon', fxAlt: 'g_tf_chungryong', altK: 0.43, fxK: 1.45, fxGrid: 'g_sinsu_cheong', gridK: 1.15, fx2: 'g_sinsu_cheong_orb', fx2K: 1.6, st: ['curse', 5], st2: ['slow', 5], drain: 0.4 },
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])

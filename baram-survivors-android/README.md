@@ -686,6 +686,29 @@ TITLE에 보입니다. 진행은 모든 직업을 합쳐 셉니다.
 영웅 자신은 오르지 않습니다(그 대신 주작비상 격이 있음). 땅에 숨 쉬는 주황 점선 고리로 범위를, 오라를 받는 아군 머리 위에 연의
 주작혈안 아이콘으로 받는 사람을 보여 줍니다. 대항전 쪽은 `war.js`의 `hit()` 첫머리 한 줄(`A.auraK`)만 씁니다.
 
+**청룡신검·현무불괴갑의 외형** (`items.js`의 `SINSU_DRESS`, `game.js`의 `sinsuPixel`·`waterPixel`·`armorDressed`): 연에는 주작선장
+(코디 309203)과 백호환령부(환수)는 있어도 청룡신검·현무불괴갑은 없습니다(Strings의 `Item_*`에 없음; 고대 백호의검·고대 주작의검만
+있음). 그래서 원작 그림에 가장 가까운 연의 치장용 장비를 입히고 원작 색으로 바꿔 칠합니다(새로 그린 그림 없음, 외형은 빌드에 이미
+있는 `ycostume` 그대로). 청룡신검: 원작은 갈고리 진 넓은 곡도(검게 푸른 날, 흰 날끝, 등에 푸른 문양)라 같은
+갈고리 날의 백사월도(치장용, 309106)를 푸른 강철로, 붉은 등·술을 청룡의 푸른색으로, 휘두르는 프레임의 궤적은 원작의 휘두름처럼
+푸른 물결 초승달로 칠하고 옅은 푸른 빛을 둘러 줍니다. 현무불괴갑: 원작은 은백 판갑에 금테·날개 어깨라 11직업 모두에 그려진
+얼음의경갑(치장용, 7100492)의 연푸른 판을 은백으로, 푸른 테를 금으로 칠합니다. 두 장비의 아이콘은 원작 그림 그대로입니다.
+
+**사신수 격** (`gyeok.js`의 `cheongrin`·`hyeoncheorong`·`jujakbisang`, `game.js` `fireGyeok`의 `fxSelf`·`fxGrid`·`fxAlt`):
+연의 신수 그림 가운데 가장 또렷하고 크게 보이는 것을 골라 겹칩니다(백호환령부가 연의 백호 신수 효과에서 발톱만 떼어 쓴 것과 같은 방식).
+- 청린수폭(원작: 3x3 청룡의 물 폭발, 청린쇠약): 연의 신수 각인 청룡(`g_zodiac_dragon`, 흰 섬광에서 푸른 용이 똬리를 틀며 나옴)이
+  맞은 자리 위로 크게, 청룡 신수 무기 효과의 물보라(`g_sinsu_cheong`)가 둘레 3x3 칸마다 가운데부터 터지고, 맞은 몬스터에 푸른
+  구슬(`g_sinsu_cheong_orb`). 진청룡마령참·심판의낫 계열의 청룡 그림(`g_roaring_dragon`)은 쓰지 않습니다.
+- 현무의 철옹: 연의 신수 각인 현무(`g_zodiac_turtle`, 거북과 뱀들)가 입은 영웅 뒤에 크게 서고(조금 비쳐 영웅이 보임), 때린 몬스터마다
+  현무 무기 효과의 수정 껍질(`g_sw_hyunmu`)이 닫힙니다.
+- 주작비상 격(주작선장): 연이 재생하는 주작비상 격 프리팹 전체(`g_zuzak_kyeog`: 불길이 휘감아 오르다 흰 섬광, 불 소용돌이 속 주작;
+  예전 `g_zuzak_captain`은 그 텍스처 한 장)를 맞은 자리에, 입은 영웅 위에는 신수 각인 주작(`g_zodiac_phoenix`)이 날개를 폅니다.
+- 새 빌드 입력(GEAR_DIR/ygyeok/에 추가, 연 추출물이라 커밋하지 않음): `tools/yeon_zodiac.py FXs.unity3d GEAR_DIR`
+  (FXs의 `zodiac_dragon_fx_ani`·`zodiac_phoenix_Fx_ani`·`zodiac_tortoise_fx_ani` → `zodiac_dragon|phoenix|turtle.png`)와
+  `tools/yeon_skills.py Skills.unity3d,FXs.unity3d tools/yeon_sinsu_kyeog.json GEAR_DIR/ygyeok`(→ `zuzak_kyeog.png`). 둘 다
+  `ygyeok/index.json`에 항목을 더하고, `prepare_assets.py`가 그대로 fx `g_<이름>`으로 만듭니다. 없으면 예전 그림(`fxAlt`·`selfAlt`:
+  `g_tf_chungryong`, `g_zuzak_captain`, `g_tf_hyunmu`)으로 그립니다.
+
 **바뀐 것** (예전 기록은 그대로 열리고 수치만 바뀝니다): 용무기 단계당 0.5 → 0.8등급(제십 14.5 → 17.2), 핵심 기술 재사용 감소를
 새 7직업에도(궁사 염화마탄시, 무사 화룡사멸, 격투가 극진권, 마도사 혈마광폭열파, 천인 자아파괴, 도깨비 일격필살'괴력난신, 차사 살극);
 청룡신검·주작선장 14 → 13등급, 청린수폭 흡혈 0.03 → 0.4(준 피해의 10%); 극'진일신검 14 → 13등급·옵션 공격력 → 기술 재사용,
