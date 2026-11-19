@@ -104,7 +104,18 @@ export const RAID_GEAR = {
     weapon: { warrior: '주작의검', rogue: '진아광검', mage: '흑단화염장', poet: '자월초롱', archer: '흑일멸화궁', lancer: '극독지옥창', monk: '적풍권갑', magus: '바람홍옥단봉', celestial: '바람홍옥포', dokkaebi: '바람홍옥퇴', reaper: '혼령영명도' } },
   raid_airavata: { pow: 14, armor: '선녀의옷', shield: '천성대방패',
     weapon: { warrior: '백호의검', rogue: '저주의단검', mage: '심판의낫', poet: '백운장', archer: "극'흑일신궁", lancer: '천부연극', monk: '백운권갑', magus: '독각귀단봉', celestial: '이매망량포', dokkaebi: '극염인화퇴', reaper: '귀면진산명도' } },
+  // The raids under the 끝없는 지옥 and over everything (LATE_RAIDS: placed after the crafted looks).
+  // Their sets are not what they are for (회한옥'심, 선계의 기운): a little over 아이라바타's, under the
+  // 사신수 and the 용무기 제팔.
+  raid_hell: { pow: 14, armor: '황혼의갑주', shield: '주술방패',
+    weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱', archer: '대붕지옥궁', lancer: '극독지옥창', monk: '적풍권갑', magus: '독각귀단봉', celestial: '이매망량포', dokkaebi: '극염인화퇴', reaper: '귀면진산명도' } },
+  raid_heaven: { pow: 14.5, armor: '선녀의옷', shield: '천성대방패',
+    weapon: { warrior: '청룡의검', rogue: '진아광검', mage: '해룡의지팡이', poet: '백운장', archer: "극'흑일신궁", lancer: '천부연극', monk: '백운권갑', magus: '금홍비단봉', celestial: '금홍비포', dokkaebi: '금홍퇴', reaper: '바람홍옥명도' } },
 };
+// Raids added after the crafted looks were laid in the lines: their pieces are placed by
+// settleLateRaids (items.js, last of all), each at the end of its line, so no saved place moves.
+const LATE_RAIDS = new Set(['raid_hell', 'raid_heaven']);
+const EARLY_RAIDS = Object.keys(RAID_GEAR).filter(id => !LATE_RAIDS.has(id));
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
 export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉', archer: '용섬제일궁', lancer: '용무제일창', monk: '용비제일권갑', magus: '용화제일단봉', celestial: '용주제일도', dokkaebi: '용린제일퇴', reaper: '용라제일명도' };
@@ -132,7 +143,7 @@ const WRITTEN = Object.fromEntries(Object.entries(GEAR).map(([c, g]) => [c, Obje
 const PLAIN_ZONE = 5;
 
 // Every raid piece has a place in each class's line, after the hunting grounds' own.
-for (const id of Object.keys(RAID_GEAR))
+for (const id of EARLY_RAIDS)
   for (const cls of Object.keys(GEAR))
     for (const [kind, name] of raidSet(id, cls)) if (!GEAR[cls][kind].includes(name)) GEAR[cls][kind].push(name);
 
@@ -143,7 +154,7 @@ for (const id of Object.keys(RAID_GEAR))
 // Those places are added by settleRaidPieces (items.js, after the crafted looks), so no place a
 // save already holds moves.
 const RAID_TIER = {}, OWNER = {}, PENDING = [];
-for (const id of Object.keys(RAID_GEAR))
+for (const id of EARLY_RAIDS)
   for (const cls of Object.keys(GEAR))
     for (const [kind, name] of raidSet(id, cls)) {
       const i = GEAR[cls][kind].indexOf(name), own = (OWNER[cls] = OWNER[cls] || {})[kind] = OWNER[cls][kind] || {};
@@ -166,6 +177,19 @@ export function settleRaidPieces() {
     const m = (MOVED_TIERS[cls] = MOVED_TIERS[cls] || {})[kind] = MOVED_TIERS[cls][kind] || {};
     if (was > 0 && m[was] === undefined) m[was] = i; // the first raid (in this order) to name it, as gearPower counted it
   }
+}
+/** The late raids' pieces (LATE_RAIDS): each a place of its own at the end of its line, wearing the
+ *  look of the first place of its name (lookAt). Called once, after every crafted look is laid. */
+export function settleLateRaids() {
+  for (const id of LATE_RAIDS)
+    for (const cls of Object.keys(GEAR))
+      for (const [kind, name] of raidSet(id, cls)) {
+        const line = GEAR[cls][kind];
+        line.push(name);
+        const i = line.length - 1;
+        ((OWNER[cls] = OWNER[cls] || {})[kind] = OWNER[cls][kind] || {})[i] = id;
+        ((RAID_TIER[id] = RAID_TIER[id] || {})[cls] = RAID_TIER[id][cls] || {})[kind] = i;
+      }
 }
 /** A raid's own piece of a kind for a class: its place in the line (-1: none, a class with no shield). */
 export function raidTier(id, cls, kind) {

@@ -1369,7 +1369,28 @@ export const RAIDS = [
     lines: {'enter': '…하늘을 떠받치는 발 아래, 너희는 먼지와 같다.', 'p1': '구름의 짐승들아, 내려오라!', 'p2': '번개가 상아 끝에 맺힌다.', 'summon': ['하늘의 무리여, 모여라!', '구름을 가르고 내려오라!'], 'kill': ['짓밟혔구나.', '하늘은 무겁다.'], 'killHealer': '빛을 비추던 자를 먼저 밟았다.', 'low': '하늘이… 기우는구나…', 'enrage': '천둥과 함께 모두 짓밟아 주마!', 'death': '하늘이… 너희를… 인정하는구나…'},
     name: '아이라바타 레이드', lv: '파티', terrain: 'field2', level: 18, open: 'kirin',
     monsters: ['2019', '2020', '2021', '2032', '2033', '2034'], boss: { id: '2037', name: '아이라바타', scale: 1.2, beast: 'airavata' },
-    patterns: ['trample', 'cross', 'rain', 'ring', 'meteor'], patterns1: ['thunder'], patterns2: ['stomp'], fx: '140', intro: '인드라를 태운 하늘 코끼리. 가장 강한 레이드' },
+    patterns: ['trample', 'cross', 'rain', 'ring', 'meteor'], patterns1: ['thunder'], patterns2: ['stomp'], fx: '140', intro: '인드라를 태운 하늘 코끼리. 대격변의 마지막 레이드' },
+  // Under the 끝없는 지옥 and over everything: 연's own raid bosses and maps (tools/yeon_grounds.json
+  // "raids": their sheets y<unit>, terrains y_<raid>, music). v3: their specials come last (items.js),
+  // and their sets are placed after the crafted looks (avatar.js LATE_RAIDS). after: a raid to win first.
+  // 지하국대적: the last of 연's 지옥 raid (Units_RaidBoss 92240, its scythed many-headed demon), on
+  // 연's 시왕의 심판정 map (kow_map_Reid_TheJudgeOfHell04) to its 지옥 raid's first boss music.
+  // Its spoils: 회한옥'심 (악마 심판의낫), now and then the scythe itself.
+  { id: 'raid_hell', v3: true, bgm: 'BGM_Raid_Hell_1stBoss', raid: true, title: '지하국의 대적',
+    lines: {'enter': '…시왕의 심판도 나를 묶지 못했다. 산 것들이 제 발로 지하국에 내려오다니.', 'p1': '옥졸들아, 사슬을 풀어라! 철상의 망령들아, 일어나라!', 'p2': '머리 하나를 베었느냐? 지하국의 대적은 머리가 아홉이다.', 'summon': ['망령들아, 저들의 발목을 잡아라!', '철상지옥의 귀졸들아, 나와라!'], 'kill': ['네 죄의 무게만큼 떨어져라.', '하나 더, 지하국으로.'], 'killHealer': '살리는 손부터 거두었다. 이곳에 구원은 없다.', 'low': '회한이… 낫 끝에 맺히는구나…', 'enrage': '아홉 머리가 모두 깨어났다! 지옥의 문을 활짝 열어라!', 'death': '심판은… 끝나지… 않는다…'},
+    name: '지하국대적 레이드', lv: '공대', terrain: 'y_raid_hell', level: 27, open: 'abyss4',
+    monsters: ['y314019', 'y314020', 'y314021', 'y314001', 'y314002', 'y615019'], boss: { id: 'y92240', name: '지하국대적', scale: 1 },
+    patterns: ['seal', 'xslash', 'meteor', 'ring'], patterns1: ['drought', 'pillars'], patterns2: ['sweep', 'lava'], fx: '140',
+    intro: '끝없는 지옥 아래, 시왕의 심판정을 차지한 아홉 머리의 대적. 쌍낫으로 베고 지옥불을 쏟는다. 회한옥\'심을 떨어뜨린다' },
+  // 선계의 백두선인: 연's 선계 (the immortals' realm over 백두산; Units_FieldBoss 912014, the white sage in
+  // his halo) as the last raid of all, on 연's 천상계 (kow_map_cheonsanggyeo) to its own music. Opens
+  // once the 지하국대적 has fallen. Its spoils: 선계의 기운, the 용무기 제십's 천상 각성 (a look only).
+  { id: 'raid_heaven', v3: true, bgm: 'BGM_Raid_BaekDuSan_4thBoss', raid: true, title: '선계의 주인', after: 'raid_hell',
+    lines: {'enter': '지옥 끝에서 여기까지 올라왔는가. 하늘은 그 발걸음을 보고 있었다.', 'p1': '선계의 수호자들이여, 구름을 걷어라.', 'p2': '하늘의 이치로 너희를 시험하겠다. 번개를 받아라.', 'summon': ['구름 위의 것들이여, 내려오라.', '선계의 문이 열린다.'], 'kill': ['하늘은 가벼운 자를 받지 않는다.', '구름 아래로 돌아가라.'], 'killHealer': '빛을 나누던 손이 먼저 내려앉았구나.', 'low': '이 늙은 몸이… 하늘을 떠받치기엔…', 'enrage': '선계의 모든 빛이여, 저들을 태워라!', 'death': '선계의 기운을… 그대들에게…'},
+    name: '선계 레이드', lv: '공대', terrain: 'y_raid_heaven', level: 28, open: 'abyss4',
+    monsters: ['y315519', 'y315520', 'y315521', 'y315522', 'y315523', 'y912015'], boss: { id: 'y912014', name: '선계의 백두선인', scale: 1.5 },
+    patterns: ['rain', 'ring', 'cross', 'plus', 'eye'], patterns1: ['thunder', 'cloud'], patterns2: ['stomp', 'meteor'], fx: '140',
+    intro: '백두산 위 선계의 주인. 하늘의 이치로 번개와 구름을 부린다. 가장 강한 레이드. 선계의 기운을 떨어뜨린다' },
 ];
 // 괴력난신 (today's weekly co-op beast hunt): one 괴수 a week, in turn, its ★ cards for the
 // collection (game.js). The week is counted from a fixed Monday, so it turns over on Mondays.

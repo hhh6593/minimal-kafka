@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """청룡신검 and 현무불괴갑 as the original draws them worn, laid on 연's heroes.
 
-    sinsu_worn.py fetch GEAR_DIR
-    sinsu_worn.py build GEAR_DIR
+    sinsu_worn.py fetch GEAR_DIR [PIECE ...]
+    sinsu_worn.py build GEAR_DIR [PIECE ...]   (only those pieces; the index keeps the rest)
 
 연 has neither piece. The official dress room renders the original worn
 (https://avatar.baram.nexon.com/Coordi/RenderAvatar/M?pi=<item>&cd=<dir>&mt=<motion>, the address
@@ -47,16 +47,21 @@ COORDI = "https://avatar.baram.nexon.com/Coordi/RenderAvatar/M"
 FEET = (167, 231)
 # key: (item name, how it is laid: 'weapon' on the hand / 'wings' on the shoulders, the classes
 # or None for all). More can be added the same way (the 태초 weapons: tools/sinsu_worn.py is generic).
-PIECES = {'cheong': '청룡신검', 'hyeonmu': '현무불괴갑', 'jinil': '진일신검'}
-MODE = {'cheong': ('weapon', ['warrior']), 'hyeonmu': ('wings', None), 'jinil': ('weapon', ['warrior'])}
+# akma: 악마 심판의낫 (items.js JUDGE_CRAFTS), worn as the original's 악마사냥꾼의낫 (명품의4기 악마사냥꾼)
+# by the classes that wield the 심판의낫; the game dresses it in the abyss's colours (AKMA_DRESS).
+PIECES = {'cheong': '청룡신검', 'hyeonmu': '현무불괴갑', 'jinil': '진일신검', 'akma': '악마사냥꾼의낫'}
+MODE = {'cheong': ('weapon', ['warrior']), 'hyeonmu': ('wings', None), 'jinil': ('weapon', ['warrior']),
+        'akma': ('weapon', ['warrior', 'rogue', 'mage'])}
+# Pieces whose grip is found from the hands only (not the face beside a blade held high).
+HAND_ONLY = {'akma'}
 DIRS = {'down': 2, 'up': 0, 'side': 3}
 MOTIONS = {'idle': 1, 'walk': 2, 'atk': 3, 'cast': 4}
 
 
-def fetch(gear):
+def fetch(gear, only=None):
     raw = os.path.join(gear, 'sinsu_worn', 'raw')
     os.makedirs(raw, exist_ok=True)
-    for key, item in [('base', None)] + list(PIECES.items()):
+    for key, item in [('base', None)] + [(k, v) for k, v in PIECES.items() if not only or k in only]:
         for cd in range(4):
             for mt in (1, 2, 3, 4):
                 path = os.path.join(raw, f'{key}_{cd}_{mt}.gif')
@@ -100,6 +105,49 @@ def piece_pixels(item, base):
     out = item.copy()
     out[..., 3] = np.where(keep, 255, 0)
     return out, ob
+
+
+def bridge_shaft(pp, most=70):
+    """A long weapon whose shaft the original's head hides in a pose (악마사냥꾼의낫 held up: the
+    blade over the head, the grip in the hand): laid on 연's smaller head, the hidden stretch is a
+    gap. The shaft is carried across it with its own pixels: the cross-section of the shaft where it
+    leaves the gap, stamped along the line to the other part (only where nothing is drawn)."""
+    from scipy.ndimage import label
+    m = pp[..., 3] > 0
+    lab, n = label(m)
+    if n < 2:
+        return pp
+    sizes = np.bincount(lab.ravel())[1:]
+    big = [i + 1 for i in np.argsort(sizes)[::-1][:2] if sizes[i] >= 20]
+    if len(big) < 2:
+        return pp
+    ya, xa = np.nonzero(lab == big[0])
+    yb, xb = np.nonzero(lab == big[1])
+    # the nearest two points of the two parts (subsampled)
+    sa, sb = slice(None, None, max(1, len(xa) // 400)), slice(None, None, max(1, len(xb) // 400))
+    A = np.stack([xa[sa], ya[sa]], 1).astype(float)
+    B = np.stack([xb[sb], yb[sb]], 1).astype(float)
+    d = ((A[:, None, :] - B[None, :, :]) ** 2).sum(-1)
+    ia, ib = np.unravel_index(np.argmin(d), d.shape)
+    pa, pb = A[ia], B[ib]
+    L = float(np.sqrt(d[ia, ib]))
+    if L < 2 or L > most:
+        return pp
+    # the cross-section: the smaller part's pixels within 3 of its end, as offsets
+    src_y, src_x = (ya, xa) if sizes[big[0] - 1] <= sizes[big[1] - 1] else (yb, xb)
+    p0 = pa if src_y is ya else pb
+    # (the shaft's own dark pixels: not the hand's skin nor a highlight beside its end)
+    dark = pp[src_y, src_x, :3].max(-1) < 110
+    near = (np.abs(src_x - p0[0]) <= 3) & (np.abs(src_y - p0[1]) <= 3) & dark
+    patch = [(int(y - p0[1]), int(x - p0[0]), pp[y, x].copy()) for y, x in zip(src_y[near], src_x[near])]
+    out = pp.copy()
+    for t in np.linspace(0, 1, int(L * 2) + 2):
+        cx, cy = pa + (pb - pa) * t
+        for dy, dx, c in patch:
+            y, x = int(round(cy)) + dy, int(round(cx)) + dx
+            if 0 <= y < out.shape[0] and 0 <= x < out.shape[1] and out[y, x, 3] == 0:
+                out[y, x] = c
+    return out
 
 
 def skin(a):
@@ -156,7 +204,7 @@ def touch_up(a, mode):
     return pad
 
 
-def build(gear):
+def build(gear, only_pieces=None):
     root = os.path.join(gear, 'sinsu_worn')
     raw = os.path.join(root, 'raw')
     h2 = os.path.join(gear, 'yhero2')
@@ -201,6 +249,8 @@ def build(gear):
         rows = max(a['row'] for a in H['anims'].values()) + 1
         cols = max(a['n'] for a in H['anims'].values())
         for piece in PIECES:
+            if only_pieces and piece not in only_pieces:
+                continue
             mode, only = MODE[piece]
             if only and cls not in only:
                 continue
@@ -231,6 +281,14 @@ def build(gear):
                     if motion == 'atk':
                         j = min(len(its) - 1, f)  # wind-up, then the blow (held over 연's last frame)
                     pp, ob = piece_pixels(its[j], bas[min(j, len(bas) - 1)])
+                    if piece in HAND_ONLY:
+                        # A dark shaft over the plain figure's dark hair reads as "no change": the gap
+                        # closed again from the piece's own render (pixels it draws between its parts).
+                        from scipy.ndimage import binary_closing
+                        m0 = pp[..., 3] > 0
+                        m1 = binary_closing(m0, structure=np.ones((3, 3), bool), iterations=10) & opaque(its[j])
+                        pp[..., 3] = np.where(m0 | m1, 255, 0)
+                        pp = bridge_shaft(pp)
                     if mode == 'wings':
                         # off the plain figure's body (grown a little): wings and shoulder flares
                         from scipy.ndimage import binary_dilation, label
@@ -257,6 +315,17 @@ def build(gear):
                         # anchor: the original hand (plain figure's skin touching the blade) on 연's hand
                         from scipy.ndimage import binary_dilation
                         near = binary_dilation(pp[..., 3] > 0, iterations=2) & skin(bas[min(j, len(bas) - 1)]) & ob
+                        # Only the hands: a long weapon held up (악마사냥꾼의낫's blade over the head) also
+                        # touches the face, which pulled the grip up between hand and head. Skin under
+                        # the chin, the biggest patch (the holding hand).
+                        if piece in HAND_ONLY:
+                            from scipy.ndimage import label as _label
+                            chin = FEET[1] - int(0.62 * pc_h)
+                            near[:chin] = False
+                            lab, nl = _label(binary_dilation(near, iterations=1))
+                            if nl > 1:
+                                sizes = np.bincount(lab.ravel())[1:]
+                                near &= lab == 1 + int(np.argmax(sizes))
                         hb = bbox(near)
                         if hb is None:
                             ohx, ohy = (x0 + x1) / 2, y1
@@ -312,8 +381,15 @@ def build(gear):
                                                'cols': cols, 'cell': [ocw, och], 'foot': [ofx, ofy],
                                                'side': [side.get(r, '') for r in range(rows)], 'k': round(k, 3)}
             print(cls, piece, 'k', round(k, 3))
-    json.dump(out, open(os.path.join(root, 'index.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    # Some pieces only (named on the command line): the others' layers already made are kept.
+    ip = os.path.join(root, 'index.json')
+    if only_pieces and os.path.isfile(ip):
+        old = json.load(open(ip, encoding='utf-8'))
+        for cls, pieces in out.items():
+            old.setdefault(cls, {}).update(pieces)
+        out = old
+    json.dump(out, open(ip, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 
 if __name__ == '__main__':
-    {'fetch': fetch, 'build': build}[sys.argv[1]](sys.argv[2])
+    {'fetch': fetch, 'build': build}[sys.argv[1]](sys.argv[2], sys.argv[3:] or None)
