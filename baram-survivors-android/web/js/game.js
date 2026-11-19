@@ -8528,7 +8528,11 @@ function classicSheet(im, path, name, H, meta) {
     // The hand's end: nearer the body's middle (the feet, half a body up).
     const bx = x0 + ffx, by = y0 + ffy - 24;
     const [grip, tip] = Math.hypot(A[0] - bx, A[1] - by) <= Math.hypot(B[0] - bx, B[1] - by) ? [A, B] : [B, A];
-    const len = Math.max(10, Math.hypot(tip[0] - grip[0], tip[1] - grip[1])) * CLASSIC_REACH;
+    // (Never shorter than CLASSIC_MIN: 연's rods are short, old 바람's staffs stand to the shoulder.)
+    const dl = Math.max(1, Math.hypot(tip[0] - grip[0], tip[1] - grip[1]));
+    const len = Math.max(CLASSIC_MIN, dl * CLASSIC_REACH);
+    // a short drawing lengthened: the grip stays, the tip goes out along the same line
+    if (len > dl * CLASSIC_REACH) { tip[0] = grip[0] + (tip[0] - grip[0]) * len / (dl * CLASSIC_REACH); tip[1] = grip[1] + (tip[1] - grip[1]) * len / (dl * CLASSIC_REACH); }
     const k = len / ph, ang = Math.atan2(tip[1] - grip[1], tip[0] - grip[0]) + Math.PI / 2;
     g.save();
     g.beginPath();
@@ -8546,6 +8550,8 @@ function classicSheet(im, path, name, H, meta) {
 }
 // How much longer the old picture is laid than 연's weapon it stands for (its handle reaches past the hand).
 const CLASSIC_REACH = 1.22;
+// The shortest the old picture is laid (px of the hero's cell): about two thirds of a body.
+const CLASSIC_MIN = 34;
 function dressedSheet(im, path, t, pal) {
   const k = path + '|' + t + '|' + (pal || '');
   let c = dressSheets.get(k);
