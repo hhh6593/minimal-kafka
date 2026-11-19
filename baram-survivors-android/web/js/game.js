@@ -4471,6 +4471,9 @@ function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
     if (!m.from.includes(G.stage.id)) continue;
     let n = matCount(id, e.kind, !!G.stage.raid);
+    // 금린 below 8등급 (산군 L3, 도깨비대장 L5): one now and then, not 3-5 a boss — the 11등급
+    // 금린 set came by the 12th hunt and skipped the raid sets and the craft ladder between.
+    if (id === 'gold' && G.level < 8) n = e.kind === 'boss' && Math.random() < 0.35 ? 1 : 0;
     if (n && Math.random() < pactReward() - 1) n++; // 규약: richer spoils
     for (let i = 0; i < n; i++) G.drops.push({ x: e.x + (i - n / 2) * 14, y: e.y + 6, kind: 'mat', mat: id });
   }
@@ -5514,6 +5517,7 @@ function castUlt() {
   const p = G.player;
   if (p.mp < p.maxMp || ultWait() > 0) return;
   G.ultAt = G.t;
+  if (G.war) War.moved(); // the player's own key: not 자리비움
   const def = ultLook(G.cls.id);
   p.mp = 0;
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
@@ -6246,6 +6250,11 @@ function up(id) {
   return ((progress.up || {})[id]) || 0;
 }
 
+// The merchant's materials (openTrade): the first one's price, up 30% a piece; MAT_BUYS of each
+// between hunts (showResults restocks). Rare ones (여의주, 은나무 가지, 고문서, 성물) are not sold.
+const MAT_PRICE = { fur: 1500, horn: 1500, bone: 1500, ember: 1500, jade: 2000, scale: 4000, silver1: 3000,
+  kalpa: 4000, gold: 5000, steel: 5000, soul: 5000, essence: 6000, silver2: 8000 };
+const MAT_BUYS = 5;
 function openTrade(who) {
   const cls = chosenClass, box = $('#trade-rows');
   box.innerHTML = '';
@@ -6257,7 +6266,7 @@ function openTrade(who) {
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
     const b = document.createElement('button');
     b.className = 'btn';
-    b.textContent = done ? '다 배움' : `${won(cost)}`;
+    b.textContent = done ? (typeof done === 'string' ? done : '다 배움') : `${won(cost)}`;
     b.disabled = done || (progress.gold || 0) < cost;
     b.onclick = () => {
       progress.gold -= cost;
@@ -6288,6 +6297,21 @@ function openTrade(who) {
       if (tier === undefined) continue;
       row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' }[kind]} · ${tier + 1}단계`,
         250 * (tier + 1) * (tier + 1), false, () => b.push(`${kind}:${tier}`));
+    }
+    // 재료: where gold goes late (a hunt there brings 30-60k전 and nothing was left to buy). Only
+    // what a ground or raid already cleared drops, a few of each between hunts, dearer each time.
+    const mats = progress.mats || {}, bought = progress.tradeBuys || {};
+    for (const [id, base] of Object.entries(MAT_PRICE)) {
+      // 금린 only once a ground of 8등급 or more that drops it is cleared (rollMats: the early raids give one now and then).
+      const lvOf = f => { const st = STAGES.find(x => x.id === f) || RAIDS.find(x => x.id === f); return st ? (st.level ?? STAGES.indexOf(st)) : 0; };
+      if (!QUERY.has('all') && !MATS[id].from.some(f => progress.cleared[f] && (id !== 'gold' || lvOf(f) >= 8))) continue;
+      const n = bought[id] || 0, cost = Math.round(base * Math.pow(1.3, n) / 100) * 100;
+      row(`${MATS[id].name} (${mats[id] || 0})`, n >= MAT_BUYS ? '다음 사냥 뒤에 다시 들여오오' : `재료 · 이번 물량 ${MAT_BUYS - n}개 남음`, cost, n >= MAT_BUYS && '품절', () => {
+        mats[id] = (mats[id] || 0) + 1;
+        progress.mats = mats;
+        bought[id] = n + 1;
+        progress.tradeBuys = bought;
+      });
     }
     if (!box.children.length) box.textContent = '더 팔 물건이 없소.';
   }
@@ -7894,6 +7918,7 @@ function showResults(title) {
   G.pendingLevels = 0;
   bankGold();
   keepBuild();
+  progress.tradeBuys = {}; // the merchant restocks its materials
   if (G.endless) {
     const st = qstats();
     st.endless = Math.max(st.endless, G.t - G.clearT);
@@ -9968,6 +9993,10 @@ $('#opt-num').onclick = () => {
   syncSettings();
 };
 document.addEventListener('pointerdown', () => audio && audio.unlock(), { capture: true });
+// 대항전·공대 자리비움 (war.js afk): any touch or key is the player at the controls, not only a
+// step — a caster standing to cast (its spells fire by themselves) was taken for away after 20
+// seconds and its blows cut to 5%, so every 주술사·도사 raid ran out of time.
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => { if (G && G.war && !G.over) War.moved(); }, { capture: true });
 // Every button clicks, as the client's did (408).
 document.addEventListener('click', e => {
   if (audio && e.target.closest('button')) audio.play('click');

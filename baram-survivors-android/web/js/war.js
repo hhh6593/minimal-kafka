@@ -3635,6 +3635,8 @@ function raidSetup() {
   A.say(`[${st.name}] 공격대 25명이 모였습니다. 역할: ${ROLES[role].name}`, 'sys');
   if (altNames.length) A.say(`내 다른 직업도 함께합니다: ${altNames.join(', ')}`, 'party');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
+  // Spells keep to their reach: a caster fighting the adds at the edge never touches the boss.
+  if (['mage', 'poet', 'magus', 'celestial'].includes(G.cls.id)) A.say('주문은 닿는 곳까지만 갑니다. 보스 가까이(4~5칸)에서 싸우세요.', 'sys');
   const btn = document.getElementById('war-sb-btn');
   if (btn) btn.hidden = false;
   document.body.classList.add('war');
@@ -3903,7 +3905,10 @@ function raidScale(dmg) {
   const span = Math.max(3, Math.min(8, G.t - win[0][0]));
   const rate = W.rawSum / span;
   const target = W.Uh * RAID.heroK * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
-  return rate > target ? dmg * target / rate : dmg;
+  if (rate > target) return dmg * target / rate;
+  // Below it (a caster's spells, which keep to their own reach, reached about 40% of a 도적's capped
+  // blows at the boss and its raids ran out of time): lifted toward it, at most 1.6 times.
+  return afk() ? dmg : dmg * Math.min(1.6, Math.sqrt(target / Math.max(rate, 1)));
 }
 function raidCredit(e, dmg, killed) {
   const W = A.G().war, h = W.hero;
