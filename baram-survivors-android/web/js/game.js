@@ -12,7 +12,7 @@ import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, cost
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
-  RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
+  RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
 } from './items.js';
 import {
@@ -1019,6 +1019,7 @@ function applyGear() {
   // The weapon's family edge (items.js): an abyss unique's hunt, the 주작's aura on the allies near.
   const wsp = g.weaponSp && SPECIAL[g.weaponSp];
   p.abyssHunt = !!(wsp && wsp.rarity);
+  p.taecho = !!(wsp && wsp.taecho);
   p.aura = 0;
   if (g.weaponSp === 'cr_sinsu_jujak') p.aura = JUJAK_AURA.k + JUJAK_AURA.perStar * (starOf(G.cls, 'sp:cr_sinsu_jujak') - 1);
   else if (!g.weaponSp && g.weapon === dragonTier(G.cls) && starOf(G.cls, `weapon:${g.weapon}`) >= 10 && (progress.dragonSinsu || {})[c] === 'jujak') p.aura = JUJAK_AURA.dragonK;
@@ -1163,6 +1164,8 @@ function tally(e, d) {
 /** An abyss unique's edge (items.js ABYSS_HUNT): more to the crowd, more again in the abyss. */
 function abyssEdge(e) {
   const crowd = !e.war && e.kind !== 'boss' && e.kind !== 'mini';
+  // 태초 (items.js TAECHO_EDGE): every foe alike, the crowd a little more; not the abyss's own.
+  if (G.player.taecho) return (1 + TAECHO_EDGE.all) * (crowd ? 1 + TAECHO_EDGE.mob : 1);
   return (crowd ? 1 + ABYSS_HUNT.mob : 1) * (G.stage.abyss && !G.war ? 1 + ABYSS_HUNT.abyss : 1);
 }
 
@@ -3294,7 +3297,7 @@ function raidPattern(b, kind, follow = false) {
     waves.push(() => commonTiles(b, 'cross', raidAim()));
   }
   // The fierce boss strings a common blow on after its own (a third phase or the enrage).
-  const more = !follow && (ph >= 2 || G.enraged) && !COMMON_PATTERNS.includes(kind) && Math.random() < 0.45;
+  const more = !follow && (ph >= 2 || G.enraged) && !COMMON_PATTERNS.includes(kind) && Math.random() < 0.3;
   G.seqTill = G.t + 20;
   raidSeq(b, waves, () => {
     if (more) {
@@ -3372,7 +3375,9 @@ function raidMark(b, raw, nth, onFall) {
   const warn = Math.max(floor, MARK_REACT + MARK_STEP * redDepth(tiles, b));
   // A share of the hero's health, so a robed caster and an armoured warrior fear it alike.
   // (A later wave strikes a little lighter: the blow is several.)
-  const share = [0.3, 0.35, 0.4][G.phase] * raidK() * (nth ? 0.8 : 1);
+  // (Softened with the bosses' own blows: [0.3, 0.35, 0.4] and later waves 0.8 had the raiders on
+  // the high raids struck 25~60% more, 흑술사's raid 57 downs.)
+  const share = [0.28, 0.32, 0.36][G.phase] * raidK() * (nth ? 0.7 : 1);
   G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share, onFall });
   b.lunge = 0.3;
 }
@@ -4425,13 +4430,18 @@ function rollSpecial(e) {
  * (the 소 왕 always, his own horn), a leader one in ten, a champion one in a hundred; the rest none.
  */
 // ---- abyss drop rates (retune here) ----
-const ABYSS_DROP = { boss: 0.35, mini: 0.1, champ: 0.01 };
+// (Was boss 35%, mini 10%, champ 1%: about 0.64 uniques a hunt, every unique within a few dozen
+// hunts. Now about 0.38: boss 20%, two leaders 6% each, nine or so champions 0.6% each.)
+const ABYSS_DROP = { boss: 0.2, mini: 0.06, champ: 0.006 };
 function rollAbyss(e) {
   const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
+  // 태초의 무기: the 소 왕 besides his horn, now and then; the 세계석 요새's lord in place of his drop.
+  if (cowKing && Math.random() < taechoChance('cow')) dropAbyss(e, true);
   if (!cowKing && !(Math.random() < (ABYSS_DROP[e.kind] || 0))) return;
+  dropAbyss(e, e.kind === 'boss' && G.stage.id === 'abyss4' && Math.random() < taechoChance('abyss4'), cowKing);
+}
+function dropAbyss(e, taecho, cowKing = false) {
   progress.abyssLoot = progress.abyssLoot || {};
-  // 태초의 무기: from the 세계석 요새's lord or the 소 왕, now and then, in place of their own.
-  const taecho = e.kind === 'boss' && (G.stage.id === 'abyss4' || cowKing) && Math.random() < taechoChance();
   const sp = rollAbyssItem(progress.abyssLoot, G.level, taecho ? 'taecho' : cowKing ? 'cow' : null);
   G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: taecho ? '#fff1c0' : RARITY.unique.color });
   if (taecho) { say(`태초의 무기가 떨어졌습니다! (${specialName(sp, G.cls.id)})`, 'warn'); banner('태초의 무기'); }

@@ -93,11 +93,16 @@ export function specialName(sp, cls) {
   return `${PREFIX[sp.src]} ${GEAR[cls][sp.kind][specialBase(sp, cls)]}`;
 }
 
+const SPECIAL_CAP = 15;
 /** A special counts a rank above its base, and half a rank more for a 격 or a ward. */
 export function specialPower(sp, cls) {
   if (sp.craft) return sp.craft.pow + (sp.gyeok ? 0.5 : 0);
-  if (sp.rarity) return abyssPower(sp.rank) + RARITY[sp.rarity].pow;
-  return gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0);
+  if (sp.rarity) return abyssPower(sp.rank) + RARITY[sp.rarity].pow + (sp.taecho ? TAECHO_EDGE.pow : 0);
+  // A boss's special is a find, not the end of the road: worn, it stays under the 용무기 제십
+  // (17.2, ×3.06). A raid special on the top raid's set came out above it: 아이라바타's bow at 15.5
+  // with its 공격력 option (×1.15) struck ×3.29. So 15 at most, 13.5 with a 공격력 option (×3.01).
+  const cap = SPECIAL_CAP - ((sp.opts || [sp.opt && sp.opt.id]).includes('power') ? 1.5 : 0);
+  return Math.min(cap, gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0));
 }
 
 /** Where an ordinary tier drops: the grounds whose rank (with luck and a boss's +1) reach it. */
@@ -456,12 +461,21 @@ export const TAECHO_BASE = {
 // pal: the recolour (pale gold, the weapon's own shading kept); glowColor and the white core; the
 // sparks along the blade are 연's own fire tongues turned to gold-white light; fx: the strike's
 // effects (the abyss ones) in gold-white.
+// 태초의 무기's own way (WEAPON_FAMILY.taecho): the abyss uniques' hunt is for the crowd only;
+// 태초 strikes everything harder alike (all: bosses, leaders, a war's fighters too), the crowd a
+// little more (mob), and stands pow ranks above an abyss unique of the deepest floor (11.5 + 1 =
+// 12.5; with its 공격력 option ×2.88). Worn: a boss ×3.10, about the 용무기 제십's ×3.06 before its
+// 용X격 (the 용무기 stays the boss weapon); a crowd ×3.57, the most outside the abyss, where an
+// abyss unique's own hunt (×3.78) is better still.
+export const TAECHO_EDGE = { pow: 1, all: 0.08, mob: 0.15 };
 export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, classicTint: 0.12, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
     // the dark ones (smoke, the dark burst) turned over first: their black becomes light
     k_ab_smoke: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)',
     k_ab_darkburst: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)' } };
-const TAECHO_DROP = 0.3;
-export function taechoChance() { return TAECHO_DROP; }
+// How rare: of the 세계석 요새 lord's own drops (ABYSS_DROP.boss, 20%) a quarter, about one hunt in
+// twenty; the 소 왕, besides his horn, one hunt in eight (it was 30% a kill: three cow runs a 태초).
+const TAECHO_DROP = { abyss4: 0.25, cow: 0.12 };
+export function taechoChance(stage) { return TAECHO_DROP[stage] || 0; }
 const OPT_BY = Object.fromEntries(OPTIONS.map(o => [o.id, o]));
 
 function registerAbyss(id, d) {
@@ -552,7 +566,9 @@ export const WEAPON_FAMILY = {
   hyeonmu: { name: '사신수 · 현무', role: '방어·보호막', best: '생존·탱커',
     text: '갑옷 자리. 맞을 때 현무의 철옹: 주변 기절과 받는 피해 -40%.' },
   abyss: { name: '심연 고유', role: '사냥 청소·어둠 폭발', best: '사냥·끝없는 지옥',
-    text: '일반 몬스터·챔피언에게 피해 +20%, 끝없는 지옥에서 +15% 더, 처치 시 20% 어둠 폭발(주변 피해). 보스·우두머리·대인전에는 이 힘이 없고 등급도 낮음(최대 13.5).' },
+    text: '일반 몬스터·챔피언에게 피해 +20%, 끝없는 지옥에서 +15% 더, 처치 시 20% 어둠 폭발(주변 피해). 보스·우두머리·대인전에는 이 힘이 없고 등급도 낮음(최대 11.5, 공격력 옵션 ×1.15).' },
+  taecho: { name: '태초의 무기', role: '만능·빛의 일격', best: '어디서나 (사냥·보스·레이드·길드전)',
+    text: '모든 적에게 피해 +8%(보스·우두머리·길드전 상대 포함), 일반 몬스터에게 +15% 더, 처치 시 빛의 폭발. 등급 12.5(공격력 옵션 포함)로 심연 고유보다 1 높고 용무기 제십(17.2)보다 낮음. 끝없는 지옥 밖 사냥에서는 가장 강하고, 보스에는 용무기와 비슷. 세계석 요새 군주(약 5%)·소 왕(12%)만 떨어뜨림.' },
   gold: { name: '전설 · 금린', role: '제압(마비)·대인전', best: '길드전 PvP',
     text: '화륜옥쇄 격: 주변 큰 피해와 마비(길드전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
   steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
@@ -564,7 +580,7 @@ const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr
 export function familyOf(sp, dragon = false, raid = false) {
   if (dragon) return 'dragon';
   if (!sp) return raid ? 'raid' : 'plain';
-  if (sp.rarity) return 'abyss';
+  if (sp.rarity) return sp.taecho ? 'taecho' : 'abyss';
   if (sp.craft) return FAMILY_OF_CRAFT[sp.id] || 'craft';
   return 'special';
 }
