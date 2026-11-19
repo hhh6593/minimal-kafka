@@ -14,7 +14,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier,
+  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier, TOP_GYEOK_FX,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -1108,7 +1108,12 @@ function applyGear() {
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (!sp) continue;
-    if (sp.gyeok && GYEOK[sp.gyeok]) gy.push(tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? pow('weapon') : 0));
+    if (sp.gyeok && GYEOK[sp.gyeok]) {
+      const g0 = tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? pow('weapon') : 0);
+      // 태초 and the abyss uniques, the top weapons: their 격 drawn larger (the picture only).
+      const top = k === 'weapon' && (sp.taecho ? TOP_GYEOK_FX.taecho : sp.rarity ? TOP_GYEOK_FX.abyss : 0);
+      gy.push(top ? { ...g0, fxK: (g0.fxK || 1) * top } : g0);
+    }
     if (sp.ward) p.wards.add(sp.ward);
   }
   p.dragonCut = 0;
@@ -1515,7 +1520,9 @@ function glowIcon(pic, dz) {
  *  gold-white dress and light, cut to the weapon. Made once a class; null until the sheet is in. */
 const taechoIcons = {};
 function taechoIcon(cls, sp) {
-  if (taechoIcons[cls.id]) return taechoIcons[cls.id];
+  // (an abyss weapon laid from the original's own picture takes the same way, in its dark dress)
+  const ik = cls.id + (sp.taecho ? '' : ':abyss');
+  if (taechoIcons[ik]) return taechoIcons[ik];
   // The first four: old 바람's picture itself, in the same light (what the hero holds).
   const cn = sp.classic && sp.classic[cls.id];
   if (cn && M.gear && M.gear[cn]) {
@@ -1523,10 +1530,12 @@ function taechoIcon(cls, sp) {
     if (!(pp in images)) loadImage(pp);
     const pic = images[pp];
     if (!pic || !pic.complete || !pic.width) return null;
-    return (taechoIcons[cls.id] = glowIcon(pic, sp.dress));
+    return (taechoIcons[ik] = glowIcon(pic, sp.dress));
   }
   const H = M.yhero2 && M.yhero2[cls.id], ab = sp.base && sp.base[cls.id];
-  const meta = H && ab && H.layers.weapon[String(ab[0])];
+  // (the original's own weapon where it is laid for the class: items.js TAECHO_WORN)
+  const wn = H && sp.worn && sp.worn[cls.id] && H.layers.weapon[sp.worn[cls.id]];
+  const meta = wn || (H && ab && H.layers.weapon[String(ab[0])]);
   if (!meta) return null;
   const path = 'yhero2/' + meta.file;
   if (!(path in images)) loadImage(path);
@@ -1534,7 +1543,7 @@ function taechoIcon(cls, sp) {
   if (!im || !im.complete || !im.width) return null;
   const a = H.anims.idle_down || H.anims.walk_down, box = frameBox(H, [meta]), dz = sp.dress;
   const sheets = { weapon: { im: dressedSheet(im, path, dz.tint, dz.pal), meta } };
-  if (H.layers.wback && H.layers.wback[String(ab[0])]) {
+  if (!wn && H.layers.wback && H.layers.wback[String(ab[0])]) {
     const wb = H.layers.wback[String(ab[0])], wp = 'yhero2/' + wb.file;
     if (!(wp in images)) loadImage(wp);
     if (images[wp] && images[wp].width) sheets.wback = { im: dressedSheet(images[wp], wp, dz.tint, dz.pal), meta: wb };
@@ -1564,10 +1573,10 @@ function taechoIcon(cls, sp) {
     rg.fillRect(0, 0, r.width, r.height);
     g.save(); g.filter = `blur(${blur}px)`; g.globalAlpha = al; g.drawImage(r, 0, 0); g.drawImage(r, 0, 0); g.restore();
   };
-  tint(dz.glowColor, 4, 0.9);
-  tint(dz.core, 1, 0.9);
+  tint(dz.glowColor || '#ff2a0a', 4, dz.core ? 0.9 : 0.6);
+  if (dz.core) tint(dz.core, 1, 0.9);
   g.drawImage(w, bb[0], bb[1], bb[2], bb[3], pad, pad, bb[2], bb[3]);
-  return (taechoIcons[cls.id] = c.toDataURL());
+  return (taechoIcons[ik] = c.toDataURL());
 }
 
 /**
@@ -1599,12 +1608,13 @@ function dragonIcon(cls, step) {
 }
 /** A piece's icon: what the hero wears with it (wornIcon); today's picture or the wardrobe's without 연's heroes. */
 function pieceIcon(cls, kind, t, spId) {
-  if (spId && SPECIAL[spId] && SPECIAL[spId].taecho) {
+  if (spId && SPECIAL[spId] && (SPECIAL[spId].taecho || (SPECIAL[spId].rarity && SPECIAL[spId].worn && SPECIAL[spId].worn[cls.id]
+    && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers.weapon[SPECIAL[spId].worn[cls.id]]))) {
     const ic = taechoIcon(cls, SPECIAL[spId]);
     if (ic) return ic;
   }
   // 청룡신검·현무불괴갑: worn as a recoloured 연 stand-in (items.js SINSU_DRESS), shown as the original's own picture.
-  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId].dress) {
+  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && (SPECIAL[spId].dress || SPECIAL[spId].worn || SPECIAL[spId].wornBack)) {
     const pic = picture(craftPicture(SPECIAL[spId], cls.id, starOf(cls, 'sp:' + spId)));
     if (pic) return pic;
   }

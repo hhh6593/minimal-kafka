@@ -1,0 +1,26 @@
+{
+ "cheong": {"item": "청룡신검", "mode": "weapon", "classes": ["warrior"]},
+ "hyeonmu": {"item": "현무불괴갑", "mode": "wings"},
+
+ "tc_warrior": {"item": "칠지천지환검", "mode": "weapon", "gauntlet": true, "classes": ["warrior"]},
+ "tc_rogue": {"item": "칠지천지환도", "mode": "weapon", "gauntlet": true, "classes": ["rogue"]},
+ "tc_mage": {"item": "칠지천지환봉", "mode": "weapon", "gauntlet": true, "classes": ["mage"]},
+ "tc_poet": {"item": "칠지천지환장", "mode": "weapon", "gauntlet": true, "classes": ["poet"]},
+ "tc_archer": {"item": "칠지천지환궁", "mode": "weapon", "gauntlet": true, "classes": ["archer"]},
+ "tc_lancer": {"item": "칠지천지환창", "mode": "weapon", "gauntlet": true, "classes": ["lancer"]},
+ "tc_monk": {"item": "칠지천지환영검", "mode": "weapon", "gauntlet": true, "classes": ["monk"]},
+ "tc_magus": {"item": "칠지천지환단봉", "mode": "weapon", "gauntlet": true, "classes": ["magus"]},
+ "tc_celestial": {"item": "칠지천지환구겸", "mode": "weapon", "gauntlet": true, "classes": ["celestial"]},
+ "tc_dokkaebi": {"item": "칠지천지환화도", "mode": "weapon", "gauntlet": true, "classes": ["dokkaebi"]},
+ "tc_reaper": {"item": "칠지천지환명도", "mode": "weapon", "gauntlet": true, "classes": ["reaper"]},
+
+ "ab_mage": {"item": "고대마령의적혈장10성", "mode": "weapon", "classes": ["mage"]},
+ "ab_poet": {"item": "할로윈천마적혈봉", "mode": "weapon", "classes": ["poet"]},
+ "ab_archer": {"item": "할로윈천마적혈궁", "mode": "weapon", "classes": ["archer"]},
+ "ab_lancer": {"item": "연옥방천극", "mode": "weapon", "classes": ["lancer"]},
+ "ab_monk": {"item": "주박권법혈천장갑", "mode": "weapon", "gauntlet": true, "classes": ["monk"]},
+ "ab_magus": {"item": "할로윈천마암흑단봉", "mode": "weapon", "classes": ["magus"]},
+ "ab_celestial": {"item": "흑옥방천극9성", "mode": "weapon", "classes": ["celestial"]},
+ "ab_dokkaebi": {"item": "고대마령의적혈봉10성", "mode": "weapon", "classes": ["dokkaebi"]},
+ "ab_reaper": {"item": "사혼명도9성", "mode": "weapon", "classes": ["reaper"]}
+}

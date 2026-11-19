@@ -300,12 +300,13 @@ export const CRAFTS = [
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
     mats: { sinsu_baekho: 8, fur: 30, scroll: 2 }, gold: 30000, sinsu: true },
-  // 현무불괴갑 (silver-white plates, gold trims, red gems, gold-and-teal wings): the body 연's
-  // 얼음의경갑(치장용) (코디 7100492, plate drawn for every class's rig), its pale-blue plates
-  // silver-white, its blue trims gold; the original's own wings on its back (wornBack, every class).
+  // 현무불괴갑 (white robe and plates, gold winged shoulders, red gems, gold-and-teal wings): the body
+  // 연's 빛의 전사 의복(남) (코디 803336: white, gold shoulders; drawn for every class's rig, as it is)
+  // and the original's own wings on its back (wornBack, every class; the user's pick of the sheet).
+  // (SINSU_DRESS.hyeonmu, the silver recolour of 얼음의경갑 7100492, stays for another look.)
   // (The look names: a build without 연's heroes.)
   { id: 'cr_sinsu_hyeonmu', kind: 'armor', name: '현무불괴갑', pic: 'name', picTop: "진'현무불괴갑",
-    base: Object.fromEntries(CLASSES.map(k => [k.id, [7100492, '얼음의경갑']])), dress: SINSU_DRESS.hyeonmu, wornBack: 's_hyeonmu',
+    base: Object.fromEntries(CLASSES.map(k => [k.id, [803336, '빛의 전사 의복']])), wornBack: 's_hyeonmu',
     look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주', lancer: '감시자남자경갑', monk: '혈귀혼남자대련복', magus: '금고급현복', celestial: '파수꾼천의', dokkaebi: '혈귀혼귀의', reaper: '해태 흑의' }, pow: 14, opt: 'life',
     mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
@@ -618,11 +619,24 @@ export const CLASSIC_AXIS = {
   '진일신검1성': [39, 28, 9, 0, 0.62, false], '청일기창1성': [105, 5, 0, 5, 1, false],
   '황염곤봉1성': [83, 9, 0, 9, 1, true], '적염곤봉1성': [2, 31, 21, 0, 1, false],
 };
+// The 태초 weapons are the original's 칠지천지환 line (its blades come out of a gauntlet), one of each
+// class's kind, as the original draws them worn laid on 연's heroes (tools/sinsu_worn.py, layers
+// "s_tc_<class>", the gauntlet on the fist), dressed in the same gold-white. The 격투가's, with no
+// glove of the line, the 칠지천지환영검. TAECHO_BASE's ids: the look where a build lacks the layers.
+export const TAECHO_WORN = Object.fromEntries(['warrior', 'rogue', 'mage', 'poet', 'archer', 'lancer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'].map(c => [c, 's_tc_' + c]));
 export const TAECHO_BASE = {
-  warrior: [1171, '진일신검'], rogue: [1272, '청일기창'], mage: [1372, '황염곤봉'], poet: [1471, '적염곤봉'],
-  archer: [220077, "극'흑일신궁"], lancer: [1324, '흑단화염장'], monk: [70025, '섬월권갑'], magus: [330064, '금홍단봉'],
-  celestial: [260048, '청월표창'], dokkaebi: [1020, '청룡의검'], reaper: [310026, '신일태도'],
+  warrior: [1171, '칠지천지환검'], rogue: [1272, '칠지천지환도'], mage: [1372, '칠지천지환봉'], poet: [1471, '칠지천지환장'],
+  archer: [220077, '칠지천지환궁'], lancer: [1324, '칠지천지환창'], monk: [70025, '칠지천지환영검'], magus: [330064, '칠지천지환단봉'],
+  celestial: [260048, '칠지천지환구겸'], dokkaebi: [1020, '칠지천지환화도'], reaper: [310026, '칠지천지환명도'],
 };
+// The abyss uniques' looks beyond the 전사·도적: the original's black and red weapons laid on 연's
+// heroes (layers "s_ab_<class>"; ABYSS_BASE where a build lacks them), dressed black, blood and fire:
+// 주술사 고대마령의적혈장, 도사 할로윈천마적혈봉, 궁사 할로윈천마적혈궁, 창술사 연옥방천극, 격투가
+// 주박권법혈천장갑, 마도사 할로윈천마암흑단봉, 천인 흑옥방천극, 도깨비 고대마령의적혈봉, 차사 사혼명도.
+export const ABYSS_WORN = Object.fromEntries(['mage', 'poet', 'archer', 'lancer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'].map(c => [c, 's_ab_' + c]));
+// 태초 and the abyss uniques are the top of the weapons: their 격 drawn this much larger again
+// (the picture only; GYEOK_TIER's reach by rank is unchanged).
+export const TOP_GYEOK_FX = { taecho: 1.6, abyss: 1.4 };
 // pal: the recolour (pale gold, the weapon's own shading kept); glowColor and the white core; the
 // sparks along the blade are 연's own fire tongues turned to gold-white light; fx: the strike's
 // effects (the abyss ones) in gold-white.
@@ -652,7 +666,8 @@ function registerAbyss(id, d) {
     ward: null, abName: T ? Object.fromEntries(Object.entries(TAECHO_BASE).map(([c, [, n]]) => [c, '태초의 ' + n])) : un.name,
     taecho: !!T, classic: T ? TAECHO_CLASSIC : null,
     // The look on the hero (a plain weapon's) and the strike's effect.
-    lookTier: ABYSS_LOOK_TIER.dark, base: T ? TAECHO_BASE : ABYSS_BASE, dress: T ? TAECHO_DRESS : ABYSS_DRESS, swing: SWING_OF };
+    lookTier: ABYSS_LOOK_TIER.dark, base: T ? TAECHO_BASE : ABYSS_BASE, dress: T ? TAECHO_DRESS : ABYSS_DRESS, swing: SWING_OF,
+    worn: T ? TAECHO_WORN : ABYSS_WORN };
   return SPECIAL[id];
 }
 
