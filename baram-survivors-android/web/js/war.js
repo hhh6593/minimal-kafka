@@ -122,6 +122,30 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const d2 = (a, b) => Math.hypot(a.tx - b.tx, a.ty - b.ty);
 
+// ------------------------------------------------ sides
+// A war has two guilds (0 is the hero's) and a raid one side against the boss's monsters; 「쟁」 has
+// three guilds and a boss whose servants strike them all. These ask the war, so the two-side modes
+// run exactly as they did (the same lists, in the same order).
+const TWO = [0, 1];
+/** The war's guilds, by number. */
+function teamsOf(W) { return W.teamIds || TWO; }
+/** The fighters a team fights (the living of every other guild; a war's gate among them): the other
+ * side's list itself in a war of two, the frame's own list in 「쟁」 (made in update). The boss's
+ * monsters are apart (W.mobs), looked at by the look-arounds that may strike them. */
+function foesOf(W, team) { return W.foes ? W.foes[team] : W.alive[1 - team]; }
+/** The hunt's list a body of the team stands in: the hero's guild with the hero (G.party), every
+ * other in G.enemies (the hero's spells strike them). */
+function listOf(team) { const G = A.G(); return team === 0 ? G.party : G.enemies; }
+/** A guild's colours (bars, names, the feed): ours green, the first foe red, 「쟁」's third violet. */
+const TEAM_COL = { bar: ['#3ad04a', '#e8402a', '#b05aff'], name: ['#9ff08a', '#ff9a8a', '#d8a8ff'], lead: ['#d8ff7a', '#ffb07a', '#e8c8ff'] };
+function teamCol(kind, team) { return TEAM_COL[kind][team === 0 ? 0 : team === 2 ? 2 : 1]; }
+/** 「쟁」, each frame: every guild's foes (the living of the other two) and the boss's living monsters. */
+function jaengLists(W) {
+  const G = A.G(), ids = W.teamIds;
+  W.foes = ids.map(t => { const out = []; for (const o of ids) if (o !== t) for (const b of W.alive[o]) out.push(b); return out; });
+  W.mobs = G.enemies.filter(e => !e.war && e.hp > 0);
+}
+
 export function initWar(api) {
   A = api;
   SK = api.SKILLS;
@@ -202,6 +226,7 @@ function injectUi() {
   #war-result td:nth-child(2), #war-sb td:nth-child(2) { text-align: left; }
   #war-result tr.me td, #war-sb tr.me td { color: #ffd040; }
   #war-result .t0 td:first-child, #war-sb .t0 td:first-child { color: #7cf08a; } #war-result .t1 td:first-child, #war-sb .t1 td:first-child { color: #ff7a6a; }
+  #war-result .t2 td:first-child, #war-sb .t2 td:first-child { color: #c88aff; }
   #war-result .wr-cols { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   #war-sb { position: fixed; inset: 6% 8%; background: rgba(10,8,6,0.93); border: 2px solid #5a4630; z-index: 40; overflow: auto; padding: 6px; }
   #war-sb .wr-cols { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
@@ -459,7 +484,7 @@ function setup() {
   heroTo(...W.teams[0].spawn);
   for (const b of W.bodies) {
     placeBody(W, b, b.home || W.teams[b.team].spawn);
-    (b.team === 1 ? G.enemies : G.party).push(b);
+    listOf(b.team).push(b);
   }
   // The enemy's gate can be struck by the hero's spells like any foe.
   if (W.gate && W.gate.team === 1) G.enemies.push(W.gate);
@@ -815,13 +840,15 @@ function update(dt) {
   const p = G.player, h = W.hero;
   h.tx = p.tx; h.ty = p.ty; h.x = p.x; h.y = p.y; h.hp = p.hp; h.maxHp = p.maxHp; h.dead = G.dead;
   // Lists of the living, by team, for every look-around this frame.
-  W.alive = [[], []];
+  const teams = teamsOf(W);
+  W.alive = teams.map(() => []);
   for (const b of W.bodies) if (!b.dead) W.alive[b.team].push(b);
   if (!h.dead) W.alive[0].push(h);
   if (W.gate && !W.gateDown) W.alive[W.gate.team].push(W.gate);
+  if (W.teamIds) jaengLists(W);
   // How many foes have each one as their target (pickFoe spreads the blows by it).
-  for (const t of [0, 1]) for (const b of W.alive[t]) b.engaged = 0;
-  for (const t of [0, 1]) for (const b of W.alive[t]) if (b.target && b.target.engaged !== undefined && !b.target.dead) b.target.engaged++;
+  for (const t of teams) for (const b of W.alive[t]) b.engaged = 0;
+  for (const t of teams) for (const b of W.alive[t]) if (b.target && b.target.engaged !== undefined && !b.target.dead) b.target.engaged++;
   // Bodies: steps, statuses, timers every frame; thinking ~8 times a second, staggered.
   for (const b of W.bodies) {
     if (b.dead) {
@@ -967,11 +994,12 @@ function startStep(b, nx, ny, dur) {
 
 function enemiesNear(W, b, r) {
   const out = [];
-  for (const e of W.alive[1 - b.team]) {
+  for (const e of foesOf(W, b.team)) {
     if (e.gate) continue;
     const d = d2(b, e);
     if (d <= r) out.push([e, d]);
   }
+  if (W.mobs) for (const e of W.mobs) { const d = d2(b, e); if (d <= r) out.push([e, d]); }
   return out;
 }
 /** The bodies of t's own side near t (a spread spell's victims round its target). A raid's
@@ -979,7 +1007,7 @@ function enemiesNear(W, b, r) {
  * side — and every spread spell of the war struck the caster's friends round its target. */
 function packNear(W, t, r) {
   const out = [];
-  for (const e of W.alive[t.team === 0 ? 0 : 1]) {
+  for (const e of t.team !== undefined ? W.alive[t.team] : W.mobs || W.alive[1]) {
     if (e.gate) continue;
     const d = d2(t, e);
     if (d <= r) out.push([e, d]);
@@ -988,12 +1016,13 @@ function packNear(W, t, r) {
 }
 function nearest(W, b, r) {
   let best = null, bd = r;
-  for (const e of W.alive[1 - b.team]) {
+  for (const e of foesOf(W, b.team)) {
     if (e.gate) continue;
     if (unseenHid(e)) continue;
     const d = d2(b, e);
     if (d <= bd && !unseen(W, b, e, d)) { bd = d; best = e; }
   }
+  if (W.mobs) for (const e of W.mobs) { const d = d2(b, e); if (d <= bd && !(e.guardT > A.G().t)) { bd = d; best = e; } }
   return best;
 }
 /**
@@ -1006,12 +1035,21 @@ function nearest(W, b, r) {
 function pickFoe(W, b, r) {
   const G = A.G();
   let best = null, bs = 1e9;
-  for (const e of W.alive[1 - b.team]) {
+  for (const e of foesOf(W, b.team)) {
     if (e.gate) continue;
     if (unseenHid(e)) continue;
+    if (b.only !== undefined && e.team !== b.only) continue; // 「쟁」: a squad sent on one guild
     const d = d2(b, e);
     if (d > r || unseen(W, b, e, d)) continue;
     const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
+    if (s < bs) { bs = s; best = e; }
+  }
+  // 「쟁」: a servant in the way is struck too (the boss is the 보스 order's, not a passing blow's).
+  if (W.mobs && b.only === undefined) for (const e of W.mobs) {
+    if (e.kind === 'boss') continue;
+    const d = d2(b, e);
+    if (d > r) continue;
+    const s = d + 1.5;
     if (s < bs) { bs = s; best = e; }
   }
   return best;
@@ -1415,7 +1453,7 @@ function thinkCmdr(W, b) {
     if (b.wind && G.t >= b.wind.at) {
       const w = b.wind;
       b.wind = null;
-      for (const e of W.alive[1 - b.team]) {
+      for (const e of foesOf(W, b.team)) {
         if (e.gate || Math.hypot(e.tx - w.x, e.ty - w.y) > w.r) continue;
         hit(W, b, e, W.U * 3.5 * (b.pw || 1));
         if (!e.hero) e.stun = Math.max(e.stun, 1);
@@ -1592,9 +1630,9 @@ function hit(W, src, t, dmg) {
   const G = A.G();
   if (!alive(t) || W.over) return;
   if (src.team === 0 && !src.hero && A.auraK) dmg *= A.auraK(src); // 주작의 기운 (game.js auraK): the hero's aura on its side
-  if (W.raid && !t.war && !t.hero) return raidHit(W, src, t, dmg);
+  if ((W.raid || W.mobs) && !t.war && !t.hero) return raidHit(W, src, t, dmg);
   if (src.dead && !src.cmdr) dmg *= 0.5;
-  if (W.diag && src.team === 1 && !t.gate) {
+  if (W.diag && src.team >= 1 && !t.gate) {
     W.diag.atk[t.hero ? 'hero' : t.role === 'tank' && !t.cmdr ? 'tank' : 'other']++;
     if (t.hero) { const w = W.diag.heroWhy = W.diag.heroWhy || {}, k = src.target === t ? src.tWhy || (src.troop ? 'troop' : src.cmdr ? 'cmdr' : '?') : 'splash'; w[k] = (w[k] || 0) + 1; }
   }
@@ -1780,7 +1818,7 @@ function kill(W, f, killer) {
   f.down = true;
   f.stats.deaths++;
   A.occ.delete(k2(f.tx, f.ty));
-  const list = f.team === 1 ? G.enemies : G.party;
+  const list = listOf(f.team);
   const at = list.indexOf(f);
   if (at >= 0) list.splice(at, 1);
   // A raider lies longer (a healer can raise it meanwhile) and longer still once the boss rages.
@@ -1811,7 +1849,7 @@ function kill(W, f, killer) {
   const heroIn = by === W.hero || (f.lastHitBy === W.hero);
   if (heroIn || (W.hero.stats && [...f.hitBy.keys()].includes(W.hero))) A.gainXp(Math.max(3, A.xpFor(G.player.lvl) / (W.role === 'dps' ? 6 : 9)));
   if (onScreen(f) && A.M().fx.h_kill && A.fxBudget('kill', 6)) A.fxOn('h_kill', f, { scale: f.cmdr ? 1.2 : 0.7 });
-  if (!f.troop) W.feed.push({ t: G.t, a: by ? by.name || (by.m && by.m.name) || '몬스터' : '?', at: by && by.team !== undefined ? by.team : 1 - f.team, b: f.name, bt: f.team, big: !!f.cmdr });
+  if (!f.troop) W.feed.push({ t: G.t, a: by ? by.name || (by.m && by.m.name) || '몬스터' : '?', at: by && by.team !== undefined ? by.team : W.teamIds ? -1 : 1 - f.team, b: f.name, bt: f.team, big: !!f.cmdr });
   if (W.mode === 'commander' && !f.troop && by) W.score[by.team] += f.cmdr ? 0 : 1;
   if (f.cmdr) {
     A.say(`${f.name}${f.team === 0 ? '이 쓰러졌습니다!' : '을 쓰러뜨렸습니다!'}`, f.team === 0 ? 'warn' : 'sys');
@@ -1835,7 +1873,7 @@ function respawn(W, b) {
   b.upT = W.t;
   const at = b.home || W.teams[b.team].spawn;
   placeBody(W, b, at);
-  (b.team === 1 ? G.enemies : G.party).push(b);
+  listOf(b.team).push(b);
   if (onScreen(b) && A.M().fx.k_revive) A.addFx('k_revive', b.x, b.y + 2, { anchor: 'bottom', scale: 0.7 });
 }
 
@@ -1848,7 +1886,7 @@ function revive(W, healer, g) {
   b.down = false;
   b.hp = b.maxHp * 0.4;
   placeBody(W, b, [g.tx, g.ty]);
-  (b.team === 1 ? G.enemies : G.party).push(b);
+  listOf(b.team).push(b);
   W.ghosts = W.ghosts.filter(x => x !== g);
   credit(healer, 'revives', 1);
   shout(W, healer, '부활');
@@ -1868,11 +1906,11 @@ function heroDown() {
   p.hp = 0;
   W.hero.stats.deaths++;
   const by = W.hero.lastHitBy;
-  if (by && by.team === 1) { credit(by, 'kills', 1); W.teams[1].kills++; if (W.mode === 'commander') W.score[1]++; }
+  if (by && by.team >= 1) { credit(by, 'kills', 1); W.teams[by.team].kills++; if (W.mode === 'commander') W.score[1]++; }
   for (const [who, t] of W.hero.hitBy) if (who !== by && G.t - t < 6) credit(who, 'assists', 1);
   W.hero.hitBy.clear();
   if (W.raid && G.aggro === p) G.aggro = raidAggro();
-  W.feed.push({ t: G.t, a: by ? by.name : '?', at: 1, b: W.hero.name, bt: 0 });
+  W.feed.push({ t: G.t, a: by ? by.name : '?', at: by && by.team >= 1 ? by.team : 1, b: W.hero.name, bt: 0 });
   // 레이드: the hero gets up a few times only (raidRevives); then it lies till the raid is over
   // and the raiders fight on (the result, rewards and the way back to town as always).
   if (W.raid && W.revivesLeft !== undefined) {
@@ -2041,8 +2079,8 @@ function heroIn(W, x, y, r) {
   return !G.dead && Math.hypot(p.tx - x, p.ty - y) <= r;
 }
 function countAt(W, x, y, r) {
-  const n = [0, 0];
-  for (const t of [0, 1]) for (const b of W.alive[t]) if (!b.gate && !b.troop && Math.hypot(b.tx - x, b.ty - y) <= r) n[t]++;
+  const n = teamsOf(W).map(() => 0);
+  for (const t of teamsOf(W)) for (const b of W.alive[t]) if (!b.gate && !b.troop && Math.hypot(b.tx - x, b.ty - y) <= r) n[t]++;
   return n;
 }
 
@@ -2960,7 +2998,7 @@ function finalOrders(W, team, set, squads) {
 function soloThink(W, b, order) {
   const G = A.G(), st = b.style;
   if (!st || st === 'obj' || order.kind === 'follow' || W.phase === 'final') return false;
-  const foes = W.alive[1 - b.team], mates = W.alive[b.team];
+  const foes = foesOf(W, b.team), mates = W.alive[b.team];
   const around = (who, list, r) => { let n = 0; for (const o of list) if (o !== who && !o.gate && Math.abs(o.tx - who.tx) + Math.abs(o.ty - who.ty) <= r) n++; return n; };
   // The cautious: outnumbered near, back to the nearest group of friends.
   if (st === 'cautious') {
@@ -3180,7 +3218,7 @@ function hideThink(W, b, order) {
   const G = A.G();
   if (!b.timid || b.carry || W.raid) return false;
   const h = b.hide;
-  const foes = W.alive[1 - b.team], mates = W.alive[b.team];
+  const foes = foesOf(W, b.team), mates = W.alive[b.team];
   const count = (list, x, y, r) => { let n = 0; for (const o of list) if (o !== b && !o.gate && Math.abs(o.tx - x) + Math.abs(o.ty - y) <= r) n++; return n; };
   const k = hpk(b);
   if (!h) {
@@ -3202,7 +3240,8 @@ function hideThink(W, b, order) {
     const spot = hideSpot(W, b, foes.filter(e => !e.gate));
     if (!spot) return false;
     // Seen going: the hunters of the other side know where to look.
-    const seenBy = Math.random() < 0.8 && near.some(e => los(W, e.tx, e.ty, b.tx, b.ty)) ? 1 - b.team : -1;
+    const seer = Math.random() < 0.8 ? near.find(e => los(W, e.tx, e.ty, b.tx, b.ty)) : null;
+    const seenBy = seer ? seer.team : -1;
     b.hide = { spot, phase: 'go', at0: G.t, until: G.t + rnd(8, 16), why, seenBy, found: false, fight: [b.tx, b.ty] };
     b.state = 'go';
     b.retreatTo = undefined;
@@ -3400,7 +3439,7 @@ function rowHtml(W, x, i) {
 }
 function tables(W, rows) {
   const head = '<tr><th>#</th><th>이름</th><th>직업</th><th>역할</th><th>기여</th><th>피해</th><th>회복</th><th>받은</th><th>목표</th><th>K/D/A</th><th>부활</th></tr>';
-  return `<div class="wr-cols">${(W.raid ? [0] : [0, 1]).map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 길드'}${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
+  return `<div class="wr-cols">${(W.raid ? [0] : teamsOf(W)).map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 길드'}${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
 }
 
 /** The hero as it stood in the war, in 연's layers and its own gear, for the result's spotlight. */
@@ -4205,12 +4244,12 @@ function drawBody(b) {
   if (mk && !W.raid) { const s = b.cmdr ? 1.4 : 1; ctx.drawImage(mk, Math.round(b.x - mk.width * s / 2), by - Math.round(mk.height * s) - 1, Math.round(mk.width * s), Math.round(mk.height * s)); }
   ctx.fillStyle = '#000';
   ctx.fillRect(bx - 1, by, bw + 2, 4);
-  ctx.fillStyle = b.team === 0 ? '#3ad04a' : '#e8402a';
+  ctx.fillStyle = teamCol('bar', b.team);
   ctx.fillRect(bx, by + 1, Math.round(bw * k), 2);
   if (b.shield > G.t) { ctx.fillStyle = '#9ad8ff'; ctx.fillRect(bx, by + 3, bw, 1); }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
-  const nameCol = b.cmdr ? '#ffd040' : b.leader ? (b.team === 0 ? '#d8ff7a' : '#ffb07a') : b.team === 0 ? '#9ff08a' : '#ff9a8a';
+  const nameCol = b.cmdr ? '#ffd040' : b.leader ? teamCol('lead', b.team) : teamCol('name', b.team);
   // Level of detail: names near the hero (and the leaders' and 진영대장's) only.
   const dh = d2(b, W.hero);
   if (b.troop ? dh < 4 : (dh < 8 || b.leader || b.cmdr)) {
@@ -4288,8 +4327,12 @@ function keepFrame(key, c) {
 function blit(ctx, e, x, y) {
   ctx.drawImage(e.pic, e.sx, e.sy, e.w, e.h, x + e.ox, y + e.oy, e.w, e.h);
 }
-const markers = [null, null];
+const markers = [null, null, null];
+// The ▼'s tint for each guild: ours green (hue turned), the first foe as 연 draws it (red), the third
+// violet — 연's own arrow under a colour filter, as the 5차 icons are tinted (no new picture).
+const MARK_TINT = ['hue-rotate(115deg) saturate(1.3) brightness(1.15)', null, 'hue-rotate(275deg) saturate(1.2) brightness(1.2)'];
 function markerPic(team) {
+  team = team === 2 ? 2 : team === 0 ? 0 : 1;
   if (markers[team]) return markers[team];
   const im = img('ui_event_red_arrow');
   if (!im) return null;
@@ -4298,7 +4341,7 @@ function markerPic(team) {
   c.height = 13;
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = true;
-  g.drawImage(team === 0 ? A.tinted(im, 'hue-rotate(115deg) saturate(1.3) brightness(1.15)') : im, 0, 0, 9, 13);
+  g.drawImage(MARK_TINT[team] ? A.tinted(im, MARK_TINT[team]) : im, 0, 0, 9, 13);
   markers[team] = c;
   if (window.createImageBitmap) createImageBitmap(c).then(bm => { markers[team] = bm; }).catch(() => {});
   return c;
@@ -4337,10 +4380,11 @@ function plateFor(team, step, shield, big) {
   c.width = bw + 2;
   c.height = mh + 6;
   const g = c.getContext('2d');
-  if (im) g.drawImage(team === 0 ? A.tinted(im, 'hue-rotate(115deg) saturate(1.3) brightness(1.15)') : im, Math.round((bw + 2 - mw) / 2), 0, mw, mh);
+  const tint = MARK_TINT[team === 2 ? 2 : team === 0 ? 0 : 1];
+  if (im) g.drawImage(tint ? A.tinted(im, tint) : im, Math.round((bw + 2 - mw) / 2), 0, mw, mh);
   g.fillStyle = '#000';
   g.fillRect(0, mh + 1, bw + 2, 4);
-  g.fillStyle = team === 0 ? '#3ad04a' : '#e8402a';
+  g.fillStyle = teamCol('bar', team);
   g.fillRect(1, mh + 2, Math.round(bw * step / 12), 2);
   if (shield) { g.fillStyle = '#9ad8ff'; g.fillRect(1, mh + 4, bw, 1); }
   keep(plates, key, c);
@@ -4704,10 +4748,10 @@ function hud() {
     const a = Math.min(1, (6 - (G.t - f.t)) * 2);
     ctx.globalAlpha = a;
     const x = cw - 8 * u;
-    hudText(f.b, x, y, f.bt === 0 ? '#9ff08a' : '#ff9a8a');
+    hudText(f.b, x, y, f.bt < 0 ? '#ffd27a' : teamCol('name', f.bt));
     const wb = ctx.measureText(f.b).width;
     if (icon) ctx.drawImage(icon, x - wb - 16 * u, y - 10 * u, 12 * u, 12 * u);
-    hudText(f.a, x - wb - 20 * u, y, f.at === 0 ? '#9ff08a' : '#ff9a8a');
+    hudText(f.a, x - wb - 20 * u, y, f.at < 0 ? '#ffd27a' : teamCol('name', f.at));
     y += 13 * u;
   }
   ctx.globalAlpha = 1;
