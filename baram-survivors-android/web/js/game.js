@@ -7906,6 +7906,8 @@ function yGearVariants(cls, gear) {
   }
   // What of the weapon goes behind the body (the 무사's spear shaft, the 격투가's far fist).
   if (out.weapon && H.layers.wback && H.layers.wback[out.weapon]) out.wback = out.weapon;
+  // What of an outfit worn as 연's own look is not on the body (the 용 파천·멸아 wings).
+  if (out.armor && H.layers.aback && H.layers.aback[out.armor]) out.aback = out.armor;
   // The 코디 worn over the gear (costume.js): its looks replace the slots' own.
   return costumeVariants(H, gear.cos, out);
 }

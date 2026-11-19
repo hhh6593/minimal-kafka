@@ -37,6 +37,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import yeon_avatar as Y  # noqa: E402
+import yeon_itemclip as YI  # noqa: E402
 
 LAYERS = {
     'back': ['Hair_b'], 'body': ['Sprite'], 'armor': ['Skin'], 'head': ['Head', 'Hair'],
@@ -99,6 +100,7 @@ def main():
     env = UnityPy.load(units, items)
     parts, clips = Y.build(env)
     crc = {v['name']: k for k, v in parts.items()}
+    turn_k = [crc[n] for n in YI.TURNED_SLOTS if n in crc]
 
     # Every variant needed: (kind, variant) -> (texture id, item id, name).
     variants = {}
@@ -242,6 +244,12 @@ def main():
             fr, stop = Y.frames(clips[cname], parts)
             ts = [t for t, _ in fr] + [stop]
             ms = [max(40, int(round((ts[i + 1] - ts[i]) * 1000))) for i in range(len(fr))]
+            # Each frame's turn of the weapon and shield slots: 연 mirrors them in the directions
+            # seen from behind, so they stay in the right and the left hand.
+            for t, st in fr:
+                full = YI.full_state(clips[cname], parts, t)
+                for k in turn_k:
+                    st[k]['m'] = YI.state_m(full[k])
             anim_frames[key] = (fr, int(round(sum(ms) / len(ms))))
         imgs = {}
 
@@ -264,6 +272,9 @@ def main():
             if root is not None:
                 x += root[0]
                 y += root[1]
+            m = slot_state.get('m')
+            if m is not None and not YI.is_identity(m):
+                return YI.turned(im, px, py, x, -y, m)
             return (im, x - px, -y - py)
 
         def layer_of(kind, variant, st):

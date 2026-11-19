@@ -62,6 +62,11 @@ CAPE_OFFSET = 21
 TYPES = {'armor': 'AVATAR_SHIRT', 'helmet': 'AVATAR_HAT', 'cape': 'AVATAR_CAPE', 'face': 'AVATAR_FACE_DECORATION',
          'weapon': 'AVATAR_WEAPON', 'shield': 'AVATAR_SHIELD'}
 SLOTS = {'armor': ['Skin'], 'helmet': ['Hat', 'Hat_color'], 'face': ['Face'], 'shield': ['Sheild', 'Sheild_color']}
+# A shield look prefab's own part (the rest, a strap or a far half, goes in the sback layer).
+SHIELD_MAIN = ('Sheild',)
+# The two layers of a look of each kind (one picture: the first is the look's own slot).
+LOOK_LAYERS = {'weapon': ['weapon', 'wback'], 'shield': ['shield', 'sback'], 'armor': ['armor', 'aback']}
+SIDED = ('weapon', 'wback', 'shield', 'sback', 'aback')
 # Parts of an item prefab that are light, not the item: glows, trails, spell flashes.
 FX_PART = re.compile(r'(?i)spell|fx|light|trail|effect|stain|point|position|drop|wheel|follow')
 # Our classes' own weapons, by the prefab's item id (a 치장용 look reuses its weapon's prefab).
@@ -219,9 +224,14 @@ def main():
             except Exception:
                 units_sp[pp.path_id] = None
         return pp.path_id
+    turn_k = {crc[n] for n in YI.TURNED_SLOTS if n in crc}
     for cname in sorted({c for cls in index for c in class_anims(cls).values()}):
-        frame_cache[cname] = [(t, {k: dict(v, sprite=keep(v['sprite'])) for k, v in st.items()})
-                              for t, st in Y.frames(clips[cname], parts)[0]]
+        # The shield slot's turn too (연 mirrors it in the directions seen from behind): a shield
+        # look worn by its sheet's frame numbers is placed as the slot is.
+        frame_cache[cname] = [(t, {k: dict(v, sprite=keep(v['sprite']), **({'m': YI.state_m(full[k])} if k in turn_k else {}))
+                                   for k, v in st.items()})
+                              for t, st in Y.frames(clips[cname], parts)[0]
+                              for full in [YI.full_state(clips[cname], parts, t)]]
     del env, clips
     gc.collect()
     print('clips', round(time.time() - t0), flush=True)
@@ -310,7 +320,16 @@ def main():
             key = m.group(1).lower() if m else None
         f = folders.get(key or '', {})
         if kind == 'armor':
-            return {'E': f.get('avatar_0001.png'), 'F': f.get('avatar_0001_f.png'), 'A': f.get('avatar_0001_a.png')}
+            # The body sheet is avatar_0001 or avatar_0001_e (용랑·용주 파천/멸아); a "_f" sheet is the
+            # 격투가's walking body (51 frames) only in older outfits: newer ones hold its attack poses
+            # alone (18-28), which by frame number would put attack frames on its walk.
+            fs = f.get('avatar_0001_f.png')
+            tx = {'E': f.get('avatar_0001.png') or f.get('avatar_0001_e.png'), 'F': fs if tex_n.get(fs, 0) >= 51 else None,
+                  'A': f.get('avatar_0001_a.png')}
+            p = prefab_id(iid)
+            if p is not None and IC.has(p):
+                tx['item'] = p
+            return tx
         if kind == 'cape':
             e = next((t for n, t in f.items() if n.endswith('_e.png') and 'cape' in n), None) \
                 or next((t for n, t in f.items() if n.endswith('_e.png')), None)
@@ -379,33 +398,8 @@ def main():
             x += root[0]
             y += root[1]
         if m is not None:
-            return turned(im, px, py, x, -y, m)
+            return YI.turned(im, px, py, x, -y, m)
         return (im, x - px, -y - py)
-
-    def turned(im, px, py, x, y, m):
-        """The picture turned by m (2x2, y up) about its pivot (px, py in the picture), the pivot
-        landing on (x, y) (y down): a mirror (연 shows a weapon from behind by turning it 180
-        degrees about y, or a scale of -1) exactly, any other turn by nearest pixels."""
-        a, b, c, d = m[0][0], -m[0][1], -m[1][0], m[1][1]  # the same in picture space (y down)
-        if abs(b) < 1e-3 and abs(c) < 1e-3 and abs(abs(a) - 1) < 1e-3 and abs(abs(d) - 1) < 1e-3:
-            if a < 0:
-                im = im.transpose(Image.FLIP_LEFT_RIGHT)
-                px = im.width - px
-            if d < 0:
-                im = im.transpose(Image.FLIP_TOP_BOTTOM)
-                py = im.height - py
-            return (im, x - px, y - py)
-        det = a * d - b * c
-        if abs(det) < 1e-6:
-            return (im.crop((0, 0, 1, 1)).point(lambda v: 0), x, y)
-        cs = [(a * (u - px) + b * (v - py), c * (u - px) + d * (v - py)) for u, v in ((0, 0), (im.width, 0), (0, im.height), (im.width, im.height))]
-        x0, y0 = math.floor(min(p[0] for p in cs)), math.floor(min(p[1] for p in cs))
-        x1, y1 = math.ceil(max(p[0] for p in cs)), math.ceil(max(p[1] for p in cs))
-        ia, ib, ic, idd = d / det, -b / det, -c / det, a / det
-        # output (X, Y) -> offset (X + x0, Y + y0) -> source pivot + inverse(offset)
-        out = im.transform((max(1, x1 - x0), max(1, y1 - y0)), Image.AFFINE,
-                           (ia, ib, ia * x0 + ib * y0 + px, ic, idd, ic * x0 + idd * y0 + py), resample=Image.NEAREST)
-        return (out, x + x0, y + y0)
 
     def template(s):
         if not s or not s['active'] or s['sprite'] is None or not s['sprite'].path_id:
@@ -422,19 +416,29 @@ def main():
         wback too. Each layer gets its side ('f' in front of the body, 'b' behind, '' both or
         none). 청룡 심판의낫 holds its shaft behind the body and its blade in front (a nested
         Weapon/Weapon_F): drawn as one layer the shaft crossed the chest."""
+        return item_split(tx, st, cname, t, YI.MAIN_PARTS, 'weapon', 'wback')
+
+    def item_split(tx, st, cname, t, mains, front, second):
+        """weapon_split for any item prefab: its main parts (and their children on the same side
+        of the body) in the layer `front`, the rest in `second`, each with its side. A prefab
+        without such a part (a few shield looks hold a Face part) has its first part as main."""
+        it = IC._item(tx['item'])
+        tops = [p['name'] for p in it['parts'].values() if p['name'] != 'Sprite' and '/' not in p['name']]
+        if tops and not any(n in mains for n in tops):
+            mains = (tops[0],)
         body = st[0]['order']
         got = []
         for name, sp, pos, order, m in IC.posed(tx['item'], cname, t):
             if FX_PART.search(name):
                 continue
             got.append((name, sp, pos, order, m, 'f' if order >= body else 'b'))
-        main = {g[0]: g[5] for g in got if g[0] in YI.MAIN_PARTS}
-        out = {'weapon': ([], set()), 'wback': ([], set())}
+        main = {g[0]: g[5] for g in got if g[0] in mains}
+        out = {front: ([], set()), second: ([], set())}
         for name, sp, pos, order, m, side in got:
             top = name.split('/')[0]
-            k = 'weapon' if top in YI.MAIN_PARTS else 'wback'
-            if k == 'weapon' and name != top and top in main and main[top] != side:
-                k = 'wback'
+            k = front if top in mains else second
+            if k == front and name != top and top in main and main[top] != side:
+                k = second
             out[k][0].append((order, place(pos, sp, sp, st[0]['pos'], m)))
             out[k][1].add(side)
         res = {}
@@ -442,6 +446,42 @@ def main():
             lst.sort(key=lambda o: o[0])
             res[k] = ([p for _, p in lst], next(iter(sides)) if len(sides) == 1 else '')
         return res
+
+    def armor_root(tx, st, cname, t):
+        """The outfit prefab's own root sprite at this moment of the avatar's clip, placed as the
+        body is; None when the prefab keys none (the avatar's Skin slot draws it)."""
+        it = IC._item(tx['item'])
+        c = IC.clip(tx['item'], cname)
+        if it is None or c is None:
+            return None
+        key = ('root', cname, round(t, 4))
+        if key not in it['states']:
+            s0 = YI.full_state(c, it['parts'], t)[0]
+            ref = s0['sprite']
+            sp = None
+            if s0['active'] and ref is not None and ref.path_id:
+                try:
+                    sp = ref.read()
+                except Exception:
+                    sp = None
+            it['states'][key] = (sp, YI.state_m(s0))
+        sp, m = it['states'][key]
+        if sp is None:
+            return None
+        return place(st[0]['pos'], sp, sp, None, None if YI.is_identity(m) else m)
+
+    def armor_back(tx, st, cname, t):
+        """The outfit prefab's other parts (wings, a cape, a tail: Sprite_b, Sprite_b2 ...; the
+        용주 serpent is drawn from its "_fx" sheet), in one layer with its side of the body."""
+        body = st[0]['order']
+        got = []
+        for name, sp, pos, order, m in IC.posed(tx['item'], cname, t):
+            if FX_PART.search(name):
+                continue
+            got.append((order, place(pos, sp, sp, st[0]['pos'], m), 'f' if order >= body else 'b'))
+        got.sort(key=lambda g: g[0])
+        sides = {g[2] for g in got}
+        return [g[1] for g in got], (next(iter(sides)) if len(sides) == 1 else '')
 
     def body_frame(st):
         b = st[0]['sprite']
@@ -463,10 +503,17 @@ def main():
             lst, side = weapon_split(tx, st, cname, t)[kind]
             cur_side[0] = side if lst else ''
             return lst
-        if kind == 'shield' and tx.get('item'):
-            for name, sp, pos, order, m in sorted(IC.posed(tx['item'], cname, t), key=lambda p: p[3]):
-                if not FX_PART.search(name):
-                    out_l.append(place(pos, sp, sp, root, m))
+        # A shield look's prefab as 연 plays it, in two layers like a weapon's: the shield itself
+        # (Sheild and its children on its side of the body) and the rest (sback), each on the side
+        # of the body 연 sorts it to in that frame. Most are held in the left hand, in front of the
+        # body or behind it as the class's own shield; a sheath, a quiver or a board is carried
+        # behind the back (연's sorting order under the body's from the front): drawn at the class's
+        # shield place it lay across the chest.
+        if kind in ('shield', 'sback') and tx.get('item'):
+            lst, side = item_split(tx, st, cname, t, SHIELD_MAIN, 'shield', 'sback')[kind]
+            cur_side[0] = side if lst else ''
+            return lst
+        if kind == 'sback':
             return out_l
         if kind == 'cape':
             s = st.get(crc.get('Cape'))
@@ -490,6 +537,21 @@ def main():
             if tmpl is not None:
                 out_l.append(place(st[k]['pos'], tmpl, None, root if k != 0 else None))
             return out_l
+        # An outfit with a prefab of its own (연's newer ones: the 용 파천·멸아 lines ...) plays it
+        # beside the avatar, as a weapon: its root sprite is the outfit in that frame (an idle of
+        # its own, the 궁사's draw, the 격투가's strikes), and its other parts (Sprite_b: wings,
+        # a cape, a tail) the aback layer, on the side of the body 연 sorts them to. A frame the
+        # prefab leaves to the avatar (All_Comp_Off, no sprite) takes the Skin slot's frame.
+        if kind == 'aback':
+            if not tx.get('item'):
+                return out_l
+            lst, side = armor_back(tx, st, cname, t)
+            cur_side[0] = side if lst else ''
+            return lst
+        if kind == 'armor' and tx.get('item'):
+            p = armor_root(tx, st, cname, t)
+            if p is not None:
+                return [p]
         for name in SLOTS[kind]:
             k = crc.get(name)
             s = st.get(k) if k is not None else None
@@ -506,7 +568,7 @@ def main():
                 if name.endswith('_color'):
                     continue
                 return None
-            out_l.append(place(s['pos'], tmpl, alt, root if k != 0 else None))
+            out_l.append(place(s['pos'], tmpl, alt, root if k != 0 else None, s.get('m') if kind == 'shield' else None))
         return out_l
 
     # The classes by their clips: the same clips, the same pictures.
@@ -569,9 +631,9 @@ def main():
                     if bb:
                         cut.append((im.crop(bb), x + bb[0], y + bb[1]))
                 drawn[(key, i)] = cut
-                if kind in ('weapon', 'wback'):
+                if kind in SIDED:
                     sides[(key, i)] = cur_side[0] if cut else ''
-        if kind in ('weapon', 'wback'):
+        if kind in SIDED:
             side_of[kind] = sides
         return drawn
 
@@ -645,14 +707,14 @@ def main():
                 cl = [c for c in cl if allowed is None or c in allowed]
                 if not cl:
                     continue
-                lk = ['weapon', 'wback'] if kind == 'weapon' else [kind]
+                lk = LOOK_LAYERS[kind] if kind == 'weapon' or (kind in ('shield', 'armor') and tx.get('item')) else [kind]
                 draws = {k: render(k, tx, gkey) for k in lk}
-                sides = {k: dict(side_of.get(k, {})) for k in lk if k in ('weapon', 'wback')}
+                sides = {k: dict(side_of.get(k, {})) for k in lk if k in SIDED}
                 d = draws[lk[0]]
-                if kind == 'weapon' and d is not None and draws['wback']:
+                if len(lk) > 1 and kind != 'armor' and d is not None and draws[lk[1]]:
                     # A weapon held behind (the 천인's gourd, a bow at rest) shows in its second
                     # part: either part covers a frame.
-                    d = {f: d[f] + draws['wback'].get(f, []) for f in d}
+                    d = {f: d[f] + draws[lk[1]].get(f, []) for f in d}
                 if d is None or not any(d.values()):
                     if only:
                         print(iid, cl, 'no picture', d is None)

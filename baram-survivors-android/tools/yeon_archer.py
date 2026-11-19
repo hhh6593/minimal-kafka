@@ -221,6 +221,11 @@ def main():
         fr, stop = Y.frames(clips[cname], parts)
         ts = [t for t, _ in fr] + [stop]
         ms = [max(40, int(round((ts[i + 1] - ts[i]) * 1000))) for i in range(len(fr))]
+        # The quiver slot's turn in each frame (연 mirrors it in the directions seen from behind).
+        for t, st in fr:
+            full = YI.full_state(clips[cname], parts, t)
+            for k in [crc[n] for n in YI.TURNED_SLOTS if n in crc]:
+                st[k]['m'] = YI.state_m(full[k])
         anim_frames[key] = (fr, int(round(sum(ms) / len(ms))))
     imgs = {}
 
@@ -243,6 +248,9 @@ def main():
         if root is not None:
             x += root[0]
             y += root[1]
+        mt = s.get('m')
+        if mt is not None and not YI.is_identity(mt):
+            return YI.turned(im, px, py, x, -y, mt)
         return (im, x - px, -y - py)
 
     def body_frame(st):
@@ -278,9 +286,13 @@ def main():
             # weapon layer, the arrow on the string (Weapon_back) in wback.
             if (kind, variant) not in variants:
                 return out_l, orders
-            for name, sp, pos, order in IC.at(variants[(kind, variant)][2], ANIMS[key], t):
+            # Posed as 연 shows them (YI.posed): turned round in the directions seen from behind,
+            # the flash swung toward the shot.
+            for name, sp, pos, order, mt in IC.posed(variants[(kind, variant)][2], ANIMS[key], t):
+                if '/' in name:
+                    continue
                 if (name in YI.MAIN_PARTS) == (kind == 'weapon'):
-                    out_l.append(place({'pos': pos}, sp, sp, root))
+                    out_l.append(place({'pos': pos, 'm': mt}, sp, sp, root))
                     orders.append(order)
             return out_l, orders
         if kind == 'shield':

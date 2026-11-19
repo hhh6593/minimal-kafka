@@ -36,10 +36,14 @@ export const COLLECT = [
   [10, { hp: 20 }], [30, { armor: 1 }], [60, { dmg: 0.02 }], [120, { hp: 30 }], [200, { dmg: 0.02 }],
   [320, { armor: 1 }], [480, { dmg: 0.03 }], [700, { hp: 50 }], [1000, { dmg: 0.03 }],
 ];
-// 투명 모자 · 투명 망토: worn in the 모자 and 등 slots, they hide the helmet or cape the hero has on
-// (its stats stay), showing the hair (or the 헤어 picked). Free and always owned, like 코디 없음.
+// 투명 모자 · 투명 망토 · 투명 방패: worn in the 모자, 등 and 방패 slots, they hide what the hero has
+// there (the gear's piece, a special one too; its stats stay), showing the hair (or the 헤어 picked)
+// under a hidden hat. Free and always owned, like 코디 없음, and listed right after it.
 export const HIDE = 'hide';
-const HIDE_NAME = { helmet: '투명 모자', cape: '투명 망토' };
+const HIDE_NAME = { helmet: '투명 모자', cape: '투명 망토', shield: '투명 방패' };
+const HIDE_WHAT = { helmet: '투구·모자', cape: '망토', shield: '방패' };
+// The layers a slot's piece is drawn in (a shield look's far part is its own layer, sback).
+const SLOT_LAYERS = { helmet: ['helmet'], cape: ['cape'], shield: ['shield', 'sback'] };
 // 아바타 프리셋: each class keeps this many whole looks (progress.costume.presets[cls]).
 const PRESETS = 5;
 // Given at the first visit: something to wear before the first purchase.
@@ -75,7 +79,7 @@ export function loadCostumes() {
         for (const [v, fi] of Object.entries(vs)) {
           L[v] = metas[fi];
           const it = items[v.slice(1)];
-          if (it && kind !== 'wback' && kind !== 'back' && !it.classes.includes(cls)) it.classes.push(cls);
+          if (it && kind !== 'wback' && kind !== 'sback' && kind !== 'aback' && kind !== 'back' && !it.classes.includes(cls)) it.classes.push(cls);
         }
       }
     }
@@ -188,7 +192,7 @@ export function costumeVariants(H, cos, out) {
   for (const [kind, id] of Object.entries(cos)) {
     // 투명 모자 / 망토: the worn helmet or cape not drawn (its stats stay).
     if (id === HIDE) {
-      if (HIDE_NAME[kind]) delete out[kind];
+      if (HIDE_NAME[kind]) for (const k of SLOT_LAYERS[kind]) delete out[k];
       continue;
     }
     const v = 'c' + id;
@@ -198,6 +202,16 @@ export function costumeVariants(H, cos, out) {
     if (kind === 'weapon') {
       if (H.layers.wback && H.layers.wback[v]) out.wback = v;
       else delete out.wback;
+    }
+    // An outfit's parts off the body (wings, a cape, a tail: its prefab's Sprite_b), or none.
+    if (kind === 'armor') {
+      if (H.layers.aback && H.layers.aback[v]) out.aback = v;
+      else delete out.aback;
+    }
+    // A shield look's far part (a sheath's strap, the half behind the body), or none.
+    if (kind === 'shield') {
+      if (H.layers.sback && H.layers.sback[v]) out.sback = v;
+      else delete out.sback;
     }
     if (kind === 'helmet' && items[id] && items[id].whole && H.layers.head && H.layers.head.nohair) {
       out.head = 'nohair';
@@ -261,14 +275,20 @@ export function layerOrder(a, f, kinds) {
     if (i >= 0) z.splice(i + 1, 0, 'hair');
   }
   if (kinds.wback && !z.includes('wback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'wback');
-  // A weapon look's two layers each know, per frame, the side of the body 연 draws them on (its
-  // sorting): where the class's own weapon is on the other side, the layer moves across (청룡
-  // 심판의낫's shaft behind the body, its blade in front).
-  for (const kind of ['weapon', 'wback']) {
+  if (kinds.sback && !z.includes('sback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'sback');
+  if (kinds.aback && !z.includes('aback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'aback');
+  // A weapon or shield look's two layers each know, per frame, the side of the body 연 draws them
+  // on (its sorting): where the class's own piece is on the other side, the layer moves across
+  // (청룡 심판의낫's shaft behind the body, its blade in front; a sheath or a quiver carried on the
+  // back behind the body from the front, over it from behind).
+  for (const kind of ['weapon', 'wback', 'shield', 'sback', 'aback']) {
     const side = sideOf(kinds[kind], a, f);
-    if (!side || !z.includes(kind)) continue;
+    if (!side || z.indexOf('body') < 0) continue;
+    // A frame the class's own piece is not drawn in (its shield facing up, its hands in a cast)
+    // still shows the look where 연 draws it.
+    if (!z.includes(kind)) z.splice(z.indexOf('body'), 0, kind);
     const i = z.indexOf(kind), b = z.indexOf('body');
-    if (b < 0 || (side === 'f') === (i > b)) continue;
+    if ((side === 'f') === (i > b)) continue;
     z.splice(i, 1);
     if (side === 'f') z.splice(Math.max(z.indexOf('body'), z.indexOf('armor')) + 1, 0, kind);
     else z.splice(z.indexOf('body'), 0, kind);
@@ -514,7 +534,9 @@ function renderList(cls) {
   // Rows: the 벗기 cell first; with 세트, items of a set (two or more of this slot, as 연 names
   // its sets) under the set's name, the rest after (the 벗기 cell then on a row of its own).
   const cells = [];
-  const lead = HIDE_NAME[tab] ? [{ none: true }, { hide: true }] : [{ none: true }];
+  // The 투명 cell right after 코디 없음 (투명 방패 only for a class that carries a shield).
+  const H2 = (A.M().yhero2 || {})[cls.id];
+  const lead = HIDE_NAME[tab] && (tab !== 'shield' || (H2 && H2.layers.shield)) ? [{ none: true }, { hide: true }] : [{ none: true }];
   const rows = [{ cells: lead }];
   if (F.sets) {
     const by = new Map();
@@ -583,7 +605,7 @@ function paintRows() {
           d.onclick = () => { delete trial[tab]; pick = null; repaint(cls); };
         } else if (c.hide) {
           d.className = 'forge-item ready' + (trial[tab] === HIDE ? ' on' : '');
-          d.innerHTML = `<div class="noimg hide"></div><b>${HIDE_NAME[tab]}</b><small>무료 · 보유</small>`;
+          d.innerHTML = `<div class="noimg hide">숨김</div><b>${HIDE_NAME[tab]}</b><small>${HIDE_WHAT[tab]} 감추기 · 무료</small>`;
           d.onclick = () => { trial[tab] = HIDE; pick = null; repaint(cls); };
         } else {
           const it = items[c.id], free = isFree(it), o = free || own[c.id], g = GRADES[it.grade];
@@ -653,7 +675,7 @@ function buildDetail(detail, cls) {
   const info = document.createElement('div');
   info.className = 'coordi-info';
   if (id === HIDE && HIDE_NAME[tab]) {
-    info.innerHTML = `<b>${HIDE_NAME[tab]}</b> <span>무료</span><br><small>쓰고 있는 ${tab === 'helmet' ? '투구·모자' : '망토'}를 감춥니다. 능력치는 장비 그대로`
+    info.innerHTML = `<b>${HIDE_NAME[tab]}</b> <span>무료</span><br><small>쓰고 있는 ${HIDE_WHAT[tab]}를 감춥니다. 능력치는 장비 그대로`
       + `${tab === 'helmet' ? ', 머리(고른 헤어)가 보입니다' : ''}.</small>`;
   } else if (it) {
     const g = GRADES[it.grade], own = ownsCostume(id);

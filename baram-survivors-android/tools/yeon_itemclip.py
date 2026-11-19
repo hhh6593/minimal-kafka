@@ -17,6 +17,8 @@ import math
 import re
 import zlib
 
+from PIL import Image
+
 import yeon_avatar as Y
 
 # Renderer properties a clip may key (bindings name them by CRC32).
@@ -177,6 +179,32 @@ class ItemClips:
         return out
 
 
+def turned(im, px, py, x, y, m):
+    """The picture turned by m (2x2, y up) about its pivot (px, py in the picture), the pivot
+    landing on (x, y) (y down): a mirror (연 shows a weapon from behind by turning it 180
+    degrees about y, or a scale of -1) exactly, any other turn by nearest pixels."""
+    a, b, c, d = m[0][0], -m[0][1], -m[1][0], m[1][1]  # the same in picture space (y down)
+    if abs(b) < 1e-3 and abs(c) < 1e-3 and abs(abs(a) - 1) < 1e-3 and abs(abs(d) - 1) < 1e-3:
+        if a < 0:
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
+            px = im.width - px
+        if d < 0:
+            im = im.transpose(Image.FLIP_TOP_BOTTOM)
+            py = im.height - py
+        return (im, x - px, y - py)
+    det = a * d - b * c
+    if abs(det) < 1e-6:
+        return (im.crop((0, 0, 1, 1)).point(lambda v: 0), x, y)
+    cs = [(a * (u - px) + b * (v - py), c * (u - px) + d * (v - py)) for u, v in ((0, 0), (im.width, 0), (0, im.height), (im.width, im.height))]
+    x0, y0 = math.floor(min(p[0] for p in cs)), math.floor(min(p[1] for p in cs))
+    x1, y1 = math.ceil(max(p[0] for p in cs)), math.ceil(max(p[1] for p in cs))
+    ia, ib, ic, idd = d / det, -b / det, -c / det, a / det
+    # output (X, Y) -> offset (X + x0, Y + y0) -> source pivot + inverse(offset)
+    out = im.transform((max(1, x1 - x0), max(1, y1 - y0)), Image.AFFINE,
+                       (ia, ib, ia * x0 + ib * y0 + px, ic, idd, ic * x0 + idd * y0 + py), resample=Image.NEAREST)
+    return (out, x + x0, y + y0)
+
+
 def quat_m(x, y, z, w):
     """The x-y block of a quaternion's rotation matrix (sprites lie flat: what turns them about x
     or y shows as a flip or a squeeze)."""
@@ -198,6 +226,21 @@ def euler_m(ex, ey, ez):
         return (w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2, w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
                 w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2, w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2)
     return quat_m(*mul(mul(qy, qx), qz))
+
+
+def state_m(s):
+    """The 2x2 matrix (y up) of a part's state from full_state: its rotation, scale and sprite flip."""
+    m = mat_mul(s['rot'], [[s['scale'][0], 0], [0, s['scale'][1]]])
+    return mat_mul(m, [[-1 if s['flip'][0] else 1, 0], [0, -1 if s['flip'][1] else 1]])
+
+
+def is_identity(m):
+    return abs(m[0][0] - 1) < 1e-3 and abs(m[1][1] - 1) < 1e-3 and abs(m[0][1]) < 1e-3 and abs(m[1][0]) < 1e-3
+
+
+# The avatar's own slots that 연's clips turn (a scale of -1 or 180 degrees about y in the
+# directions seen from behind, so the weapon and shield stay in the right and left hands).
+TURNED_SLOTS = ('Weapon', 'Weapon_color', 'Weapon_back', 'Sheild', 'Sheild_color')
 
 
 def mat_mul(a, b):

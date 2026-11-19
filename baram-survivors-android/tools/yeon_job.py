@@ -176,7 +176,11 @@ def main():
         """{letter: texture} of the item's worn sheets for a kind."""
         f = folders.get(str(iid), {})
         if kind == 'armor':
-            return {'E': f.get('avatar_0001.png'), 'F': f.get('avatar_0001_f.png'),
+            # A "_f" sheet is the 격투가's walking body (51 frames) only in older outfits; newer ones
+            # (용비파천갑 ...) hold its strikes alone (18), which by frame number put strike poses on
+            # its walk and left the rest bare: such an outfit is not the 격투가's.
+            fs = f.get('avatar_0001_f.png')
+            return {'E': f.get('avatar_0001.png') or f.get('avatar_0001_e.png'), 'F': fs if tex_n.get(fs, 0) >= 51 else None,
                     'A': next((t for n, t in f.items() if n.endswith('_a.png') and '_a_b' not in n), None)}
         if kind == 'weapon':
             # Laid by the item's own clips: worn when they show it held and striking.
@@ -318,7 +322,7 @@ def main():
             imgs[k] = sp.image.convert('RGBA')
         return imgs[k]
 
-    def place(pos, tmpl, alt, root):
+    def place(pos, tmpl, alt, root, mt=None):
         sp = alt or tmpl
         geo = tmpl if alt is not None and (int(alt.m_Rect.width), int(alt.m_Rect.height)) == (int(tmpl.m_Rect.width), int(tmpl.m_Rect.height)) else sp
         im = pic(sp)
@@ -331,6 +335,8 @@ def main():
         if root is not None:
             x += root[0]
             y += root[1]
+        if mt is not None and not YI.is_identity(mt):
+            return YI.turned(im, px, py, x, -y, mt)
         return (im, x - px, -y - py)
 
     def body_frame(st):
@@ -370,9 +376,12 @@ def main():
             # Weapon_Spear) in the weapon layer, the others (behind, the off hand) in wback.
             if not tx.get('item'):
                 return out_l, orders
-            for name, sp, pos, order in IC.at(tx['item'], anims[key], t):
+            # Posed as 연 shows them (YI.posed): turned round in the directions seen from behind.
+            for name, sp, pos, order, mt in IC.posed(tx['item'], anims[key], t):
+                if '/' in name:
+                    continue
                 if (name in YI.MAIN_PARTS) == (kind == 'weapon'):
-                    out_l.append(place(pos, sp, sp, root))
+                    out_l.append(place(pos, sp, sp, root, mt))
                     orders.append(order)
             return out_l, orders
         if kind == 'cape':
