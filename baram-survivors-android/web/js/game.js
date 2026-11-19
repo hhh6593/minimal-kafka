@@ -980,14 +980,16 @@ function startRun(cls, stage, training = false) {
   nextChoice();
 }
 
-/** The 속도 key: shown only on a ground (or raid) conquered before. */
+/** The 속도 key: x2 anywhere, x3 on a ground (or raid) conquered before. */
+function speedMax() { return !G || (G.war && !G.war.raid) ? 1 : G.wasCleared ? 3 : 2; } // 대항전: as it is
+function huntSpeed() { return G ? Math.min(settings.speed || 1, speedMax()) : 1; }
 function syncSpeed() {
   const b = $('#speed-btn');
-  b.hidden = !(G && G.wasCleared);
-  b.textContent = `속도 ×${settings.speed || 1}`;
+  b.hidden = !G || !!G.training || speedMax() < 2;
+  b.textContent = `속도 ×${huntSpeed()}`;
 }
 $('#speed-btn').onclick = () => {
-  settings.speed = (settings.speed || 1) % 3 + 1;
+  settings.speed = huntSpeed() % speedMax() + 1;
   saveJson('bs_settings', settings);
   syncSpeed();
 };
@@ -2552,8 +2554,8 @@ function frame(now) {
   // slow motion.
   const dt = Math.min(0.1, (now - (frame.last || now)) / 1000);
   frame.last = now;
-  // A ground already conquered may be hunted at x2 or x3 (the 속도 key): farming goes quicker.
-  const fast = G && G.wasCleared ? settings.speed || 1 : 1;
+  // The 속도 key: x2 on any ground, x3 on one already conquered (farming goes quicker).
+  const fast = huntSpeed();
   for (let i = 0; i < TEST_SPEED * fast; i++) {
     if (!G || G.paused || G.choosing || G.over) continue;
     if (G.hitstop > 0) G.hitstop -= dt;
@@ -7002,14 +7004,22 @@ const PARTY = {
 
 /** 동료 모드's own companions: the player's other classes that have been played (a record). */
 function ownCompanions() {
-  return CLASSES.map(c => c.id).filter(id => id !== G.cls.id && PARTY[id] && (best[id] || promoOf(id) > 0))
-    .sort((a, b) => promoOf(b) - promoOf(a));
+  return CLASSES.map(c => c.id).filter(id => id !== G.cls.id && PARTY[id] && (best[id] || promoOf(id) > 0));
+}
+/** Who joins this hunt, in order: the 동료 설정's picks, then classes at random (once a hunt). */
+function partyOrder() {
+  if (G.partyOrder) return G.partyOrder;
+  const picks = (settings.partyPick || []).filter(id => id !== G.cls.id && PARTY[id]);
+  const rest = CLASSES.map(c => c.id).filter(id => id !== G.cls.id && PARTY[id] && !picks.includes(id));
+  for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  return (G.partyOrder = picks.concat(rest));
 }
 
 function joinParty(cls) {
   const p = G.player;
   const def = PARTY[cls.id];
-  const own = ownCompanions().includes(cls.id), promo = own ? promoOf(cls.id) : 0;
+  // Mine: a class picked in 동료 설정, or one played before; it shares the conquest (promote).
+  const own = (settings.partyPick || []).includes(cls.id) || ownCompanions().includes(cls.id), promo = own ? promoOf(cls.id) : 0;
   const name = own ? `내 ${cls.name}` : def.names[Math.floor(Math.random() * def.names.length)];
   const gear = savedGear(cls);
   const slot = G.party.length;
@@ -8164,8 +8174,7 @@ function gainXp(v) {
     if (joinAt >= 0) {
       // 동료 모드: the player's own other characters (those with a record), most 승급 first, then
       // the old four; they share the conquest (promote) and so climb their own 승급 with the hero.
-      const mine = ownCompanions();
-      const order = mine.concat(['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id && !mine.includes(c)));
+      const order = partyOrder();
       const c = CLASSES.find(x => x.id === order[joinAt]);
       // Only in 동료 모드 (the menu): a hunting ground is the hero's alone otherwise.
       // They come once the card is picked, announced, so no card seems to have called them.
@@ -8643,8 +8652,9 @@ function record() {
 /** How many 승급 a class has: each tier needs its ground conquered by that class, in order. */
 function promoOf(cls) {
   const done = progress.byClass[cls] || {};
+  // A later tier's ground conquered brings every 승급 before it (its ground need not be done).
   let n = 0;
-  while (n < PROMOS[cls].length && done[PROMOS[cls][n].at]) n++;
+  PROMOS[cls].forEach((pr, i) => { if (done[pr.at]) n = i + 1; });
   return n;
 }
 
@@ -10619,6 +10629,33 @@ $('#opt-sfx').onclick = () => {
   saveJson('bs_settings', settings);
   syncSettings();
 };
+$('#opt-party-pick').onclick = () => openPartyPick();
+/** 동료 설정: who joins in 동료 모드, in order (up to three); an empty place goes to a class at random. */
+function openPartyPick() {
+  const box = $('#trade-rows'), picks = (settings.partyPick || []).slice();
+  box.innerHTML = '';
+  $('#trade-title').textContent = '동료 설정';
+  $('#trade-gold').textContent = `고른 동료 ${picks.length}/3 · 빈 자리는 무작위`;
+  for (const c of CLASSES) {
+    const at = picks.indexOf(c.id), pr = promoOf(c.id), rec = best[c.id];
+    const r = document.createElement('div');
+    r.className = 'trade-row';
+    r.innerHTML = `<div><b>${at >= 0 ? `${at + 1}. ` : ''}${c.name}</b><span>${rec ? `최고 Lv ${rec.lvl}` : '기록 없음'}${pr ? ` · ${pr}차 승급` : ''}`
+      + `${rec || pr ? ' · 함께 깬 사냥터는 이 직업 기록에도' : ''}</span></div>`;
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = at >= 0 ? '빼기' : '넣기';
+    b.disabled = at < 0 && picks.length >= 3;
+    b.onclick = () => {
+      settings.partyPick = at >= 0 ? picks.filter(x => x !== c.id) : picks.concat(c.id);
+      saveJson('bs_settings', settings);
+      openPartyPick();
+    };
+    r.append(b);
+    box.append(r);
+  }
+  $('#trade').hidden = false;
+}
 $('#opt-party').onclick = () => {
   settings.party = !settings.party;
   saveJson('bs_settings', settings);
