@@ -183,7 +183,7 @@ export const CRAFTS = [
     look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '횃불', archer: '흑일멸화궁', lancer: '금홍비창', monk: '바람홍옥권갑', magus: '바람홍옥단봉', celestial: '바람홍옥포', dokkaebi: '바람홍옥퇴', reaper: '바람홍옥명도' }, pow: 8, opt: 'power', mats: { ember: 12, horn: 4 }, gold: 3500 },
   { id: 'cr_jade_armor', kind: 'armor', name: '옥룡 갑옷', look: '선녀의옷', pow: 9, opt: 'life', mats: { jade: 12, scale: 4 }, gold: 4500 },
   { id: 'cr_jade_shield', kind: 'shield', name: '백옥 방패', look: '정화의방패', pow: 9, opt: 'regen', mats: { jade: 12 }, gold: 4500 },
-  { id: 'cr_dragon_armor', kind: 'armor', name: { warrior: '용마파천갑', rogue: '용천파천갑', mage: '용랑파천의', poet: '용겸파천의', archer: '용섬파천복', lancer: '용무파천갑', monk: '용비파천갑', magus: '용화파천의', celestial: '용주파천단', dokkaebi: '용린파천갑', reaper: '용라파천갑' }, look: '용왕의용포', pow: 10, opt: 'guard',
+  { id: 'cr_dragon_armor', kind: 'armor', name: { warrior: '용마파천갑', rogue: '용천파천갑', mage: '용랑파천의', poet: '용겸파천의', archer: '용섬파천복', lancer: '용무파천갑', monk: '용비파천갑', magus: '용화파천의', celestial: '용주파천단', dokkaebi: '용린파천갑', reaper: '용라파천갑' }, look: '용왕의용포', pow: 10, opt: 'guard', /* worn as 연's own 치장용 of the class's piece, where 연 has one (its icon's picture) */ base: { warrior: [7100675], rogue: [7100677], poet: [7100679], archer: [7100685], lancer: [7100687], monk: [7100683], magus: [342039], dokkaebi: [7100691], reaper: [7100693] },
     mats: { scale: 20, pearl: 1 }, gold: 6000, pic: 'name', steps: [1, 3, 5, 7, 10] },
   { id: 'cr_dragon_shield', kind: 'shield', name: '용린방패', look: '백룡현갑', pow: 10, opt: 'power', mats: { scale: 15, pearl: 1 }, gold: 6000 },
   // Today's client's legendary gear (중국전설 금린, 일본전설 무신, 타계 고대마령, 용 멸아): drawn
@@ -228,7 +228,7 @@ export const CRAFTS = [
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 13, opt: 'guard', from: 'cr_gold_weapon',
     mats: { gold: 20, kalpa: 15, scroll: 2 }, gold: 15000, pic: 'name', legend: true },
   { id: 'cr_dragon_armor2', kind: 'armor', name: { warrior: '용마멸아갑', rogue: '용천멸아갑', mage: '용랑멸아의', poet: '용겸멸아의', archer: '용섬멸아복', lancer: '용무멸아갑', monk: '용비멸아갑', magus: '용화멸아의', celestial: '용주멸아단', dokkaebi: '용린멸아갑', reaper: '용라멸아갑' },
-    look: '용왕의용포', pow: 13, opt: 'life', from: 'cr_dragon_armor', mats: { essence: 15, scale: 20, pearl: 2 }, gold: 20000,
+    look: '용왕의용포', base: { warrior: [7100676], rogue: [7100678], poet: [7100680], archer: [7100686], lancer: [7100688], monk: [7100684], magus: [342043], dokkaebi: [7100692], reaper: [7100694] }, pow: 13, opt: 'life', from: 'cr_dragon_armor', mats: { essence: 15, scale: 20, pearl: 2 }, gold: 20000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_brit_shield', kind: 'shield', name: '브리트라한의방패', look: '천성대방패', pow: 13, opt: 'regen', from: 'cr_steel_shield',
     mats: { essence: 10, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
