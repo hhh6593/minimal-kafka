@@ -269,6 +269,86 @@ for (const c of CRAFTS) {
 // The raids' own places in the lines (avatar.js), after the crafted looks so no saved place moves.
 settleRaidPieces();
 
+// ---------------------------------------------------------------- 방어구 보조 옵션
+// The pieces besides the weapon (갑옷·방패·투구·망토) of special grade and above carry a second
+// option line besides their first, and the higher ones (a raid's, a deep ground's, the smith's
+// 전설 and 사신수 pieces) a feature of their own besides (PROCS): not a weapon's 격, a way of the
+// piece. Both follow from the piece's id (gearExtra), so a save holds nothing new and every old
+// piece has them already. A line is a second line, not more power: the piece's rank, and so its
+// health, guard and 전투력 base, stay as they were (combatPower counts the lines a little).
+// ---- armor option tuning (retune here) ----
+// Per line worn: crit +4%p chance (of 10%); critdmg +25% on a crit (×1.8 → ×2.05); final ×1.05;
+// floor: the low end of the blow's roll (0.9..1.1) raised 8% (so 0.98..1.1); vamp: 0.5% of the
+// hero's own blows back as health, at most vampCap of the most health a second; exp +8%.
+export const GEAR_OPT = { crit: 0.04, critdmg: 0.25, final: 0.05, floor: 0.08, vamp: 0.005, vampCap: 0.015, exp: 0.08 };
+export const EXTRA_OPTIONS = [
+  { id: 'crit', text: '치명타 확률 +4%' },
+  { id: 'critdmg', text: '치명타 피해 +25%' },
+  { id: 'final', text: '최종 피해 +5%' },
+  { id: 'floor', text: '최소 피해 +8%' },
+  { id: 'vamp', text: '흡혈 0.5%' },
+  { id: 'exp', text: '경험치 +8%' },
+];
+// The second line's pool by kind: low (an early ground's piece) and the more a high piece may draw.
+// 갑옷 stays mostly with life; 방패 guard and the low end of a blow; 투구 the crit; 망토 speed and the rest.
+const EXTRA_POOL = {
+  armor: { low: ['life', 'regen', 'guard', 'exp'], high: ['vamp', 'final', 'crit'] },
+  shield: { low: ['guard', 'regen', 'floor'], high: ['critdmg', 'boss', 'final'] },
+  helmet: { low: ['crit', 'haste', 'mana'], high: ['floor', 'exp', 'critdmg'] },
+  cape: { low: ['speed', 'magnet', 'regen'], high: ['critdmg', 'vamp', 'haste', 'final'] },
+};
+// The features (procs), by kind. cd: seconds between two.
+//   barrier  호신강기 — every cd seconds a shield that takes k of the most health in blows.
+//   killheal 흡정 — a kill heals k of the most health, chance a kill.
+//   shock    진각 — struck, a shockwave round the hero (area tiles), dmg × the 격 power.
+//   swift    질풍 — struck, speed +k for sec seconds.
+// ---- armor proc tuning (retune here) ----
+export const PROCS = {
+  barrier: { name: '호신강기', cd: 18, k: 0.1, fx: 'k_p_protect', text: '18초마다 최대 체력 10%만큼 피해를 막는 보호막' },
+  killheal: { name: '흡정', chance: 0.1, cd: 0.5, k: 0.02, fx: 'k_c_heal', text: '몬스터를 쓰러뜨리면 10% 확률로 체력 2% 회복' },
+  shock: { name: '진각', cd: 4, area: 2, dmg: 1.5, fx: 'k_mk_quake', text: '맞으면 주변 2칸에 충격파(격 위력 ×1.5, 4초마다)' },
+  swift: { name: '질풍', cd: 8, k: 0.35, sec: 2.5, fx: 'k_rp_walk', text: '맞으면 2.5초 동안 이동속도 +35%(8초마다)' },
+};
+const PROC_POOL = { armor: ['barrier', 'killheal'], shield: ['shock', 'barrier'], helmet: ['killheal', 'shock'], cape: ['swift', 'killheal'] };
+const OPT_TEXT = Object.fromEntries([...OPTIONS, ...EXTRA_OPTIONS].map(o => [o.id, o.text]));
+/** A piece's high grade: a raid's, a deep ground's (rank 15+), the smith's 전설·사신수 (rank 10+). */
+function highPiece(sp) {
+  return sp.craft ? sp.craft.pow >= 10 : sp.raid || sp.rank >= 15;
+}
+function idHash(id) {
+  let h = 2166136261;
+  for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+}
+/** The second line and the feature of a piece besides the weapon, from its id: { extra, proc }. */
+export function gearExtra(sp) {
+  if (!sp || sp.kind === 'weapon' || sp.rarity || !EXTRA_POOL[sp.kind]) return { extra: null, proc: null };
+  const h = idHash(sp.id), high = highPiece(sp), pool = EXTRA_POOL[sp.kind];
+  const first = sp.opt && sp.opt.id;
+  const from = (high ? [...pool.low, ...pool.high] : pool.low).filter(o => o !== first && o !== 'power');
+  // A high piece draws its line from the high half two times in three (an offensive line likelier).
+  const pick = high && h % 3 ? pool.high.filter(o => o !== first) : from;
+  const extra = pick[(h >>> 4) % pick.length];
+  const procs = PROC_POOL[sp.kind];
+  const proc = high ? procs[(h >>> 12) % procs.length] : null;
+  return { extra, proc };
+}
+/** Every option id of a special (its first, then the rest). */
+export function optIds(sp) {
+  return sp.opts || (sp.opt ? [sp.opt.id] : []);
+}
+for (const sp of SPECIALS) {
+  const { extra, proc } = gearExtra(sp);
+  if (!extra && !proc) continue;
+  const first = sp.opt.id;
+  sp.opts = extra ? [first, extra] : [first];
+  sp.extra = extra;
+  sp.proc = proc;
+  // A new object: OPTIONS' own entries are shared by many pieces.
+  sp.opt = { id: first, text: [OPT_TEXT[first], extra && OPT_TEXT[extra], proc && PROCS[proc].name].filter(Boolean).join(' · ') };
+  sp.optLines = [OPT_TEXT[first], extra && OPT_TEXT[extra]].filter(Boolean);
+}
+
 // Worn looks where 연's own item layer (yhero2's map) is missing or broken, as 연's 치장용 copy of
 // the piece or its nearest kin (game.js yGearVariants; the icon follows the look, game.js wornIcon).
 // The 용무기 by step, where the build's map repeats a lower step's sword (연's 칠~십 have no plain

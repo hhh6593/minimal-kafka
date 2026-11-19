@@ -450,6 +450,13 @@
   .equip i.fam { display: block; width: 100%; font: normal 8px/10px G9, monospace; color: #8a3a08; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .equip:has(i.fam) { height: 80px; } .equip.special:has(i.fam) { height: 80px; } .equip:has(i.fam) img { max-height: 30px; }
   #equip-gyeok .none { color: #8a6a40; }
+  /* A piece's card: pointed at (or just worn), its rank, its option lines and its feature. */
+  #equip-tip { margin: 6px 0 0; padding: 4px 8px; font: 10px/14px G9, monospace; color: #2a1606; background: #f4e2b8;
+      border: 2px solid; border-color: #7a4a1e #f4dca8 #f4dca8 #7a4a1e; }
+  #equip-tip b { font-size: 12px; color: #7a1800; }
+  #equip-tip .o1 { color: #2a5a10; } #equip-tip .o2 { color: #1a4a9a; } #equip-tip .pr { color: #8a3a08; } #equip-tip .gy { color: #7a1800; }
+  #equip-tip .sub { color: #6a5030; }
+  .equip.util { height: 68px; } .equip.util img { max-width: 30px; max-height: 30px; margin: 0 auto; }
   #sort { padding: 4px 0 8px; }
   .sort-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .sort-head b { font-size: 20px; color: #7a1800; min-width: 80px; }
@@ -552,6 +559,13 @@
   #ult { width: 92px; height: 40px; }
   #ult.ready { color: #7a1800; border-color: #fff0c0 #5a3212 #5a3212 #fff0c0; }
   #ult small { display: block; font: 8px G7, monospace; font-weight: normal; }
+  /* 보조 기술: tapped by hand only; the wait darkens it from the top, the seconds under the name. */
+  #keys #util-btn { position: relative; width: 92px; height: 40px; background-color: #000; background-repeat: no-repeat; background-position: 4px center; background-size: 32px 32px; color: #fff;
+      padding-left: 36px !important; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; --wait: 0%; }
+  #keys #util-btn::after { content: ''; position: absolute; left: 0; top: 0; right: 0; height: var(--wait); background: rgba(0,0,0,0.6); pointer-events: none; }
+  #keys #util-btn span, #keys #util-btn small { position: relative; z-index: 1; display: block; }
+  #keys #util-btn small { font: 8px G7, monospace; font-weight: normal; }
+  #keys #util-btn.ready { border-color: #9ad8ff; }
   /* Folded away: a tab on the frame brings it back; health and mana stay in sight under the map tab. */
   #unfold { position: absolute; right: 0; top: 30%; transform: translateY(-50%); pointer-events: auto; padding: 8px 2px;
       writing-mode: vertical-rl; font: 700 10px G9, monospace; color: #f4e6c4; background: #6a3a18;
@@ -608,7 +622,7 @@
   body.yeon #keys { right: 8px; bottom: 8px; display: grid; grid-template-columns: 42px 42px; gap: 5px;
       justify-items: stretch; align-items: end; }
   body.yeon #keys > button { touch-action: manipulation; }
-  body.yeon #keys > button:not(#ult) { height: 32px; width: auto !important; min-width: 0; padding: 0 2px;
+  body.yeon #keys > button:not(#ult):not(#util-btn) { height: 32px; width: auto !important; min-width: 0; padding: 0 2px;
       font-size: 12px !important; line-height: 28px; white-space: nowrap;
       background: rgba(0,0,0,0.78) !important; color: #fff !important; border: 2px solid rgb(148,48,219) !important; }
   body.yeon #keys > #war-call-btn { border-color: rgb(88,168,60) !important; color: #c8f0b0 !important; }
@@ -619,6 +633,12 @@
       padding-bottom: 1px; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
   body.yeon #ult small { font-size: 8px; }
   body.yeon #ult.ready { border-color: #ffd040; }
+  /* 보조 기술 left of the 필살기, a little smaller, at its foot. */
+  body.yeon #keys > button#util-btn:not(#ult) { position: absolute; right: 64px; bottom: 0; width: 46px !important; height: 46px; padding: 0 !important;
+      background-color: #000 !important; background-position: center 3px; background-size: 32px 32px; border: 3px solid rgb(88,140,219) !important; outline: 1px solid #000;
+      display: flex; flex-direction: column; justify-content: flex-end; line-height: 10px; font-size: 9px !important; }
+  body.yeon #keys > button#util-btn:not(#ult).ready { border-color: #9ad8ff !important; }
+  body.yeon #keys > button#util-btn:not(#ult)[hidden] { display: none; }
   body.yeon #pause-btn, body.yeon #speed-btn { background: #000; color: #fff; border: 2px solid rgb(148,48,219); }
   body.yeon #unfold { top: 46%; }
   /* 연's notices: words in the field with a black edge, no box (as its '대상이 너무 멀리 있습니다'). */
@@ -746,7 +766,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>
@@ -834,6 +854,7 @@
   <div id="equip-box">
     <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
     <div id="equip-rows"></div>
+    <div id="equip-tip" hidden></div>
     <div id="equip-stats"></div>
     <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="equip-cards" class="btn">괴력난신</button><button id="equip-coordi" class="btn">코디</button><button id="close-equip" class="btn">닫기</button></div>
   </div>
