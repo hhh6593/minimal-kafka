@@ -2,7 +2,7 @@
 """The 사신수 길드대항전's battlefields, from 바람의나라 연's own maps (decrypted Maps_* bundles):
 연's 사신수 공성전 castles (kow_zodiac_*_siege) and the 길림 쟁탈 field (kow_jilin_pk_castle).
 
-    yeon_war.py DEC_DIR OUT_DIR [--preview] [--assets]
+    yeon_war.py DEC_DIR OUT_DIR [--preview] [--assets | --props] [--only=war,war]
 
 DEC_DIR holds the decrypted Maps_*.unity3d. Writes OUT_DIR/ywar/<war>_<cx>_<cy>.png (1024-pixel
 chunks of the crop, every tile layer, at the map's own scale: one 연 tile is 32 pixels, as the
@@ -40,12 +40,27 @@ WARS = {
     'baekho': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (26, 28, 138, 76)),
     'jujak': ('Maps_5100.unity3d', 'kow_zodiac_redbird_siege_00_00_castle', (58, 24, 104, 142)),
     'hyeonmu': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (42, 76, 120, 142)),
+    # 월드 보스 쟁탈전 「쟁」: 연's world-boss arenas (the painted part round the play square).
+    'bosspk_jp': ('Maps_416001.unity3d', 'kow_japan2_worldboss_01', (9, 9, 52, 40)),
+    'bosspk_sea': ('Maps_416501.unity3d', 'kow_younggung2_worldboss_01', (8, 8, 53, 41)),
+    'bosspk_sky': ('Maps_415501.unity3d', 'kow_map_worldboss_undersky_wave1', (8, 8, 49, 44)),
 }
+# 연 lets one walk only on a square in the middle of its world-boss arenas (the screen it fights
+# on); round it lies the same ground, painted. On these the ground the square is laid with (its
+# tiles found eight times or more in it) counts as open wherever nothing stands on it.
+FLOOR_OPEN = {'bosspk_jp', 'bosspk_sea', 'bosspk_sky'}
 
 
 PROPS = {'gate': ('1070', 'wall'), 'door': ('1054', 'wall'), 'wall': ('1034', 'wall'), 'brazier': ('1052', 'torch'),
          'totem': ('0058_totem_l', 'statue'), 'altar': ('1092', 'statue'), 'lock': ('0212_a', 'wall'), 'seal': ('0228', 'decal'),
-         'stonewall': ('20004', 'wall'), 'lantern': ('1053', 'torch')}
+         'stonewall': ('20004', 'wall'), 'lantern': ('1053', 'torch'),
+         # 「쟁」: the boss's chained totems, its seal on the ground and the stone altar it rises from.
+         # (glow: its additive part kept under the rest, its brightness as its cover.)
+         'totem_r': ('0058_totem_r', 'statue'), 'bossmark': ('1023', 'decal', 'glow'), 'bossaltar': ('0086', 'decal')}
+# Objects whose renderer the effect pipeline draws empty (an additive-named shader on a plain
+# sprite, a node the animator shows): their sprites as they are. name -> (object, node, kind).
+SPRITES = {'sealstone1': ('0003', 'Sprite', 'statue'), 'sealstone2': ('0004', 'Sprite', 'statue'), 'sealstone3': ('0007', 'Sprite', 'statue'),
+           'sealring': ('0003', 'Select/Sprite', 'decal')}
 CARTS = {'cart': '0146', 'cart2': '0147', 'cart3': '0145'}
 UNITS = {'war_g1': ('Monster_0515', '평양성 경비병(검)'), 'war_g2': ('Monster_0517', '평양성 경비병(창)'),
          'war_g3': ('Monster_0518', '동부여성 경비병(검)'), 'war_g4': ('Monster_0520', '동부여성 경비병(창)'),
@@ -67,9 +82,18 @@ def props(dec, out):
     def put(name, im, ox, oy, box, kind, obj):
         im.save(os.path.join(pdir, 'war_' + name + '.png'))
         idx['props']['war_' + name] = {'size': list(im.size), 'terrain': 'war', 'kind': kind, 'foot': [ox - box[0], oy - box[1]], 'src': 'object_' + obj}
-    for name, (obj, kind) in PROPS.items():
+    for name, (obj, kind, *opt) in PROPS.items():
         frames, _, ox, oy, _ = K.render(found['object_' + obj + '.prefab'].read())
-        al = frames[0][0]
+        # (The first frame that shows something: an orb's opens empty and grows.)
+        fi = next((i for i, f in enumerate(frames) if f[0].getbbox() or np.asarray(f[1]).max() > 3), 0) if 'glow' in opt else 0
+        al = frames[fi][0]
+        if 'glow' in opt:
+            ad = np.clip(frames[fi][1], 0, 255)
+            a = ad.max(2)
+            rgb = np.where(a[..., None] > 0, ad * 255.0 / np.maximum(a, 1)[..., None], 0)
+            glow = Image.fromarray(np.dstack([rgb, a]).astype(np.uint8), 'RGBA')
+            glow.alpha_composite(al)
+            al = glow
         box = al.getbbox()
         im = al.crop(box)
         if name == 'wall':
@@ -83,11 +107,24 @@ def props(dec, out):
             top = top.crop(top.getbbox())
             top.save(os.path.join(pdir, 'war_rocks.png'))
             idx['props']['war_rocks'] = {'size': list(top.size), 'terrain': 'war', 'kind': 'wall', 'foot': [top.width // 2, top.height - 2], 'src': 'object_' + obj}
+    for name, (obj, node, kind) in SPRITES.items():
+        go = found['object_' + obj + '.prefab'].read()
+        tr = K.comp(go, 'Transform')
+        r = next(K.comp(t.m_GameObject.read(), 'SpriteRenderer') for p, t in [('', tr)] + K.child_paths(tr) if p == node)
+        im = r.m_Sprite.read().image.convert('RGBA')
+        box = im.getbbox()
+        im = im.crop(box)
+        foot = [im.width // 2, im.height // 2] if kind == 'decal' else [im.width // 2, im.height - 2]
+        im.save(os.path.join(pdir, 'war_' + name + '.png'))
+        idx['props']['war_' + name] = {'size': list(im.size), 'terrain': 'war', 'kind': kind, 'foot': foot, 'src': 'object_' + obj + '/' + node}
     for name, obj in CARTS.items():
         frames, _, ox, oy, _ = K.render(found['object_' + obj + '.prefab'].read())
         ad = np.clip(frames[0][1], 0, 255)
         im = Image.fromarray(np.dstack([ad, np.where(ad.max(2) > 3, 255, 0)]).astype(np.uint8), 'RGBA')
         box = im.getbbox()
+        if box is None:
+            print('war_' + name, 'drawn empty: kept as it was', file=sys.stderr)
+            continue
         put(name, im.crop(box), ox, oy, box, 'wood', obj)
     json.dump(idx, open(ip, 'w'), indent=1)
 
@@ -113,6 +150,20 @@ def units(dec, out):
 
 
 ROOF = 2  # 연's tile layer drawn over the walkers: roofs, the caps of walls, a gate's lintel
+
+
+def floor_open(data, crop):
+    """FLOOR_OPEN's rule: 연's own movables, and its square's ground tiles wherever no upper layer is drawn."""
+    from collections import Counter
+    W, H = data['width'], data['height']
+    x0, y0, x1, y1 = crop
+    mv = data['movables']
+    L = data['tileLayers']
+    gid = lambda x, y: L[0]['tiles'][y * W + x]['aioTileID']
+    floor = Counter(gid(x, y) for y in range(H) for x in range(W) if mv[y * W + x])
+    keep = {k for k, v in floor.items() if v >= 8}
+    up = lambda x, y: any(L[i]['tiles'][y * W + x]['aioTileID'] >= 0 for i in (1, 2, 3))
+    return [[not (mv[y * W + x] or (gid(x, y) in keep and not up(x, y))) for x in range(x0, x1)] for y in range(y0, y1)]
 
 
 def blocked32(data, crop):
@@ -240,6 +291,9 @@ def main():
     if '--assets' in sys.argv:
         props(dec, out)
         units(dec, out)
+    elif '--props' in sys.argv:
+        props(dec, out)
+    only = [a[len('--only='):].split(',') for a in sys.argv if a.startswith('--only=')]
     preview = '--preview' in sys.argv
     walk_only = '--walk' in sys.argv
     d = os.path.join(out, 'ywar')
@@ -249,12 +303,20 @@ def main():
         with open(os.path.join(d, 'index.json'), encoding='utf-8') as f:
             index = json.load(f)
     full_cache = {}
+    if only:
+        # Some wars only (--only=a,b): the others' pieces and index entries are kept.
+        ip = os.path.join(d, 'index.json')
+        if os.path.isfile(ip) and not walk_only:
+            with open(ip, encoding='utf-8') as f:
+                index = json.load(f)
     for war, (bundle, name, (x0, y0, x1, y1)) in WARS.items():
+        if only and war not in only[0]:
+            continue
         b = os.path.join(dec, bundle)
         data, _ = yeon_maps.load_map(b, name)
         if walk_only:
             v = index[war]
-            v['walk'] = walk_grid(blocked32(data, (x0, y0, x1, y1)), v['cols'], v['rows'])
+            v['walk'] = walk_grid((floor_open if war in FLOOR_OPEN else blocked32)(data, (x0, y0, x1, y1)), v['cols'], v['rows'])
             print(war, 'walk', sum(r.count('#') for r in v['walk']), 'closed of', v['cols'] * v['rows'])
             continue
         if (b, name) not in full_cache:
@@ -270,7 +332,7 @@ def main():
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
                     os.path.join(d, f'{war}_{cx}_{cy}.png'), optimize=True)
         cols, rows = w // G, h // G
-        walk = walk_grid(blocked32(data, (x0, y0, x1, y1)), cols, rows)
+        walk = walk_grid((floor_open if war in FLOOR_OPEN else blocked32)(data, (x0, y0, x1, y1)), cols, rows)
         index[war] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'map': name, 'crop': [x0, y0, x1, y1]}
         print(war, name, (w, h), (cols, rows))
         if preview:
