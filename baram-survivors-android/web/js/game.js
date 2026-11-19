@@ -1171,6 +1171,7 @@ function abyssBurst(e) {
   const b = ABYSS_HUNT.burst;
   if (G.t < (G.abyssBurstAt || 0) || Math.random() >= b.chance) return;
   G.abyssBurstAt = G.t + b.cd;
+  G.burstN = (G.burstN || 0) + 1; // (counted for the tests)
   // (태초의 무기: its burst in light, the weapon's own strike tint.)
   const tint = G.player.swing && fxTintOf(G.player.swing.tint, b.fx);
   if (M.fx[b.fx] && fxBudget('abyssBurst', 2)) addFx(b.fx, e.x, e.y - 14, { scale: 0.5 * ABYSS_FX_K * 1.3, tint });
@@ -10324,6 +10325,30 @@ window.__gearTest = () => {
   return { cls: c, tried: ['weapon', 'armor', 'shield', 'helmet', 'cape'].reduce((a, k) => a + (GEAR[c][k] || []).length, 0) + n, bad };
 };
 window.__dragonTier = () => dragonTier(G.cls);
+// Test (weapon bench): put on one weapon of a family, as a player who has it at its best would.
+// conf: plain | special | dragon1 | dragon10 | cr_<craft id> | abyss | taecho. Returns its name and power.
+window.__benchWear = conf => {
+  const cls = G.cls, c = cls.id;
+  progress.stars = progress.stars || {};
+  const st = progress.stars[c] = progress.stars[c] || {};
+  let t, sp = null;
+  if (conf === 'plain') { const l = plainList(c, 'weapon'); t = l[l.length - 1]; st[`weapon:${t}`] = STAR_MAX; }
+  else if (conf.startsWith('dragon')) { t = dragonTier(cls); st[`weapon:${t}`] = +conf.slice(6); }
+  else if (conf === 'special') {
+    const s0 = Object.values(SPECIAL).filter(x => x.kind === 'weapon' && !x.craft && !x.rarity && (!x.cls || x.cls === c)).sort((a, b) => specialPower(b, c) - specialPower(a, c))[0];
+    sp = s0.id; t = specialBase(s0, c);
+  } else if (conf === 'abyss' || conf === 'taecho') {
+    progress.abyssLoot = progress.abyssLoot || {};
+    const s0 = rollAbyssItem(progress.abyssLoot, 26, conf === 'abyss' ? 'diablo' : 'taecho');
+    sp = s0.id; t = specialBase(s0, c);
+  } else { const s0 = SPECIAL[conf]; if (!s0) return null; sp = s0.id; t = specialBase(s0, c); st['sp:' + sp] = STAR_MAX; }
+  wear('weapon', t, sp);
+  G.dealt = { all: 0, big: 0, ally: 0 };
+  G.gyeokCount = {};
+  G.burstN = 0;
+  return { name: sp ? specialName(SPECIAL[sp], c) : pieceName(cls, 'weapon', t), power: G.player.gearPower, fam: familyOf(sp && SPECIAL[sp], !sp && t === dragonTier(cls)) };
+};
+window.__benchRead = () => ({ dealt: G.dealt, gyeok: G.gyeokCount, burst: G.burstN || 0, hp: G.player.hp / G.player.maxHp, t: G.t });
 // For measuring: the hero grown to a level with its build (as a raid starts it), now.
 // For measuring single-target damage: the field cleared and the ground's boss alone, unkillable.
 window.__dummyBoss = () => {
