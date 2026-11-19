@@ -2103,7 +2103,7 @@ function treeSpell(id, opts = {}) {
   const fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
   const mine = G && G.skills.find(x => x.id === id);
   el.className = 'spell' + (def.evolved ? ' final' : '') + (mine ? ' have' : '')
-    + (G && !mine && (def.req || 1) > G.player.lvl ? ' lock' : '');
+    + (G && !mine && skillReq(def) > G.player.lvl ? ' lock' : '');
   el.append(skillIcon(id, fx));
   const t = document.createElement('div');
   const grown = !mine && G && G.skills.some(x => x.from === id || x.from2 === id);
@@ -2184,7 +2184,7 @@ function buildTree(cls, hot = new Set()) {
       } else if (d.up) note = `8단 → ${SKILLS[d.up].name}(${SKILLS[d.up].promo}차)`;
       if (d.pre) {
         const q = SKILLS[d.pre[0]];
-        note = (note ? note + ' · ' : '') + `${q.name}(${q.promo ? q.promo + '차' : '일반'}) 배우면 열림`;
+        note = (note ? note + ' · ' : '') + `${q.name}(${q.promo ? q.promo + '차' : '일반'}) ${INHERIT_LV}단에서 계승 (자리·단 이어받음)`;
       }
       if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 나옴';
       const el = treeSpell(id, note ? { note } : {});
@@ -2676,7 +2676,7 @@ function floorCount(t) {
 function applyBuild(start) {
   const cls = G.cls.id, rec = (progress.builds || {})[cls];
   const fits = (id, d) => d && (d.cls === cls || d.cls === 'all') && d.kind !== 'ult' && promoOf(cls) >= (d.promo || 0)
-    && (d.req || 1) <= start;
+    && skillReq(d) <= start;
   let list = rec ? rec.skills.filter(([id]) => fits(id, SKILLS[id])) : [];
   if (!list.length) {
     // No record yet: the class's open spells, the ones that strike first (a raid boss is not
@@ -2684,14 +2684,14 @@ function applyBuild(start) {
     // A 도사 keeps two of its heals: in a raid it is the party's healer.
     const hits = d => (d.dmg ? 0 : 1);
     const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
-    const heals = cls === 'poet' ? open.filter(([, d]) => d.kind === 'heal').sort((a, b) => (b[1].req || 1) - (a[1].req || 1)).slice(0, 2) : [];
+    const heals = cls === 'poet' ? open.filter(([, d]) => d.kind === 'heal').sort((a, b) => skillReq(b[1]) - skillReq(a[1])).slice(0, 2) : [];
     list = heals.concat(open.filter(e => !heals.includes(e))
-      .sort((a, b) => hits(a[1]) - hits(b[1]) || (b[1].req || 1) - (a[1].req || 1))).slice(0, 5).map(([id]) => [id, 8]);
+      .sort((a, b) => hits(a[1]) - hits(b[1]) || skillReq(b[1]) - skillReq(a[1]))).slice(0, 5).map(([id]) => [id, 8]);
     list.push(['c_heal', 8]);
   }
   G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
     const d = SKILLS[id];
-    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(lv, start - (d.req || 1) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
+    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(lv, start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
   });
   const cap = Math.max(1, Math.floor(start / 4));
   for (const k of Object.keys(G.passives)) G.passives[k] = Math.min(cap, rec ? rec.passives[k] || 0 : (k === 'life' || k === 'power' ? cap : 0));
@@ -2829,6 +2829,13 @@ function raidSpawn(dt) {
     // Tougher for a party that comes in stronger (a start above Lv 20: +6% a level).
     // 공대: in the raid's own measure, for twenty-five (war.js).
     e.hp = e.maxHp = RW ? War.raidBossHp() : 11000 * G.level * (1 + 0.06 * Math.max(0, G.player.lvl - 20));
+    // 공대: the boss stands over the crowd of twenty-five, some three and a half heroes tall,
+    // so it shows through their spells. Only the picture grows: its reach stays (baseScale).
+    if (RW) {
+      const yu = M.yunit && M.yunit[e.m.id], tall = (yu ? yu.foot[1] - 4 : e.m.h) * e.scale;
+      e.baseScale = e.scale;
+      e.scale *= Math.max(1, Math.min(2.4, RAID_BOSS_TALL / Math.max(1, tall)));
+    }
     // Its bite takes a sixth of the hero's health.
     e.dmg = G.player.maxHp * 0.16 * raidK();
     G.aggroT = 0;
@@ -2987,6 +2994,9 @@ function raidPattern(b, kind) {
   G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share });
   b.lunge = 0.3;
 }
+
+// How tall a raid boss stands on screen (px): over the heads of the 25 and their spells.
+const RAID_BOSS_TALL = 170;
 
 // A person's moment to see the red and turn (0.45 s and the 0.1 s turn), and the slowest class's
 // step (전사·도깨비, speed 66: 0.24 s × 70 / 66).
@@ -7029,7 +7039,7 @@ function gainXp(v) {
 
 /** The highest level a spell may have now: never past (character level − its req + 1). */
 function levelCap(id) {
-  return Math.min(MAX_SKILL_LEVEL, G.player.lvl - (SKILLS[id].req || 1) + 1);
+  return Math.min(MAX_SKILL_LEVEL, G.player.lvl - skillReq(SKILLS[id]) + 1);
 }
 
 /** Evolves the first spell that is ready: level 8, its catalyst passive, its form's level. */
@@ -7040,7 +7050,7 @@ function evolve() {
     const d = SKILLS[s.id];
     if (!d.up || s.lv < MAX_SKILL_LEVEL) continue;
     const into = SKILLS[d.up];
-    if (G.player.lvl < into.req) continue;
+    if (G.player.lvl < skillReq(into)) continue;
     if (promoOf(G.cls.id) < into.promo) {
       // Ready but not yet allowed: say once what is missing.
       G.told = G.told || {};
@@ -7090,16 +7100,25 @@ function drawCards() {
     const d = SKILLS[s.id], ready = d.up && promoOf(G.cls.id) >= SKILLS[d.up].promo;
     opts.push({ type: 'skill', id: s.id, lv: s.lv + 1, w: ready ? 4 : 3 });
   }
+  // 계승: a 5차 and higher spell takes the place of the spell before it in its line (its slot and
+  // its 단), so the line climbs without a new slot. Before, each step needed a slot of its own:
+  // 포효검황 → 황룡승천 → 천둥낙뢰 → 흑룡광참 was four of six, and from 6차 up nothing was used.
+  for (const [id, d] of Object.entries(SKILLS)) {
+    if (!d.pre || !mine(id) || d.evolved || skillReq(d) > lvl || have(id)) continue;
+    if (d.promo && promoOf(G.cls.id) < d.promo) continue;
+    const from = G.skills.find(x => x.id === d.pre[0]);
+    if (!from || from.lv < INHERIT_LV) continue;
+    opts.push({ type: 'skill', id, lv: Math.max(1, Math.min(from.lv, levelCap(id))), from: from.id, w: 3.5 + 0.25 * (d.promo || 0) });
+  }
   if (G.skills.length < MAX_SKILLS) {
     for (const [id, d] of Object.entries(SKILLS)) {
-      if (!mine(id) || d.evolved || d.kind === 'ult' || (d.req || 1) > lvl || have(id)) continue;
+      if (!mine(id) || d.evolved || d.kind === 'ult' || skillReq(d) > lvl || have(id)) continue;
       if (d.promo && promoOf(G.cls.id) < d.promo) continue;
-      // 계열: the spell before it in the tree, learned in this hunt, opens it (it once had to be
-      // raised to 3단 first, which with every hunt starting over and the slots filling up was
-      // hardly ever reached).
-      if (d.pre && !G.skills.some(x => x.id === d.pre[0])) continue;
+      // 계열: a spell with one before it in the tree comes by 계승 (above), in that one's place.
+      if (d.pre) continue;
       // The class's own way of fighting (the 도적's 투명) comes up more often.
-      opts.push({ type: 'skill', id, lv: 1, w: SIGNATURE[G.cls.id] === id ? 4 : 2.5 });
+      // A higher 승급's spell comes up more: the hero won it to use it.
+      opts.push({ type: 'skill', id, lv: 1, w: SIGNATURE[G.cls.id] === id ? 4 : 2.5 + 0.25 * (d.promo || 0) });
     }
   }
   const owned = Object.values(G.passives).filter(v => v > 0).length;
@@ -7155,7 +7174,8 @@ function nextChoice() {
       icon = skillIcon(o.id, lvFx);
       name = skillName(o.id, o.lv);
       text = levelText(o.id, o.lv);
-      tag = (o.mastered ? '숙련' : o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
+      if (o.from) text = `${SKILLS[o.from].name} 자리를 잇는다 (${o.lv}단 그대로). ` + text;
+      tag = (o.from ? '계승' : o.mastered ? '숙련' : o.lv === 1 ? '새 마법' : `Lv ${o.lv}`)
         + (def.elem ? ` <u style="background:${ELEMENTS[def.elem][1]}">${ELEMENTS[def.elem][0]}</u>` : '');
     } else if (o.type === 'passive') {
       const ps = PASSIVES[o.id];
@@ -7238,6 +7258,7 @@ function cardScore(o) {
   if (o.type === 'skill') {
     const d = SKILLS[o.id], attack = !SUPPORT_KINDS.has(d.kind);
     let v;
+    if (o.from) return (attack ? 14 : 9) + (d.promo || 0) - (SKILLS[o.from].promo || 0) + (kept.includes(o.id) ? 3 : 0);
     if (o.lv > 1) {
       v = attack ? 10 : 6;
       if (d.up && SKILLS[d.up] && promoOf(G.cls.id) >= SKILLS[d.up].promo) v += 5;
@@ -7253,7 +7274,7 @@ function cardScore(o) {
       // of a lower 승급 than those is put after raising what is held and the passives.
       const free = MAX_SKILLS - G.skills.length, lvl = p.lvl, pr = promoOf(G.cls.id);
       const later = Object.entries(SKILLS).filter(([id, x]) => (x.cls === G.cls.id) && !x.evolved && x.kind !== 'ult'
-        && !SUPPORT_KINDS.has(x.kind) && (x.promo || 0) > (d.promo || 0) && (x.promo || 0) <= pr && (x.req || 1) > lvl
+        && !x.pre && !SUPPORT_KINDS.has(x.kind) && (x.promo || 0) > (d.promo || 0) && (x.promo || 0) <= pr && skillReq(x) > lvl
         && !G.skills.some(s => s.id === id)).length;
       if (attack && later && free <= Math.min(later, 3)) v -= 9;
     }
@@ -7285,7 +7306,13 @@ function choose(o) {
     nextChoice();
     return;
   }
-  if (o.type === 'skill') {
+  if (o.type === 'skill' && o.from) {
+    const sk = G.skills.find(x => x.id === o.from);
+    const was = SKILLS[o.from].name;
+    if (sk) { sk.id = o.id; sk.lv = o.lv; sk.timer = 0.2; sk.from = o.from; } else addSkill(o.id);
+    audio.play('levelup');
+    say(`${josa(was, '이', '가')} ${josa(SKILLS[o.id].name, '으로', '로')} 이어졌습니다! (계승)`, 'sys');
+  } else if (o.type === 'skill') {
     addSkill(o.id);
     say(`${josa(skillName(o.id, o.lv), '을', '를')} 익혔습니다.`);
   } else if (o.type === 'passive') {
@@ -7382,6 +7409,27 @@ function gatherGear() {
   }
 }
 
+/** The level a spell opens at in a hunt: its 연 level (req) brought down to under half, so the
+ * high 승급 spells come in the hunt's first half (9차 at Lv 15, not 33 — a hunt reached that only
+ * as its boss came, and they were never really used). The order of the tree stays. */
+function skillReq(d) {
+  const r = d.req || 1;
+  return r <= 1 ? 1 : Math.max(2, Math.round(r * SKILL_REQ_K));
+}
+const SKILL_REQ_K = 0.45;
+// The 단 a spell must reach before the next of its line can take its place.
+const INHERIT_LV = 2;
+
+/** What a hunt gave, short: the same thing counted (곰가죽 ×3), the rare first, eight at most. */
+function gainedSummary(list, most = 8) {
+  const n = new Map();
+  for (const x of list) n.set(x, (n.get(x) || 0) + 1);
+  const rank = x => x.startsWith('★') ? 0 : x.startsWith('[') ? 1 : 2;
+  const all = [...n].sort((a, b) => rank(a[0]) - rank(b[0]) || b[1] - a[1]);
+  const shown = all.slice(0, most).map(([x, k]) => k > 1 ? `${x} ×${k}` : x).join(', ');
+  return all.length > most ? `${shown} 외 ${all.length - most}종 (모두 ${list.length}개)` : shown;
+}
+
 function showResults(title) {
   if (!G || G.over) return;
   // 공대 (war.js): the contribution, the tier and its coins, then the war's spotlight result.
@@ -7413,7 +7461,7 @@ function showResults(title) {
     + (G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : '') + '<br>'
     + `쓰러뜨린 몬스터 ${G.kills}마리 · ${won(G.gold)}<br>`
     + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
-    + (G.gained && G.gained.length ? `<br><b class="promo">얻은 장비: ${G.gained.join(', ')}</b>` : '')
+    + (G.gained && G.gained.length ? `<br><b class="promo">얻은 것: ${gainedSummary(G.gained)}</b>` : '')
     + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '');
   // A conquered ground can be hunted on, harder and harder, for its specials.
   $('#keep').hidden = !(G.cleared && !G.dead && !G.stage.raid);
@@ -8300,6 +8348,15 @@ function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
 }
 
 function drawMonster(b, x, y, s, alpha = 1) {
+  // A raid boss is struck all the time by twenty-five: with the white flash on it would stay a
+  // pale shape. It is drawn without it (the numbers show the blows).
+  if (b.kind === 'boss' && b.flash > 0 && G.war && G.war.raid) {
+    const fl = b.flash;
+    b.flash = 0;
+    drawMonster(b, x, y, s, alpha);
+    b.flash = fl;
+    return;
+  }
   const yu = yunit(b.m);
   if (yu) {
     const r = yunitAnim(yu.u, b);
@@ -8612,6 +8669,11 @@ function render(now) {
     if (f.alpha) ctx.globalAlpha = f.alpha;
     drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip);
     ctx.globalAlpha = 1;
+  }
+  // 공대: the spells of twenty-five hid the boss. Its shape again, faint, over them.
+  if (G.war && G.war.raid) {
+    const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0);
+    if (bo && G.fxs.length) drawMonster(bo, bo.x, bo.y, bo.scale, 0.42);
   }
   if (trail) {
     for (const sh of G.shots) if (sh.mine && G.t >= (sh.trailAt || 0) && puffs.length < 8) { sh.trailAt = G.t + trail.cd; puffs.push([sh.x, sh.y]); }

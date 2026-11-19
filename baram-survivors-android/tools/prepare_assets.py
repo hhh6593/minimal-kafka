@@ -151,8 +151,25 @@ def is_additive(frames):
 
 # 연 units the name match got wrong (호랑이 → a small yellow creature).
 YUNIT_WRONG = {"Monster_0164"}
-# Our monsters whose 연 namesake is plainly another creature, by eye (은여우 → a jellyfish).
-YUNIT_WRONG_IDS = {"6005"}
+# Our monsters whose 연 namesake is plainly another creature, by eye (은여우 → a jellyfish; the
+# old 삼두룡 10014, named 반고 in the old table, → 연's 반고, a green giant). Audited pair by pair:
+# a wrong one keeps the old picture, so the raid list and the field show the same monster.
+YUNIT_WRONG_IDS = {
+    "10001", "10003", "10004", "10005", "10006", "10007", "10008", "10009", "10010", "10011", "10012", "10013",
+    "10014", "1014", "1022", "1025", "1040", "1041", "11001", "11002", "11018", "11024", "12001", "12008",
+    "12011", "12013", "12018", "12019", "12023", "12025", "12026", "12027", "12029", "12033", "12034", "12036",
+    "12038", "12039", "12041", "12042", "12045", "12046", "12050", "12053", "12056", "12059", "12060", "12070",
+    "12097", "12099", "12106", "12107", "14003", "2001", "2002", "2003", "2004", "3010", "3011", "3016",
+    "3019", "3020", "3022", "3023", "3026", "3027", "3034", "3035", "3036", "3042", "3043", "3044",
+    "3045", "3051", "3052", "3053", "3055", "3070", "3071", "3078", "6001", "6002", "6004", "6006",
+    "6007", "6017", "6018", "6019", "6027", "6028", "6030", "6031", "6033", "6034", "6036", "6046",
+    "6053", "6054", "6055", "6056", "6057", "6058", "6059", "7002", "7005", "7006", "7007", "7009",
+    "7012", "8011", "8015", "8023", "8024", "8026", "8027", "8049", "8050", "8051", "8055", "8056",
+    "9011", "9021", "9022", "6005",
+}
+# The old table's names run one off in places (10013's picture is 반고, not 순제): 연's sheet for
+# one id is the right monster for another. Our id → the 연 unit whose sheet it wears.
+YUNIT_REMAP = {"10013": "10014", "10012": "10013", "10003": "10006", "7012": "7009", "10006": "10009", "10004": "10005", "10005": "10007", "10007": "10008", "10008": "10010", "10010": "10011", "2001": "2002", "2002": "2001"}
 
 
 
@@ -665,8 +682,10 @@ def main():
         os.makedirs(os.path.join(out, "yunit"), exist_ok=True)
         with open(os.path.join(udir, "index.json"), encoding="utf-8") as f:
             index = json.load(f)
-        for mid, u in index.items():
-            usrc = os.path.join(udir, mid + ".png")
+        pairs = [(mid, u, mid) for mid, u in index.items() if mid not in YUNIT_REMAP]
+        pairs += [(mid, index[src], src) for mid, src in YUNIT_REMAP.items() if src in index]
+        for mid, u, src in pairs:
+            usrc = os.path.join(udir, src + ".png")
             # 연's own monsters (tools/yeon_grounds.py: the grounds out of 연's maps) have no old
             # picture: their sheet is the monster, and its first standing frame its picture.
             if u.get("own") and os.path.isfile(usrc):
@@ -685,7 +704,8 @@ def main():
                 manifest["monsters"].append({"id": mid, "w": pic.width, "h": pic.height, "pages": [], "name": u.get("name", ""),
                                              "quick": int(float(u.get("move") or 0)) >= 96})
                 continue
-            if not yunit_sure(u) or u.get("prefab") in YUNIT_WRONG or mid in YUNIT_WRONG_IDS or not os.path.isfile(usrc):
+            remapped = mid in YUNIT_REMAP
+            if not remapped and (not yunit_sure(u) or u.get("prefab") in YUNIT_WRONG or mid in YUNIT_WRONG_IDS) or not os.path.isfile(usrc):
                 continue
             # A namesake can be another creature altogether (연's 흑다람쥐 is a wrestler): a
             # picture far taller or shorter than the old one is not the same monster.

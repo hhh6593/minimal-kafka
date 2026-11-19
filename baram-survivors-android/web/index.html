@@ -429,7 +429,7 @@
   #sound-rows .pick b { min-width: 54px; text-align: center; font: 12px G11, monospace; color: #7a1800; }
   #sound-rows .pick button { width: 30px; height: 26px; padding: 0; color: #2a1606; background: #c89858;
       border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
-  #over-stats { margin: 6px 0; text-align: center; line-height: 1.7; }
+  #over-stats { margin: 6px 0; text-align: center; line-height: 1.7; max-height: calc(100dvh - 120px); overflow-y: auto; }
 
   /* ---- The old client's screen: a framed play area, a carved side panel, a parchment chat. ---- */
   :root { --side: clamp(176px, 27vw, 250px); --wood: #c18a4e; --wood-hi: #e2b679; --wood-lo: #5a3212;

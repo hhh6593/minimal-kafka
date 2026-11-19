@@ -1037,7 +1037,7 @@ export const PASSIVES = {
 // The four 신수 of 신수마법: the site draws every element alike at each grade, so cards name it.
 export const ELEMENTS = { fire: ['불', '#c8401a'], earth: ['땅', '#8a6a2a'], water: ['물', '#1a5ab0'], thunder: ['풍뢰', '#6a3ab0'] };
 
-export const MAX_SKILLS = 6;
+export const MAX_SKILLS = 8;
 export const MAX_PASSIVES = 6;
 export const MAX_SKILL_LEVEL = 8;
 export const MAX_PASSIVE_LEVEL = 5;

@@ -447,6 +447,10 @@ function setup() {
   }
   W.squads[1].members.push(W.hero);
   W.hero.squad = W.squads[1];
+  // A 딜러 or 서포터 hero has its squad's healer to itself (전담 힐러): it follows the hero, not the
+  // tank, and mends the hero first. Without one the hero roamed out of every healer's reach.
+  const pocket = (role === 'dps' || role === 'support') && W.squads[1].members.find(m => m.role === 'healer');
+  if (pocket) pocket.pocket = true;
   mkCommanders(W);
   mkTroops(W);
   // The escort's camps are set by its road (and the troops' posts by the camps), before anyone stands.
@@ -463,6 +467,7 @@ function setup() {
   orders(W, 1, true);
   A.say(`[${def.name}] ${W.teams[0].name} 길드 대 ${W.teams[1].name} 길드 — ${def.title}. 역할: ${ROLES[role].name}`, 'sys');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
+  if (pocket) A.say(`${pocket.name}(${pocket.cls.name})이(가) 당신을 전담 치유합니다`, 'sys');
   A.banner(`${def.name} · ${def.title}`);
   const btn = document.getElementById('war-sb-btn');
   if (btn) btn.hidden = false;
@@ -1198,7 +1203,7 @@ function thinkHealer(W, b, order) {
     const d = d2(m, b);
     if (d > 9) continue;
     const struck = G.t - (m.lastHitT || -9) < 2.5;
-    const k = hpk(m) - (m.squad === sq ? 0.04 : 0) - (m.role === 'tank' ? (struck ? 0.2 : 0.06) : 0) - (struck ? 0.04 : 0) + (m.troop ? 0.15 : 0) + (d > 7 ? 0.05 : 0) - (m.hero ? 0.04 : 0);
+    const k = hpk(m) - (m.squad === sq ? 0.04 : 0) - (m.role === 'tank' ? (struck ? 0.2 : 0.06) : 0) - (struck ? 0.04 : 0) + (m.troop ? 0.15 : 0) + (d > 7 ? 0.05 : 0) - (m.hero ? (b.pocket ? 0.25 : 0.04) : 0);
     if (k < lk) { lk = k; low = m; }
   }
   const hurt = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 5 && hpk(m) < 0.7).length;
@@ -1258,7 +1263,7 @@ function thinkHealer(W, b, order) {
  * guild's tank nearest its squad's order, else a mate of its squad. */
 function healerAnchor(W, b, sq, order) {
   const G = A.G();
-  if (order.kind === 'follow' && !G.dead) return W.hero;
+  if ((b.pocket || order.kind === 'follow') && !G.dead) return W.hero;
   let best = null, bd = 1e9;
   for (const m of W.alive[b.team]) {
     if (m.role !== 'tank' || m.cmdr || m.troop || m.gate || m === b) continue;
@@ -3630,6 +3635,7 @@ function raidSetup() {
   A.say(`[${st.name}] 공격대 25명이 모였습니다. 역할: ${ROLES[role].name}`, 'sys');
   if (altNames.length) A.say(`내 다른 직업도 함께합니다: ${altNames.join(', ')}`, 'party');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
+  if (pocket) A.say(`${pocket.name}(${pocket.cls.name})이(가) 당신을 전담 치유합니다`, 'sys');
   const btn = document.getElementById('war-sb-btn');
   if (btn) btn.hidden = false;
   document.body.classList.add('war');
@@ -3707,7 +3713,7 @@ function dangerMap(W, G) {
 /** How close a fighter must stand to strike: a big boss can be struck from two tiles. */
 function reachOf(b, t) {
   if (b.kit.range > 1) return b.kit.range + (t.kind === 'boss' ? 0.5 : 0);
-  return t.kind === 'boss' ? 1.3 + 0.6 * (t.scale || 1) : 1.5;
+  return t.kind === 'boss' ? 1.3 + 0.6 * (t.baseScale || t.scale || 1) : 1.5;
 }
 
 /** A free tile beside the target, within reach, off the red floor, nearest the fighter. */
