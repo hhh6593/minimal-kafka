@@ -14,7 +14,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds,
+  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -1032,11 +1032,36 @@ function cardSet() {
 /** 전투력, as today's client shows it: the gear's ranks and stars, the 승급, the best level, the cards. */
 function combatPower(cls) {
   const g = savedGear(cls), c = cls.id;
-  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
-    : g[k] < 0 || g[k] === undefined ? 0 : gearPower(c, k, g[k]) + starPow(cls, `${k}:${g[k]}`));
-  const gear = pw('weapon') * 3 + pw('armor') * 2 + (hasShield(c) ? pw('shield') : pw('armor') / 2) + pw('helmet') + pw('cape') + extraPow(g);
+  const pw = k => Math.max(0, pieceRank(cls, g, k));
+  // The weapon as it strikes (weaponEff): its 공격력 options and its family's edge on every foe
+  // counted, so the ▲/▼ and 가장 강한 장비 agree with the damage done. (By the rank alone a
+  // 공격력 piece — 심연 고유 ×2.74 — read below a 진일신검 ×2.50.)
+  const gear = weaponEff(cls, g) * 3 + pw('armor') * 2 + (hasShield(c) ? pw('shield') : pw('armor') / 2) + pw('helmet') + pw('cape') + extraPow(g);
   const set = cardSet(), rec = best[c];
   return Math.round((gear * 200 + promoOf(c) * 800 + (rec ? rec.lvl : 1) * 60) * (1 + set.dmg) * (1 + PROMO_BONUS.dmg * promoOf(c)) + set.hp * 20);
+}
+/** A worn piece's rank (-1: none): a special's with its stars (items.js specialRank), else its
+ *  place's power with its stars (the 용무기 its step). One rule for the 전투력, the stats, the card. */
+function pieceRank(cls, g, k) {
+  const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+  if (sp) return specialRank(sp, cls.id, starOf(cls, 'sp:' + sp.id));
+  return g[k] < 0 || g[k] === undefined ? -1 : gearPower(cls.id, k, g[k]) + starPow(cls, `${k}:${g[k]}`);
+}
+/** The weapon's damage multiplier: ×(1 + 0.12 rank), the 공격력 options worn, its family's edge on
+ *  every foe (태초, 심판의낫). */
+function weaponMult(cls, g) {
+  const sp = g.weaponSp && SPECIAL[g.weaponSp];
+  let power = 0;
+  for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+    const s = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
+    if (s) power += optIds(s).filter(o => o === 'power').length;
+  }
+  const edge = sp && sp.taecho ? 1 + TAECHO_EDGE.all : sp && sp.craft && sp.craft.judge ? 1 + JUDGE_EDGE.all : 1;
+  return (1 + 0.12 * Math.max(0, pieceRank(cls, g, 'weapon'))) * (1 + 0.15 * power) * edge;
+}
+/** The weapon's rank as it strikes: the plain rank that would strike as hard. */
+function weaponEff(cls, g) {
+  return (weaponMult(cls, g) - 1) / 0.12;
 }
 /** 방어구 보조 옵션 (items.js gearExtra) in 전투력: a second line counts 0.3 of a rank, a feature 0.5. */
 const EXTRA_POW = { line: 0.3, proc: 0.5 };
@@ -1059,8 +1084,7 @@ function applyGear() {
   if (!hasShield(c)) { g.shield = -1; delete g.shieldSp; } // an old save's shield on a class that carries none
   // A special worn counts a rank above its look, and adds its option.
   // Each star above ★1 adds half a rank.
-  const pow = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], c) + 0.5 * (starOf(G.cls, 'sp:' + g[k + 'Sp']) - 1)
-    : g[k] < 0 ? -1 : gearPower(c, k, g[k]) + starPow(G.cls, `${k}:${g[k]}`));
+  const pow = k => pieceRank(G.cls, g, k);
   const bonus = p.bonus = {};
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
@@ -1084,18 +1108,19 @@ function applyGear() {
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (!sp) continue;
-    if (sp.gyeok && GYEOK[sp.gyeok]) gy.push({ id: sp.gyeok, ...GYEOK[sp.gyeok] });
+    if (sp.gyeok && GYEOK[sp.gyeok]) gy.push(tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? pow('weapon') : 0));
     if (sp.ward) p.wards.add(sp.ward);
   }
   p.dragonCut = 0;
   if (!g.weaponSp && g.weapon === dragonTier(G.cls)) {
     const step = starOf(G.cls, `weapon:${g.weapon}`), dg = dragonGyeok(c, step);
-    gy.push({ id: 'dragon', ...dg });
+    gy.push(tierGyeok({ id: 'dragon', ...dg }, pow('weapon')));
     p.dragonCut = dg.cdCut;
     const ss = (progress.dragonSinsu || {})[c];
-    if (ss && SINSU[ss] && step >= 10) gy.push({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] });
+    if (ss && SINSU[ss] && step >= 10) gy.push(tierGyeok({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] }, pow('weapon')));
   }
   p.gyeoks = gy;
+  p.judge = g.weaponSp && SPECIAL[g.weaponSp] && SPECIAL[g.weaponSp].craft && SPECIAL[g.weaponSp].craft.judge ? JUDGE_EDGE.all : 0;
   // The weapon's family edge (items.js): an abyss unique's hunt, the 주작's aura on the allies near.
   const wsp = g.weaponSp && SPECIAL[g.weaponSp];
   p.abyssHunt = !!(wsp && wsp.rarity);
@@ -1110,6 +1135,14 @@ function applyGear() {
   const fxTint = ws && ws.dress && ws.dress.fxTint || null; // a filter, or one per effect (TAECHO_DRESS)
   p.swing = ws && ws.swing && have(set.hit).length ? { ...ws.swing, hit: have(set.hit), heavy: ws.swing.heavy ? have(set.heavy) : null, tint: fxTint } : null;
   p.trail = far && ws && ws.rarity && have(ABYSS_TRAIL.layers).length ? { ...ABYSS_TRAIL, layers: have(ABYSS_TRAIL.layers), tint: fxTint } : null;
+}
+
+/** A weapon's 격 grown with the weapon's rank (items.js GYEOK_TIER): a larger picture, and a 격 that
+ *  strikes round reaching further. The 격's own entry is left as it is (a copy). */
+function tierGyeok(g, rank) {
+  const t = gyeokTier(rank);
+  if (!t) return g;
+  return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area };
 }
 
 /** A weapon's strike-effect filter for effect id: one for all, or by effect (with a default). */
@@ -1764,10 +1797,13 @@ function showPieceTip(cls, kind, t, id) {
   if (kind === 'util') return showUtilTip(t);
   const el = $('#equip-tip'), sp = id && SPECIAL[id];
   if (!sp && (t === undefined || t < 0)) { el.hidden = true; return; }
-  const st = starOf(cls, sp ? 'sp:' + id : `${kind}:${t}`);
-  const rank = sp ? specialPower(sp, cls.id) + 0.5 * (st - 1) : gearPower(cls.id, kind, t) + starPow(cls, `${kind}:${t}`);
+  const st = starOf(cls, sp ? 'sp:' + id : `${kind}:${t}`), dragon = !sp && kind === 'weapon' && t === dragonTier(cls);
+  const one = { [kind]: t, [kind + 'Sp']: sp ? id : null }, rank = pieceRank(cls, one, kind);
   const name = sp ? specialName(sp, cls.id) : pieceName(cls, kind, t);
-  const lines = [`<b${sp && sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${name}${st > 1 ? ` ★${st}` : ''}</b> <span class="sub">${KIND_NAME[kind]} · ${(Math.round(rank * 10) / 10)}등급${sp ? sp.craft ? ' · 조합' : sp.rarity ? ' · 고유' : sp.raid ? ' · 레이드 스페셜' : ' · 스페셜' : ''}</span>`];
+  // A weapon: the damage it strikes for alone (its rank, its own 공격력 option, its family's edge on
+  // every foe), so two weapons read the same way the ▲/▼ do. (The 용무기's step is in its name, not a ★.)
+  const hit = kind === 'weapon' ? ` · 공격력 ×${weaponMult(cls, one).toFixed(2)}` : '';
+  const lines = [`<b${sp && sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${name}${st > 1 && !dragon ? ` ★${st}` : ''}</b> <span class="sub">${KIND_NAME[kind]} · ${(Math.round(rank * 10) / 10)}등급${hit}${sp ? sp.craft ? ' · 조합' : sp.rarity ? ' · 고유' : sp.raid ? ' · 레이드 스페셜' : ' · 스페셜' : dragon ? ' · 용무기' : ''}</span>`];
   if (sp) {
     const [o1, ...more] = sp.optLines || [sp.opt.text];
     lines.push(`<div class="o1">옵션: ${o1}</div>`);
@@ -1985,11 +2021,11 @@ function buildEquip() {
   utilRow(box, cls);
   if (equipTip) showPieceTip(cls, ...equipTip);
   else $('#equip-tip').hidden = true;
-  const pw = k => (g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] ? specialPower(SPECIAL[g[k + 'Sp']], cls.id) + 0.5 * (starOf(cls, 'sp:' + g[k + 'Sp']) - 1)
-    : g[k] < 0 ? -1 : gearPower(cls.id, k, g[k]) + starPow(cls, `${k}:${g[k]}`));
+  const pw = k => pieceRank(cls, g, k);
   const opts = ['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).map(sp => sp.opt.text);
-  const ex = k => (g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
-  $('#equip-stats').textContent = `공격력 +${Math.round(12 * pw('weapon'))}% · 체력 +${pw('armor') * 20 + ex('helmet') * 12}`
+  // As applyGear counts them: a plain helmet or cape too (only the specials were shown).
+  const ex = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
+  $('#equip-stats').textContent = `공격력 +${Math.round((weaponMult(cls, g) - 1) * 100)}% · 체력 +${Math.round(pw('armor') * 20 + ex('helmet') * 12)}`
     + ` · 방어 +${(hasShield(cls.id) ? Math.max(0, pw('shield') + 1) : Math.max(0, Math.floor(pw('armor') / 2) + 1)) + Math.round(ex('cape') / 3)} · 전투력 ${combatPower(cls).toLocaleString()}`
     + (opts.length ? ` · ${opts.join(' · ')}` : '') + ` · ${moveText(cls)}`;
   // The 격 worn, each with its rule (gyeok.js), and the statuses warded.
@@ -2014,11 +2050,19 @@ function codexItems(cls) {
   const b = bag(cls), out = [];
   for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     if (kind === 'shield' && !hasShield(cls.id)) continue;
+    const plain = new Set(plainList(cls.id, kind));
     GEAR[cls.id][kind].forEach((name, t) => {
       const raid = raidOf(cls.id, kind, t), craft = kind === 'weapon' && name === CRAFT_GEAR[cls.id];
-      const rc = craft && craftRecipe(cls.id);
+      // A look only a crafted piece wears (해골갑옷 on the 전사's line ...) is no piece of its own: it
+      // was listed as a plain piece "나오지 않음" at its raw place for a rank (남자기모노 15등급).
+      if (!craft && !raid && !plain.has(t)) return;
+      const rc = craft && craftRecipe(cls.id), step = craft && b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 0;
+      // The 용무기: its rank at the step owned, and the whole climb (it read a flat 10등급, under
+      // pieces it outranks from 제사 on).
+      const dpow = r => Math.round(r * 10) / 10;
       out.push({ grade: craft ? 'craft' : raid ? 'raid' : 'plain', kind, name: craft ? `${dragonName(cls.id, 1)} ~ ${dragonName(cls.id, DRAGON_MAX)}` : name,
-        icon: (craft && (dragonIcon(cls, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1) || picture(dragonName(cls.id, b.includes(`${kind}:${t}`) ? starOf(cls, `${kind}:${t}`) : 1)))) || pieceIcon(cls, kind, t), pow: gearPower(cls.id, kind, t),
+        icon: (craft && (dragonIcon(cls, step || 1) || picture(dragonName(cls.id, step || 1)))) || pieceIcon(cls, kind, t),
+        pow: craft ? `${step ? `${dragonName(cls.id, step)} ${dpow(CRAFT_POWER + (step - 1) * DRAGON_STEP)} · ` : ''}${CRAFT_POWER}~${dpow(CRAFT_POWER + (DRAGON_MAX - 1) * DRAGON_STEP)}` : gearPower(cls.id, kind, t),
         owned: b.includes(`${kind}:${t}`),
         from: craft ? `대장장이 조합: ${GEAR[cls.id].weapon[rc.base]} ★${rc.star} + 용의 비늘 ${rc.mats.scale} + 여의주 ${rc.mats.pearl}`
           : raid ? raid.name : tierSources(cls.id, kind, t) });
@@ -2220,6 +2264,7 @@ function openCraft(sink = null) {
     const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
     if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
     if (c.sinsu && c === CRAFTS.find(x => x.sinsu && (!x.only || x.only.includes(cls.id)))) head('조합 · 사신수 지존 장비 (성물 4종 → 신수의 격)');
+    if (c.judge && c === CRAFTS.find(x => x.judge)) head('조합 · 심판의낫 (용궁의 보물 · 균형 딜)');
     // An evolution is made out of its base piece at ★5, which goes into the making.
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
@@ -4262,7 +4307,8 @@ function hurtEnemy(e, dmg, push = null) {
     * (own ? 1 + GEAR_OPT.final * opt('final') : 1)
     * (e.st && e.st.mark && e.st.mark.until > G.t ? 1 + e.st.mark.k : 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1)
-    * (p.abyssHunt && !G.allyHitting ? abyssEdge(e) : 1);
+    * (p.abyssHunt && !G.allyHitting ? abyssEdge(e) : 1)
+    * (p.judge && own ? 1 + p.judge : 1); // 심판의낫 (items.js JUDGE_EDGE): every foe alike
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
   const lucky = Math.random() < 0.1 + (own ? GEAR_OPT.crit * opt('crit') : 0);
@@ -11380,6 +11426,7 @@ window.__gearTest = () => {
   for (const sp of Object.values(SPECIAL)) {
     if (sp.cls && sp.cls !== c) continue;
     if (sp.kind === 'shield' && !hasShield(c)) continue;
+    if (sp.craft && sp.craft.only && sp.craft.judge && !sp.craft.only.includes(c)) continue; // 심판의낫: its three classes
     n++;
     check(`special ${sp.id} ${specialName(sp, c)}`, sp.kind, specialBase(sp, c), sp.id);
   }

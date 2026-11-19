@@ -195,6 +195,8 @@ export const CRAFT_GYEOK = {
   cr_fur_weapon: 'turyeong', cr_horn_weapon: 'gwimunsan', cr_bone_weapon: 'gwimunhon', cr_ember_weapon: 'yeomryeong',
   cr_gold_weapon: 'hwaryun', cr_gold_weapon2: 'hwaryun', cr_steel_weapon: 'saseong', cr_steel_weapon2: 'saseong',
   cr_maryeong_weapon: 'gwimunsang',
+  // 심판의낫: the PC original's 저주격 on the 청룡 step, 연's 진청룡마령참 격 (blow and heal) on the last.
+  cr_judge_weapon: 'jeoju', cr_judge_weapon2: 'maryeongcham',
   cr_sinsu_cheong: 'cheongrin', cr_sinsu_jujak: 'jujakbisang', cr_sinsu_baekho: 'baekmaeng', cr_sinsu_hyeonmu: 'hyeoncheorong',
 };
 

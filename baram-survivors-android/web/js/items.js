@@ -7,7 +7,7 @@
 // what makes a conquered ground worth hunting again; the 도감 shows where each piece drops.
 
 import { STAGES, RAIDS, CLASSES } from './data.js';
-import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces } from './avatar.js';
+import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, RAID_GEAR } from './avatar.js';
 import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
 
 // The name each source gives its specials.
@@ -79,8 +79,12 @@ export function specialBase(sp, cls) {
     const at = name ? GEAR[cls][sp.kind].indexOf(name) : -1;
     if (at >= 0) return at;
   }
-  // A class whose plain line of this kind is all crafted looks (the 주술사's shields) takes the
-  // line as it stands, so the special still has a base, a name and a picture.
+  return rankBase(sp, cls);
+}
+/** The grounds' piece of a source's rank in a class's line. A class whose plain line of this kind
+ *  is all crafted looks (the 주술사's shields) takes the line as it stands, so the special still has
+ *  a base, a name and a picture. */
+function rankBase(sp, cls) {
   let list = plainList(cls, sp.kind);
   if (!list.length) list = GEAR[cls][sp.kind].map((n, i) => i);
   return list[Math.min(list.length - 1, Math.floor(sp.rank / 3) + 1)];
@@ -92,16 +96,44 @@ export function specialName(sp, cls) {
   return `${PREFIX[sp.src]} ${GEAR[cls][sp.kind][specialBase(sp, cls)]}`;
 }
 
-const SPECIAL_CAP = 15;
+// ---- special rank tuning (retune here; README "장비 티어") ----
+// A boss's special is a find, not the end of the road. Its rank: its base piece's +1 (+0.5 with a 격
+// or a ward), at most `cap` at ★1 and `top` with its stars. A weapon's 공격력 option (×1.15) is worth
+// some three ranks at the top (1 + 0.12 × 13.5 = 2.62, ×1.15 = 3.01, rank 16.8's), so a weapon that
+// carries one is capped `powerEdge` lower. Weapons: 14.5 (×2.74) at ★1, 16 (×2.92) at ★5, under the
+// 사신수 (15, ★5 17) and the 용무기 제십 (17.2, ×3.06); with 공격력 11.5 (×2.74) / 13 (×2.94).
+// (Before: 15 / 13.5 at ★1 with no top: 아이라바타's bow at ★5 struck ×3.29, over the 용무기 제십.)
+// Armour, shields, helmets and capes: 15 / 17 (아이라바타's plain armour is 14 already).
+export const SPECIAL_RANK = { weapon: { cap: 14.5, top: 16 }, other: { cap: 15, top: 17 }, powerEdge: 3 };
+function specialCaps(sp) {
+  const c = SPECIAL_RANK[sp.kind === 'weapon' ? 'weapon' : 'other'];
+  const cut = sp.kind === 'weapon' && (sp.opts || [sp.opt && sp.opt.id]).includes('power') ? SPECIAL_RANK.powerEdge : 0;
+  return { cap: c.cap - cut, top: c.top - cut };
+}
 /** A special counts a rank above its base, and half a rank more for a 격 or a ward. */
 export function specialPower(sp, cls) {
   if (sp.craft) return sp.craft.pow + (sp.gyeok ? 0.5 : 0);
   if (sp.rarity) return abyssPower(sp.rank) + RARITY[sp.rarity].pow + (sp.taecho ? TAECHO_EDGE.pow : 0);
-  // A boss's special is a find, not the end of the road: worn, it stays under the 용무기 제십
-  // (17.2, ×3.06). A raid special on the top raid's set came out above it: 아이라바타's bow at 15.5
-  // with its 공격력 option (×1.15) struck ×3.29. So 15 at most, 13.5 with a 공격력 option (×3.01).
-  const cap = SPECIAL_CAP - ((sp.opts || [sp.opt && sp.opt.id]).includes('power') ? 1.5 : 0);
-  return Math.min(cap, gearPower(cls, sp.kind, specialBase(sp, cls)) + 1 + (sp.gyeok || sp.ward ? 0.5 : 0));
+  // The base it counts on: its look's place when that is a grounds' piece or a raid's. A look that
+  // is only a crafted piece's (해골갑옷, 거울방패 …, added to every line by the smith's recipes) has
+  // no rank of its own: the grounds' piece of the source's rank counts. (By the look's raw place in
+  // the line, a 원혼 armour of rank 7 counted 15, more than any armour, above the 현무불괴갑.)
+  // A ground boss's look that is a raid's piece (원혼's 주술방패, 괴력난신's) counts no more than a raid
+  // of the ground's own level gives (it counted the raid's: a rank-7 ground's shield 12.5).
+  let t = specialBase(sp, cls);
+  if (!sp.raid && t >= 0 && !plainList(cls, sp.kind).includes(t) && !raidOwner(cls, sp.kind, t)) t = rankBase(sp, cls);
+  let base = gearPower(cls, sp.kind, t);
+  if (!sp.raid && raidOwner(cls, sp.kind, t)) base = Math.min(base, Math.max(gearPower(cls, sp.kind, rankBase(sp, cls)), raidPowAt(sp.rank)));
+  return Math.min(specialCaps(sp).cap, base + 1 + (sp.gyeok || sp.ward ? 0.5 : 0));
+}
+/** The set power of the strongest raid of a level or below (0 below the first). */
+function raidPowAt(level) {
+  return RAIDS.filter(r => r.level <= level && RAID_GEAR[r.id]).reduce((m, r) => Math.max(m, RAID_GEAR[r.id].pow), 0);
+}
+/** A piece's rank worn at a star: half a rank a star; a boss's find no further than its top. */
+export function specialRank(sp, cls, star = 1) {
+  const r = specialPower(sp, cls) + 0.5 * (Math.max(1, star) - 1);
+  return sp.craft || sp.rarity ? r : Math.min(specialCaps(sp).top, r);
 }
 
 /** Where an ordinary tier drops: the grounds whose rank (with luck and a boss's +1) reach it. */
@@ -268,6 +300,39 @@ for (const c of CRAFTS) {
 }
 // The raids' own places in the lines (avatar.js), after the crafted looks so no saved place moves.
 settleRaidPieces();
+
+// 심판의낫 (the original's 용궁 quest weapon, Lv 99, every class: 데미지·명중 +6, 체력·마력 +7000,
+// 힘 +15·지력 +10 — even, no one thing; its line in 연: 심판의낫 → 청룡 심판의낫 → 진'·극'청룡 →
+// 군주 청룡 심판의낫). Worn in 연's own 치장용 of the step by the 전사 and 도적 (its only figures),
+// by the 주술사 in its own 심판의낫. Its way (WEAPON_FAMILY.judge): even damage on every foe. Made
+// after the raids' places are settled, so its look, new to a line, moves no saved place.
+// (Kept as an extra list, not in CRAFTS above: those lines carry the old saves' places.)
+export const JUDGE_CRAFTS = [
+  { id: 'cr_judge_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '청룡 심판의낫', look: '심판의낫',
+    base: { warrior: [7100334], rogue: [7100334] }, pow: 12, opt: 'life', mats: { scale: 12, essence: 6, scroll: 1 }, gold: 9000, legend: true, judge: true },
+  { id: 'cr_judge_weapon2', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '군주 청룡 심판의낫', look: '심판의낫',
+    base: { warrior: [7100443], rogue: [7100443] }, pow: 13, opt: 'life', from: 'cr_judge_weapon',
+    mats: { essence: 15, kalpa: 15, pearl: 1, scroll: 2 }, gold: 22000, legend: true, judge: true },
+];
+for (const c of JUDGE_CRAFTS) {
+  CRAFTS.push(c);
+  const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
+    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base };
+  SPECIALS.push(sp);
+  SPECIAL[c.id] = sp;
+  for (const k of c.only) specialBase(sp, k);
+}
+
+// ---------------------------------------------------------------- 장비 티어 (README "장비 티어")
+// The crafted pieces' ranks as the ladder sets them (over the recipes' own pow, kept above as they
+// were written). A rank r strikes ×(1 + 0.12 r); 체력 20 a rank (갑옷), 12 (투구). The ladder, weapons:
+//   사냥터 0~5 · 레이드 3~14 · 재료 조합 3~8 · 금린 1차 11 · 일본(무신) 1차 12 · 청룡 심판의낫 12
+//   · 금린·무신 2차 13 · 군주 청룡 심판의낫 13 (+6% 모든 적) · 사신수 지존 14.5 (★5 16.5)
+//   · 용무기 제일 10 … 제칠 14.8 · 제팔 15.6 · 제구 16.4 · 제십 17.2 (+ 격 0.5 where it has one).
+// 사신수: 13 → 14.5 (청룡신검·주작선장: 극'진일신검과 같던 13.5 → 15, 일본 1차 12.5보다 +2.5),
+// 현무불괴갑 14 → 15 (멸아갑 13 위), 백호환령부 13 → 14.5 (망토의 꼭대기).
+export const TIER_POW = { cr_sinsu_cheong: 14.5, cr_sinsu_jujak: 14.5, cr_sinsu_baekho: 14.5, cr_sinsu_hyeonmu: 15 };
+for (const c of CRAFTS) if (TIER_POW[c.id] !== undefined) c.pow = TIER_POW[c.id];
 
 // ---------------------------------------------------------------- 방어구 보조 옵션
 // The pieces besides the weapon (갑옷·방패·투구·망토) of special grade and above carry a second
@@ -629,6 +694,15 @@ export const ABYSS_HUNT = { mob: 0.2, abyss: 0.15, burst: { chance: 0.2, cd: 0.5
 // 주작의 기운: allies (companions, raiders, the guild in a war) within r tiles of the wearer
 // strike k harder, perStar more for each star above ★1; the 용무기 제십 that took the 주작, dragonK.
 export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
+// 심판의낫's way: the same edge on every foe (crowd, boss, leader, a war's fighter), no niche.
+export const JUDGE_EDGE = { all: 0.06 };
+// A weapon's 격 grows with the weapon: from rank `at` its picture is drawn fxK times larger and a
+// 격 that strikes round (area) reaches `area` tiles further (진청룡마령참 on a 13+ weapon, the
+// 사신수's, the 용무기 제구·제십's). Single-target 격 stay single (the 용X격): only the picture grows.
+export const GYEOK_TIER = [{ at: 16, fxK: 1.5, area: 1 }, { at: 14.5, fxK: 1.35, area: 1 }, { at: 13, fxK: 1.2, area: 0 }];
+export function gyeokTier(rank) {
+  return GYEOK_TIER.find(t => rank >= t.at) || null;
+}
 
 // The families as the equipment window tells them: name, role, where they are best, the trade.
 export const WEAPON_FAMILY = {
@@ -654,9 +728,11 @@ export const WEAPON_FAMILY = {
     text: '화륜옥쇄 격: 주변 큰 피해와 마비(길드전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
   steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
     text: '사성격 출혈(일반 몬스터)과 이동·기술 재사용 옵션. 보스에게는 출혈이 듣지 않음.' },
+  judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·길드전)',
+    text: '모든 적에게 피해 +6%(보스·길드전 상대 포함). 청룡 심판의낫 12.5 → 군주 청룡 심판의낫 13.5등급, 진청룡마령참 격(주변 피해와 체력·마력 회복). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
 };
 const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
-  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel' };
+  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge' };
 /** A piece's family (a key of WEAPON_FAMILY): sp its special (or null); dragon: the 용무기; raid: a raid's piece. */
 export function familyOf(sp, dragon = false, raid = false) {
   if (dragon) return 'dragon';
