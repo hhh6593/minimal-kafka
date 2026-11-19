@@ -3168,7 +3168,9 @@ function raidPattern(b, kind, follow = false) {
   } else if (base === 'quake') {
     // Rings of force going out from the boss, one after the other (two, four, six tiles out; a
     // fourth at eight when it is fierce): step over each, or in behind it.
-    for (let i = 0; i < (ph >= 2 ? 4 : 3); i++) waves.push(() => sq(b.tx, b.ty, 2 * i + 2, [], 2 * i + 1));
+    // (화염 폭발 and 대지 진동 come on top of the late phase's other blows: three rings, never four.)
+    const rings = ph >= 2 && kind === 'quake' ? 4 : 3;
+    for (let i = 0; i < rings; i++) waves.push(() => sq(b.tx, b.ty, 2 * i + 2, [], 2 * i + 1));
   } else if (base === 'sparks') {
     // A small cross under several of the party at once (spread out!); 낙뢰 strikes twice, following.
     const n = kind === 'thunder' ? 2 : 1;

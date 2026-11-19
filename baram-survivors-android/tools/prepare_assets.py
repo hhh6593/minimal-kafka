@@ -683,9 +683,9 @@ def main():
         with open(os.path.join(udir, "index.json"), encoding="utf-8") as f:
             index = json.load(f)
         pairs = [(mid, u, mid) for mid, u in index.items() if mid not in YUNIT_REMAP]
-        pairs += [(mid, index[src], src) for mid, src in YUNIT_REMAP.items() if src in index]
-        for mid, u, src in pairs:
-            usrc = os.path.join(udir, src + ".png")
+        pairs += [(mid, index[sid], sid) for mid, sid in YUNIT_REMAP.items() if sid in index]
+        for mid, u, sid in pairs:
+            usrc = os.path.join(udir, sid + ".png")
             # 연's own monsters (tools/yeon_grounds.py: the grounds out of 연's maps) have no old
             # picture: their sheet is the monster, and its first standing frame its picture.
             if u.get("own") and os.path.isfile(usrc):
