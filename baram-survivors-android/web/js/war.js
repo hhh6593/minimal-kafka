@@ -259,7 +259,8 @@ export function openBoard() {
   const mats = pr.mats || {};
   const cards = Object.values(WARS).map(x => {
     const pic = img(x.art) ? `assets/hud/${x.art}.png` : '';
-    return `<button class="wb-card${x.id === pickWar ? ' on' : ''}" data-war="${x.id}">${pic ? `<img src="${pic}" alt="">` : ''}<b>${x.name}</b>${x.title}<br><small>보상: ${A.MATS[x.mat].name} (보유 ${mats[x.mat] || 0})</small></button>`;
+    const gate = (A.SINSU_GATE[x.mat] || [])[0], open = !gate || (pr.raids || {})[gate];
+    return `<button class="wb-card${x.id === pickWar ? ' on' : ''}" data-war="${x.id}">${pic ? `<img src="${pic}" alt="">` : ''}<b>${x.name}</b>${x.title}<br><small>보상: ${open ? `${A.MATS[x.mat].name} (보유 ${mats[x.mat] || 0})` : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[x.mat].name})`}</small></button>`;
   }).join('');
   const roleBtns = Object.entries(ROLES).map(([id, r]) => {
     const fit = roles.includes(id);
@@ -3369,7 +3370,11 @@ function finish(W, win, why) {
   const gold = 1500 + (won ? 2500 : 0) + tierN * 700;
   const pr = A.progress();
   pr.mats = pr.mats || {};
-  pr.mats[W.def.mat] = (pr.mats[W.def.mat] || 0) + mats;
+  // The 신수's 성물 only once its own raid has fallen (items.js SINSU_GATE: 바루나, 아그니,
+  // 아이라바타): before, the war pays 겁화의 파편 instead, so the 사신수 waits for the 대격변's end.
+  const gate = (A.SINSU_GATE[W.def.mat] || [])[0];
+  const matId = !gate || (pr.raids || {})[gate] ? W.def.mat : 'kalpa';
+  pr.mats[matId] = (pr.mats[matId] || 0) + mats;
   pr.gold = (pr.gold || 0) + gold;
   pr.war = pr.war || { played: 0, won: 0, best: {} };
   pr.war.played++;
@@ -3379,7 +3384,7 @@ function finish(W, win, why) {
   // 코디: a war won gives a costume (S and A tiers a rarer one).
   if (won) dropCostume(tierN >= 3 ? [1, 2] : [0, 1, 2], '대항전 승리');
   A.saveProgress();
-  W.result = { win, why, tier, tierK, mats, gold, rank: rank + 1, rows };
+  W.result = { win, why, tier, tierK, mats, matId, gold, rank: rank + 1, rows };
   G.over = true;
   document.getElementById('levelup').hidden = true;
   G.choosing = false;
@@ -3416,12 +3421,12 @@ function showResult(W) {
   if (!G || G.war !== W) return;
   const r = W.result, won = r.win === 0, box = document.getElementById('war-result');
   const art = img(won ? 'ui_attack_result_win' : 'ui_attack_result_lose');
-  const mat = W.raid ? { name: '레이드주화' } : A.MATS[W.def.mat];
+  const mat = W.raid ? { name: '레이드주화' } : A.MATS[r.matId || W.def.mat];
   // 연's duel result: the word on a brush stroke, the hero in a spotlight, the rewards as medallions.
   const hud = n => (img(n) ? `assets/hud/${n}.png` : '');
   const medal = (label, value, icon) => `<div class="wr-medal">${hud('ui_icon_medal01') ? `<img class="wr-mbg" src="${hud('ui_icon_medal01')}" alt="">` : ''}
     ${icon ? `<img class="wr-mic" src="${icon}" alt="">` : ''}<b>${label}</b><span>${value}</span></div>`;
-  const matIcon = W.raid ? '' : A.matPicture ? A.matPicture(W.def.mat) : '';
+  const matIcon = W.raid ? '' : A.matPicture ? A.matPicture(r.matId || W.def.mat) : '';
   const tierLine = W.raid
     ? `레이드주화 ${10 * G.level + (G.stage.gwoe ? 30 : 0)} × 등급 (S 1.5 · A 1.25 · B 1 · C 0.7)${won ? '' : ' × 실패 0.3'} · 전 ${won ? 60 : 30}×${G.level}×등급`
     : `참여 2 + ${won ? '승리 3 + ' : ''}등급 보너스 ${{ S: 4, A: 3, B: 2, C: 1 }[r.tier]}`;

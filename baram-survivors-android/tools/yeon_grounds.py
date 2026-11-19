@@ -3,7 +3,7 @@
 asset a ground of tools/yeon_grounds.json needs.
 
     yeon_grounds.py survey DEC_DIR OUT.json         every 연 hunting map and what it holds
-    yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR
+    yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR [ID ...]   (only those grounds / raids)
 
 DEC_DIR holds the decrypted bundles (tools/yeon_dexor.py): Commons, Units, Image, Sounds and the
 Maps_* bundles.
@@ -30,6 +30,9 @@ build, for each ground of SPEC ({"tabs": {...}, "grounds": [...]}, see tools/yeo
     loudness-matched; the build makes it OGG);
   - its pin: GEAR_DIR/ymap/index.json (the stage-select tabs), with a new tab's 연 map picture
     (a Texture2D of Image.unity3d) where SPEC names one.
+SPEC "raids": raids out of 연's own (data.js RAIDS with a terrain y_<id>): the same units (from
+Units_RaidBoss too), floor, props and music, no pin (the raid list is the game's own).
+With IDs, only those grounds and raids are built (the indexes keep everything else).
 """
 import json
 import os
@@ -103,7 +106,7 @@ class Res:
         for o in env.objects:
             if o.type.name == 'MonoBehaviour':
                 n = o.peek_name()
-                if n in ('Maps', 'Units_Field', 'Units_FieldBoss'):
+                if n in ('Maps', 'Units_Field', 'Units_FieldBoss', 'Units_RaidBoss'):
                     bufs[n] = bytes(o.read_typetree()['_buffer'])
             elif o.type.name == 'TextAsset' and o.peek_name() == 'Strings':
                 sc = o.read().m_Script
@@ -111,13 +114,15 @@ class Res:
         self.str = dict(re.findall(r'<String Key="([^"]+)"><!\[CDATA\[(.*?)\]\]></String>', strings, re.S))
         self.maps = read_table(bufs['Maps'], 'Map')
         self.units = {}
-        for t in ('Units_Field', 'Units_FieldBoss'):
+        for t in ('Units_Field', 'Units_FieldBoss', 'Units_RaidBoss'):
             for r in read_table(bufs[t], 'Unit'):
+                if t == 'Units_RaidBoss' and one(r['ID']) in self.units:
+                    continue  # (the field tables' entry first: the raid table repeats some ids)
                 p = one(r.get('Prefab')) or ''
                 tags = r.get('Tag') or []
                 self.units[one(r['ID'])] = {
                     'prefab': p.split('/')[-1].replace('.prefab', ''), 'table': t,
-                    'boss': 'BOSS' in (tags if isinstance(tags, list) else [tags]) or t == 'Units_FieldBoss',
+                    'boss': 'BOSS' in (tags if isinstance(tags, list) else [tags]) or t != 'Units_Field',
                     'move': one(r.get('MoveSpeed')), 'atk': one(r.get('AttackTime'))}
 
     def name(self, key):
@@ -194,14 +199,15 @@ def survey(dec, out):
               + (' || ' + ', '.join(r['name'] for r in G['boss'][:2]) if G['boss'] else ''))
 
 
-def build(spec_path, dec, gear, audio):
+def build(spec_path, dec, gear, audio, *only):
     import yeon_maps
     spec = json.load(open(spec_path, encoding='utf-8'))
     R = Res(dec)
-    grounds = spec['grounds']
+    grounds = [g for g in spec['grounds'] if not only or g['id'] in only]
+    raids = [g for g in spec.get('raids', []) if not only or g['id'] in only]
     # Monsters, leaders and bosses.
     match = {}
-    for g in grounds:
+    for g in grounds + raids:
         for uid in g['units'] + [g['mini'], g['boss']]:
             u = R.units[str(uid)]
             match['y%s' % uid] = {'prefab': u['prefab'], 'name': R.unit_name(str(uid)), 'yeon': R.unit_name(str(uid)),
@@ -227,7 +233,7 @@ def build(spec_path, dec, gear, audio):
     print(len(got), 'units')
     # Floors and props, a terrain of its own for each ground.
     terr = {}
-    for g in grounds:
+    for g in grounds + raids:
         b = os.path.join(dec, g['bundle'])
         # floor_tiles: the map's tiles named outright where its walkable cells are too few to read.
         terr['y_' + g['id']] = {'floor': {'bundle': b, 'map': g['map'], 'auto': True, 'tiles': g.get('floor_tiles')},
@@ -238,7 +244,7 @@ def build(spec_path, dec, gear, audio):
     # Music.
     bdir = os.path.join(audio, 'bgm')
     os.makedirs(bdir, exist_ok=True)
-    want = {g['music'] for g in grounds} - {f[:-4] for f in os.listdir(bdir)}
+    want = {g['music'] for g in grounds + raids} - {f[:-4] for f in os.listdir(bdir)}
     if want:
         import UnityPy
         env = UnityPy.load(os.path.join(dec, 'Sounds.unity3d'))
@@ -261,7 +267,7 @@ def build(spec_path, dec, gear, audio):
     ip = os.path.join(ydir, 'index.json')
     yidx = json.load(open(ip)) if os.path.isfile(ip) else {}
     for tab, t in spec.get('tabs', {}).items():
-        if tab not in yidx:
+        if tab not in yidx and (not only or any(g['tab'] == tab for g in grounds)):
             if t.get('render'):
                 # A region with no world-map picture: its 연 hub map itself, every layer, scaled down.
                 from PIL import Image
@@ -290,7 +296,7 @@ def main():
     if sys.argv[1] == 'survey':
         survey(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'build':
-        build(*sys.argv[2:6])
+        build(*sys.argv[2:])
     else:
         raise SystemExit(__doc__)
 

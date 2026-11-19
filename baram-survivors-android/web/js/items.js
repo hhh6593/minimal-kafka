@@ -7,7 +7,7 @@
 // what makes a conquered ground worth hunting again; the 도감 shows where each piece drops.
 
 import { STAGES, RAIDS, CLASSES } from './data.js';
-import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, RAID_GEAR } from './avatar.js';
+import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, settleLateRaids, RAID_GEAR } from './avatar.js';
 import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
 
 // The name each source gives its specials.
@@ -26,6 +26,7 @@ const PREFIX = {
   hanbing: '한빙의', geohae: '거해의', zud: '고원의', zud2: '주술사의', sandolim: '협곡의', fallforest: '몰락의', jagwi: '자귀의',
   oldaram: '섬망의', haya: '하야의', lobi: '세암의', aram: '황무지의', ancient: '도성의',
   hwatang: '화탕의', cheolsang: '철상의', abyss: '묘지의', abyss2: '고통의', abyss3: '혼돈의', abyss4: '세계석의', cow: '음매의',
+  raid_hell: '대적의', raid_heaven: '선계의',
 };
 
 // The extra options, in turn. Each special has one.
@@ -50,7 +51,7 @@ export const SPECIALS = [];
 // 연's own grounds (v3) after those, for the same reason.
 const era = s => (s.v3 ? 2 : s.v2 ? 1 : 0);
 const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false, v2: s.v2, v3: s.v3 })),
-  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2 }))]
+  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2, v3: r.v3 }))]
   .sort((a, b) => era(a) - era(b));
 SOURCES.forEach((src, n) => KINDS.forEach((kind, k) => {
   // A boss's specials carry its nature (gyeok.js SOURCE_GYEOK): the weapon its 격, the armour
@@ -132,7 +133,9 @@ function raidPowAt(level) {
 }
 /** A piece's rank worn at a star: half a rank a star; a boss's find no further than its top. */
 export function specialRank(sp, cls, star = 1) {
-  const r = specialPower(sp, cls) + 0.5 * (Math.max(1, star) - 1);
+  // (the 사신수 지존's weapons a little a star: SINSU_STAR; a one-step piece has no stars: craft.stars)
+  const step = sp.craft && sp.craft.sinsu && sp.kind === 'weapon' ? SINSU_STAR : 0.5;
+  const r = specialPower(sp, cls) + step * (Math.min(Math.max(1, star), sp.craft && sp.craft.stars || 99) - 1);
   return sp.craft || sp.rarity ? r : Math.min(specialCaps(sp).top, r);
 }
 
@@ -175,25 +178,56 @@ export const MATS = {
   // raise the 용무기 from 제일 to 제십.
   gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong', 'raid_airavata', 'greatwall', 'qin', 'haya'] },
   steel: { name: '순수의 강철', icon: 'm_steel', yeon: 50000606, from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin', 'raid_agni', 'wolf', 'ancient'] },
-  essence: { name: '조화의 정수', icon: 'm_essence', yeon: 21119, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
-  soul: { name: '거마족의 영혼석', icon: 'm_soul', yeon: 509043, from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
-  scroll: { name: '제작 고문서', icon: 'm_scroll', yeon: 50000607, from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
-  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', yeon: 12005, from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
-  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
-  silver2: { name: '은나무 조각', icon: 'm_silver2', yeon: 407099, from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  essence: { name: '조화의 정수', icon: 'm_essence', yeon: 21119, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
+  soul: { name: '거마족의 영혼석', icon: 'm_soul', yeon: 509043, from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'raid_hell'] },
+  scroll: { name: '제작 고문서', icon: 'm_scroll', yeon: 50000607, from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'raid_hell', 'raid_heaven'] },
+  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', yeon: 12005, from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
+  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
+  silver2: { name: '은나무 조각', icon: 'm_silver2', yeon: 407099, from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
   // The 사신수's 성물 (the original's 신수현신공성전: four of a 신수 make its 지존 piece; 연 keeps
-  // 주작혈안 and 백호광안 among its items, whose icons these are). From the raids of the 신수's
-  // nature, and the 길드대항전.
+  // 주작혈안 and 백호광안 among its items, whose icons these are). Each from its 신수's own raid at
+  // the end of the 대격변 (SINSU_GATE: 청룡 바루나 L15, 현무 해왕 L11 and 바루나, 주작 아그니 L17,
+  // 백호 아이라바타 L18); the earlier raids of the same nature (산군, 삼두룡, 화령) only a taste, one
+  // now and then (sinsuCount), and the 길드대항전's only once the gate is down (war.js).
   sinsu_jujak: { name: '주작혈안', icon: 'st:mat_jujak', from: ['raid_fire', 'raid_agni'] },
-  sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger'] },
+  sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger', 'raid_airavata'] },
   sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', yeon: 407101, from: ['raid_varuna', 'raid_hydra'] },
-  sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', yeon: 406243, from: ['raid_sea'] },
-  silver3: { name: '은나무 가지', icon: 'm_silver3', yeon: 407072, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
+  sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', yeon: 406243, from: ['raid_sea', 'raid_varuna'] },
+  // 은나무 가지 (the 용무기's 제십): from the last raids and the 끝없는 지옥 only (was 삼두룡 L7 up).
+  silver3: { name: '은나무 가지', icon: 'm_silver3', yeon: 407072, from: ['raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'raid_hell', 'raid_heaven'] },
+  // 지하국대적 레이드's own: 연's 회한옥'심 (the sinners' jade of regret 연 spends on 극'청룡
+  // 심판의낫's awakening), what 군주 청룡 심판의낫 becomes 악마 심판의낫 with (JUDGE_CRAFTS).
+  hoehan: { name: "회한옥'심", icon: 'm_soul', yeon: 50001035, from: ['raid_hell'] },
+  // 선계 레이드's own: 연's 선계의 기운, the light the 용무기 제십 is dressed in (천상 각성: HEAVEN_DRESS).
+  seongi: { name: '선계의 기운', icon: 'm_essence', yeon: 303, from: ['raid_heaven'] },
 };
+// The 사신수 성물's own raids (above); elsewhere a taste only (SINSU_TASTE a boss). 현무's 해왕 gives
+// its full share only once 바루나 has fallen. A 사신수 recipe's gate (needs) is its 성물's raid.
+export const SINSU_GATE = { sinsu_cheong: ['raid_varuna'], sinsu_jujak: ['raid_agni'], sinsu_baekho: ['raid_airavata'], sinsu_hyeonmu: ['raid_varuna', 'raid_sea'] };
+export const SINSU_TASTE = 0.05;
+/** How many of a 성물 a kill drops at a stage, with the raids already won (progress.raids). */
+export function sinsuCount(id, stage, kind, raids) {
+  const gate = SINSU_GATE[id] || [];
+  const full = gate.includes(stage) && (stage !== 'raid_sea' || !!(raids || {}).raid_varuna);
+  if (!full) return kind === 'boss' && Math.random() < SINSU_TASTE ? 1 : 0;
+  return matCount(id, kind, true);
+}
+/** A recipe's gate (craft.needs): a raid won, or a ground conquered. Pieces already made keep. */
+export function needsMet(needs, progress) {
+  if (!needs) return true;
+  return needs.startsWith('raid_') ? !!(progress.raids || {})[needs] : !!(progress.cleared || {})[needs];
+}
+/** The gate's name, for the smith's locked row. */
+export function needsName(needs) {
+  const r = RAIDS.find(x => x.id === needs) || STAGES.find(x => x.id === needs);
+  return r ? r.name : needs;
+}
 /** How many of a material a kill drops: most fall from bosses (3-5), some from mini bosses. */
 export function matCount(id, kind, raid) {
   const r = Math.random();
   if (id === 'pearl') return kind === 'boss' && r < (raid ? 0.6 : 0.12) ? 1 : 0;
+  // 회한옥'심 and 선계의 기운: two or three from their raid's boss, every clear.
+  if (id === 'hoehan' || id === 'seongi') return kind === 'boss' ? 2 + (r < 0.5 ? 1 : 0) : 0;
   // 은나무 가지: raid bosses 25%; the 끝없는 지옥's bosses (in its list) 10% — they gave none (raid only).
   if (id === 'silver3') return kind === 'boss' && r < (raid ? 0.25 : 0.1) ? 1 : 0;
   if (id === 'scroll') return kind === 'boss' ? 1 + (r < 0.3 ? 1 : 0) : 0;
@@ -314,7 +348,7 @@ export const CRAFTS = [
     look: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '검정깃발', archer: '대붕지옥궁', lancer: '청룡의검', monk: '금홍권갑', magus: '독각단봉', celestial: '흑해염호리병', dokkaebi: '흑골방망이', reaper: '흑사백도' }, pow: 10, opt: 'boss', mats: { soul: 14, scroll: 1 }, gold: 5000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true, noCoordi: true },
   { id: 'cr_brit_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage', 'poet', 'archer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'], name: { warrior: '브리트라한의신검', rogue: '브리트라한의패도', mage: '브리트라한의법장', poet: '브리트라한의신령', archer: '브리트라한의신궁', monk: '브리트라한의투겸', magus: '브리트라한의단봉', celestial: '브리트라한의성배', dokkaebi: '브리트라한의화도', reaper: '브리트라한의명도' },
-    look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '횃불', archer: '천부연궁', lancer: '청룡의검', monk: '적풍권갑', magus: '바람홍옥단봉', celestial: '바람홍옥포', dokkaebi: '극염인화퇴', reaper: '혼령영명도' }, pow: 13, opt: 'power', from: 'cr_maryeong_weapon', mats: { essence: 12, kalpa: 20, scroll: 2 }, gold: 20000,
+    look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '횃불', archer: '천부연궁', lancer: '청룡의검', monk: '적풍권갑', magus: '바람홍옥단봉', celestial: '바람홍옥포', dokkaebi: '극염인화퇴', reaper: '혼령영명도' }, pow: 13, opt: 'regen', from: 'cr_maryeong_weapon', mats: { essence: 12, kalpa: 20, scroll: 2 }, gold: 20000,
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true, noCoordi: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
@@ -358,32 +392,57 @@ settleRaidPieces();
 // by the 주술사 in its own 심판의낫. Its way (WEAPON_FAMILY.judge): even damage on every foe. Made
 // after the raids' places are settled, so its look, new to a line, moves no saved place.
 // (Kept as an extra list, not in CRAFTS above: those lines carry the old saves' places.)
+// The line's steps by the gate of the story (README "장비 티어"): 청룡 after the 용궁 (the 용궁 quest
+// weapon), 군주 after 신아람's 황무지 ("신아람의 신비를 깨우치고"), and its last, 악마 심판의낫, out of the
+// 지하국대적 레이드 (the hell under the 끝없는 지옥): its 회한옥'심, or now and then the scythe itself.
+// lookSteps: 연's 치장용 of the 청룡 step by star (★1-2 청룡, ★3-4 진'청룡, ★5 극'청룡).
+// 악마 심판의낫 (no 연 or original item of the name; made after the original's 악마사냥꾼의낫, 명품의4기
+// 악마사냥꾼, a black-and-red reaper's scythe): worn as that scythe laid on 연's hero (tools/sinsu_worn.py
+// layer s_akma), its icon the scythe's official picture (picName), both dressed as the 끝없는 지옥's
+// weapons are (AKMA_DRESS: black, blood and embers, the abyss's strike effects). No stars: one step.
+export const AKMA_DRESS = { tint: 0.85, glow: 0.7, glowColor: '#b0100a', core: '#ff6a2a', flames: 5, fsc: 1 };
 export const JUDGE_CRAFTS = [
-  { id: 'cr_judge_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '청룡 심판의낫', look: '심판의낫',
-    base: { warrior: [7100334], rogue: [7100334] }, pow: 12, opt: 'life', mats: { scale: 12, essence: 6, scroll: 1 }, gold: 9000, legend: true, judge: true },
-  { id: 'cr_judge_weapon2', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '군주 청룡 심판의낫', look: '심판의낫',
-    base: { warrior: [7100443], rogue: [7100443] }, pow: 13, opt: 'life', from: 'cr_judge_weapon',
+  { id: 'cr_judge_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '청룡 심판의낫', look: '심판의낫', needs: 'palace',
+    base: { warrior: [7100334], rogue: [7100334] }, lookSteps: { 1: 7100334, 3: 7100335, 5: 7100336 },
+    pow: 12, opt: 'life', mats: { scale: 12, essence: 6, scroll: 1 }, gold: 9000, legend: true, judge: true },
+  { id: 'cr_judge_weapon2', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '군주 청룡 심판의낫', look: '심판의낫', needs: 'aram',
+    base: { warrior: [7100443], rogue: [7100443] }, pow: 12.5, opt: 'life', from: 'cr_judge_weapon',
     mats: { essence: 15, kalpa: 15, pearl: 1, scroll: 2 }, gold: 22000, legend: true, judge: true },
+  { id: 'cr_judge_weapon3', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '악마 심판의낫', look: '심판의낫', needs: 'raid_hell',
+    base: { warrior: [7100443], rogue: [7100443] }, worn: { warrior: 's_akma', rogue: 's_akma', mage: 's_akma' }, dress: AKMA_DRESS, swing: true,
+    pic: 'name', picName: '악마사냥꾼의낫', noCoordi: true, stars: 1, pow: 14.5, opt: 'life', from: 'cr_judge_weapon2',
+    mats: { hoehan: 10, essence: 20, kalpa: 25, scroll: 3 }, gold: 40000, legend: true, judge: true },
 ];
+// 악마 심판의낫 straight from the 지하국대적 (game.js clearStage), now and then, for a class that wields it.
+export const AKMA_DROP = 0.04;
 for (const c of JUDGE_CRAFTS) {
   CRAFTS.push(c);
   const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
-    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base };
+    gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress, worn: c.worn, lookSteps: c.lookSteps };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
   for (const k of c.only) specialBase(sp, k);
 }
+// The raids written after the crafted looks (지하국대적, 선계): their pieces' places in the lines now,
+// at the ends, so no place a save holds moves (avatar.js LATE_RAIDS).
+settleLateRaids();
 
 // ---------------------------------------------------------------- 장비 티어 (README "장비 티어")
 // The crafted pieces' ranks as the ladder sets them (over the recipes' own pow, kept above as they
-// were written). A rank r strikes ×(1 + 0.12 r); 체력 20 a rank (갑옷), 12 (투구). The ladder, weapons:
-//   사냥터 0~5 · 레이드 3~14 · 재료 조합 3~8 · 금린 1차 11 · 일본(무신) 1차 12 · 청룡 심판의낫 12
-//   · 금린·무신 2차 13 · 군주 청룡 심판의낫 13 (+6% 모든 적) · 사신수 지존 14.5 (★5 16.5)
-//   · 용무기 제일 10 … 제칠 14.8 · 제팔 15.6 · 제구 16.4 · 제십 17.2 (+ 격 0.5 where it has one).
-// 사신수: 13 → 14.5 (청룡신검·주작선장: 극'진일신검과 같던 13.5 → 15, 일본 1차 12.5보다 +2.5),
-// 현무불괴갑 14 → 15 (멸아갑 13 위), 백호환령부 13 → 14.5 (망토의 꼭대기).
-export const TIER_POW = { cr_sinsu_cheong: 14.5, cr_sinsu_jujak: 14.5, cr_sinsu_baekho: 14.5, cr_sinsu_hyeonmu: 15 };
+// were written). A rank r strikes ×(1 + 0.12 r); 체력 20 a rank (갑옷), 12 (투구). The ladder, weapons
+// (boss-equivalent rank of the warrior, ★1; README "장비 티어"):
+//   용무기 제십 17.2 > 사신수 ★5 17.0 > 악마 심판의낫 16.9 > 태초 16.8 > 용무기 제구 16.4 = 사신수 ★1
+//   16.4 (≈ 군주 ★5) > 용무기 제팔 15.6 > 제칠 14.8 > 심연 14.5 > 군주 14.3 > 아이라바타 14 > 2차 13.5
+//   > 청룡 심판 13.3 > 1차 11.5~12.5.
+// 사신수 지존 (청룡신검·주작선장): 15.9 + 격 0.5 = 16.4 at ★1, the 용무기 제구's, above the 제팔; its stars
+// a little each (SINSU_STAR 0.15: ★5 17.0), so it never passes the 제십. 현무불괴갑 15 (멸아갑 13 위),
+// 백호환령부 14.5 (망토의 꼭대기): their stars as any piece's.
+export const TIER_POW = { cr_sinsu_cheong: 15.9, cr_sinsu_jujak: 15.9, cr_sinsu_baekho: 14.5, cr_sinsu_hyeonmu: 15 };
+export const SINSU_STAR = 0.15;
 for (const c of CRAFTS) if (TIER_POW[c.id] !== undefined) c.pow = TIER_POW[c.id];
+// The 사신수's gates: its 성물's raid won (SINSU_GATE). A piece already made is kept whatever.
+const CRAFT_NEEDS = { cr_sinsu_cheong: 'raid_varuna', cr_sinsu_hyeonmu: 'raid_varuna', cr_sinsu_jujak: 'raid_agni', cr_sinsu_baekho: 'raid_airavata' };
+for (const c of CRAFTS) if (CRAFT_NEEDS[c.id]) c.needs = CRAFT_NEEDS[c.id];
 
 // ---------------------------------------------------------------- 방어구 보조 옵션
 // The pieces besides the weapon (갑옷·방패·투구·망토) of special grade and above carry a second
@@ -498,7 +557,8 @@ export function starMats(sp, star) {
   if (!sp) {
     if (star <= 4) return { mats: Object.assign({ silver1: 2 * star + 2 }, star === 4 ? { pearl: 1 } : {}), gold: 500 * star };
     if (star <= 8) return { mats: Object.assign({ silver2: star, scale: 5 }, star % 2 === 0 ? { pearl: 1 } : {}), gold: 1500 * star };
-    return { mats: { silver3: 1, pearl: 2, essence: 10 }, gold: 30000 };
+    // 제구 → 제십: three 은나무 가지 (was one), only from the last raids and the 끝없는 지옥 (MATS.silver3).
+    return { mats: { silver3: 3, pearl: 2, essence: 10 }, gold: 50000 };
   }
   if (sp.craft.legend) {
     const need = { kalpa: (sp.craft.from ? 3 : 2) * star + 2 };
@@ -527,6 +587,8 @@ export function craftPicture(sp, cls, star = 1) {
   const name = typeof c.name === 'string' ? c.name : c.name[cls];
   // A piece with a 진' form (the 사신수 지존 장비) shows it from ★5.
   if (c.picTop && star >= 5) return c.picTop;
+  // A piece with no picture of its own name (악마 심판의낫): the original piece it is made after.
+  if (c.picName) return c.picName;
   return c.steps ? name + c.steps[Math.max(1, Math.min(c.steps.length, star)) - 1] + '성' : name;
 }
 
@@ -638,6 +700,8 @@ export const ABYSS_SWING = {
 };
 // size (× the layers' own), seconds between strikes' effects, the heavy blow every hcd s.
 export const SWING_OF = { scale: 1.05, cd: 0.45, heavy: 1, hcd: 2 };
+// 악마 심판의낫 strikes with these too (it is dressed as the 끝없는 지옥's weapons are).
+for (const c of JUDGE_CRAFTS) if (c.swing) SPECIAL[c.id].swing = SWING_OF;
 // A far weapon's flying spells and arrows leave a trail: puffs of black smoke and embers behind
 // them, every cd seconds while they fly.
 // The strike effects' size against the hero (a blow of the weapon, not a spell of its own).
@@ -647,16 +711,16 @@ export const MELEE_WEAPON = new Set(['warrior', 'rogue', 'lancer', 'monk', 'dokk
 // The uniques: names after Diablo II's, each with a dark look that fits it and a 격 out of
 // gyeok.js (연's own effect, to match the look: poison for the fang, fire for the horn ...).
 export const ABYSS_UNIQUES = [
-  { u: 'raven', name: '피의 까마귀 발톱', opts: ['power', 'speed'], gyeok: 'saseong' },
-  { u: 'andariel', name: '안다리엘의 독니', opts: ['power', 'regen'], gyeok: 'maengdok' },
-  { u: 'mephisto', name: '메피스토의 증오', opts: ['haste', 'mana', 'power'], gyeok: 'binggyeol' },
-  { u: 'diablo', name: '공포의 군주의 뿔', opts: ['power', 'life'], gyeok: 'yeomryeong' },
-  { u: 'baal', name: '바알의 세계석 조각', opts: ['power', 'haste', 'guard'], gyeok: 'jiok' },
-  { u: 'tyrael', name: '티리엘의 맹세', opts: ['speed', 'regen', 'haste'], gyeok: 'nakroe' },
-  { u: 'cow', name: '소 왕의 뿔', opts: ['power', 'magnet'], gyeok: 'gijeol' },
+  { u: 'raven', name: '피의 까마귀 발톱', opts: ['power', 'speed'], gyeok: 'ab_saseong' },
+  { u: 'andariel', name: '안다리엘의 독니', opts: ['power', 'regen'], gyeok: 'ab_maengdok' },
+  { u: 'mephisto', name: '메피스토의 증오', opts: ['haste', 'mana', 'power'], gyeok: 'ab_binggyeol' },
+  { u: 'diablo', name: '공포의 군주의 뿔', opts: ['power', 'life'], gyeok: 'ab_yeomryeong' },
+  { u: 'baal', name: '바알의 세계석 조각', opts: ['power', 'haste', 'guard'], gyeok: 'ab_jiok' },
+  { u: 'tyrael', name: '티리엘의 맹세', opts: ['speed', 'regen', 'haste'], gyeok: 'ab_nakroe' },
+  { u: 'cow', name: '소 왕의 뿔', opts: ['power', 'magnet'], gyeok: 'ab_gijeol' },
   // 태초의 무기: the 일본 1차 weapons of old, one per class and no 성, as they were at the beginning,
   // in a golden-white light (TAECHO_DRESS). Only the 세계석 요새's lord and the 소 왕 drop them.
-  { u: 'taecho', name: 'TAECHO', opts: ['power', 'haste', 'life'], gyeok: 'cheonja', taecho: true },
+  { u: 'taecho', name: 'TAECHO', opts: ['power', 'haste', 'life'], gyeok: 'taechogwang', taecho: true },
 ];
 // 태초의 무기's look: an old 바람 weapon in 연's own drawing for the class (its plain id in the hero's
 // layers), and its name. The first four: their 일본 1차 weapons. The classes old 바람 lacked: an old
@@ -697,13 +761,14 @@ export const TOP_GYEOK_FX = { taecho: 1.6, abyss: 1.4 };
 // pal: the recolour (pale gold, the weapon's own shading kept); glowColor and the white core; the
 // sparks along the blade are 연's own fire tongues turned to gold-white light; fx: the strike's
 // effects (the abyss ones) in gold-white.
-// 태초의 무기's own way (WEAPON_FAMILY.taecho): the abyss uniques' hunt is for the crowd only;
-// 태초 strikes everything harder alike (all: bosses, leaders, a war's fighters too), the crowd a
-// little more (mob), and stands pow ranks above an abyss unique of the deepest floor (11.5 + 1 =
-// 12.5; with its 공격력 option ×2.88). Worn: a boss ×3.10, about the 용무기 제십's ×3.06 before its
-// 용X격 (the 용무기 stays the boss weapon); a crowd ×3.57, the most outside the abyss, where an
-// abyss unique's own hunt (×3.78) is better still.
-export const TAECHO_EDGE = { pow: 1, all: 0.08, mob: 0.15 };
+// 태초의 무기's own way (WEAPON_FAMILY.taecho): the first blow. A foe struck at its full health takes
+// fresh more (the crowd at every first blow, a boss once, never a war's fighter); the crowd mob more
+// besides. "Every foe" is the 심판의낫's alone, and the abyss's dark burst its uniques' alone (태초's
+// light bursts as its 격, 태초광명). It stands pow ranks above an abyss unique of the deepest floor
+// (11.5 + 2 = 13.5; with its 공격력 option a boss ×3.01, rank 16.8, under the 용무기 제십's 17.2); a
+// crowd ×3.46 (×4.85 its first blow), the most outside the abyss, where an abyss unique's own hunt
+// (×3.78) is better still.
+export const TAECHO_EDGE = { pow: 2, all: 0, mob: 0.15, fresh: 0.4 };
 export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, classicTint: 0.12, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
     // the dark ones (smoke, the dark burst) turned over first: their black becomes light
     k_ab_smoke: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)',
@@ -785,12 +850,25 @@ export const ABYSS_HUNT = { mob: 0.2, abyss: 0.15, burst: { chance: 0.2, cd: 0.5
 // 주작의 기운: allies (companions, raiders, the guild in a war) within r tiles of the wearer
 // strike k harder, perStar more for each star above ★1; the 용무기 제십 that took the 주작, dragonK.
 export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
-// 심판의낫's way: the same edge on every foe (crowd, boss, leader, a war's fighter), no niche.
-export const JUDGE_EDGE = { all: 0.06 };
+// 심판의낫's way: the same edge on every foe (crowd, boss, leader, a war's fighter), no niche; more
+// with each step of the line (청룡 4%, 군주 6%, 악마 8%).
+export const JUDGE_EDGE = { cr_judge_weapon: 0.04, cr_judge_weapon2: 0.06, cr_judge_weapon3: 0.08 };
 // A weapon's 격 grows with the weapon: from rank `at` its picture is drawn fxK times larger and a
 // 격 that strikes round (area) reaches `area` tiles further (진청룡마령참 on a 13+ weapon, the
 // 사신수's, the 용무기 제구·제십's). Single-target 격 stay single (the 용X격): only the picture grows.
-export const GYEOK_TIER = [{ at: 16, fxK: 1.5, area: 1 }, { at: 14.5, fxK: 1.35, area: 1 }, { at: 13, fxK: 1.2, area: 0 }];
+// The rank is the weapon's as it strikes a boss (game.js weaponEff: its 공격력 options and its family's
+// edge counted), so 태초 and 악마 심판의낫 are drawn as large as they strike. The top (신화: the 용무기
+// 제십, 사신수 ★5, 악마 심판의낫, 태초) ×1.7, and the screen flashes in the family's colour (FAMILY_TINT).
+export const GYEOK_TIER = [{ at: 16.75, fxK: 1.7, area: 1, flash: true }, { at: 16, fxK: 1.5, area: 1 }, { at: 14.5, fxK: 1.35, area: 1 }, { at: 13, fxK: 1.2, area: 0 },
+  // and under: the lower a weapon, the smaller its 격's picture (a ground's or a material craft's).
+  { at: 10, fxK: 1, area: 0 }, { at: 6, fxK: 0.85, area: 0 }, { at: -99, fxK: 0.7, area: 0 }];
+// The flash's colour by the family (the 용무기 its 사신수's when it took one, else gold-white).
+export const FAMILY_TINT = { dragon: '#fff2c0', taecho: '#ffcf5a', judge: '#c0201a', abyss: '#c0201a', cheong: '#3f9dff', jujak: '#ff6a2a', baekho: '#f4f4ff', hyeonmu: '#2ad0a0', heaven: '#fff6dc' };
+export const SINSU_TINT = { cheong: '#3f9dff', jujak: '#ff6a2a', baekho: '#f4f4ff', hyeonmu: '#2ad0a0' };
+// 천상 각성 (선계 레이드's 선계의 기운): the 용무기 제십 in a light of 선계 — gold-white, as 태초's but cooler,
+// its strikes lit. A look only (no rank: the 제십 stays the top), HEAVEN_COST at the smith.
+export const HEAVEN_DRESS = { pal: 'heaven', tint: 0.25, glow: 0.9, glowColor: '#fff2c0', core: '#ffffff', flames: 4, fsc: 0.7 };
+export const HEAVEN_COST = { mats: { seongi: 12, essence: 20 }, gold: 60000 };
 export function gyeokTier(rank) {
   return GYEOK_TIER.find(t => rank >= t.at) || null;
 }
@@ -802,9 +880,9 @@ export const WEAPON_FAMILY = {
   special: { name: '스페셜', role: '보스의 격', best: '격에 따라', text: '보스의 격 하나와 옵션 하나, 한 등급 반 위. 아주 드물게 떨어짐.' },
   craft: { name: '조합 장비', role: '재료 조합', best: '중반', text: '재료로 만드는 장비. 옵션과 격이 정해져 있음.' },
   dragon: { name: '용무기', role: '성장형 단일 화력', best: '보스·레이드 딜',
-    text: '같은 단계 최고의 기본 공격력(제일 10 → 제십 17.2등급). 용X제N격 고정 피해, 제구·제십은 핵심 기술 재사용 -35%/-50%, 제십은 사신수 하나. 광역·보조 효과는 없음.' },
+    text: '같은 단계 최고의 기본 공격력(제일 10 → 제십 17.2등급, 조합의 꼭대기). 용X제N격 고정 피해, 제구·제십은 핵심 기술 재사용 -35%/-50%, 제십은 사신수 하나(각인 격·신수 색 광채)와 선계의 기운으로 천상 각성(외형만). 광역·보조 효과는 없음.' },
   cheong: { name: '사신수 · 청룡', role: '제어·저주 + 흡혈', best: '레이드·길드전 (저주 걸린 적은 아군에게 더 아픔)',
-    text: '청린수폭이 자주 터져 저주·둔화를 걸고 준 피해의 10%를 흡혈. 기본 등급은 용무기보다 낮음.' },
+    text: '청린수폭이 자주 터져 저주·둔화를 걸고 준 피해의 10%를 흡혈. 등급 16.4(용무기 제구와 같음, ★5 17). 성물은 바루나 레이드(L15)에서.' },
   jujak: { name: '사신수 · 주작', role: '화상 광역 + 아군 공격력 오라', best: '레이드·길드전·동료 사냥',
     text: '주작비상 격(넓은 화상, 내 공격 +30%)과 주작의 기운: 주변 4칸 안의 동료·공대원·길드원 공격력 +12%(★5 +15%). 혼자일 때는 오라가 쓸모없음.' },
   baekho: { name: '사신수 · 백호', role: '공격·백호 덮치기', best: '사냥·보스 폭딜',
@@ -813,17 +891,17 @@ export const WEAPON_FAMILY = {
     text: '갑옷 자리. 맞을 때 현무의 철옹: 주변 기절과 받는 피해 -40%.' },
   abyss: { name: '심연 고유', role: '사냥 청소·어둠 폭발', best: '사냥·끝없는 지옥',
     text: '일반 몬스터·챔피언에게 피해 +20%, 끝없는 지옥에서 +15% 더, 처치 시 20% 어둠 폭발(주변 피해). 보스·우두머리·대인전에는 이 힘이 없고 등급도 낮음(최대 11.5, 공격력 옵션 ×1.15).' },
-  taecho: { name: '태초의 무기', role: '만능·빛의 일격', best: '어디서나 (사냥·보스·레이드·길드전)',
-    text: '모든 적에게 피해 +8%(보스·우두머리·길드전 상대 포함), 일반 몬스터에게 +15% 더, 처치 시 빛의 폭발. 등급 12.5(공격력 옵션 포함)로 심연 고유보다 1 높고 용무기 제십(17.2)보다 낮음. 끝없는 지옥 밖 사냥에서는 가장 강하고, 보스에는 용무기와 비슷. 세계석 요새 군주(약 5%)·소 왕(12%)만 떨어뜨림.' },
+  taecho: { name: '태초의 무기', role: '무리 사냥의 왕·첫 일격', best: '사냥 (끝없는 지옥 밖), 보스는 제십 바로 아래',
+    text: '처음 맞는 적(체력이 가득한 적)에게 피해 +40%, 일반 몬스터에게 +15%. 태초광명 격: 넓은 금빛 일격과 기절. 등급 13.5(공격력 옵션 포함 보스 16.8)로 용무기 제십(17.2) 바로 아래. 끝없는 지옥 밖 사냥에서는 가장 강함. 어둠 폭발은 없음. 세계석 요새 군주(약 5%)·소 왕(12%)만 떨어뜨림.' },
   gold: { name: '전설 · 금린', role: '제압(마비)·대인전', best: '길드전 PvP',
     text: '화륜옥쇄 격: 주변 큰 피해와 마비(길드전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
   steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
     text: '사성격 출혈(일반 몬스터)과 이동·기술 재사용 옵션. 보스에게는 출혈이 듣지 않음.' },
   judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·길드전)',
-    text: '모든 적에게 피해 +6%(보스·길드전 상대 포함). 청룡 심판의낫 12.5 → 군주 청룡 심판의낫 13.5등급, 진청룡마령참 격(주변 피해와 체력·마력 회복). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
+    text: '모든 적에게 같은 피해 보너스(보스·길드전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
 };
 const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
-  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge' };
+  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge', cr_judge_weapon3: 'judge' };
 /** A piece's family (a key of WEAPON_FAMILY): sp its special (or null); dragon: the 용무기; raid: a raid's piece. */
 export function familyOf(sp, dragon = false, raid = false) {
   if (dragon) return 'dragon';

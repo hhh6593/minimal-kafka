@@ -11,6 +11,9 @@
 // gyeokBase() in game.js), so it stays worth having at every stage, like the original's 직타
 // that ignores armour.
 
+// The 끝없는 지옥's black and blood, as a filter over a 격's picture (악마 심판 격, the 심연판 격).
+export const ABYSS_TINT = 'grayscale(1) sepia(1) saturate(8) hue-rotate(-42deg) brightness(0.48) contrast(1.7)';
+
 export const STATUS = {
   // id: name, icon (hud/st_<icon>.png), colour of its numbers, what it does (game.js)
   poison: { name: '중독', icon: 'debuff_poison1', color: '#6ad04a', text: '초당 피해' },
@@ -52,6 +55,16 @@ export const GYEOK = {
   cheonja: { name: '천자의분노 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_anger_son', self: ['pierce', 5, 0.2] },
   // 기원 격: the blow that heals (연 8030 진청룡마령참 격: 체력·마력 50% 회복).
   maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', heal: 0.5 },
+  // 심판의낫's line, one way grown at each step: a blow and a heal (연 Buff 5534-5538, 심판의 낫의 힘:
+  // "피해를 입히고 체력과 마력을 회복"). 청룡참 the first (the dragon smaller), 진청룡마령참 the 군주's
+  // (above), 악마 심판 격 the last: the dragon's roar in the 끝없는 지옥's black and blood (tint), wider,
+  // and 절망 on the struck (they strike softer): the line's balance, a little of blow, heal and guard.
+  cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', fxK: 0.8 },
+  akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', fxK: 1.3,
+    fx2: 'k_ab_darkburst', fx2K: 0.7, tint: ABYSS_TINT },
+  // 태초's own (태초광명 격): 천자의분노's wide blow in gold-white light, a stun, and the wearer's pierce.
+  taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_anger_son', fxK: 1.4,
+    tint: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)' },
   // 주작선장's own (연 8080 주작비상 격): fire around and the wearer's party strengthened. Drawn as
   // 연 plays it (g_zuzak_kyeog: the whole prefab, the fire whirling up into a white flash and the
   // phoenix in its blaze; the old g_zuzak_captain was its one texture) on the struck, and 연's 주작
@@ -82,6 +95,10 @@ export const GYEOK = {
   // flash) standing over the wearer it guards, and the 현무 weapon effect (Sinsu_Weapon_Hyunmu: the
   // crystal shell closing) on each who struck. (fxAlt / selfAlt: a build without tools/yeon_zodiac.py's
   // strips draws 연's 신수 transforms instead.)
+  // The 용무기 제십's 백호·현무 각인: weaker kin of the 지존's own (its cape and armour keep 백호의 맹렬
+  // and 현무의 철옹 to themselves; worn together they no longer go off twice).
+  baekgak: { name: '백호의 발톱', on: 'hit', chance: 0.12, cd: 10, dmg: 3, area: 1, fx: 'g_tf_backho_claw', fxK: 0.5 },
+  hyeongak: { name: '현무의 껍질', on: 'hurt', chance: 0.2, cd: 12, dmg: 0.5, area: 1, fx: 'g_sw_hyunmu', self: ['ward', 4, 0.25] },
   hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fxSelf: 'g_zodiac_turtle', selfAlt: 'g_tf_hyunmu', selfAltK: 0.48, selfK: 1.3, selfDy: -18, selfAlpha: 0.82, fx: 'g_sw_hyunmu', fx2: 'g_sw_hyunmu', fxK: 1.5, fx2K: 1.1, st: ['stun', 2], self: ['ward', 4, 0.4] },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),
   // in 연's own 청룡 pictures: 연's 신수 각인 청룡 (g_zodiac_dragon: the blue dragon coiling out of a
@@ -93,6 +110,16 @@ export const GYEOK = {
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])
 };
+
+// The 끝없는 지옥's uniques each carry a 격 of their own, the abyss's kin of a boss's (심연판): a third
+// harder, a tile wider (a single blow two more struck), in the abyss's black and blood (tint), and
+// "심연의" before its name. ABYSS_KIN: the 격 they are made from.
+export const ABYSS_KIN = ['saseong', 'maengdok', 'binggyeol', 'yeomryeong', 'jiok', 'nakroe', 'gijeol'];
+for (const id of ABYSS_KIN) {
+  const g = GYEOK[id];
+  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT,
+    ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : { area: 1 }) };
+}
 
 // Armour of a boss: when struck, 20% to put its status on the attacker (and those beside).
 for (const [st, sec] of [['poison', 5], ['venom', 5], ['bleed', 5], ['burn', 5], ['stun', 1.5], ['para', 1.2], ['freeze', 2], ['curse', 6], ['despair', 6]]) {
@@ -150,7 +177,7 @@ export const SOURCE_GYEOK = {
   kirin: { st: 'para', weapon: 'noeryeong', looks: ['청룡의검', '진아광검', '일월대도', '하늘개비', '궁중무사갑주', '천성대방패'] },
   tagye: { st: 'despair', weapon: 'jiok', looks: ['참마도', '저주의단검', '심판의낫', '자월초롱', '황혼의갑주', '주술방패'] },
   // 연's own grounds (tools/yeon_grounds.py): their bosses' natures.
-  wolf: { st: 'bleed', weapon: 'baekmaeng' },
+  wolf: { st: 'bleed', weapon: 'saseong' },
   reef: { st: 'curse', weapon: 'jeoju' },
   wreck: { st: 'despair', weapon: 'gwimunhon' },
   greatwall: { st: 'despair', weapon: 'gwimunsang' },
@@ -183,20 +210,25 @@ export const SOURCE_GYEOK = {
   abyss4: { st: 'stun', weapon: 'cheonbuyeon' },
   cow: { st: 'stun', weapon: 'gijeol' },
   raid_boar: { st: 'stun', weapon: 'hwasin' },
-  raid_tiger: { st: 'bleed', weapon: 'baekmaeng' },
+  raid_tiger: { st: 'bleed', weapon: 'giryeong' },
   raid_goblin: { st: 'stun', weapon: 'gwimunsan' },
   raid_hydra: { st: 'venom', weapon: 'hwaryun' },
   raid_sorcerer: { st: 'curse', weapon: 'jeoju' },
   raid_sea: { st: 'freeze', weapon: 'binggyeol' },
-  raid_fire: { st: 'burn', weapon: 'jujakbul' },
+  raid_fire: { st: 'burn', weapon: 'hwasang' },
   raid_wukong: { st: 'stun', weapon: 'cheonbuyeon' },
   raid_musin: { st: 'burn', weapon: 'yeomryeong' },
   raid_brit: { st: 'despair', weapon: 'jiok' },
   raid_gwoe: { st: 'despair', weapon: 'gwimunhon' },
-  raid_varuna: { st: 'freeze', weapon: 'cheongrin' },
+  raid_varuna: { st: 'freeze', weapon: 'bingryeong' },
   raid_agni: { st: 'burn', weapon: 'hwasin' },
   raid_airavata: { st: 'para', weapon: 'nakroe' },
+  // The raids under and over all (지하국대적 레이드, 선계 레이드).
+  raid_hell: { st: 'despair', weapon: 'gwimunsang' },
+  raid_heaven: { st: 'stun', weapon: 'cheonja' },
 };
+// (The 사신수's own 격 — 청린수폭, 주작비상, 주작의 불꽃, 백호의 맹렬, 현무의 철옹 — are the 사신수's and the
+// 제십's 각인 only: no boss's special carries them.)
 
 // Today's crafted weapons, by the 연 격 their set carries: 중국전설 금린 → 화륜옥쇄 (its own
 // China prefab), 일본전설 무신 → 사성격 (4th grade), 타계 고대마령 → 귀문진상, the old
@@ -205,8 +237,8 @@ export const CRAFT_GYEOK = {
   cr_fur_weapon: 'turyeong', cr_horn_weapon: 'gwimunsan', cr_bone_weapon: 'gwimunhon', cr_ember_weapon: 'yeomryeong',
   cr_gold_weapon: 'hwaryun', cr_gold_weapon2: 'hwaryun', cr_steel_weapon: 'saseong', cr_steel_weapon2: 'saseong',
   cr_maryeong_weapon: 'gwimunsang',
-  // 심판의낫: the PC original's 저주격 on the 청룡 step, 연's 진청룡마령참 격 (blow and heal) on the last.
-  cr_judge_weapon: 'jeoju', cr_judge_weapon2: 'maryeongcham',
+  // 심판의낫: blow and heal at every step, growing (청룡참 → 연's 진청룡마령참 → 악마 심판).
+  cr_judge_weapon: 'cheongryongcham', cr_judge_weapon2: 'maryeongcham', cr_judge_weapon3: 'akmasimpan',
   // The original's weapon lines (items.js): the 백제 환두대도 steps a mountain's blow, a fire god's
   // stun, the sun-and-moon curse; 브리트라한's lightning.
   cr_baekje_weapon: 'cheonbuyeon', cr_baekje_weapon2: 'hwasin', cr_baekje_weapon3: 'ilwol', cr_brit_weapon: 'nakroe',
@@ -232,6 +264,6 @@ export function dragonGyeok(cls, step) {
 export const SINSU = {
   jujak: { name: '주작', gyeok: 'jujakbul', mat: 'sinsu_jujak' },
   cheong: { name: '청룡', gyeok: 'cheongsinsok', mat: 'sinsu_cheong' },
-  baekho: { name: '백호', gyeok: 'baekmaeng', mat: 'sinsu_baekho' },
-  hyeonmu: { name: '현무', gyeok: 'hyeoncheorong', mat: 'sinsu_hyeonmu' },
+  baekho: { name: '백호', gyeok: 'baekgak', mat: 'sinsu_baekho' },
+  hyeonmu: { name: '현무', gyeok: 'hyeongak', mat: 'sinsu_hyeonmu' },
 };
