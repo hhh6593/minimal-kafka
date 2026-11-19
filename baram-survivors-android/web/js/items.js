@@ -123,34 +123,40 @@ export function raidOf(cls, kind, tier) {
 }
 
 // Materials for the smith's 조합: dropped by the grounds and raids of their kind.
+// icon: the old client's item icon (or st:<name>, 연's own from the HUD); yeon: 연's own item whose
+// inventory icon is shown instead where the build has it (tools/fetch_icons.py cuts and normalises
+// it; game.js matIcon) — the very item where 연 has it (용의비늘, 여의주, 순수의 강철, 은나무가지),
+// else 연's nearest of that name and nature (가죽, 해골의 뼈, 조화의 기운, 영혼의 파편, 표신궁
+// 고문서, 불씨의 흔적 조각 for the 겁화, 은나무잎, 용천의 비늘 for the 청룡's, 빈 거북 등딱지 for
+// the 현무's). 도깨비 탈, 불씨 단지, 백옥, 금린, 은나무 파편 keep the old icons, which already match.
 export const MATS = {
-  fur: { name: '짐승 가죽', icon: 'm_fur', from: ['deer', 'bear', 'bearman', 'steppe', 'raid_boar', 'raid_tiger', 'hwagwa', 'wolf', 'baekdu', 'baekdu2', 'zud'] },
+  fur: { name: '짐승 가죽', icon: 'm_fur', yeon: 50000003, from: ['deer', 'bear', 'bearman', 'steppe', 'raid_boar', 'raid_tiger', 'hwagwa', 'wolf', 'baekdu', 'baekdu2', 'zud'] },
   horn: { name: '도깨비 탈', icon: 'm_horn', from: ['goblin', 'yogoe', 'raid_goblin', 'hwagwa'] },
-  bone: { name: '해골 조각', icon: 'm_bone', from: ['haunt', 'skull', 'raid_sorcerer', 'tagye', 'reef', 'wreck', 'greatwall'] },
+  bone: { name: '해골 조각', icon: 'm_bone', yeon: 406062, from: ['haunt', 'skull', 'raid_sorcerer', 'tagye', 'reef', 'wreck', 'greatwall'] },
   ember: { name: '불씨 단지', icon: 'm_ember', from: ['volcano', 'raid_fire', 'raid_agni', 'pokyeom', 'hwatang'] },
   jade: { name: '백옥', icon: 'm_jade', from: ['island', 'palace', 'royal', 'kirin', 'raid_airavata', 'gogyun', 'gareung'] },
-  scale: { name: '용의 비늘', icon: 'gem2', from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea', 'deepsea', 'raid_varuna', 'reef', 'wreck'] },
-  pearl: { name: '여의주', icon: 'gem4', from: ['raid_hydra', 'palace', 'deepsea', 'raid_varuna'] },
+  scale: { name: '용의 비늘', icon: 'gem2', yeon: 50000962, from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea', 'deepsea', 'raid_varuna', 'reef', 'wreck'] },
+  pearl: { name: '여의주', icon: 'gem4', yeon: 50000719, from: ['raid_hydra', 'palace', 'deepsea', 'raid_varuna'] },
   // Today's client's materials, as its smith asks for them: 금린 for the 중국전설 set, 순수의 강철
   // for the 일본전설 set, 조화의 정수 for the 용 set, 거마족의 영혼석 for 고대마령, a 제작 고문서
   // for every legendary piece, 겁화의 파편 for their stars, and the 은나무 파편·조각·가지 that
   // raise the 용무기 from 제일 to 제십.
   gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong', 'raid_airavata', 'greatwall', 'qin', 'haya'] },
-  steel: { name: '순수의 강철', icon: 'm_steel', from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin', 'raid_agni', 'wolf', 'ancient'] },
-  essence: { name: '조화의 정수', icon: 'm_essence', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
-  soul: { name: '거마족의 영혼석', icon: 'm_soul', from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
-  scroll: { name: '제작 고문서', icon: 'm_scroll', from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
-  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  steel: { name: '순수의 강철', icon: 'm_steel', yeon: 50000606, from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin', 'raid_agni', 'wolf', 'ancient'] },
+  essence: { name: '조화의 정수', icon: 'm_essence', yeon: 21119, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  soul: { name: '거마족의 영혼석', icon: 'm_soul', yeon: 509043, from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
+  scroll: { name: '제작 고문서', icon: 'm_scroll', yeon: 50000607, from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe'] },
+  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', yeon: 12005, from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
   silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
-  silver2: { name: '은나무 조각', icon: 'm_silver2', from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
+  silver2: { name: '은나무 조각', icon: 'm_silver2', yeon: 407099, from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow'] },
   // The 사신수's 성물 (the original's 신수현신공성전: four of a 신수 make its 지존 piece; 연 keeps
   // 주작혈안 and 백호광안 among its items, whose icons these are). From the raids of the 신수's
   // nature, and the 길드대항전.
   sinsu_jujak: { name: '주작혈안', icon: 'st:mat_jujak', from: ['raid_fire', 'raid_agni'] },
   sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger'] },
-  sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', from: ['raid_varuna', 'raid_hydra'] },
-  sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', from: ['raid_sea'] },
-  silver3: { name: '은나무 가지', icon: 'm_silver3', from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
+  sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', yeon: 407101, from: ['raid_varuna', 'raid_hydra'] },
+  sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', yeon: 406243, from: ['raid_sea'] },
+  silver3: { name: '은나무 가지', icon: 'm_silver3', yeon: 407072, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4'] },
 };
 /** How many of a material a kill drops: most fall from bosses (3-5), some from mini bosses. */
 export function matCount(id, kind, raid) {
@@ -253,6 +259,31 @@ export const CRAFTS = [
     look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 13, opt: 'haste', from: 'cr_steel_weapon',
     base: { warrior: [7100310] }, /* 극'진일신검(치장용) */
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
+  // 원작의 무기 계열 (the original's own weapon lines the game lacked; tools/item_catalog.json has
+  // every name). Each class's piece by the original's own name and picture (its official item
+  // render, pic: 'name', normalised to 연's icons by tools/fetch_icons.py); worn as the class's 연
+  // weapon nearest it (look: a name already in the class's line, so no place in a line moves).
+  // noCoordi: not rendered in the dress room (the 연 heroes wear the look; fetch_gear.py skips them).
+  // 백제 환두대도 (the 백제 event's ring-pommel swords, three steps: 단봉 ★1-★5 → 삼엽문 → 금동장,
+  // each made out of the last at ★5). The 궁사 holds a 노 at 삼엽문, which has no 궁.
+  { id: 'cr_baekje_weapon', kind: 'weapon', name: { warrior: '백제단봉환두대검', rogue: '백제단봉환두대도', mage: '백제단봉환두대장', poet: '백제단봉환두대봉', archer: '백제단봉환두대궁', lancer: '백제단봉환두대곤', monk: '백제단봉환두대구겸', magus: '백제단봉환두대마봉', celestial: '백제단봉환두대신장', dokkaebi: '백제단봉환두대화도', reaper: '백제단봉환두대명도' },
+    look: { warrior: '환두대도', rogue: '진아광검', mage: '일월대도', poet: '백운장', archer: '대명궁', lancer: '은장철창', monk: '비조권갑', magus: '혼령단봉', celestial: '호표호리병', dokkaebi: '흑단방망이', reaper: '흑해백도' }, pow: 9, opt: 'boss', mats: { jade: 12, ember: 6 }, gold: 4500,
+    pic: 'name', steps: [1, 2, 3, 4, 5], legend: true, noCoordi: true },
+  { id: 'cr_baekje_weapon2', kind: 'weapon', name: { warrior: '백제삼엽문환두대검', rogue: '백제삼엽문환두대도', mage: '백제삼엽문환두대장', poet: '백제삼엽문환두대봉', archer: '백제삼엽문환두대노', lancer: '백제삼엽문환두대곤', monk: '백제삼엽문환두대구겸', magus: '백제삼엽문환두대마봉', celestial: '백제삼엽문환두대신장', dokkaebi: '백제삼엽문환두대화도', reaper: '백제삼엽문환두대명도' },
+    look: { warrior: '칠지도', rogue: '현랑부', mage: '현랑부', poet: '나비채', archer: '금강비궁', lancer: '두억창', monk: '금강권갑', magus: '금단봉', celestial: '금강비포', dokkaebi: '금강퇴', reaper: '금강비명도' }, pow: 10, opt: 'haste', from: 'cr_baekje_weapon', mats: { scale: 12, pearl: 1, kalpa: 6 }, gold: 8000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true, noCoordi: true },
+  { id: 'cr_baekje_weapon3', kind: 'weapon', name: { warrior: '백제금동장환두대검', rogue: '백제금동장환두대도', mage: '백제금동장환두대장', poet: '백제금동장환두대봉', archer: '백제금동장환두대궁', lancer: '백제금동장환두대곤', monk: '백제금동장환두대구겸', magus: '백제금동장환두대마봉', celestial: '백제금동장환두대신장', dokkaebi: '백제금동장환두대화도', reaper: '백제금동장환두대명도' },
+    look: { warrior: '현무의검', rogue: '얼음칼', mage: '심판의낫', poet: '현무의검', archer: '나라강궁', lancer: '바람홍옥창', monk: '제화금홍권갑', magus: '금홍비단봉', celestial: '금홍비포', dokkaebi: '금홍퇴', reaper: '금홍비명도' }, pow: 12, opt: 'speed', from: 'cr_baekje_weapon2', mats: { gold: 15, steel: 10, kalpa: 15, scroll: 1 }, gold: 15000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true, noCoordi: true },
+  // 고대마령의적혈 무기: the 타계 고대마령 set's weapon (its armour, helmet and shield are above), and
+  // 브리트라한의 무기 made out of it at ★5, as 브리트라한의방패 is out of 무신귀면방. The original has
+  // no 창 in either: the 창술사 has none.
+  { id: 'cr_maryeong_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage', 'poet', 'archer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'], name: { warrior: '고대마령의적혈검', rogue: '고대마령의적혈도', mage: '고대마령의적혈장', poet: '고대마령의적혈봉', archer: '고대마령의적혈궁', monk: '고대마령의적혈겸', magus: '고대마령의적혈단봉', celestial: '고대마령의적혈포', dokkaebi: '고대마령의적혈화도', reaper: '고대마령의적혈명도' },
+    look: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '검정깃발', archer: '대붕지옥궁', lancer: '청룡의검', monk: '금홍권갑', magus: '독각단봉', celestial: '흑해염호리병', dokkaebi: '흑골방망이', reaper: '흑사백도' }, pow: 10, opt: 'boss', mats: { soul: 14, scroll: 1 }, gold: 5000,
+    pic: 'name', steps: [1, 3, 5, 7, 10], legend: true, noCoordi: true },
+  { id: 'cr_brit_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage', 'poet', 'archer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'], name: { warrior: '브리트라한의신검', rogue: '브리트라한의패도', mage: '브리트라한의법장', poet: '브리트라한의신령', archer: '브리트라한의신궁', monk: '브리트라한의투겸', magus: '브리트라한의단봉', celestial: '브리트라한의성배', dokkaebi: '브리트라한의화도', reaper: '브리트라한의명도' },
+    look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '횃불', archer: '천부연궁', lancer: '청룡의검', monk: '적풍권갑', magus: '바람홍옥단봉', celestial: '바람홍옥포', dokkaebi: '극염인화퇴', reaper: '혼령영명도' }, pow: 13, opt: 'power', from: 'cr_maryeong_weapon', mats: { essence: 12, kalpa: 20, scroll: 2 }, gold: 20000,
+    pic: 'name', steps: [1, 3, 5, 7, 9], legend: true, noCoordi: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
   // 청룡신검 and 현무불괴갑 are not in 연: each is worn as 연's own piece nearest the original's
@@ -435,8 +466,8 @@ export function coordiPieces() {
   const out = new Map();
   for (const cls of Object.keys(DRAGON_LINE)) for (let i = 1; i <= DRAGON_MAX; i++) out.set(dragonName(cls, i), 'weapon');
   for (const c of CRAFTS) {
-    if (!c.pic) continue;
-    for (const cls of Object.keys(DRAGON_LINE)) for (let st = 1; st <= 5; st++) out.set(craftPicture(SPECIAL[c.id], cls, st), c.kind);
+    if (!c.pic || c.noCoordi) continue;
+    for (const cls of craftClasses(c)) for (let st = 1; st <= 5; st++) out.set(craftPicture(SPECIAL[c.id], cls, st), c.kind);
   }
   return [...out].map(([name, kind]) => ({ name, kind }));
 }
@@ -447,9 +478,35 @@ export function gearPictures() {
   for (const cls of Object.keys(DRAGON_LINE)) for (let i = 1; i <= DRAGON_MAX; i++) out.add(dragonName(cls, i));
   for (const c of CRAFTS) {
     if (!c.pic) continue;
-    for (const cls of Object.keys(DRAGON_LINE)) for (let st = 1; st <= 5; st++) out.add(craftPicture(SPECIAL[c.id], cls, st));
+    for (const cls of craftClasses(c)) for (let st = 1; st <= 5; st++) out.add(craftPicture(SPECIAL[c.id], cls, st));
   }
   return [...out];
+}
+
+/** The classes a crafted piece is made for (`only`, else every class). */
+function craftClasses(c) {
+  return Object.keys(DRAGON_LINE).filter(cls => !c.only || c.only.includes(cls));
+}
+
+// Pieces of the lines (avatar.js GEAR) whose 연 icon is another item's — 연 has no item of that
+// name, so the build's map gave the piece a kin's layer and icon (철검 showed 바람홍옥검, the
+// shields 수라방패, the later classes' 해골갑옷 a 용 outfit ...). These show the original's own icon
+// by name instead (the official item render, tools/fetch_icons.py; game.js nameIcon); the hero
+// still wears the 연 layer. Found by the icon audit: every 도감 row whose icon's item is not the
+// piece, kept where the avatar server has the name (tools/item_catalog.json).
+export const NAME_ICONS = new Set(['철검', '삼첨도', '일월대도', '흑단화염장', '남자기모노', '황혼의갑주', '해골갑옷',
+  '대나무방패', '떡갈나무방패', '문신방패', '팔세지도', '일광방패', '월광방패', '주술방패', '거울방패', '청룡의검', '불의갑주',
+  '저주의단검', '백화검', '무도가옷', '건곤권', '백운장', '백선마봉', '하늘개비', '초롱', '검정깃발', '여명의치마', '초록색궁포',
+  // the legendary sets' looks as the lines hold them (★1 names)
+  '고대마령투구1성', '금린화월관1성', '태염무신금잠1성', "용아투구'마1성", "용아투구'천1성", '고대마령모자1성', '금린추월관1성',
+  '태광천신금잠1성', "용아천관'랑1성", "용아천관'겸1성", '금린화월1성', '무신귀갑주1성', '금린추월1성', '천신부금장1성']);
+
+/** What tools/fetch_icons.py fetches: every crafted piece's pictures (gear), the lines' pieces
+ *  shown by name (NAME_ICONS) and the materials' 연 item ids. */
+export function iconPictures() {
+  const gear = gearPictures();
+  const mats = Object.fromEntries(Object.entries(MATS).filter(([, m]) => m.yeon).map(([id, m]) => [id, m.yeon]));
+  return { gear, names: [...NAME_ICONS].filter(n => !gear.includes(n)), mats };
 }
 
 /** The 용무기 recipe: the class's best hunting-ground weapon at ★3, scales, a pearl and gold. */

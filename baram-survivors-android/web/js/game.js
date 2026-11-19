@@ -14,7 +14,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds,
+  GEAR_OPT, PROCS, optIds, NAME_ICONS,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -1441,10 +1441,23 @@ function isDragonKey(cls, key) {
 function starMaxOf(cls, key) {
   return isDragonKey(cls, key) ? DRAGON_MAX : STAR_MAX;
 }
-/** A today's-client item picture by the item's name, or null when the build has none. */
+/** An item icon by the item's name, made to sit with 연's (tools/fetch_icons.py, manifest gicon), or null. */
+function nameIcon(name) {
+  const f = name && M && M.gicon && M.gicon[name];
+  return f ? 'assets/gicon/' + f : null;
+}
+/** A today's-client item picture by the item's name (its icon in 연's frame where the build has
+ *  one, else the render as fetched), or null when the build has none. */
 function picture(name) {
+  const n = nameIcon(name);
+  if (n) return n;
   const g = name && M && M.gear && M.gear[name];
   return g ? `assets/gear/${g.id}.png` : null;
+}
+/** Two item names the same piece: 연's 치장용 copy, a 진' form, spaces and the star aside. */
+function sameItem(a, b) {
+  const n = x => String(x || '').replace(/\(.*?\)|\d+성$|\s/g, '').replace(/^(진|극)'?/, '');
+  return !!a && !!b && n(a) === n(b);
 }
 /** A bag piece's name: the 용무기 by its step (용천제삼검), the rest by their line. */
 function pieceName(cls, kind, t) {
@@ -1581,6 +1594,22 @@ function pieceIcon(cls, kind, t, spId) {
   if (abIt && abIt.icon && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers[kind] && M.yhero2[cls.id].layers[kind]['c' + ab[0]]) return 'assets/' + abIt.icon;
   const lt = spId && SPECIAL[spId] && SPECIAL[spId].lookTier ? SPECIAL[spId].lookTier[cls.id] : undefined;
   if (lt !== undefined) return yItemIcon(cls, kind, lt, null) || (hasAvatars() ? gearIcon(cls.id, kind, lt) : null);
+  // A crafted piece with the original's own name and picture (the legendary sets, the original's
+  // weapon lines): that picture, unless the hero wears 연's own copy of the very item (a 치장용),
+  // whose icon is then the same piece in 연's drawing.
+  const csp = spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId];
+  if (csp && csp.craft.pic) {
+    const name = craftPicture(csp, cls.id, starOf(cls, 'sp:' + spId));
+    const g = { [kind]: t, [kind + 'Sp']: spId }, v = (yGearVariants(cls, g) || {})[kind];
+    const it = v && v[0] === 'c' && costumeItems()[v.slice(1)];
+    if (!(it && sameItem(it.name, name)) && picture(name)) return picture(name);
+  }
+  // A piece of the lines whose 연 icon is another item's (items.js NAME_ICONS): the original's own.
+  if (!csp && M.gicon) {
+    const base = spId && SPECIAL[spId] ? specialBase(SPECIAL[spId], cls.id) : t;
+    const n = base >= 0 && GEAR[cls.id][kind][base];
+    if (n && NAME_ICONS.has(n) && nameIcon(n)) return nameIcon(n);
+  }
   const y = wornIcon(cls, kind, t, spId);
   if (y) return y;
   if (spId && SPECIAL[spId]) {
@@ -2406,7 +2435,7 @@ function openForge() {
       + (m.gyeok ? `<div class="fd-gyeok">${gyeokLine(m.gyeok)}</div>` : '')
       + (m.opt ? `<div class="fd-opt">옵션: ${m.opt}</div>` : '')
       + (m.base ? `<div class="fd-mat">재료 장비: ${m.base}</div>` : '')
-      + (m.mats ? Object.entries(m.mats).map(([id, n]) => `<div class="fd-mat ${(mats[id] || 0) >= n ? 'ok' : 'no'}"><span>${MATS[id].name} ${mats[id] || 0}/${n}</span><small>${where(id)}</small></div>`).join('') : '')
+      + (m.mats ? Object.entries(m.mats).map(([id, n]) => `<div class="fd-mat ${(mats[id] || 0) >= n ? 'ok' : 'no'}"><span>${matIcon(id) ? `<img src="${matIcon(id)}" alt="">` : ''}${MATS[id].name} ${mats[id] || 0}/${n}</span><small>${where(id)}</small></div>`).join('') : '')
       + (m.gold ? `<div class="fd-mat ${(progress.gold || 0) >= m.gold ? 'ok' : 'no'}"><span>${won(m.gold)}</span></div>` : '')
       + (!m.mats ? `<div class="fd-desc">${pick.desc}</div>` : '');
     const bt = document.createElement('button');
@@ -10488,8 +10517,26 @@ function heroHeight() {
   return p.av ? p.av.top : p.img.height;
 }
 
-/** A material's picture: an old item icon, or 연's own (st:<name> → hud/st_<name>.png). */
+/** A material's icon, as a path under assets/: 연's own item (items.js MATS[].yeon, cut and set in
+ *  연's frame by tools/fetch_icons.py: gicon "mat:<id>"), else the old item icon, or 연's HUD one
+ *  (st:<name> → hud/st_<name>.png). */
+function matPath(id) {
+  const g = M.gicon && M.gicon['mat:' + id];
+  if (g) return 'gicon/' + g;
+  const ic = MATS[id].icon;
+  return ic.startsWith('st:') ? `hud/st_${ic.slice(3)}.png` : M.items[ic] ? `item/${M.items[ic].id}.png` : null;
+}
+/** A material's icon for the windows (a URL), or ''. */
+function matIcon(id) {
+  const p = MATS[id] && matPath(id);
+  return p ? 'assets/' + p : '';
+}
+/** A material's picture (loaded on first ask; the old icon until then). */
 function matImage(id) {
+  const p = matPath(id);
+  if (p && !(p in images)) loadImage(p);
+  const im = p && images[p];
+  if (im && im.complete && im.width) return im;
   const ic = MATS[id].icon;
   return ic.startsWith('st:') ? images[`hud/st_${ic.slice(3)}.png`] : images[`item/${M.items[ic].id}.png`];
 }

@@ -205,6 +205,9 @@ export const CRAFT_GYEOK = {
   cr_fur_weapon: 'turyeong', cr_horn_weapon: 'gwimunsan', cr_bone_weapon: 'gwimunhon', cr_ember_weapon: 'yeomryeong',
   cr_gold_weapon: 'hwaryun', cr_gold_weapon2: 'hwaryun', cr_steel_weapon: 'saseong', cr_steel_weapon2: 'saseong',
   cr_maryeong_weapon: 'gwimunsang',
+  // The original's weapon lines (items.js): the 백제 환두대도 steps a mountain's blow, a fire god's
+  // stun, the sun-and-moon curse; 브리트라한's lightning.
+  cr_baekje_weapon: 'cheonbuyeon', cr_baekje_weapon2: 'hwasin', cr_baekje_weapon3: 'ilwol', cr_brit_weapon: 'nakroe',
   cr_sinsu_cheong: 'cheongrin', cr_sinsu_jujak: 'jujakbisang', cr_sinsu_baekho: 'baekmaeng', cr_sinsu_hyeonmu: 'hyeoncheorong',
 };
 
