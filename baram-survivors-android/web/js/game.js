@@ -3006,22 +3006,251 @@ function raidSpawn(dt) {
     say('광역기가 파티를 덮쳤습니다!', 'warn');
   }
   G.raidT -= dt;
-  if (G.raidT <= 0) {
+  // One pattern at a time: a pattern of several waves runs out before the next begins.
+  if (G.raidT <= 0 && !(G.t < (G.seqTill || 0))) {
     G.raidT = [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * (G.frenzy ? 0.85 : 1);
-    const pats = G.stage.patterns;
-    raidPattern(b, pats[Math.floor(Math.random() * pats.length)]);
+    raidPattern(b, pickPattern());
   }
 }
 
-/** The boss marks tiles in red; a moment later they are struck. Step off them. */
-const PATTERN_NAMES = { cross: '십자 화염', breath: '화염 숨결', rain: '저주의 비', ring: '혼의 고리', meteor: '유성 낙하', plus: '불기둥' };
+/**
+ * The boss marks tiles in red; a moment later they are struck. Step off them.
+ * The common blows (십자·숨결·비·고리·유성·불기둥) every raid may use, and each boss's own: a charge it
+ * runs along, a pounce, rings of force going out, three heads in turn, a curse that follows, a
+ * sweeping tide, fire rising in turn, a floor with a few safe spots … Several waves come one after
+ * another, each shown only when the one before falls, each with its own warning.
+ */
+const PATTERN_NAMES = {
+  cross: '십자 화염', breath: '화염 숨결', rain: '저주의 비', ring: '혼의 고리', meteor: '유성 낙하', plus: '불기둥',
+  charge: '돌진', stampede: '연속 돌진', trample: '짓밟기',
+  pounce: '덮치기', cloud: '근두운', claw: '할퀴기',
+  quake: '방망이 충격파', stomp: '대지 진동', flare: '화염 폭발',
+  sparks: '도깨비불', thunder: '낙뢰',
+  heads: '세 머리 숨결', heads3: '삼두 화염',
+  hunt: '쫓는 저주', drought: '가뭄의 손길',
+  safe: '혼의 결계', ward: '괴수의 영역', eye: '태풍의 눈', seal: '봉인진',
+  whirl: '소용돌이', tide: '해일', sweep: '타계의 물결',
+  pillars: '불기둥 연쇄', lava: '불바다',
+  staff: '여의봉', clones: '분신술',
+  xslash: '십자 검기', iai: '발도 일섬',
+};
+// The boss's own blows that share another's shape (by name only).
+const PATTERN_AS = { trample: 'charge', cloud: 'pounce', stomp: 'quake', flare: 'quake', thunder: 'sparks', drought: 'hunt', ward: 'safe', sweep: 'tide' };
+const COMMON_PATTERNS = ['cross', 'breath', 'rain', 'ring', 'meteor', 'plus'];
 
-function raidPattern(b, kind) {
-  // Aimed at whoever the boss has turned on.
-  // 공대: at whom it has turned, or the one nearest it (never a hero standing far off).
-  const p = G.war && G.war.raid ? War.raidTarget() : G.aggro && !G.aggro.down ? G.aggro : G.player, tiles = [];
-  b.bubble = { text: PATTERN_NAMES[kind] + '!', t: G.t };
-  const add = (x, y) => tiles.push([x, y]);
+/** The next blow: the raid's own list, more as its phases go (patterns1, patterns2); its own blows twice as often. */
+function pickPattern() {
+  const st = G.stage, pool = [];
+  const add = list => { for (const k of list || []) pool.push(...Array(COMMON_PATTERNS.includes(k) ? 1 : 2).fill(k)); };
+  add(st.patterns);
+  if (G.phase >= 1) add(st.patterns1);
+  if (G.phase >= 2) add(st.patterns2);
+  // Not the same twice running, if there is another.
+  const other = pool.filter(k => k !== G.lastPattern);
+  const list = other.length ? other : pool;
+  return G.lastPattern = list[Math.floor(Math.random() * list.length)];
+}
+
+/** Whom the boss aims at: whom it has turned on (공대: the raid's target). */
+function raidAim() {
+  return G.war && G.war.raid ? War.raidTarget() || G.player : G.aggro && !G.aggro.down ? G.aggro : G.player;
+}
+
+/** The four ways, the one leading most from a toward c. */
+function wayTo(a, c) {
+  const dx = c.tx - a.tx, dy = c.ty - a.ty;
+  return Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dy) || 1];
+}
+
+function raidPattern(b, kind, follow = false) {
+  const base = PATTERN_AS[kind] || kind, ph = G.phase;
+  b.bubble = { text: (PATTERN_NAMES[kind] || '') + '!', t: G.t };
+  // A boss's own blow is named on the screen the first time it comes.
+  if (!COMMON_PATTERNS.includes(kind)) {
+    G.patSeen = G.patSeen || {};
+    if (!G.patSeen[kind]) { G.patSeen[kind] = true; banner(`${G.boss.name} · ${PATTERN_NAMES[kind]}`); }
+  }
+  const waves = [];
+  const sq = (cx, cy, r, out = [], hole = -1) => {
+    for (let x = -r; x <= r; x++) for (let y = -r; y <= r; y++) if (Math.max(Math.abs(x), Math.abs(y)) > hole) out.push([cx + x, cy + y]);
+    return out;
+  };
+  // A line out at an angle, from r0 to r1 tiles.
+  const ray = (cx, cy, a, r0, r1, out = []) => {
+    for (let s = r0; s <= r1; s += 0.5) out.push([Math.round(cx + Math.cos(a) * s), Math.round(cy + Math.sin(a) * s)]);
+    return out;
+  };
+  if (base === 'cross' || base === 'breath' || base === 'rain' || base === 'ring' || base === 'meteor' || base === 'plus') {
+    waves.push(() => commonTiles(b, base, raidAim()));
+  } else if (base === 'charge' || base === 'stampede') {
+    // It lowers its head toward its mark and runs the line, past where they stood (짓밟기: three wide).
+    // (연속 돌진: three runs, each from where the last ended, at whoever it faces then.)
+    const runs = base === 'stampede' ? 3 : kind === 'trample' && ph >= 2 ? 2 : 1;
+    for (let i = 0; i < runs; i++) waves.push(() => {
+      const t = raidAim(), [dx, dy] = wayTo(b, t), d = Math.abs(t.tx - b.tx) + Math.abs(t.ty - b.ty);
+      // It runs to where its mark stood (the line goes two past), not on into the back ranks.
+      const L = Math.max(5, Math.min(11, d + 2)), run = Math.max(3, Math.min(L, d)), tiles = [], wide = kind === 'trample' ? 1 : 0;
+      for (let k = 1; k <= L; k++) for (let w = -wide; w <= wide; w++) tiles.push([b.tx + dx * k + dy * w, b.ty + dy * k + dx * w]);
+      return { tiles, fall: () => bossLeap(b, b.tx + dx * run, b.ty + dy * run, 0.3) };
+    });
+  } else if (base === 'pounce') {
+    // It springs onto its mark (a 3×3 where they stand), then swipes all round where it lands.
+    waves.push(() => {
+      const t = raidAim(), cx = t.tx, cy = t.ty;
+      return { tiles: sq(cx, cy, 1), fall: () => bossLeap(b, cx, cy, 0.25) };
+    });
+    waves.push(() => ({ tiles: sq(b.tx, b.ty, ph >= 1 ? 2 : 1, [], 0) }));
+  } else if (base === 'claw') {
+    // Three claw marks across its mark, one tile apart, the long way across the boss's line.
+    const n = ph >= 2 ? 2 : 1;
+    for (let i = 0; i < n; i++) waves.push(() => {
+      const t = raidAim(), [dx, dy] = wayTo(b, t), tiles = [], off = i ? 1 : 0;
+      for (const o of [-2, 0, 2]) for (let k = -5; k <= 5; k++) tiles.push([t.tx + dx * (o + off) + dy * k, t.ty + dy * (o + off) + dx * k]);
+      return tiles;
+    });
+  } else if (base === 'quake') {
+    // Rings of force going out from the boss, one after the other (two, four, six tiles out; a
+    // fourth at eight when it is fierce): step over each, or in behind it.
+    for (let i = 0; i < (ph >= 2 ? 4 : 3); i++) waves.push(() => sq(b.tx, b.ty, 2 * i + 2, [], 2 * i + 1));
+  } else if (base === 'sparks') {
+    // A small cross under several of the party at once (spread out!); 낙뢰 strikes twice, following.
+    const n = kind === 'thunder' ? 2 : 1;
+    for (let i = 0; i < n; i++) waves.push(() => {
+      const near = partyBodies().filter(x => Math.abs(x.tx - b.tx) + Math.abs(x.ty - b.ty) < 14);
+      const aim = raidAim(), picks = [aim];
+      while (picks.length < 2 + ph && near.length) {
+        const x = near.splice(Math.floor(Math.random() * near.length), 1)[0];
+        if (!picks.includes(x)) picks.push(x);
+      }
+      const tiles = [];
+      for (const x of picks) tiles.push(...plusTiles(x.tx, x.ty, 1));
+      return tiles;
+    });
+  } else if (base === 'heads' || base === 'heads3') {
+    // Three heads, three ways. 세 머리 숨결: one after another (toward its mark, then the two sides
+    // in turn); 삼두 화염: all three at once, only behind it is clear.
+    const [dx, dy] = wayTo(b, raidAim()), s = Math.random() < 0.5 ? 1 : -1;
+    const ways = [[dx, dy], [dy * s, dx * s], [-dy * s, -dx * s]];
+    if (base === 'heads3') waves.push(() => ways.flatMap(([x, y]) => triTiles(b.tx, b.ty, x, y, 3)));
+    else for (const [x, y] of ways) waves.push(() => triTiles(b.tx, b.ty, x, y, 4));
+  } else if (base === 'hunt') {
+    // A curse that follows its mark: three times, wherever they stand by then.
+    for (let i = 0; i < 3; i++) waves.push(() => {
+      const t = raidAim(), tiles = sq(t.tx, t.ty, 1);
+      for (let j = 0; j < 2 + ph; j++) tiles.push([t.tx + Math.floor(rand(-4, 5)), t.ty + Math.floor(rand(-4, 5))]);
+      return tiles;
+    });
+  } else if (base === 'safe') {
+    // All the floor round the boss red but a few spots (one each corner way) and the far edge.
+    waves.push(() => {
+      const R = 4, tiles = [], holes = new Set();
+      for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const hx = b.tx + sx * (2 + Math.floor(rand(0, 2))), hy = b.ty + sy * (2 + Math.floor(rand(0, 2)));
+        for (const [x, y] of sq(hx, hy, 1)) holes.add(x + ',' + y);
+      }
+      for (const t of sq(b.tx, b.ty, R)) if (!holes.has(t[0] + ',' + t[1])) tiles.push(t);
+      return tiles;
+    });
+  } else if (base === 'eye') {
+    // A storm round its mark: a band all round, calm only in its eye and outside.
+    waves.push(() => { const t = raidAim(); return sq(t.tx, t.ty, 4, [], 1); });
+    if (ph >= 2) waves.push(() => { const t = raidAim(); return sq(t.tx, t.ty, 2); });
+  } else if (base === 'seal') {
+    // A seal of rings about the boss: the inner circle (step out), then the band round it (step back in).
+    waves.push(() => sq(b.tx, b.ty, 2));
+    waves.push(() => sq(b.tx, b.ty, 4, [], 2));
+  } else if (base === 'whirl') {
+    // Four arms turning about the boss, wave by wave.
+    const a0 = Math.random() * Math.PI / 2, turn = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 8;
+    for (let i = 0; i < 3; i++) waves.push(() => {
+      const tiles = [];
+      for (let k = 0; k < 4; k++) ray(b.tx, b.ty, a0 + turn * i + k * Math.PI / 2, 1.5, 7, tiles);
+      return tiles;
+    });
+  } else if (base === 'tide') {
+    // A wall of water sweeping out from the boss toward its mark, two rows a wave: step back into
+    // the row that has just broken.
+    const [dx, dy] = wayTo(b, raidAim()), cx = raidAim(), mid = dx ? cx.ty : cx.tx;
+    for (let i = 0; i < 4; i++) waves.push(() => {
+      const tiles = [];
+      for (const k of [2 + 2 * i, 3 + 2 * i]) for (let w = -8; w <= 8; w++)
+        tiles.push(dx ? [b.tx + dx * k, mid + w] : [mid + w, b.ty + dy * k]);
+      return tiles;
+    });
+  } else if (base === 'pillars') {
+    // Fire rising in turn: three pillars a wave where its mark stands then, and about it.
+    for (let i = 0; i < 3; i++) waves.push(() => {
+      const t = raidAim(), tiles = [];
+      for (const [cx, cy] of [[t.tx, t.ty], [t.tx + Math.floor(rand(-4, 5)), t.ty + Math.floor(rand(-4, 5))], [t.tx + Math.floor(rand(-4, 5)), t.ty + Math.floor(rand(-4, 5))]])
+        tiles.push(...plusTiles(cx, cy, 1));
+      return tiles;
+    });
+  } else if (base === 'lava') {
+    // The floor about its mark burns in a checker of 2×2, then the other squares.
+    const t = raidAim(), cx = t.tx, cy = t.ty;
+    for (const odd of [0, 1]) waves.push(() => sq(cx, cy, 3).filter(([x, y]) => ((Math.floor(x / 2) + Math.floor(y / 2)) & 1) === odd));
+  } else if (base === 'staff') {
+    // 여의봉 grows and falls along its line, then swings across where it fell.
+    const t0 = raidAim(), [dx, dy] = wayTo(b, t0);
+    const d = Math.max(4, Math.min(10, Math.abs(t0.tx - b.tx) + Math.abs(t0.ty - b.ty)));
+    waves.push(() => {
+      const tiles = [];
+      for (let k = 1; k <= 14; k++) tiles.push([b.tx + dx * k, b.ty + dy * k]);
+      return tiles;
+    });
+    waves.push(() => {
+      const tiles = [], cx = b.tx + dx * d, cy = b.ty + dy * d;
+      for (let k = -7; k <= 7; k++) for (const w of [0, 1]) tiles.push([cx + dy * k + dx * w, cy + dx * k + dy * w]);
+      return tiles;
+    });
+  } else if (base === 'clones') {
+    // Hairs blown into copies about its mark: each strikes a cross about itself, two and two.
+    const t = raidAim(), spots = [];
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 2 * i + rand(-0.4, 0.4), r = rand(3, 5);
+      spots.push([Math.round(t.tx + Math.cos(a) * r), Math.round(t.ty + Math.sin(a) * r)]);
+    }
+    for (const pair of [[spots[0], spots[2]], [spots[1], spots[3]]]) waves.push(() => {
+      const tiles = [];
+      for (const [x, y] of pair) tiles.push(...plusTiles(x, y, 3));
+      return tiles;
+    });
+  } else if (base === 'xslash') {
+    // Cuts like an ✕ across its mark, then a ✚ (and an ✕ again when it is fierce).
+    const t = raidAim(), cx = t.tx, cy = t.ty;
+    const X = () => { const o = [[cx, cy]]; for (let k = 1; k <= 5; k++) o.push([cx + k, cy + k], [cx - k, cy - k], [cx + k, cy - k], [cx - k, cy + k]); return o; };
+    waves.push(X);
+    waves.push(() => plusTiles(cx, cy, 6));
+    if (ph >= 2) waves.push(X);
+  } else if (base === 'iai') {
+    // One cut from far off along a whole row through its mark, then the column.
+    const t = raidAim();
+    for (const horiz of Math.random() < 0.5 ? [1, 0] : [0, 1]) waves.push(() => {
+      const t2 = raidAim(), tiles = [];
+      for (let k = -12; k <= 12; k++) tiles.push(horiz ? [t2.tx + k, t.ty] : [t.tx, t2.ty + k]);
+      return tiles;
+    });
+  } else {
+    waves.push(() => commonTiles(b, 'cross', raidAim()));
+  }
+  // The fierce boss strings a common blow on after its own (a third phase or the enrage).
+  const more = !follow && (ph >= 2 || G.enraged) && !COMMON_PATTERNS.includes(kind) && Math.random() < 0.45;
+  G.seqTill = G.t + 20;
+  raidSeq(b, waves, () => {
+    if (more) {
+      const list = G.stage.patterns.filter(k => COMMON_PATTERNS.includes(k));
+      raidPattern(b, list.length ? list[Math.floor(Math.random() * list.length)] : 'meteor', true);
+      return;
+    }
+    // A blow of several waves takes the time of more than one: the next waits a while after it.
+    G.seqTill = G.t + 0.4;
+    if (waves.length > 1) G.raidT = Math.max(G.raidT, [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * 0.6);
+  });
+}
+
+/** The common blows' tiles, at its mark p. */
+function commonTiles(b, kind, p) {
+  const tiles = [], add = (x, y) => tiles.push([x, y]);
   if (kind === 'cross') {
     for (let k = -7; k <= 7; k++) { add(p.tx + k, p.ty); if (k) add(p.tx, p.ty + k); }
   } else if (kind === 'breath') {
@@ -3044,19 +3273,83 @@ function raidPattern(b, kind) {
     tiles.push(...plusTiles(b.tx, b.ty, 9));
     for (const [dx, dy] of DIRS) add(p.tx + dx, p.ty + dy);
   }
+  return tiles;
+}
+
+/**
+ * A pattern's waves, one after another: each is laid (its tiles worked out then, at whoever the
+ * boss faces then) when the one before falls, with its own full warning; done after the last.
+ * A wave gives its tiles, or { tiles, fall } with what happens as it falls (the boss's own run).
+ */
+function raidSeq(b, waves, done) {
+  let i = 0;
+  const next = () => {
+    if (!(b.hp > 0) || G.over || G.cleared) { G.seqTill = 0; return; }
+    if (i >= waves.length) { if (done) done(); return; }
+    const r = waves[i](), o = Array.isArray(r) ? { tiles: r } : r;
+    raidMark(b, o.tiles, i, () => { if (o.fall) o.fall(); next(); });
+    i++;
+  };
+  next();
+}
+
+/** One wave of red: off the arena's edge it is not laid; the warning as long as stepping off needs. */
+function raidMark(b, raw, nth, onFall) {
+  const seen = new Set(), tiles = [];
+  const W = G.war && G.war.raid ? G.war : null;
+  for (const [x, y] of raw) {
+    const k = x + ',' + y;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (W && !War.open(x, y)) continue;
+    tiles.push([x, y]);
+  }
   // The warning lasts at least as long as a person needs to step off the red at the slowest
   // class's own pace: a moment to see it, a turn, and a step for each tile of the deepest red
   // (a melee hero beside the boss is three tiles inside 혼의 고리; at the third phase's one
-  // second it could not get out).
-  const warn = Math.max([1.4, 1.2, 1][G.phase], MARK_REACT + MARK_STEP * redDepth(tiles, b));
+  // second it could not get out). A later wave of the same blow is a little quicker, never less.
+  const floor = nth ? [1.05, 0.95, 0.9][G.phase] : [1.4, 1.2, 1][G.phase];
+  const warn = Math.max(floor, MARK_REACT + MARK_STEP * redDepth(tiles, b));
   // A share of the hero's health, so a robed caster and an armoured warrior fear it alike.
-  const share = [0.3, 0.35, 0.4][G.phase] * raidK();
-  G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share });
+  // (A later wave strikes a little lighter: the blow is several.)
+  const share = [0.3, 0.35, 0.4][G.phase] * raidK() * (nth ? 0.8 : 1);
+  G.marks.push({ tiles, at: G.t + warn, made: G.t, dmg: G.player.maxHp * share, share, onFall });
   b.lunge = 0.3;
 }
 
 // How tall a raid boss stands on screen (px): over the heads of the 25 and their spells.
 const RAID_BOSS_TALL = 170;
+
+/** The boss runs or springs to (x, y) (the nearest free tile there), in dur seconds. */
+function bossLeap(b, x, y, dur) {
+  if (!(b.hp > 0)) return;
+  const W = G.war && G.war.raid ? G.war : null;
+  if (W) { x = Math.max(1, Math.min(W.map.cols - 2, x)); y = Math.max(1, Math.min(W.map.rows - 2, y)); }
+  let at = null;
+  for (let r = 0; r < 4 && !at; r++)
+    for (let dx = -r; dx <= r && !at; dx++)
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const nx = x + dx, ny = y + dy;
+        if ((W && !War.open(nx, ny)) || !free(nx, ny)) continue;
+        at = [nx, ny];
+        break;
+      }
+  if (!at || (at[0] === b.tx && at[1] === b.ty)) return;
+  leave(b);
+  b.fx = b.tx;
+  b.fy = b.ty;
+  if (at[0] !== b.tx) b.face = at[0] > b.tx ? 1 : -1;
+  b.tx = at[0];
+  b.ty = at[1];
+  occ.set(key(b.tx, b.ty), b);
+  b.mt = 0;
+  b.dur = dur;
+  b.moving = true;
+  b.lunge = 0.3;
+  shock(b.tx * TILE + TILE / 2, b.ty * TILE + TILE - 6, 2.5);
+  G.shake = Math.max(G.shake, 0.45);
+}
 
 // A person's moment to see the red and turn (0.45 s and the 0.1 s turn), and the slowest class's
 // step (전사·도깨비, speed 66: 0.24 s × 70 / 66).
@@ -3072,6 +3365,7 @@ function redDepth(tiles, b) {
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy, k = K(nx, ny);
       if (red.has(k) || (b && nx === b.tx && ny === b.ty)) continue;
+      if (G.war && G.war.raid && !War.open(nx, ny)) continue; // the arena's edge is no way out
       if (!dist.has(K(x, y))) { dist.set(K(x, y), 1); q.push([x, y]); }
     }
   }
@@ -3100,6 +3394,8 @@ function raidMarks() {
     if (!mk.fell) {
       mk.fell = true;
       partyMarks(mk);
+      // The next wave of the same blow is laid as this one falls (raidSeq).
+      if (mk.onFall) mk.onFall();
     }
     if (G.t < mk.at + grace) continue;
     mk.done = true;
