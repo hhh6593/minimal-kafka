@@ -6962,14 +6962,21 @@ const PARTY = {
   reaper: { names: ['강림', '월직', '일직'], role: '백도로 파고들어 거둔다' },
 };
 
+/** 동료 모드's own companions: the player's other classes that have been played (a record). */
+function ownCompanions() {
+  return CLASSES.map(c => c.id).filter(id => id !== G.cls.id && PARTY[id] && (best[id] || promoOf(id) > 0))
+    .sort((a, b) => promoOf(b) - promoOf(a));
+}
+
 function joinParty(cls) {
   const p = G.player;
   const def = PARTY[cls.id];
-  const name = def.names[Math.floor(Math.random() * def.names.length)];
+  const own = ownCompanions().includes(cls.id), promo = own ? promoOf(cls.id) : 0;
+  const name = own ? `내 ${cls.name}` : def.names[Math.floor(Math.random() * def.names.length)];
   const gear = savedGear(cls);
   const slot = G.party.length;
   const m = {
-    cls, name, lv: 1, gear, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
+    cls, name, lv: 1, gear, own, promo, baseLv: own ? Math.min(6, 1 + Math.floor(promo / 2)) : 0, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
     // Walks in from the edge of the view, as another player would.
     x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
     cd: { a: 1, b: 3, c: 6, d: 9, r: 0, e: 5, g: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,
@@ -6980,8 +6987,12 @@ function joinParty(cls) {
   m.ty = Math.floor((m.y - TILE / 2 + 6) / TILE);
   m.x = m.tx * TILE + TILE / 2;
   m.y = m.ty * TILE + TILE - 6;
+  m.lv = Math.max(1, m.baseLv);
+  m.maxHp = memberMaxHp(m);
+  m.hp = m.maxHp;
   G.party.push(m);
-  say(`${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
+  say(own ? `${name}${promo ? `(${promo}차 승급)` : ''}이(가) 함께합니다. 이 사냥터를 깨면 ${cls.name}의 기록에도 남습니다.`
+    : `${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
 }
 
 /** A companion's health: its class's, growing with its level; sturdier in a raid. */
@@ -8113,7 +8124,10 @@ function gainXp(v) {
     // Party members join at levels 3, 9 and 15, as D2 Survivors' mercenaries do.
     const joinAt = [3, 9, 15].indexOf(p.lvl);
     if (joinAt >= 0) {
-      const order = ['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id);
+      // 동료 모드: the player's own other characters (those with a record), most 승급 first, then
+      // the old four; they share the conquest (promote) and so climb their own 승급 with the hero.
+      const mine = ownCompanions();
+      const order = mine.concat(['poet', 'warrior', 'mage', 'rogue'].filter(c => c !== G.cls.id && !mine.includes(c)));
       const c = CLASSES.find(x => x.id === order[joinAt]);
       // Only in 동료 모드 (the menu): a hunting ground is the hero's alone otherwise.
       // They come once the card is picked, announced, so no card seems to have called them.
@@ -8598,6 +8612,18 @@ function promoOf(cls) {
 
 /** On a conquest: the class's record, and a 승급 when the ground was the next one it needed. */
 function promote() {
+  // 동료 모드: the player's own characters in the party share the conquest, and its 승급.
+  for (const m of G.party || []) {
+    if (!m.own) continue;
+    const id = m.cls.id, was = promoOf(id);
+    (progress.byClass[id] = progress.byClass[id] || {})[G.stage.id] = true;
+    const now = promoOf(id);
+    if (now > was) {
+      say(`${m.name} ${now}차 승급! (함께 깬 ${G.stage.name})`, 'sys');
+      G.promoted = (G.promoted || []).concat(`${m.cls.name} ${now}차 승급 (동료)`);
+      m.bubble = { text: `${now}차 승급!`, t: G.t };
+    }
+  }
   const cls = G.cls.id, before = promoOf(cls);
   (progress.byClass[cls] = progress.byClass[cls] || {})[G.stage.id] = true;
   const after = promoOf(cls);
