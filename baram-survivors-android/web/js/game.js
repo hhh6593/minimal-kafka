@@ -15,7 +15,8 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier, NAME_ICONS,
+  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
+  sinsuCount, SINSU_GATE, needsMet, needsName, AKMA_DROP, FAMILY_TINT, SINSU_TINT, HEAVEN_DRESS, HEAVEN_COST,
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
@@ -383,7 +384,7 @@ function makeGround(kind) {
 
 const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35,
   // 연's grounds under the earth or the sea (tools/yeon_grounds.py).
-  y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
+  y_raid_hell: 0.45, y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
 
 function resize() {
   // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
@@ -586,7 +587,7 @@ function buildStages() {
       b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
       const done = (progress.raids || {})[r.id];
       b.innerHTML = `<img src="assets/mon/${r.boss.id}.png" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
-        + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</span></div>`;
+        + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : raidLock(r)}</span></div>`;
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
     }
@@ -721,7 +722,12 @@ function openCards() {
 }
 
 function raidOpen(r) {
-  return QUERY.has('all') || !!progress.cleared[r.open];
+  return QUERY.has('all') || (!!progress.cleared[r.open] && (!r.after || !!(progress.raids || {})[r.after]));
+}
+/** What a raid still waits on, for its card. */
+function raidLock(r) {
+  if (!progress.cleared[r.open]) return `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`;
+  return `${RAIDS.find(x => x.id === r.after).name}에서 이기면 열린다`;
 }
 
 /** The raid's card: its boss, and the party that will gather, from each class's best. */
@@ -742,7 +748,7 @@ function raidInfo(r) {
       const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
       return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(있음)' : ''}`;
     }).join(' · ')}</div>
-    <div class="state">${raidOpen(r) ? '공격대 25명이 함께 친다' : `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`}</div>`;
+    <div class="state">${raidOpen(r) ? '공격대 25명이 함께 친다' : raidLock(r)}</div>`;
   $('#stage-info').querySelectorAll('[data-rrole]').forEach(b => {
     b.onclick = () => { settings.raidRole = b.dataset.rrole; saveJson('bs_settings', settings); raidInfo(r); };
   });
@@ -1059,7 +1065,8 @@ function weaponMult(cls, g) {
     const s = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (s) power += optIds(s).filter(o => o === 'power').length;
   }
-  const edge = sp && sp.taecho ? 1 + TAECHO_EDGE.all : sp && sp.craft && sp.craft.judge ? 1 + JUDGE_EDGE.all : 1;
+  // (태초's first blow and crowd edge are not "every foe": a boss is struck by its rank alone.)
+  const edge = sp && sp.taecho ? 1 + TAECHO_EDGE.all : sp && sp.craft && sp.craft.judge ? 1 + (JUDGE_EDGE[sp.id] || 0) : 1;
   return (1 + 0.12 * Math.max(0, pieceRank(cls, g, 'weapon'))) * (1 + 0.15 * power) * edge;
 }
 /** The weapon's rank as it strikes: the plain rank that would strike as hard. */
@@ -1108,25 +1115,35 @@ function applyGear() {
   // 격: what the worn pieces loose by themselves (gyeok.js), and the statuses the shields ward off.
   const gy = [];
   p.wards = new Set();
+  // A weapon's 격 is drawn as large as the weapon strikes a boss (items.js GYEOK_TIER, weaponEff).
+  const eff = weaponEff(G.cls, g);
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (!sp) continue;
-    if (sp.gyeok && GYEOK[sp.gyeok]) gy.push(tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? pow('weapon') : 0));
+    if (sp.gyeok && GYEOK[sp.gyeok]) {
+      const g0 = tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? eff : null, familyTint(sp));
+      // The abyss uniques: their 격 drawn larger still (태초 is already at the top tier of tierGyeok).
+      const top = k === 'weapon' && !sp.taecho && sp.rarity ? TOP_GYEOK_FX.abyss : 0;
+      gy.push(top ? { ...g0, fxK: (g0.fxK || 1) * top } : g0);
+    }
     if (sp.ward) p.wards.add(sp.ward);
   }
   p.dragonCut = 0;
   if (!g.weaponSp && g.weapon === dragonTier(G.cls)) {
     const step = starOf(G.cls, `weapon:${g.weapon}`), dg = dragonGyeok(c, step);
-    gy.push(tierGyeok({ id: 'dragon', ...dg }, pow('weapon')));
-    p.dragonCut = dg.cdCut;
     const ss = (progress.dragonSinsu || {})[c];
-    if (ss && SINSU[ss] && step >= 10) gy.push(tierGyeok({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] }, pow('weapon')));
+    // The 제십's flash: its 사신수's colour where it took one, 선계's light after its 천상 각성.
+    const dtint = step >= 10 && heavenOn(c) ? FAMILY_TINT.heaven : ss && step >= 10 ? SINSU_TINT[ss] : FAMILY_TINT.dragon;
+    gy.push(tierGyeok({ id: 'dragon', ...dg }, eff, dtint));
+    p.dragonCut = dg.cdCut;
+    if (ss && SINSU[ss] && step >= 10) gy.push(tierGyeok({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] }, eff, dtint));
   }
   p.gyeoks = gy;
-  p.judge = g.weaponSp && SPECIAL[g.weaponSp] && SPECIAL[g.weaponSp].craft && SPECIAL[g.weaponSp].craft.judge ? JUDGE_EDGE.all : 0;
-  // The weapon's family edge (items.js): an abyss unique's hunt, the 주작's aura on the allies near.
+  p.judge = g.weaponSp && SPECIAL[g.weaponSp] && SPECIAL[g.weaponSp].craft && SPECIAL[g.weaponSp].craft.judge ? JUDGE_EDGE[g.weaponSp] || 0 : 0;
+  // The weapon's family edge (items.js): an abyss unique's hunt (not 태초's: its own is the first
+  // blow, TAECHO_EDGE), the 주작's aura on the allies near.
   const wsp = g.weaponSp && SPECIAL[g.weaponSp];
-  p.abyssHunt = !!(wsp && wsp.rarity);
+  p.abyssHunt = !!(wsp && wsp.rarity && !wsp.taecho);
   p.taecho = !!(wsp && wsp.taecho);
   p.aura = 0;
   if (g.weaponSp === 'cr_sinsu_jujak') p.aura = JUJAK_AURA.k + JUJAK_AURA.perStar * (starOf(G.cls, 'sp:cr_sinsu_jujak') - 1);
@@ -1142,10 +1159,20 @@ function applyGear() {
 
 /** A weapon's 격 grown with the weapon's rank (items.js GYEOK_TIER): a larger picture, and a 격 that
  *  strikes round reaching further. The 격's own entry is left as it is (a copy). */
-function tierGyeok(g, rank) {
-  const t = gyeokTier(rank);
+function tierGyeok(g, rank, tint = null) {
+  // (an armour's 격: as it is, whatever the weapon)
+  const t = rank === null ? null : gyeokTier(rank);
   if (!t) return g;
-  return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area };
+  return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area, flash: t.flash ? tint || '#fff2c0' : null };
+}
+/** The colour of a worn piece's family (items.js FAMILY_TINT): the top 격's flash. */
+function familyTint(sp) {
+  const f = familyOf(sp);
+  return FAMILY_TINT[f] || null;
+}
+/** 천상 각성 (선계 레이드's 선계의 기운): the class's 용무기 제십 in 선계's light. */
+function heavenOn(c) {
+  return !!(progress.dragonHeaven || {})[c];
 }
 
 /** A weapon's strike-effect filter for effect id: one for all, or by effect (with a default). */
@@ -1265,7 +1292,7 @@ function fireGyeok(g, t) {
       const f = G.fxs[G.fxs.length - 1];
       if (g.selfAlpha && f && f.id === self) f.alpha = g.selfAlpha;
     }
-    fxOn(fxId, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1) });
+    fxOn(fxId, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1), tint: g.tint || null });
     // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water).
     if (g.fxGrid && M.fx[g.fxGrid]) {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -1273,7 +1300,19 @@ function fireGyeok(g, t) {
       }
     }
     // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
-    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) fxOn(g.fx2, e, { scale: 0.8 * (g.fx2K || g.fxK || 1) });
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) fxOn(g.fx2, e, { scale: 0.8 * (g.fx2K || g.fxK || 1), tint: g.tint || null });
+  }
+  // The top weapons' 격 (신화, items.js GYEOK_TIER): the screen flashes in the family's colour.
+  if (g.flash) {
+    G.gyeokFlash = { t: G.t, color: g.flash };
+    G.shake = Math.max(G.shake, 0.14);
+    // a second, wider bloom of the same picture a moment later, seen through: the 신화 blow lands twice as large
+    if (fxId && fxBudget('gyeok', 3)) {
+      const k = (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1) * 1.35;
+      fxOn(fxId, t, { scale: k, delay: 0.12, tint: g.tint || null });
+      const f = G.fxs[G.fxs.length - 1];
+      if (f && f.id === fxId) f.alpha = 0.55;
+    }
   }
   G.procHitting = true;
   let dealt = 0;
@@ -1353,8 +1392,8 @@ function tally(e, d) {
 /** An abyss unique's edge (items.js ABYSS_HUNT): more to the crowd, more again in the abyss. */
 function abyssEdge(e) {
   const crowd = !e.war && e.kind !== 'boss' && e.kind !== 'mini';
-  // 태초 (items.js TAECHO_EDGE): every foe alike, the crowd a little more; not the abyss's own.
-  if (G.player.taecho) return (1 + TAECHO_EDGE.all) * (crowd ? 1 + TAECHO_EDGE.mob : 1);
+  // 태초 (items.js TAECHO_EDGE): the crowd a little more; not the abyss's own (no burst either).
+  if (G.player.taecho) return crowd ? 1 + TAECHO_EDGE.mob : 1;
   return (crowd ? 1 + ABYSS_HUNT.mob : 1) * (G.stage.abyss && !G.war ? 1 + ABYSS_HUNT.abyss : 1);
 }
 
@@ -1475,7 +1514,8 @@ function isDragonKey(cls, key) {
 }
 /** The top star of a piece: the 용무기 climbs 제일 to 제십, the rest ★1 to ★5. */
 function starMaxOf(cls, key) {
-  return isDragonKey(cls, key) ? DRAGON_MAX : STAR_MAX;
+  const sp = key.startsWith('sp:') && SPECIAL[key.slice(3)];
+  return isDragonKey(cls, key) ? DRAGON_MAX : sp && sp.craft && sp.craft.stars ? sp.craft.stars : STAR_MAX;
 }
 /** An item icon by the item's name, made to sit with 연's (tools/fetch_icons.py, manifest gicon), or null. */
 function nameIcon(name) {
@@ -1527,11 +1567,24 @@ function glowIcon(pic, dz) {
   g.drawImage(pic, pad, pad);
   return c.toDataURL();
 }
+/** A picture (its path under assets/) recoloured as a dress recolours a worn layer, in its light;
+ *  made once, null until the picture is in. */
+const dressedIcons = {};
+function dressedIcon(src, dz) {
+  if (dressedIcons[src]) return dressedIcons[src];
+  const rel = src.replace(/^assets\//, '');
+  if (!(rel in images)) loadImage(rel);
+  const im = images[rel];
+  if (!im || !im.complete || !im.width) return null;
+  return (dressedIcons[src] = glowIcon(dressedSheet(im, 'icon|' + rel, dz.tint, dz.pal), dz));
+}
 /** 태초의 무기's icon: the very weapon the hero wears (its 연 layer, standing, facing down) in its
  *  gold-white dress and light, cut to the weapon. Made once a class; null until the sheet is in. */
 const taechoIcons = {};
 function taechoIcon(cls, sp) {
-  if (taechoIcons[cls.id]) return taechoIcons[cls.id];
+  // (an abyss weapon laid from the original's own picture takes the same way, in its dark dress)
+  const ik = cls.id + (sp.taecho ? '' : ':abyss');
+  if (taechoIcons[ik]) return taechoIcons[ik];
   // The first four: old 바람's picture itself, in the same light (what the hero holds).
   const cn = sp.classic && sp.classic[cls.id];
   if (cn && M.gear && M.gear[cn]) {
@@ -1539,10 +1592,12 @@ function taechoIcon(cls, sp) {
     if (!(pp in images)) loadImage(pp);
     const pic = images[pp];
     if (!pic || !pic.complete || !pic.width) return null;
-    return (taechoIcons[cls.id] = glowIcon(pic, sp.dress));
+    return (taechoIcons[ik] = glowIcon(pic, sp.dress));
   }
   const H = M.yhero2 && M.yhero2[cls.id], ab = sp.base && sp.base[cls.id];
-  const meta = H && ab && H.layers.weapon[String(ab[0])];
+  // (the original's own weapon where it is laid for the class: items.js TAECHO_WORN)
+  const wn = H && sp.worn && sp.worn[cls.id] && H.layers.weapon[sp.worn[cls.id]];
+  const meta = wn || (H && ab && H.layers.weapon[String(ab[0])]);
   if (!meta) return null;
   const path = 'yhero2/' + meta.file;
   if (!(path in images)) loadImage(path);
@@ -1550,7 +1605,7 @@ function taechoIcon(cls, sp) {
   if (!im || !im.complete || !im.width) return null;
   const a = H.anims.idle_down || H.anims.walk_down, box = frameBox(H, [meta]), dz = sp.dress;
   const sheets = { weapon: { im: dressedSheet(im, path, dz.tint, dz.pal), meta } };
-  if (H.layers.wback && H.layers.wback[String(ab[0])]) {
+  if (!wn && H.layers.wback && H.layers.wback[String(ab[0])]) {
     const wb = H.layers.wback[String(ab[0])], wp = 'yhero2/' + wb.file;
     if (!(wp in images)) loadImage(wp);
     if (images[wp] && images[wp].width) sheets.wback = { im: dressedSheet(images[wp], wp, dz.tint, dz.pal), meta: wb };
@@ -1580,10 +1635,10 @@ function taechoIcon(cls, sp) {
     rg.fillRect(0, 0, r.width, r.height);
     g.save(); g.filter = `blur(${blur}px)`; g.globalAlpha = al; g.drawImage(r, 0, 0); g.drawImage(r, 0, 0); g.restore();
   };
-  tint(dz.glowColor, 4, 0.9);
-  tint(dz.core, 1, 0.9);
+  tint(dz.glowColor || '#ff2a0a', 4, dz.core ? 0.9 : 0.6);
+  if (dz.core) tint(dz.core, 1, 0.9);
   g.drawImage(w, bb[0], bb[1], bb[2], bb[3], pad, pad, bb[2], bb[3]);
-  return (taechoIcons[cls.id] = c.toDataURL());
+  return (taechoIcons[ik] = c.toDataURL());
 }
 
 /**
@@ -1615,13 +1670,16 @@ function dragonIcon(cls, step) {
 }
 /** A piece's icon: what the hero wears with it (wornIcon); today's picture or the wardrobe's without 연's heroes. */
 function pieceIcon(cls, kind, t, spId) {
-  if (spId && SPECIAL[spId] && SPECIAL[spId].taecho) {
+  if (spId && SPECIAL[spId] && (SPECIAL[spId].taecho || (SPECIAL[spId].rarity && SPECIAL[spId].worn && SPECIAL[spId].worn[cls.id]
+    && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers.weapon[SPECIAL[spId].worn[cls.id]]))) {
     const ic = taechoIcon(cls, SPECIAL[spId]);
     if (ic) return ic;
   }
   // 청룡신검·현무불괴갑: worn as a recoloured 연 stand-in (items.js SINSU_DRESS), shown as the original's own picture.
-  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId].dress) {
+  if (spId && SPECIAL[spId] && SPECIAL[spId].craft && (SPECIAL[spId].dress || SPECIAL[spId].worn || SPECIAL[spId].wornBack)) {
     const pic = picture(craftPicture(SPECIAL[spId], cls.id, starOf(cls, 'sp:' + spId)));
+    // 악마 심판의낫: the original's picture in the abyss's dress and its red light, as it is worn.
+    if (pic && SPECIAL[spId].worn && !SPECIAL[spId].dress.pal) return dressedIcon(pic, SPECIAL[spId].dress) || pic;
     if (pic) return pic;
   }
   // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
@@ -2270,7 +2328,7 @@ function openCraft(sink = null) {
     });
   // 레이드 상점: 레이드주화 for today's makers' goods, as the client's raid shop.
   head(`레이드 상점 · 레이드주화 ${progress.coins || 0}개`);
-  const SHOP = [['scroll', 1, 5], ['kalpa', 5, 8], ['silver1', 5, 6], ['silver2', 2, 15], ['essence', 3, 20], ['silver3', 1, 120], ['pearl', 1, 60]];
+  const SHOP = [['scroll', 1, 5], ['kalpa', 5, 8], ['silver1', 5, 6], ['silver2', 2, 15], ['essence', 3, 20], ['silver3', 1, 250], ['pearl', 1, 60]];
   for (const [id, n, price] of SHOP) {
     row(`${MATS[id].name} ${n}개`, `레이드주화 ${price}개`, '교환', (progress.coins || 0) >= price, () => {
       progress.coins -= price;
@@ -2324,8 +2382,11 @@ function openCraft(sink = null) {
     icon = pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id) || picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
     meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text, got };
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
-    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급)`, `${baseText}${matText(c.mats)} + ${won(c.gold)} · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}${famText}`,
-      got ? '가짐' : '조합', !got && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
+    // A recipe of the story's gate (items.js needs): shut until that ground or raid is won.
+    const gateOk = got || needsMet(c.needs, progress);
+    const gateText = gateOk ? '' : `🔒 ${needsName(c.needs)}${c.needs.startsWith('raid_') ? '에서 이기면' : '을(를) 정복하면'} 열린다 · `;
+    row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급${c.stars === 1 ? ' · 별 없음' : ''})`, `${gateText}${baseText}${matText(c.mats)} + ${won(c.gold)} · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}${famText}`,
+      got ? '가짐' : gateOk ? '조합' : '잠김', !got && gateOk && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
         for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
         progress.mats = mats;
@@ -2358,6 +2419,20 @@ function openCraft(sink = null) {
           banner(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`);
         });
     }
+    // 천상 각성 (선계 레이드's 선계의 기운): the 제십 in 선계's light — a look and its 격's flash, no rank.
+    head('천상 각성 · 선계의 기운으로 제십 용무기에 선계의 빛을 입힌다 (외형만)');
+    const hv = heavenOn(cls.id);
+    icon = dragonIcon(cls, DRAGON_MAX) || picture(dragonName(cls.id, DRAGON_MAX));
+    meta = { mats: HEAVEN_COST.mats, gold: HEAVEN_COST.gold, got: hv };
+    row(`천상의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(HEAVEN_COST.mats)} + ${won(HEAVEN_COST.gold)} · 금백 광채와 격 섬광 (등급은 그대로 17.2)`,
+      hv ? '입힘' : '각성', !hv && have(HEAVEN_COST.mats) && (progress.gold || 0) >= HEAVEN_COST.gold, () => {
+        progress.gold -= HEAVEN_COST.gold;
+        for (const [id, n] of Object.entries(HEAVEN_COST.mats)) mats[id] -= n;
+        progress.mats = mats;
+        (progress.dragonHeaven = progress.dragonHeaven || {})[cls.id] = true;
+        say(`${dragonName(cls.id, DRAGON_MAX)}에 선계의 빛이 깃들었습니다!`, 'sys');
+        banner(`천상의 ${dragonName(cls.id, DRAGON_MAX)}`);
+      });
   }
   head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
   // 확률 강화 (today's way, optional): half the materials, but it can fail — 손상 (spent for
@@ -4375,7 +4450,9 @@ function hurtEnemy(e, dmg, push = null) {
     * (own ? 1 + GEAR_OPT.final * opt('final') : 1)
     * (e.st && e.st.mark && e.st.mark.until > G.t ? 1 + e.st.mark.k : 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1)
-    * (p.abyssHunt && !G.allyHitting ? abyssEdge(e) : 1)
+    * ((p.abyssHunt || p.taecho) && !G.allyHitting ? abyssEdge(e) : 1)
+    // 태초's first blow (items.js TAECHO_EDGE.fresh): a foe at its full health, never a war's fighter.
+    * (p.taecho && own && !G.procHitting && !e.war && e.hp >= e.maxHp ? 1 + TAECHO_EDGE.fresh : 1)
     * (p.judge && own ? 1 + p.judge : 1) // 심판의낫 (items.js JUDGE_EDGE): every foe alike
     * (G.hunt ? Hunt.takeK(e) * (own ? Hunt.react(e) : 1) : 1); // 사냥 기믹: 그로기, 폭주, 속성 반응
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
@@ -4805,7 +4882,8 @@ function dropAbyss(e, taecho, cowKing = false) {
 function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
     if (!m.from.includes(G.stage.id)) continue;
-    let n = matCount(id, e.kind, !!G.stage.raid);
+    // 사신수 성물: in full only from their 신수's raid (items.js SINSU_GATE), elsewhere a taste.
+    let n = id.startsWith('sinsu_') ? sinsuCount(id, G.stage.id, e.kind, progress.raids) : matCount(id, e.kind, !!G.stage.raid);
     // 금린 below 8등급 (산군 L3, 도깨비대장 L5): one now and then, not 3-5 a boss — the 11등급
     // 금린 set came by the 12th hunt and skipped the raid sets and the craft ladder between.
     if (id === 'gold' && G.level < 8) n = e.kind === 'boss' && Math.random() < 0.35 ? 1 : 0;
@@ -4974,6 +5052,12 @@ function clearStage() {
     say(`레이드 전용 장비가 떨어졌습니다: ${names}`, 'sys');
     later(1.2, () => banner(`레이드 전용 · ${names}`));
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
+    // 지하국대적: now and then 악마 심판의낫 itself (items.js AKMA_DROP), for a class that wields it.
+    const ak = SPECIAL.cr_judge_weapon3;
+    if (G.stage.id === 'raid_hell' && ak && ak.craft.only.includes(G.cls.id) && Math.random() < AKMA_DROP) {
+      G.drops.push({ x: p.x, y: p.y - 30, kind: 'gear', gear: { kind: 'weapon', tier: specialBase(ak, G.cls.id), sp: ak.id } });
+      later(2.4, () => banner(`★ ${specialName(ak, G.cls.id)}`));
+    }
     G.gold += 120 * G.level;
     // 레이드주화 for the raid shop (in the smith's window).
     // 공대: paid at the end by the hero's tier (war.js raidEnd).
@@ -9527,7 +9611,14 @@ function yGearVariants(cls, gear) {
     // An abyss weapon looks its class's named 연 weapon, dressed (items.js ABYSS_BASE), or where the
     // build lacks that layer a plain iron or steel one (ABYSS_LOOK_TIER).
     const lt = sp && SPECIAL[sp] && SPECIAL[sp].lookTier && SPECIAL[sp].lookTier[cls.id];
-    const ab = sp && SPECIAL[sp] && SPECIAL[sp].base && SPECIAL[sp].base[cls.id];
+    let ab = sp && SPECIAL[sp] && SPECIAL[sp].base && SPECIAL[sp].base[cls.id];
+    // A look by star (청룡 심판의낫: ★1-2 청룡, ★3-4 진'청룡, ★5 극'청룡; items.js lookSteps).
+    const ls = ab && SPECIAL[sp].lookSteps;
+    if (ls) {
+      const st = starOf(cls, 'sp:' + sp);
+      const at = Object.keys(ls).map(Number).filter(k => k <= st).sort((a, b) => b - a)[0];
+      if (at && H.layers[kind] && H.layers[kind]['c' + ls[at]]) ab = [ls[at]];
+    }
     // The original's own piece laid on 연's hero (items.js worn, tools/sinsu_worn.py), where the build has it.
     const wn = sp && SPECIAL[sp] && SPECIAL[sp].worn && SPECIAL[sp].worn[cls.id];
     if (wn && H.layers[kind] && H.layers[kind][wn]) v = wn;
@@ -9566,6 +9657,9 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   const sheets = {};
   // An abyss weapon worn: its layers dressed in black, blood and fire (by its rarity).
   let dz = !window.__noDress && gear && gear.weaponSp && SPECIAL[gear.weaponSp] && SPECIAL[gear.weaponSp].dress;
+  // The 용무기 제십 after its 천상 각성 (선계의 기운): 선계's light (items.js HEAVEN_DRESS).
+  if (!window.__noDress && gear && !gear.weaponSp && gear.weapon >= 0 && gear.weapon === dragonTier(cls)
+    && heavenOn(cls.id) && starOf(cls, `weapon:${gear.weapon}`) >= DRAGON_MAX) dz = HEAVEN_DRESS;
   // The original's own piece worn (an "s_" layer) is not recoloured as its stand-in would be.
   if (dz && dz.standIn && want.weapon && want.weapon.startsWith('s_')) dz = null;
   for (const [kind, v] of Object.entries(want)) {
@@ -9805,6 +9899,13 @@ function dressedSheet(im, path, t, pal, swing) {
       if (pal === 'cheong' || pal === 'hyeonmu') { sinsuPixel(p, i, t, pal); continue; }
       const l = (0.3 * p[i] + 0.59 * p[i + 1] + 0.11 * p[i + 2]) / 255;
       // 태초 (pal gold): pale gold, lighter, the shading kept; the abyss: black, blood and embers.
+      // 천상 각성 (pal heaven): a little toward a cool gold-white, the steel's own shading kept.
+      if (pal === 'heaven') {
+        p[i] += (Math.min(255, 175 + l * 90) - p[i]) * t;
+        p[i + 1] += (Math.min(250, 165 + l * 95) - p[i + 1]) * t;
+        p[i + 2] += (Math.min(240, 125 + l * 125) - p[i + 2]) * t;
+        continue;
+      }
       const r = pal === 'gold' ? Math.min(255, 150 + l * 130) : Math.min(235, Math.max(8, Math.pow(l, 1.6) * 330));
       const gg = pal === 'gold' ? Math.min(248, 115 + l * 140) : Math.min(140, Math.max(0, (l - 0.6) * 260));
       const b = pal === 'gold' ? Math.min(225, 40 + l * 170) : Math.min(20, l * 12);
@@ -9908,7 +10009,7 @@ function tongues(color = '#ff8c4c') {
   return (flameTongues = out);
 }
 function drawBladeFlames(pts, ox, oy, dz) {
-  const T = pts && pts.length && tongues(dz.pal === 'gold' ? '#ffe7a0' : undefined);
+  const T = pts && pts.length && tongues(dz.pal === 'gold' || dz.pal === 'heaven' ? '#ffe7a0' : undefined);
   if (!T) return;
   const now = performance.now() / 70;
   for (let j = 0; j < pts.length; j++) {
@@ -10556,6 +10657,14 @@ function render(now) {
     gr.addColorStop(1, `rgba(0,0,0,${dark})`);
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // A 신화 격's flash in its family's colour (fireGyeok), soft, a quarter second.
+  if (G.gyeokFlash && G.t - G.gyeokFlash.t < 0.26) {
+    ctx.save();
+    ctx.globalAlpha = 0.32 * (1 - (G.t - G.gyeokFlash.t) / 0.26);
+    ctx.fillStyle = G.gyeokFlash.color;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
   }
   // A 필살기's blink of white over the whole screen.
   if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.32) {
@@ -11693,7 +11802,8 @@ window.__hurtPlayerFrom = (d, e) => hurtPlayer(d, e);
 window.__event = k => huntEvent(k);
 // For trying effects out: one of the build's effects at a place.
 window.__fx = (id, x, y, o) => addFx(id, x, y, o || {});
-window.__fireGyeok = (id, e) => fireGyeok({ id, ...GYEOK[id] }, e || G.enemies[0]); // test: a 격 goes off
+window.__fireWorn = (i = 0, e) => fireGyeok(G.player.gyeoks[i], e || G.enemies.find(x => x.kind === 'boss') || G.enemies[0]); // test: a worn 격 as it is grown (GYEOK_TIER)
+window.__fireGyeok = (id, e) => fireGyeok({ id, ...GYEOK[id] }, e || G.enemies[0]); // test: a 격 goesoff
 // For trying the abyss loot out: a unique (by name, else any) dropped beside the hero.
 window.__abyssDrop = u => {
   progress.abyssLoot = progress.abyssLoot || {};
@@ -11737,6 +11847,7 @@ const War = initWar({
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
+  SINSU_GATE, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
   heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
   // 공대 (the raid on the war's fighters)
   strike: allyStrike, auraK, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
