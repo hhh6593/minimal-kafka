@@ -755,6 +755,20 @@ def main():
             if c.get("portrait") and os.path.isfile(os.path.join(h2, c["portrait"])):
                 shutil.copyfile(os.path.join(h2, c["portrait"]), os.path.join(out, "yhero2", c["portrait"]))
             manifest["yhero2"][cls_id] = c
+        # Pieces 연 lacks, as the original draws them worn, laid on these heroes (GEAR_DIR/sinsu_worn/,
+        # tools/sinsu_worn.py: 청룡신검's blade, 현무불괴갑's wings): more layers "s_<piece>".
+        sw = os.path.join(gear_src, "sinsu_worn")
+        if os.path.isfile(os.path.join(sw, "index.json")):
+            with open(os.path.join(sw, "index.json"), encoding="utf-8") as f:
+                swindex = json.load(f)
+            os.makedirs(os.path.join(out, "yhero2", "sinsu"), exist_ok=True)
+            for cls_id, pieces in swindex.items():
+                if cls_id not in manifest["yhero2"]:
+                    continue
+                for piece, meta in pieces.items():
+                    shutil.copyfile(os.path.join(sw, os.path.basename(meta["file"])), os.path.join(out, "yhero2", meta["file"]))
+                    layer = {k: meta[k] for k in ("file", "cols", "cell", "foot", "side")}
+                    manifest["yhero2"][cls_id]["layers"].setdefault(meta["kind"], {})["s_" + piece] = layer
 
     # 바람의나라 연's 외형 (코디) items as more layers of the same heroes (GEAR_DIR/ycostume/: s/*.webp,
     # icons/, index.json, from tools/yeon_costume.py) and 연's pets (GEAR_DIR/ypet/, from

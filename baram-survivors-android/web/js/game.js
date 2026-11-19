@@ -9405,7 +9405,10 @@ function yGearVariants(cls, gear) {
     // build lacks that layer a plain iron or steel one (ABYSS_LOOK_TIER).
     const lt = sp && SPECIAL[sp] && SPECIAL[sp].lookTier && SPECIAL[sp].lookTier[cls.id];
     const ab = sp && SPECIAL[sp] && SPECIAL[sp].base && SPECIAL[sp].base[cls.id];
-    if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
+    // The original's own piece laid on 연's hero (items.js worn, tools/sinsu_worn.py), where the build has it.
+    const wn = sp && SPECIAL[sp] && SPECIAL[sp].worn && SPECIAL[sp].worn[cls.id];
+    if (wn && H.layers[kind] && H.layers[kind][wn]) v = wn;
+    else if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
     else if (ab && kind === 'weapon' && H.layers[kind] && H.layers[kind][String(ab[0])]) v = String(ab[0]);
     else if (lt !== undefined && lt !== null && map['t' + lt]) v = map['t' + lt];
     else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + lookAt(cls.id, kind, specialBase(SPECIAL[sp], cls.id))] : null);
@@ -9424,6 +9427,9 @@ function yGearVariants(cls, gear) {
   if (out.weapon && H.layers.wback && H.layers.wback[out.weapon]) out.wback = out.weapon;
   // What of an outfit worn as 연's own look is not on the body (the 용 파천·멸아 wings).
   if (out.armor && H.layers.aback && H.layers.aback[out.armor]) out.aback = out.armor;
+  // 현무불괴갑's wings, the original's own (items.js wornBack).
+  const wb = gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].wornBack;
+  if (wb && out.armor && H.layers.aback && H.layers.aback[wb]) out.aback = wb;
   // The 코디 worn over the gear (costume.js): its looks replace the slots' own.
   return costumeVariants(H, gear.cos, out);
 }
@@ -9436,7 +9442,9 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     : (b.yvGear = gear, b.yvCos = costumeVersion(), b.yv = yGearVariants(cls, gear || {}));
   const sheets = {};
   // An abyss weapon worn: its layers dressed in black, blood and fire (by its rarity).
-  const dz = !window.__noDress && gear && gear.weaponSp && SPECIAL[gear.weaponSp] && SPECIAL[gear.weaponSp].dress;
+  let dz = !window.__noDress && gear && gear.weaponSp && SPECIAL[gear.weaponSp] && SPECIAL[gear.weaponSp].dress;
+  // The original's own piece worn (an "s_" layer) is not recoloured as its stand-in would be.
+  if (dz && dz.standIn && want.weapon && want.weapon.startsWith('s_')) dz = null;
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
     if (!(path in images)) loadImage(path);
@@ -9648,12 +9656,13 @@ function waterRows(H, meta) {
 /** A worn layer as the hero wears it: 현무불괴갑's outfit recoloured (SINSU_DRESS with armor), else as it is. */
 function armorDressed(gear, kind, im, path) {
   const az = (kind === 'armor' || kind === 'aback') && gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress;
-  return az && az.armor ? dressedSheet(im, path, az.tint, az.pal) : im;
+  // (the original's own wings, an "s_" layer, keep their colours)
+  return az && az.armor && !path.includes('/sinsu/') ? dressedSheet(im, path, az.tint, az.pal) : im;
 }
 /** The same for a still picture of the hero (the class card): 청룡신검's blade too. */
 function sinsuDressed(gear, kind, im, path) {
   const w = (kind === 'weapon' || kind === 'wback') && gear.weaponSp && SPECIAL[gear.weaponSp];
-  return w && w.craft && w.dress ? dressedSheet(im, path, w.dress.tint, w.dress.pal) : armorDressed(gear, kind, im, path);
+  return w && w.craft && w.dress && !path.includes('/sinsu/') ? dressedSheet(im, path, w.dress.tint, w.dress.pal) : armorDressed(gear, kind, im, path);
 }
 function dressedSheet(im, path, t, pal, swing) {
   const k = path + '|' + t + '|' + (pal || '') + (swing ? '|w' : '');
