@@ -104,8 +104,8 @@ export const SKILLS = {
     desc: '바라보는 쪽 네 칸 안의 몬스터 등 뒤로 순식간에 옮겨 가며 벤다' },
   r_bolt: { elem: 'thunder', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31',
     dmg: 12, cd: 1.8, range: 6, count: 1, names: tier('뇌진주'), up: 'r_storm', desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
-  r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '36', cd: 12, duration: 2.5,
-    desc: '잠시 모습을 감춘다. 몬스터가 공격하지 못하고, 그동안 주는 피해가 3배가 된다' },
+  r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '36', cd: 10, duration: 5,
+    desc: '5초 동안 모습을 감춰 몬스터가 놓치고 헤맨다. 잠시 다가간 뒤 가장 강한 기술로 암습해 3.5배로 치명타를 넣고, 이어 3초 동안 모든 공격이 배후 공격(피해 +50%)이 된다' },
   r_drain: { cls: 'rogue', req: 6, name: '흡성대법', kind: 'spell', fx: '49', dmg: 16, cd: 2.8, range: 5, count: 1,
     drain: 0.3, weakest: true, desc: '체력이 낮은 몬스터의 기운을 빨아들여 체력을 회복한다' },
   r_clone: { cls: 'rogue', req: 12, name: '분신', kind: 'buff', buff: 'power', fx: '33', cd: 14, duration: 4, power: 1,
@@ -1434,6 +1434,7 @@ export function levelText(id, level) {
       '사중공격: 네 번 연달아 벤다', '신검합일: 공격력 +30%', '오중공격: 다섯 번 연달아 벤다'][level - 1];
   }
   if (s.kind === 'heal') return '회복량 +45%, 재사용 -7%';
+  if (s.buff === 'stealth') return '암습 피해 +0.25배, 재사용 -7%';
   if (s.kind === 'buff') return '지속 시간 +10%, 재사용 -7%';
   const parts = ['피해 +15%', '재사용 -7%'];
   if ((level === 4 || level === 7) && s.kind !== 'cleave' && s.kind !== 'nova')
