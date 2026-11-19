@@ -1171,7 +1171,9 @@ function abyssBurst(e) {
   const b = ABYSS_HUNT.burst;
   if (G.t < (G.abyssBurstAt || 0) || Math.random() >= b.chance) return;
   G.abyssBurstAt = G.t + b.cd;
-  if (M.fx[b.fx] && fxBudget('abyssBurst', 2)) addFx(b.fx, e.x, e.y - 14, { scale: 0.5 * ABYSS_FX_K * 1.3 });
+  // (태초의 무기: its burst in light, the weapon's own strike tint.)
+  const tint = G.player.swing && fxTintOf(G.player.swing.tint, b.fx);
+  if (M.fx[b.fx] && fxBudget('abyssBurst', 2)) addFx(b.fx, e.x, e.y - 14, { scale: 0.5 * ABYSS_FX_K * 1.3, tint });
   const hits = G.enemies.filter(o => o !== e && o.hp > 0 && Math.abs(o.tx - e.tx) <= b.area && Math.abs(o.ty - e.ty) <= b.area);
   G.procHitting = true;
   for (const o of hits) hurtEnemy(o, gyeokBase() * b.dmg);
