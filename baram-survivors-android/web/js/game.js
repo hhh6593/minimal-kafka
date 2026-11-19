@@ -5833,7 +5833,7 @@ const PORTAL_ROW = [
   { tab: 'world_4', label: '환상의 섬', sub: '사냥터', tint: 'hue-rotate(170deg) saturate(1.5) brightness(1.5)' },
   { tab: 'gungnae', label: '국내성', sub: '사냥터', tint: null },
   { tab: 'world_1', label: '대륙', sub: '사냥터', tint: 'hue-rotate(28deg) saturate(1.8) brightness(1.35)' },
-  { tab: 'training', label: '수련장', sub: '허수아비', tint: 'hue-rotate(95deg) saturate(1.5) brightness(1.1)' },
+  { tab: 'training', label: '수련장', sub: '기술 시험', tint: 'hue-rotate(95deg) saturate(1.5) brightness(1.1)' },
 ];
 const PORTAL_FX = 'k_rp_gate';
 let portalCache = null;
@@ -5847,7 +5847,7 @@ function townPortals() {
     portalCache = PORTAL_ROW.map((p, i) => ({ ...p, x: PORTAL_MID + (i - 2) * PORTAL_STEP, y: PORTAL_ROW_Y, r: p.art === 'statue' ? 26 : 30 }));
   } else {
     portalCache = yt.portals.map(p => ({ ...p, sub: '', tint: null }));
-    portalCache.push({ tab: 'training', label: '수련장', sub: '허수아비', x: m.spawn[0] + 96, y: m.spawn[1], r: 30, tint: PORTAL_ROW[4].tint });
+    portalCache.push({ tab: 'training', label: '수련장', sub: '기술 시험', x: m.spawn[0] + 96, y: m.spawn[1], r: 30, tint: PORTAL_ROW[4].tint });
   }
   return portalCache;
 }
@@ -5950,7 +5950,7 @@ const TOWN_WALKERS = [
   { name: '견습 도적', cls: 'rogue', gear: { armor: 1, weapon: 2, shield: -1, helmet: -1, cape: -1 },
     lines: ['쉿, 투명 쓰고 지나가는 중이오.', '흉가 귀신이 요새 부쩍 늘었다던데.', '떼보네 갑옷점 물건이 오늘 좋더군.'] },
   { name: '방랑 주술사', cls: 'mage', gear: { armor: 2, weapon: 2, shield: -1, helmet: -1, cape: -1 },
-    lines: ['마력이 바닥나면 주막에서 쉬어 가게.', '헬파이어 한 방이면 다 끝나지.', '수련장 허수아비한테 마법을 시험해 봤소?'] },
+    lines: ['마력이 바닥나면 주막에서 쉬어 가게.', '헬파이어 한 방이면 다 끝나지.', '수련장 도깨비한테 마법을 시험해 봤소?'] },
   { name: '마을 도사', cls: 'poet', gear: { armor: 1, weapon: 1, shield: -1, helmet: -1, cape: -1 },
     lines: ['다친 데 있으면 말하게. 기원 한 번이면 낫는다네.', '부여성까지 걸어가려니 다리가 후들거리는군.', '영웅의 석상 앞에 모이면 공대를 꾸린다네.'] },
   { name: '사냥꾼 궁사', cls: 'archer', gear: { armor: 1, weapon: 2, shield: -1, helmet: -1, cape: -1 },
@@ -6456,12 +6456,12 @@ function talk() {
 
 // ---------------------------------------------------------------- 수련장
 //
-// The town's training ground: a 허수아비 that never falls, and the class's spells to try on it one
+// The town's training ground: a target that never falls, and the class's spells to try on it one
 // at a time — the spell's name and what it does, its effect, the numbers of every blow over it,
 // and the damage it deals (each blow, a second over the last five seconds, all of it). Built on
 // the hunt itself (startRun with no cards and no crowd, G.dummy as window.__dummyBoss uses it), so
-// what is seen is what the spell does on a hunt. 연 has no 허수아비 of its own in the build: the
-// dummy is 연's own 장승 (the town's wooden post, ytown/sign.png).
+// what is seen is what the spell does on a hunt. The target is a 도깨비 (placeDummy):
+// 연 ships no 허수아비 picture.
 
 const TRAIN_WINDOW = 5; // seconds of the recent DPS
 const TRAIN_RING = 1024;
@@ -6469,10 +6469,11 @@ const trainT = new Float64Array(TRAIN_RING), trainD = new Float64Array(TRAIN_RIN
 const TRAIN_KIND = { slash: '근접 연타', cleave: '정면 베기', nova: '주위 공격', screen: '화면 전체', spell: '마법', spell4: '네 방향 마법', ult: '필살기', strike: '내려치기',
   line: '직선 공격', blink: '이동 공격', buff: '강화', heal: '회복', summon: '소환', aura: '오라', passive: '패시브' };
 
+const TRAIN_MOB = '6021'; // 수련장's target: 도깨비굴's first 도깨비
 function startTraining(cls) {
   chosenClass = cls;
   // The first ground's floor, at its easiest; the dummy alone on it.
-  startRun(cls, { ...STAGES[0], level: 0, name: '국내성 수련장', intro: '허수아비는 쓰러지지 않습니다. 왼쪽에서 기술을 골라 시험해 보세요.' }, true);
+  startRun(cls, { ...STAGES[0], level: 0, name: '국내성 수련장', intro: '수련장 도깨비는 쓰러지지 않고 맞서 싸우지도 않습니다. 왼쪽에서 기술을 골라 시험해 보세요.' }, true);
 }
 
 /** The class's spells for the panel: all of them (a locked one marked), the 필살기 apart. */
@@ -6502,13 +6503,13 @@ function setupTraining() {
 function placeDummy() {
   const p = G.player;
   for (const e of G.enemies.slice()) { G.enemies.splice(G.enemies.indexOf(e), 1); leave(e); }
-  const im = images['ytown/sign.png'];
-  const m = { id: 'dummy', name: '허수아비', img: im, w: im ? im.width : 40, h: im ? im.height : 80, area: 3000, rank: 0, pages: [] };
-  m.area = m.w * m.h;
+  // 연 has no 허수아비 in the build (its test dummies' units were never shipped): a 도깨비 of the
+  // 도깨비굴 stands in, its own picture and motions (the 장승 post before it was hard to make out).
+  const m = monsterById[TRAIN_MOB] || Object.values(monsterById)[0];
   let at = null;
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0]]) if (free(p.tx + dx, p.ty + dy)) { at = [p.tx + dx, p.ty + dy]; break; }
   if (!at) return null;
-  const e = addEnemy(m, 'boss', { name: '수련장 허수아비', scale: 0.8 }, 0, at);
+  const e = addEnemy(m, 'boss', { name: '수련장 도깨비', scale: 1.1 }, 0, at);
   if (!e) return null;
   e.hp = e.maxHp = 1e12;
   e.still = true;
@@ -6624,7 +6625,7 @@ function syncTrainPanel() {
   $('#train-auto').textContent = tr.auto ? '자동 시전: 켬' : '자동 시전: 끔';
   $('#train-cast').hidden = tr.auto;
   if (!d) {
-    $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>허수아비에게 쓰면 이펙트와 피해 숫자가 나옵니다. 아직 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
+    $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>수련장 도깨비에게 쓰면 이펙트와 피해 숫자가 나옵니다. 아직 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
     return;
   }
   const s = G.skills[0], st = stats(s), tier = promoOf(G.cls.id);
