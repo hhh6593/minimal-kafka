@@ -7,7 +7,7 @@
 // what makes a conquered ground worth hunting again; the 도감 shows where each piece drops.
 
 import { STAGES, RAIDS, CLASSES } from './data.js';
-import { GEAR, RAID_GEAR, raidSet, plainTiers, plainList, gearPower, lookTier } from './avatar.js';
+import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces } from './avatar.js';
 import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
 
 // The name each source gives its specials.
@@ -70,8 +70,7 @@ export function specialBase(sp, cls) {
     return lookTier(cls, sp.kind, look);
   }
   if (sp.raid) {
-    const piece = raidSet(sp.src, cls).find(([k]) => k === sp.kind);
-    return piece ? GEAR[cls][sp.kind].indexOf(piece[1]) : -1; // a raid's shield, for a class with none
+    return raidTier(sp.src, cls, sp.kind); // -1: a raid's shield, for a class with none
   }
   // Its own look where the boss has one in this class's line (a fox's 칠지도, a skull's 참마도).
   const sg = SOURCE_GYEOK[sp.src];
@@ -119,8 +118,7 @@ export function tierSources(cls, kind, tier) {
 
 /** The raid an ordinary-looking piece belongs to, if any. */
 export function raidOf(cls, kind, tier) {
-  const name = GEAR[cls][kind][tier];
-  const id = Object.keys(RAID_GEAR).find(r => raidSet(r, cls).some(([k, n]) => k === kind && n === name));
+  const id = raidOwner(cls, kind, tier);
   return id ? RAIDS.find(r => r.id === id) : null;
 }
 
@@ -158,7 +156,8 @@ export const MATS = {
 export function matCount(id, kind, raid) {
   const r = Math.random();
   if (id === 'pearl') return kind === 'boss' && r < (raid ? 0.6 : 0.12) ? 1 : 0;
-  if (id === 'silver3') return kind === 'boss' && raid && r < 0.25 ? 1 : 0;
+  // 은나무 가지: raid bosses 25%; the 끝없는 지옥's bosses (in its list) 10% — they gave none (raid only).
+  if (id === 'silver3') return kind === 'boss' && r < (raid ? 0.25 : 0.1) ? 1 : 0;
   if (id === 'scroll') return kind === 'boss' ? 1 + (r < 0.3 ? 1 : 0) : 0;
   if (id === 'essence' || id === 'silver2') return kind === 'boss' ? 2 + Math.floor(r * 3) : kind === 'mini' && r < 0.3 ? 1 : 0;
   return kind === 'boss' ? 3 + Math.floor(r * 3) : kind === 'mini' ? (r < 0.5 ? 1 : 0)
@@ -267,6 +266,8 @@ for (const c of CRAFTS) {
   // Put the look on every class's line now, so the loader fetches its sheets with the rest.
   for (const k of CLASSES) specialBase(sp, k.id);
 }
+// The raids' own places in the lines (avatar.js), after the crafted looks so no saved place moves.
+settleRaidPieces();
 
 // Worn looks where 연's own item layer (yhero2's map) is missing or broken, as 연's 치장용 copy of
 // the piece or its nearest kin (game.js yGearVariants; the icon follows the look, game.js wornIcon).

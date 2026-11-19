@@ -122,18 +122,73 @@ export function raidSet(id, cls) {
   return [['weapon', r.weapon[cls]], ['armor', r.armor], ['shield', r.shield]].filter(([k]) => k !== 'shield' || SHIELDED[cls]);
 }
 
+// The lines as written (before the 용무기, raids and crafts add pieces): what the hunting grounds
+// hand out. The first five of a written line are always the grounds' own, even where a raid's set
+// later reused the name (the 도적·주술사·도사's first weapons are 태염무신's, the 도사's 백운장
+// 아이라바타's ...): by name alone those counted as the raid's piece, so a new 주술사 started with a
+// power-11 weapon, and the grounds dropped only one or two weapon tiers for those classes.
+const WRITTEN = Object.fromEntries(Object.entries(GEAR).map(([c, g]) => [c, Object.fromEntries(
+  ['armor', 'weapon', 'shield', 'helmet', 'cape'].map(k => [k, (g[k] || []).slice()]))]));
+const PLAIN_ZONE = 5;
+
 // Every raid piece has a place in each class's line, after the hunting grounds' own.
 for (const id of Object.keys(RAID_GEAR))
   for (const cls of Object.keys(GEAR))
     for (const [kind, name] of raidSet(id, cls)) if (!GEAR[cls][kind].includes(name)) GEAR[cls][kind].push(name);
 
+// Each raid's own piece: RAID_TIER[raid][cls][kind] = its place in the line, OWNER[cls][kind][place]
+// = the raid. A raid piece whose name is a grounds' piece (the first five) or another raid's
+// piece (브리트라's 현무의검 is 해왕's) gets a place of its own at the end of the line (same look),
+// so it counts as its own raid's power: before, 아이라바타 (14) gave a 전사 a 백호의검 worth 4.
+// Those places are added by settleRaidPieces (items.js, after the crafted looks), so no place a
+// save already holds moves.
+const RAID_TIER = {}, OWNER = {}, PENDING = [];
+for (const id of Object.keys(RAID_GEAR))
+  for (const cls of Object.keys(GEAR))
+    for (const [kind, name] of raidSet(id, cls)) {
+      const i = GEAR[cls][kind].indexOf(name), own = (OWNER[cls] = OWNER[cls] || {})[kind] = OWNER[cls][kind] || {};
+      const plain = i < PLAIN_ZONE && WRITTEN[cls][kind][i] === name;
+      if (!plain && !own[i]) {
+        own[i] = id;
+        ((RAID_TIER[id] = RAID_TIER[id] || {})[cls] = RAID_TIER[id][cls] || {})[kind] = i;
+      } else PENDING.push([id, cls, kind, name, plain ? i : -1]);
+    }
+// Old saves: a grounds' piece (past the first, which every class starts with) that counted as a
+// raid's is the raid's piece moved to its own place: {cls: {kind: {old place: new place}}}.
+export const MOVED_TIERS = {};
+export function settleRaidPieces() {
+  for (const [id, cls, kind, name, was] of PENDING.splice(0)) {
+    const line = GEAR[cls][kind];
+    line.push(name);
+    const i = line.length - 1;
+    OWNER[cls][kind][i] = id;
+    ((RAID_TIER[id] = RAID_TIER[id] || {})[cls] = RAID_TIER[id][cls] || {})[kind] = i;
+    const m = (MOVED_TIERS[cls] = MOVED_TIERS[cls] || {})[kind] = MOVED_TIERS[cls][kind] || {};
+    if (was > 0 && m[was] === undefined) m[was] = i; // the first raid (in this order) to name it, as gearPower counted it
+  }
+}
+/** A raid's own piece of a kind for a class: its place in the line (-1: none, a class with no shield). */
+export function raidTier(id, cls, kind) {
+  const t = ((RAID_TIER[id] || {})[cls] || {})[kind];
+  return t === undefined ? -1 : t;
+}
+/** The first place in a line with the same look as this one: a raid's own place (settleRaidPieces)
+ *  wears the look of the place its name was first given, for the maps the build keys by place. */
+export function lookAt(cls, kind, t) {
+  const l = GEAR[cls][kind];
+  return t >= 0 && t < l.length ? l.indexOf(l[t]) : t;
+}
+/** The raid a place in a line belongs to, or undefined. */
+export function raidOwner(cls, kind, tier) {
+  return ((OWNER[cls] || {})[kind] || {})[tier];
+}
+
 /** The tier a worn piece counts as: its place in the line, or its raid set's power. */
 export function gearPower(cls, kind, tier) {
   const name = GEAR[cls][kind][tier];
   if (kind === 'weapon' && name === CRAFT_GEAR[cls]) return CRAFT_POWER;
-  for (const id of Object.keys(RAID_GEAR))
-    if (raidSet(id, cls).some(([k, n]) => k === kind && n === name)) return RAID_GEAR[id].pow;
-  return tier;
+  const id = raidOwner(cls, kind, tier);
+  return id ? RAID_GEAR[id].pow : tier;
 }
 
 // Looks added to a class's line only for crafted pieces: never dropped as they are.
@@ -150,12 +205,12 @@ export function lookTier(cls, kind, name) {
   return i;
 }
 
-/** The places in a line that the hunting grounds hand out, weakest first: no raid or crafted
- *  piece among them, wherever those sit in the line. */
+/** The places in a line that the hunting grounds hand out, weakest first: the line as written,
+ *  less its raid pieces and the 용무기. (By name, a crafted look added to another class's line
+ *  used to take a grounds' piece of the same name out: the 주술사 dropped no shield at all.) */
 export function plainList(cls, kind) {
-  const raid = new Set(Object.keys(RAID_GEAR).flatMap(id => raidSet(id, cls)).filter(([k]) => k === kind).map(([, n]) => n));
-  if (kind === 'weapon') raid.add(CRAFT_GEAR[cls]);
-  return GEAR[cls][kind].map((n, i) => (raid.has(n) || EXTRA_LOOKS.has(n) ? -1 : i)).filter(i => i >= 0);
+  return (WRITTEN[cls] ? WRITTEN[cls][kind] : []).map((n, i) => (raidOwner(cls, kind, i) || (kind === 'weapon' && n === CRAFT_GEAR[cls]) ? -1 : i))
+    .filter(i => i >= 0);
 }
 
 /** How many tiers of a kind the hunting grounds hand out: no raid or crafted-only piece. */
