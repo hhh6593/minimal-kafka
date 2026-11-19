@@ -207,6 +207,9 @@ export const CRAFT_GYEOK = {
   cr_maryeong_weapon: 'gwimunsang',
   // 심판의낫: the PC original's 저주격 on the 청룡 step, 연's 진청룡마령참 격 (blow and heal) on the last.
   cr_judge_weapon: 'jeoju', cr_judge_weapon2: 'maryeongcham',
+  // The original's weapon lines (items.js): the 백제 환두대도 steps a mountain's blow, a fire god's
+  // stun, the sun-and-moon curse; 브리트라한's lightning.
+  cr_baekje_weapon: 'cheonbuyeon', cr_baekje_weapon2: 'hwasin', cr_baekje_weapon3: 'ilwol', cr_brit_weapon: 'nakroe',
   cr_sinsu_cheong: 'cheongrin', cr_sinsu_jujak: 'jujakbisang', cr_sinsu_baekho: 'baekmaeng', cr_sinsu_hyeonmu: 'hyeoncheorong',
 };
 

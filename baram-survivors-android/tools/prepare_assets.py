@@ -612,6 +612,20 @@ def main():
             im.save(os.path.join(out, "gear", f"g{i}.png"), optimize=True)
             manifest["gear"][n[:-4]] = {"id": f"g{i}", "w": im.width, "h": im.height}
 
+    # Item icons by name, made to sit with 연's (GEAR_DIR/gicon/<file>.png + index.json {item name |
+    # "mat:<id>": file}, tools/fetch_icons.py: the official item renders and 연's material icons,
+    # normalised to 연's 32-pixel frame): copied as they are, the manifest maps the names (gicon).
+    gi = os.path.join(gear_src, "gicon") if gear_src else None
+    manifest["gicon"] = {}
+    if gi and os.path.isfile(os.path.join(gi, "index.json")):
+        with open(os.path.join(gi, "index.json"), encoding="utf-8") as f:
+            gidx = json.load(f)
+        os.makedirs(os.path.join(out, "gicon"), exist_ok=True)
+        for key, fn in gidx.items():
+            if os.path.isfile(os.path.join(gi, fn)):
+                shutil.copyfile(os.path.join(gi, fn), os.path.join(out, "gicon", fn))
+                manifest["gicon"][key] = fn
+
     # 바람의나라 연's own spell icons (GEAR_DIR/skillicon/<id>.png): the 8·9차 ones cut from its skill
     # window (tools/skill_icons.py), the 1~4차 ones from the official patch notes' skill tables.
     sdir = os.path.join(gear_src, "skillicon") if gear_src else None
