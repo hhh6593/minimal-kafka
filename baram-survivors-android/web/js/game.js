@@ -6466,7 +6466,7 @@ function talk() {
 const TRAIN_WINDOW = 5; // seconds of the recent DPS
 const TRAIN_RING = 1024;
 const trainT = new Float64Array(TRAIN_RING), trainD = new Float64Array(TRAIN_RING);
-const TRAIN_KIND = { slash: '근접 연타', cleave: '정면 베기', nova: '주위 공격', screen: '화면 전체', spell: '마법', strike: '내려치기',
+const TRAIN_KIND = { slash: '근접 연타', cleave: '정면 베기', nova: '주위 공격', screen: '화면 전체', spell: '마법', spell4: '네 방향 마법', ult: '필살기', strike: '내려치기',
   line: '직선 공격', blink: '이동 공격', buff: '강화', heal: '회복', summon: '소환', aura: '오라', passive: '패시브' };
 
 function startTraining(cls) {
