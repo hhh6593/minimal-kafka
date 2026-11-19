@@ -4091,7 +4091,8 @@ function hurtEnemy(e, dmg, push = null) {
   e.hp -= dmg;
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
   // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
-  if (e.flash > 0 || flashRoom()) e.flash = 0.12;
+  // 수련장: the dummy is struck many times a second; kept white it showed nothing but a white shape.
+  if (!G.training && (e.flash > 0 || flashRoom())) e.flash = 0.12;
   e.shown = G.t;
   if (e.war) War.credit(e, dmg); // 대항전: the hero's contribution
   if (RW) War.raidCredit(e, dmg, e.hp <= 0);
