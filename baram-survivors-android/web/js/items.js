@@ -197,6 +197,7 @@ export const CRAFTS = [
     mats: { soul: 10, scroll: 1 }, gold: 5000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon', kind: 'weapon', name: { warrior: '구곡검', rogue: '협가검', mage: '영후단봉', poet: '대모홍접선', archer: '흑월신궁', lancer: '화첨창', monk: '백운권갑', magus: '흑염곤봉', celestial: '녹옥방천극', dokkaebi: '화룡퇴', reaper: '신월태도' },
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
+    base: { archer: [7100112] }, /* 흑월신궁(치장용): the archer's own 흑월신궁 (the rest wear their 연 item by name already) */
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_gold_armor', kind: 'armor', name: { warrior: '금린천화갑', rogue: '금린천화갑', mage: '금린천추갑', poet: '금린천추갑', archer: '금린천화갑', lancer: '금린천화갑', monk: '금린천화갑', magus: '금린천추갑', celestial: '금린천추갑', dokkaebi: '금린천화갑', reaper: '금린천화갑' },
     look: { warrior: '곤룡포', rogue: '곤룡포', mage: '남자신관복', poet: '남자신관복', archer: '혈귀혼궁포', lancer: '지박귀남자경갑', monk: '지박귀남자대련복', magus: '은현복', celestial: '금고급천의', dokkaebi: '지박귀귀의', reaper: '사저의복' }, pow: 11, opt: 'life', mats: { gold: 12, scroll: 1 }, gold: 6000,
@@ -205,6 +206,7 @@ export const CRAFTS = [
     mats: { gold: 10, scroll: 1 }, gold: 6000, pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_steel_weapon', kind: 'weapon', name: { warrior: '진일신검', rogue: '청일기창', mage: '황염곤봉', poet: '적염곤봉', archer: '한별가온궁', lancer: '백일신창', monk: '섬월권갑', magus: '금홍단봉', celestial: '청월표창', dokkaebi: '백일퇴', reaper: '신일태도' },
     look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 12, opt: 'speed', mats: { steel: 14, scroll: 1 }, gold: 8000,
+    base: { archer: [230007] }, /* 한별가온궁(치장용). 청일기창·황염곤봉 wear their 진' (연's own 치장용 copies have no strike frames for the rig) */
     pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_steel_armor', kind: 'armor', name: { warrior: '태염무신장갑', rogue: '태염무신장갑', mage: '태광천신의복', poet: '태광천신의복', archer: '태염무신장갑', lancer: '태염무신장갑', monk: '태염무신장갑', magus: '태광천신의복', celestial: '태광천신의복', dokkaebi: '태염무신장갑', reaper: '태염무신장갑' },
     look: { warrior: '궁중무사갑주', rogue: '궁중무사갑주', mage: '여자성광법의', poet: '남자성광법의', archer: '숲의군주궁포', lancer: '금고급남자경갑', monk: '숲의군주남자대련복', magus: '상급마도현복', celestial: '숲의군주천의', dokkaebi: '숲의군주귀의', reaper: '지박귀흑의' }, pow: 12, opt: 'mana', mats: { steel: 14, scroll: 1 }, gold: 8000,
@@ -223,9 +225,12 @@ export const CRAFTS = [
   { id: 'cr_steel_cape', kind: 'cape', name: { warrior: "무신귀갑주", rogue: "무신귀갑주", mage: "천신부금장", poet: "천신부금장", archer: '무신귀갑주', lancer: '무신귀갑주', monk: '무신귀갑주', magus: '천신부금장', celestial: '천신부금장', dokkaebi: '무신귀갑주', reaper: '무신귀갑주' }, look: { warrior: "무신귀갑주1성", rogue: "무신귀갑주1성", mage: "천신부금장1성", poet: "천신부금장1성", archer: '무신귀갑주1성', lancer: '무신귀갑주1성', monk: '무신귀갑주1성', magus: '천신부금장1성', celestial: '천신부금장1성', dokkaebi: '무신귀갑주1성', reaper: '무신귀갑주1성' }, pow: 12, opt: 'boss', mats: { steel: 12, scroll: 1 }, gold: 8000,
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_dragon_helm', kind: 'helmet', name: { warrior: "용아투구'마", rogue: "용아투구'천", mage: "용아천관'랑", poet: "용아천관'겸", archer: "용아투구'섬", lancer: "진용아투구'무", monk: "진용아투구'비", magus: "진용아천관'화", celestial: "진용아천관'주", dokkaebi: "진용아투구'린", reaper: "진용아투구'영" }, look: { warrior: "용아투구'마1성", rogue: "용아투구'천1성", mage: "용아천관'랑1성", poet: "용아천관'겸1성", archer: "용아투구'천1성", lancer: "용아투구'천1성", monk: "용아투구'천1성", magus: "용아천관'겸1성", celestial: "용아천관'겸1성", dokkaebi: "용아투구'천1성", reaper: "용아투구'천1성" }, pow: 13, opt: 'power', mats: { essence: 12, scale: 15, pearl: 1 }, gold: 15000,
+    /* 연's own 진용아 helmets (치장용) of each class: 연 has no plain 용아 helmet, its line starts at 진 */
+    base: { warrior: [7100628], rogue: [7100629], mage: [7100630], poet: [7100631], archer: [7100633], lancer: [7100634], monk: [7100632], magus: [341015], celestial: [7100635], dokkaebi: [7100636], reaper: [7100649] },
     pic: 'name', steps: [1, 3, 5, 7, 10], legend: true },
   { id: 'cr_gold_weapon2', kind: 'weapon', name: { warrior: '마곡검', rogue: '패협검', mage: '백선마봉', poet: '암혈홍접선', archer: '흑일신궁', lancer: "화첨창'청", monk: "진'백운권갑", magus: "진'흑염곤봉", celestial: '흑옥방천극', dokkaebi: '멸룡퇴', reaper: '사혼태도' },
     look: { warrior: '청룡의검', rogue: '백화검', mage: '해룡의지팡이', poet: '흑단부채', archer: '파천비궁', lancer: '파천비창', monk: '파천권갑', magus: '파천비단봉', celestial: '파천비포', dokkaebi: '파천퇴', reaper: '파천비명도' }, pow: 13, opt: 'guard', from: 'cr_gold_weapon',
+    base: { warrior: [7100518], rogue: [7100519], poet: [7100521], archer: [7100299] }, /* 마곡검·패협검·암혈홍접선·흑일신궁(치장용) */
     mats: { gold: 20, kalpa: 15, scroll: 2 }, gold: 15000, pic: 'name', legend: true },
   { id: 'cr_dragon_armor2', kind: 'armor', name: { warrior: '용마멸아갑', rogue: '용천멸아갑', mage: '용랑멸아의', poet: '용겸멸아의', archer: '용섬멸아복', lancer: '용무멸아갑', monk: '용비멸아갑', magus: '용화멸아의', celestial: '용주멸아단', dokkaebi: '용린멸아갑', reaper: '용라멸아갑' },
     look: '용왕의용포', base: { warrior: [7100676], rogue: [7100678], mage: [7100682], poet: [7100680], archer: [7100686], lancer: [7100688], monk: [7100552], magus: [342043], celestial: [7100690], dokkaebi: [7100692], reaper: [7100694] }, pow: 13, opt: 'life', from: 'cr_dragon_armor', mats: { essence: 15, scale: 20, pearl: 2 }, gold: 20000,
@@ -234,6 +239,7 @@ export const CRAFTS = [
     mats: { essence: 10, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', steps: [1, 3, 5, 7, 9], legend: true },
   { id: 'cr_steel_weapon2', kind: 'weapon', name: { warrior: "극'진일신검", rogue: "극'청일기창", mage: "극'황염곤봉", poet: "극'적염곤봉", archer: "극'한별가온궁", lancer: "극'백일신창", monk: "섬월권갑'폭", magus: "금홍단봉'화", celestial: "극'청월표창", dokkaebi: "진'백일퇴", reaper: "극'신일태도" },
     look: { warrior: '일월대도', rogue: '삼첨도', mage: '백운장', poet: '하늘개비', archer: '진아광궁', lancer: '진아광창', monk: '경원권갑', magus: '진아광단봉', celestial: '아광포', dokkaebi: '아광퇴', reaper: '진아광백도' }, pow: 13, opt: 'haste', from: 'cr_steel_weapon',
+    base: { warrior: [7100310] }, /* 극'진일신검(치장용) */
     mats: { steel: 24, kalpa: 20, scroll: 2 }, gold: 20000, pic: 'name', legend: true },
   // 사신수 지존 장비 (the original: 청룡신검 the 전사's, 주작선장 the 주술사's, 백호환령부 — the
   // fastest mount, worn here as a mantle — and 현무불괴갑 anyone's). Each carries its 신수's 격.
@@ -256,6 +262,30 @@ for (const c of CRAFTS) {
   // Put the look on every class's line now, so the loader fetches its sheets with the rest.
   for (const k of CLASSES) specialBase(sp, k.id);
 }
+
+// Worn looks where 연's own item layer (yhero2's map) is missing or broken, as 연's 치장용 copy of
+// the piece or its nearest kin (game.js yGearVariants; the icon follows the look, game.js wornIcon).
+// The 용무기 by step, where the build's map repeats a lower step's sword (연's 칠~십 have no plain
+// layer for these classes): {cls: {step: costume id}}.
+export const DRAGON_LOOK = {
+  warrior: { 7: 7100286, 8: 7100528, 9: 7100538, 10: 7100655 },
+  rogue: { 7: 7100287, 8: 7100529, 9: 7100539, 10: 7100656 },
+  mage: { 7: 7100288, 8: 7100530, 9: 7100540 },
+  poet: { 7: 7100289, 8: 7100531, 9: 7100541, 10: 7100658 },
+  archer: { 4: 7100283 },
+  reaper: { 9: 7100640, 10: 7100664 },
+};
+// A slot's look by its variant (or the piece's name): {cls: {kind: {variant | name: costume id}}}.
+// 용마제육투구 (202037) and 용천제사·제육투구 (202041, 202043) came out of the build drawn wrong (a
+// flower, a straw hat): the 제사 as its 치장용, the 제육 (no 치장용) as the 제칠's. The 격투가's and
+// 천인's 용왕의용포 has no outfit of its own in the build (the others wear their 멸아): the 멸아
+// look their dragon armour wears.
+export const LOOK_FIX = {
+  warrior: { helmet: { 202037: 7100608 } },
+  rogue: { helmet: { 202041: 7100381, 202043: 7100609 } },
+  monk: { armor: { 용왕의용포: 7100552 } },
+  celestial: { armor: { 용왕의용포: 7100690 } },
+};
 
 /**
  * What a crafted piece's next star costs. Old-style pieces: their recipe's first material.
