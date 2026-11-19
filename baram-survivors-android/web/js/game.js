@@ -12,7 +12,7 @@ import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, cost
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
-  RARITY, loadAbyssLoot, rollAbyssItem, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
+  RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine,
 } from './items.js';
 import {
@@ -1026,8 +1026,14 @@ function applyGear() {
   const ws = g.weaponSp && SPECIAL[g.weaponSp];
   const far = !MELEE_WEAPON.has(c), set = ABYSS_SWING[far ? 'ranged' : 'melee'];
   const have = layers => layers.filter(l => M.fx[l[0]]);
-  p.swing = ws && ws.swing && have(set.hit).length ? { ...ws.swing, hit: have(set.hit), heavy: ws.swing.heavy ? have(set.heavy) : null } : null;
-  p.trail = far && ws && ws.rarity && have(ABYSS_TRAIL.layers).length ? { ...ABYSS_TRAIL, layers: have(ABYSS_TRAIL.layers) } : null;
+  const fxTint = ws && ws.dress && ws.dress.fxTint || null; // a filter, or one per effect (TAECHO_DRESS)
+  p.swing = ws && ws.swing && have(set.hit).length ? { ...ws.swing, hit: have(set.hit), heavy: ws.swing.heavy ? have(set.heavy) : null, tint: fxTint } : null;
+  p.trail = far && ws && ws.rarity && have(ABYSS_TRAIL.layers).length ? { ...ABYSS_TRAIL, layers: have(ABYSS_TRAIL.layers), tint: fxTint } : null;
+}
+
+/** A weapon's strike-effect filter for effect id: one for all, or by effect (with a default). */
+function fxTintOf(t, id) {
+  return t && typeof t === 'object' ? t[id] || t.default : t || null;
 }
 
 /** A 격's weight: the hero's own blow at their level (the 격 power multiplies it; might() is
@@ -1054,12 +1060,12 @@ function gyeokProc(on, t) {
       G.swingAt = G.t + w.cd;
       w.hit.forEach(([id, sc, dy, dl], i) => {
         const [x, y] = at(i ? 0.95 : 0.6, dy);
-        addFx(id, x, y, { scale: sc * w.scale * ABYSS_FX_K, delay: land + dl, rot: melee && !i ? ang - Math.PI / 2 : 0 });
+        addFx(id, x, y, { scale: sc * w.scale * ABYSS_FX_K, delay: land + dl, rot: melee && !i ? ang - Math.PI / 2 : 0, tint: fxTintOf(w.tint, id) });
       });
     }
     if (w.heavy && w.heavy.length && G.t >= (G.heavyAt || 0)) {
       G.heavyAt = G.t + w.hcd;
-      for (const [id, sc, dy, dl] of w.heavy) { const [x, y] = at(0.9, dy); addFx(id, x, y, { scale: sc * ABYSS_FX_K, delay: land + dl }); }
+      for (const [id, sc, dy, dl] of w.heavy) { const [x, y] = at(0.9, dy); addFx(id, x, y, { scale: sc * ABYSS_FX_K, delay: land + dl, tint: fxTintOf(w.tint, id) }); }
     }
   }
   if (!p.gyeoks || !p.gyeoks.length || !t || !t.m) return;
@@ -1295,7 +1301,61 @@ function yItemIcon(cls, kind, t, spId) {
   const f = key && idx[key];
   return f ? 'assets/yitemicon/' + f : null;
 }
+/** 태초의 무기's icon: the very weapon the hero wears (its 연 layer, standing, facing down) in its
+ *  gold-white dress and light, cut to the weapon. Made once a class; null until the sheet is in. */
+const taechoIcons = {};
+function taechoIcon(cls, sp) {
+  if (taechoIcons[cls.id]) return taechoIcons[cls.id];
+  const H = M.yhero2 && M.yhero2[cls.id], ab = sp.base && sp.base[cls.id];
+  const meta = H && ab && H.layers.weapon[String(ab[0])];
+  if (!meta) return null;
+  const path = 'yhero2/' + meta.file;
+  if (!(path in images)) loadImage(path);
+  const im = images[path];
+  if (!im || !im.complete || !im.width) return null;
+  const a = H.anims.idle_down || H.anims.walk_down, box = frameBox(H, [meta]), dz = sp.dress;
+  const sheets = { weapon: { im: dressedSheet(im, path, dz.tint, dz.pal), meta } };
+  if (H.layers.wback && H.layers.wback[String(ab[0])]) {
+    const wb = H.layers.wback[String(ab[0])], wp = 'yhero2/' + wb.file;
+    if (!(wp in images)) loadImage(wp);
+    if (images[wp] && images[wp].width) sheets.wback = { im: dressedSheet(images[wp], wp, dz.tint, dz.pal), meta: wb };
+  }
+  const w = document.createElement('canvas');
+  w.width = box.cw;
+  w.height = box.ch;
+  drawLayers(w.getContext('2d'), H, sheets, a, 0, box);
+  let bb;
+  try {
+    const d = w.getContext('2d').getImageData(0, 0, w.width, w.height).data;
+    let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+    for (let y = 0; y < w.height; y++) for (let x = 0; x < w.width; x++) if (d[(y * w.width + x) * 4 + 3] > 30) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    if (x1 < 0) return null;
+    bb = [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+  } catch (e) { return null; }
+  const pad = 8, c = document.createElement('canvas');
+  c.width = bb[2] + pad * 2;
+  c.height = bb[3] + pad * 2;
+  const g = c.getContext('2d'), tint = (col, blur, al) => {
+    const r = document.createElement('canvas');
+    r.width = c.width; r.height = c.height;
+    const rg = r.getContext('2d');
+    rg.drawImage(w, bb[0], bb[1], bb[2], bb[3], pad, pad, bb[2], bb[3]);
+    rg.globalCompositeOperation = 'source-in';
+    rg.fillStyle = col;
+    rg.fillRect(0, 0, r.width, r.height);
+    g.save(); g.filter = `blur(${blur}px)`; g.globalAlpha = al; g.drawImage(r, 0, 0); g.drawImage(r, 0, 0); g.restore();
+  };
+  tint(dz.glowColor, 4, 0.9);
+  tint(dz.core, 1, 0.9);
+  g.drawImage(w, bb[0], bb[1], bb[2], bb[3], pad, pad, bb[2], bb[3]);
+  return (taechoIcons[cls.id] = c.toDataURL());
+}
+
 function pieceIcon(cls, kind, t, spId) {
+  if (spId && SPECIAL[spId] && SPECIAL[spId].taecho) {
+    const ic = taechoIcon(cls, SPECIAL[spId]);
+    if (ic) return ic;
+  }
   // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
   const ab = spId && SPECIAL[spId] && SPECIAL[spId].base && SPECIAL[spId].base[cls.id];
   const abIt = ab && costumeItems()[ab[0]];
@@ -4014,9 +4074,12 @@ function rollAbyss(e) {
   const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
   if (!cowKing && !(Math.random() < (ABYSS_DROP[e.kind] || 0))) return;
   progress.abyssLoot = progress.abyssLoot || {};
-  const sp = rollAbyssItem(progress.abyssLoot, G.level, cowKing ? 'cow' : null);
-  G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: RARITY.unique.color });
-  say(`${RARITY.unique.name} 아이템이 떨어졌습니다!`, 'warn');
+  // 태초의 무기: from the 세계석 요새's lord or the 소 왕, now and then, in place of their own.
+  const taecho = e.kind === 'boss' && (G.stage.id === 'abyss4' || cowKing) && Math.random() < taechoChance();
+  const sp = rollAbyssItem(progress.abyssLoot, G.level, taecho ? 'taecho' : cowKing ? 'cow' : null);
+  G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: taecho ? '#fff1c0' : RARITY.unique.color });
+  if (taecho) { say(`태초의 무기가 떨어졌습니다! (${specialName(sp, G.cls.id)})`, 'warn'); banner('태초의 무기'); }
+  else say(`${RARITY.unique.name} 아이템이 떨어졌습니다!`, 'warn');
 }
 
 /** Materials of the ground's kind: a few from bosses, sometimes from the strong ones. */
@@ -7613,7 +7676,7 @@ function addFx(id, x, y, o = {}) {
   // and much to draw.
   if (area > 12000 && G.fxs.filter(f => f.id === id).length >= 4) return life;
   G.fxs.push({ id, x, y, t: -(o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
-    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip });
+    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint });
   return life;
 }
 
@@ -7626,7 +7689,7 @@ function fxFrame(d, t, loop) {
   return d.length - 1;
 }
 
-function drawFx(id, x, y, t, scale, rot, anchor, loop, flip) {
+function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const f = M.fx[id];
   const im = images[`fx/${f.src || id}.png`];
   const i = fxFrame(durs(id), t, loop);
@@ -7636,7 +7699,7 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip) {
   const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
   ctx.save();
   if (f.add) ctx.globalCompositeOperation = 'lighter';
-  const pic = f.tint ? tinted(im, f.tint) : im;
+  const pic = tint || f.tint ? tinted(im, tint || f.tint) : im;
   // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks.
   if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
   ctx.translate(x, y);
@@ -7946,6 +8009,7 @@ function yGearVariants(cls, gear) {
     const lt = sp && SPECIAL[sp] && SPECIAL[sp].lookTier && SPECIAL[sp].lookTier[cls.id];
     const ab = sp && SPECIAL[sp] && SPECIAL[sp].base && SPECIAL[sp].base[cls.id];
     if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
+    else if (ab && kind === 'weapon' && H.layers[kind] && H.layers[kind][String(ab[0])]) v = String(ab[0]);
     else if (lt !== undefined && lt !== null && map['t' + lt]) v = map['t' + lt];
     else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
     else if (kind === 'weapon' && t === dragonTier(cls)) v = map['dragon' + starOf(cls, `weapon:${t}`)] || map['t' + t];
@@ -7978,7 +8042,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
       if (kind === 'body' || kind === 'head') return false;
       continue;
     }
-    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(im, path, dz.tint) : im, meta };
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(im, path, dz.tint, dz.pal) : im, meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
@@ -8002,7 +8066,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   // The layers composited once per frame and kept: six draws from big sheets each frame (연's
   // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
   const key = cls.id + JSON.stringify(want) + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
-    + (dz ? '|d' + dz.tint : '');
+    + (dz ? '|d' + dz.tint + (dz.pal || '') : '');
   let pic = heroFrames.get(key);
   if (!pic) {
     const c = document.createElement('canvas');
@@ -8029,8 +8093,8 @@ const heroFrames = new Map();
 // as the hero's are) gets a red glow under the weapon and its blade points: a few spots spread along
 // the weapon's long axis in that very cell, so the fire follows the blade in every direction and frame.
 const dressSheets = new Map();
-function dressedSheet(im, path, t) {
-  const k = path + '|' + t;
+function dressedSheet(im, path, t, pal) {
+  const k = path + '|' + t + '|' + (pal || '');
   let c = dressSheets.get(k);
   if (c) return c;
   c = document.createElement('canvas');
@@ -8043,7 +8107,10 @@ function dressedSheet(im, path, t) {
     for (let i = 0; i < p.length; i += 4) {
       if (!p[i + 3]) continue;
       const l = (0.3 * p[i] + 0.59 * p[i + 1] + 0.11 * p[i + 2]) / 255;
-      const r = Math.min(235, Math.max(8, Math.pow(l, 1.6) * 330)), gg = Math.min(140, Math.max(0, (l - 0.6) * 260)), b = Math.min(20, l * 12);
+      // 태초 (pal gold): pale gold, lighter, the shading kept; the abyss: black, blood and embers.
+      const r = pal === 'gold' ? Math.min(255, 150 + l * 130) : Math.min(235, Math.max(8, Math.pow(l, 1.6) * 330));
+      const gg = pal === 'gold' ? Math.min(248, 115 + l * 140) : Math.min(140, Math.max(0, (l - 0.6) * 260));
+      const b = pal === 'gold' ? Math.min(225, 40 + l * 170) : Math.min(20, l * 12);
       p[i] += (r - p[i]) * t;
       p[i + 1] += (gg - p[i + 1]) * t;
       p[i + 2] += (b - p[i + 2]) * t;
@@ -8093,19 +8160,31 @@ function dressFrame(c, H, sheets, a, f, box, dz, key) {
     const rg = r.getContext('2d');
     rg.drawImage(w, 0, 0);
     rg.globalCompositeOperation = 'source-in';
-    rg.fillStyle = '#ff2a0a';
+    rg.fillStyle = dz.glowColor || '#ff2a0a';
     rg.fillRect(0, 0, r.width, r.height);
     g.drawImage(r, 0, 0);
     g.drawImage(r, 0, 0);
+    // 태초: a wider gold light, and a white core hugging the weapon.
+    if (dz.core) {
+      g.filter = 'blur(5px)';
+      g.drawImage(r, 0, 0);
+      rg.fillStyle = dz.core;
+      rg.fillRect(0, 0, r.width, r.height);
+      g.filter = 'blur(1px)';
+      g.globalAlpha = Math.min(1, dz.glow * 1.1);
+      g.drawImage(r, 0, 0);
+    }
     g.restore();
   }
 }
 // The fire: 연's archer 화염벽, each of its frames cut into its three tongues, deepened to blood orange.
+const flameSets = new Map();
 let flameTongues = null;
-function tongues() {
+function tongues(color = '#ff8c4c') {
+  flameTongues = flameSets.get(color) || null;
   if (flameTongues) return flameTongues.length ? flameTongues : null;
   const fm = M.fx.k_a_firewall, path = fm && `fx/${fm.src || 'k_a_firewall'}.png`;
-  if (!fm) return (flameTongues = []), null;
+  if (!fm) return flameSets.set(color, []), (flameTongues = []), null;
   if (!(path in images)) loadImage(path);
   const im = images[path];
   if (!im || !im.complete || !im.width) return null;
@@ -8119,17 +8198,20 @@ function tongues() {
       const g = c.getContext('2d');
       g.drawImage(im, sx + t * tw, sy, tw, fm.h, 0, 0, tw, fm.h);
       g.globalCompositeOperation = 'multiply';
-      g.fillStyle = '#ff8c4c';
+      g.fillStyle = color;
       g.fillRect(0, 0, tw, fm.h);
+      // 태초's light: the tongue's own shape, lifted to gold-white.
+      if (color !== '#ff8c4c') { g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45; g.fillRect(0, 0, tw, fm.h); g.globalAlpha = 1; }
       g.globalCompositeOperation = 'destination-in';
       g.drawImage(im, sx + t * tw, sy, tw, fm.h, 0, 0, tw, fm.h);
       out.push(c);
     }
   }
+  flameSets.set(color, out);
   return (flameTongues = out);
 }
 function drawBladeFlames(pts, ox, oy, dz) {
-  const T = pts && pts.length && tongues();
+  const T = pts && pts.length && tongues(dz.pal === 'gold' ? '#ffe7a0' : undefined);
   if (!T) return;
   const now = performance.now() / 70;
   for (let j = 0; j < pts.length; j++) {
@@ -8667,7 +8749,7 @@ function render(now) {
       if (trail && k < 1 && !f.trailFx && G.t >= (f.trailAt || 0) && puffs.length < 6) { f.trailAt = G.t + trail.cd; puffs.push([x, y]); }
     }
     if (f.alpha) ctx.globalAlpha = f.alpha;
-    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip);
+    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip, f.tint);
     ctx.globalAlpha = 1;
   }
   // 공대: the spells of twenty-five hid the boss. Its shape again, faint, over them.
@@ -8677,7 +8759,7 @@ function render(now) {
   }
   if (trail) {
     for (const sh of G.shots) if (sh.mine && G.t >= (sh.trailAt || 0) && puffs.length < 8) { sh.trailAt = G.t + trail.cd; puffs.push([sh.x, sh.y]); }
-    for (const [x, y] of puffs) for (const [id, sc] of trail.layers) { addFx(id, x, y, { scale: sc * trail.scale }); G.fxs[G.fxs.length - 1].trailFx = true; }
+    for (const [x, y] of puffs) for (const [id, sc] of trail.layers) { addFx(id, x, y, { scale: sc * trail.scale, tint: fxTintOf(trail.tint, id) }); G.fxs[G.fxs.length - 1].trailFx = true; }
   }
   ctx.font = '8px G7';
   ctx.textAlign = 'center';
@@ -9811,6 +9893,8 @@ window.__abyssDrop = u => {
   return sp.id;
 };
 window.__openPortal = t => openPortal(t);
+window.__wear = (k, t, sp) => wear(k, t, sp); // test: put on a piece
+window.__pieceIcon = (k, t, sp) => pieceIcon(G.cls, k, t, sp); // test: its icon
 window.__silentSkills = () => {
   const has = n => (Array.isArray(n) ? n : [n]).some(x => x && x !== '-' && audio.has(String(x).split('@')[0]));
   return Object.entries(SKILLS).filter(([id, d]) => d.kind !== 'passive' && !has(audio.map['skill_' + id]))

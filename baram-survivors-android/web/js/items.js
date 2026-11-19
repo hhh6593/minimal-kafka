@@ -89,7 +89,7 @@ export function specialBase(sp, cls) {
 
 export function specialName(sp, cls) {
   if (sp.craft) return typeof sp.craft.name === 'string' ? sp.craft.name : sp.craft.name[cls];
-  if (sp.rarity) return abyssName(sp);
+  if (sp.rarity) return abyssName(sp, cls);
   return `${PREFIX[sp.src]} ${GEAR[cls][sp.kind][specialBase(sp, cls)]}`;
 }
 
@@ -396,17 +396,41 @@ export const ABYSS_UNIQUES = [
   { u: 'baal', name: '바알의 세계석 조각', opts: ['power', 'haste', 'guard'], gyeok: 'jiok' },
   { u: 'tyrael', name: '티리엘의 맹세', opts: ['speed', 'regen', 'haste'], gyeok: 'nakroe' },
   { u: 'cow', name: '소 왕의 뿔', opts: ['power', 'magnet'], gyeok: 'gijeol' },
+  // 태초의 무기: the 일본 1차 weapons of old, one per class and no 성, as they were at the beginning,
+  // in a golden-white light (TAECHO_DRESS). Only the 세계석 요새's lord and the 소 왕 drop them.
+  { u: 'taecho', name: 'TAECHO', opts: ['power', 'haste', 'life'], gyeok: 'cheonja', taecho: true },
 ];
+// 태초의 무기's look: an old 바람 weapon in 연's own drawing for the class (its plain id in the hero's
+// layers), and its name. The first four: their 일본 1차 weapons. The classes old 바람 lacked: an old
+// weapon 연 draws for them that suits them (금홍단봉, 청월표창, 신일태도 are old 바람's too; the
+// 도깨비 the 청룡의검, the 창술사 the long 흑단화염장). The 궁사 and 권사 have no old weapon 연 draws:
+// their 일본 line's (흑일 bow, 섬월권갑).
+export const TAECHO_BASE = {
+  warrior: [1171, '진일신검'], rogue: [1272, '청일기창'], mage: [1372, '황염곤봉'], poet: [1471, '적염곤봉'],
+  archer: [220077, "극'흑일신궁"], lancer: [1324, '흑단화염장'], monk: [70025, '섬월권갑'], magus: [330064, '금홍단봉'],
+  celestial: [260048, '청월표창'], dokkaebi: [1020, '청룡의검'], reaper: [310026, '신일태도'],
+};
+// pal: the recolour (pale gold, the weapon's own shading kept); glowColor and the white core; the
+// sparks along the blade are 연's own fire tongues turned to gold-white light; fx: the strike's
+// effects (the abyss ones) in gold-white.
+export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
+    // the dark ones (smoke, the dark burst) turned over first: their black becomes light
+    k_ab_smoke: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)',
+    k_ab_darkburst: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)' } };
+const TAECHO_DROP = 0.3;
+export function taechoChance() { return TAECHO_DROP; }
 const OPT_BY = Object.fromEntries(OPTIONS.map(o => [o.id, o]));
 
 function registerAbyss(id, d) {
   const un = ABYSS_UNIQUES.find(x => x.u === d.u) || ABYSS_UNIQUES[0];
   const opts = un.opts.filter(o => OPT_BY[o]);
+  const T = un.taecho;
   SPECIAL[id] = { id, src: 'abyss', srcName: '끝없는 지옥', raid: false, kind: d.kind, rank: d.rank, rarity: d.rarity,
     opts, opt: { id: opts[0], text: opts.map(o => OPT_BY[o].text).join(' · ') }, gyeok: un.gyeok,
-    ward: null, abName: un.name,
+    ward: null, abName: T ? Object.fromEntries(Object.entries(TAECHO_BASE).map(([c, [, n]]) => [c, '태초의 ' + n])) : un.name,
+    taecho: !!T,
     // The look on the hero (a plain weapon's) and the strike's effect.
-    lookTier: ABYSS_LOOK_TIER.dark, base: ABYSS_BASE, dress: ABYSS_DRESS, swing: SWING_OF };
+    lookTier: ABYSS_LOOK_TIER.dark, base: T ? TAECHO_BASE : ABYSS_BASE, dress: T ? TAECHO_DRESS : ABYSS_DRESS, swing: SWING_OF };
   return SPECIAL[id];
 }
 
@@ -415,7 +439,7 @@ function registerAbyss(id, d) {
 export function loadAbyssLoot(loot) {
   for (const [id, d] of Object.entries(loot || {})) {
     if (d.rarity !== 'unique' || !ABYSS_UNIQUES.some(x => x.u === d.u)) {
-      const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow');
+      const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow' && x.u !== 'taecho');
       let h = 0;
       for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
       d.rarity = 'unique';
@@ -430,7 +454,7 @@ export function loadAbyssLoot(loot) {
 /** A new abyss weapon, kept; returns its special. One of the uniques (not the 소 왕's horn, which
  *  only he drops) unless named. */
 export function rollAbyssItem(loot, rank, uniq = null) {
-  const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow');
+  const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow' && x.u !== 'taecho');
   const d = { kind: 'weapon', rarity: 'unique', rank, u: uniq || pool[Math.floor(Math.random() * pool.length)].u };
   let n = Object.keys(loot).length + 1;
   while (loot['ab' + n]) n++;
@@ -438,8 +462,8 @@ export function rollAbyssItem(loot, rank, uniq = null) {
   return registerAbyss('ab' + n, d);
 }
 
-function abyssName(sp) {
-  return sp.abName;
+function abyssName(sp, cls) {
+  return typeof sp.abName === 'object' ? sp.abName[cls] || sp.abName.warrior : sp.abName;
 }
 
 // ---------------------------------------------------------------- weapon families
