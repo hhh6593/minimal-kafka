@@ -5,6 +5,7 @@ asset a ground of tools/yeon_grounds.json needs.
     yeon_grounds.py survey DEC_DIR OUT.json         every 연 hunting map and what it holds
     yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR [ID ...]   (only those grounds / raids)
     yeon_grounds.py arena DEC_DIR GEAR_DIR [ID ...]      bounded fields from 연's maps (yhunt/)
+    yeon_grounds.py ambient DEC_DIR GEAR_DIR             weather particles from 연's FXs (yamb/)
 
 DEC_DIR holds the decrypted bundles (tools/yeon_dexor.py): Commons, Units, Image, Sounds and the
 Maps_* bundles.
@@ -342,11 +343,32 @@ def arena(dec, gear, only=None):
         json.dump(index, f, ensure_ascii=False, separators=(',', ':'))
 
 
+# 사냥 대개편 P5: 연's own weather particles (FXs.unity3d textures) for the hunting grounds' groups.
+AMBIENT = ['weather_snow', 'csg04_rain', 'bubble_blue', 'csg04_leaf', 'weather_tachukbo', 'fog3']
+
+
+def ambient(dec, gear):
+    """GEAR_DIR/yamb/<name>.png: the snow, rain, bubble, leaf, dust and fog textures of 연's FXs."""
+    import UnityPy
+    d = os.path.join(gear, 'yamb')
+    os.makedirs(d, exist_ok=True)
+    env = UnityPy.load(os.path.join(dec, 'FXs.unity3d'))
+    for k, v in env.container.items():
+        base = k.rsplit('/', 1)[-1]
+        if base.endswith('.png') and base[:-4] in AMBIENT:
+            o = v.read()
+            if type(o).__name__ == 'Texture2D':
+                o.image.save(os.path.join(d, base))
+                print('ambient', base, o.image.size)
+
+
 def main():
     if sys.argv[1] == 'survey':
         survey(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'build':
         build(*sys.argv[2:])
+    elif sys.argv[1] == 'ambient':
+        ambient(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'arena':
         arena(sys.argv[2], sys.argv[3], sys.argv[4:] or None)
     else:

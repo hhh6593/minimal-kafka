@@ -22,7 +22,7 @@ export const PACE = {
   champsAt: [0.12, 0.5, 0.82], minisAt: [0.32, 0.68],
   open: 1.6, openHp: 0.6,    // 1막: the field at the gate ×1.6, each weaker
   floorT: [20, 110],         // the gauge's ceiling: (t - 20) / 110
-  boss: { cap: 0.03, decayAt: 75, decay: 0.006, enrageAt: 90, killAt: 150, fight: 46, lo: 0.4, hi: 2.6 },
+  boss: { cap: 0.03, decayAt: 75, decay: 0.006, enrageAt: 90, killAt: 150, fight: 40, lo: 0.4, hi: 1.8 },
   groggy: { fill: 0.25, stun: 3, take: 1.5 },
   share: 0.5,                // a red tile in a hunt takes half a raid's share
 };
@@ -69,6 +69,9 @@ function start(G) {
     bigDmg: 0, bigTime: 0, bonusLv: 0, beat: 0,
   };
   G.phase = 0;
+  arenaStart(G);
+  ambientLoad(G);
+  modeStart(G);
   // The old clock's leaders and champions are the gauge's now.
   G.minis = [];
   G.champs = [];
@@ -111,7 +114,7 @@ function gain(k) {
 function release() {
   const G = A.G(), H = G.hunt;
   if (!H || !H.bank) return;
-  const room = Math.max(0, Math.min(1, (G.t - PACE.floorT[0]) / PACE.floorT[1]) - H.prog);
+  const room = Math.max(0, Math.min(1, (G.t - (H.floor0 ?? PACE.floorT[0])) / PACE.floorT[1]) - H.prog);
   const k = Math.min(room, H.bank);
   H.prog = Math.min(1, H.prog + k);
   H.bank -= k;
@@ -134,6 +137,7 @@ function tough() {
 function xpK() {
   const G = A.G(), H = G.hunt;
   if (!H) return 1;
+  if (H.mode === 'rush') return 0; // 보스 직행: no experience (the build comes made)
   const t = G.t, act = H.act === 1 ? (t < 15 ? 2.5 : 2.5 - (Math.min(t, PACE.act1End) - 15) / (PACE.act1End - 15)) : H.act === 2 ? 1.15 : 0.9;
   // A steeper climb past 20: the run ends about Lv 30~38, each card weighing more.
   return act * surgeK() / (1 + 0.1 * Math.max(0, G.player.lvl - 20));
@@ -145,7 +149,7 @@ function spawn(dt) {
   const G = A.G(), H = G.hunt, t = G.t;
   const boss = G.bossT !== undefined;
   const ct = clock();
-  const floor = Math.round((boss ? 25 : A.floorCount(ct) * (H.act === 1 ? PACE.open : 1)) * (A.pactOn('horde') ? 1.35 : 1));
+  const floor = Math.round((boss ? 25 : A.floorCount(ct) * (H.act === 1 ? PACE.open : 1)) * (A.pactOn('horde') ? 1.35 : 1) * (G.arena ? 0.8 : 1));
   for (let i = 0; i < 4 && G.enemies.length < floor; i++) {
     const e = A.addEnemy(A.pickMonster());
     if (e && H.act === 1) { e.hp *= PACE.openHp; e.maxHp *= PACE.openHp; }
@@ -212,11 +216,12 @@ function beats(dt) {
     H.crossed = true;
     crossroad();
   }
-  if (H.act === 1 && t >= PACE.act1End) {
+  if (H.act === 1 && t >= PACE.act1End && H.mode !== 'rush') {
     H.act = 2;
     note('act2');
     goalStart();
   }
+  if (H.rushGoal && t >= H.rushGoal) { H.rushGoal = 0; goalStart(); }
   if (H.act === 2) { goalTick(dt); hazardTick(); }
   affixTick();
   breakTick();
@@ -235,7 +240,7 @@ function beats(dt) {
     else { if (k === 'treasure') H.treasures++; A.huntEvent(k); }
   }
   // The boss is called: at 100%, or at the latest by 3:30 (a weak hero still gets there).
-  if (H.warnAt === null && H.act >= 2 && (H.prog >= 1 || t >= PACE.maxBoss)) {
+  if (H.warnAt === null && H.act >= 2 && (H.prog >= 1 || t >= (H.maxBoss || PACE.maxBoss))) {
     H.warnAt = t;
     A.banner(`${G.boss.name}의 기운이 다가온다!`);
     A.say(`토벌도가 가득 찼습니다. ${A.josa(G.boss.name, '이', '가')} 나타납니다!`, 'warn');
@@ -387,12 +392,12 @@ function takeK(e) {
 function tick(dt) {
   sample();
   const G = A.G(), H = G.hunt;
-  if (H) { momentumTick(); release(); }
+  if (H) { momentumTick(); release(); unstick(); }
   if (!H || H.act >= 3 || !dt) return;
   const p = G.player;
   let n = 0;
   for (const e of G.enemies) if ((e.kind === 'champ' || e.kind === 'mini') && Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 5) n++;
-  if (n) H.bigTime += dt * Math.sqrt(n);
+  if (n) H.bigTime += dt * Math.pow(n, 0.8); // (a crowd-striker hits the whole pack at once)
 }
 
 /** A monster fell: the gauge. */
@@ -515,8 +520,15 @@ function stepK() {
 function clockText() {
   const G = A.G(), H = G.hunt;
   if (!H) return null;
+  if (G.endless) return G.endEnd ? `소탕 · 남은 시간 ${Math.max(0, Math.ceil(G.endEnd - G.t))}초` : '계속 사냥';
   if (G.bossT !== undefined) return G.cleared ? '' : `${G.boss.name}${G.enraged ? ' · 광폭화' : ''}`;
   return `토벌도 ${Math.floor(H.prog * 100)}% · ${['', '돌입', '목표', '보스'][H.act]}`;
+}
+
+/** Where the gauge stands: under the map's name, or under the leader's bar while it shows. */
+function hudTop(cv) {
+  const s = cv.width / 860, bb = document.querySelector('#bossbar');
+  return (bb && !bb.hidden ? 90 : 46) * s;
 }
 
 /** The gauge across the top, and the boss's warning on the screen's edge. */
@@ -524,8 +536,9 @@ function hud(ctx, cv) {
   const G = A.G(), H = G.hunt;
   if (!H) return;
   const s = cv.width / 860;
+  if (G.endless) return;
   if (G.bossT === undefined) {
-    const w = 200 * s, h = 6 * s, x = (cv.width - w) / 2, y = 30 * s;
+    const w = 200 * s, h = 6 * s, x = (cv.width - w) / 2, y = hudTop(cv);
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(x - s, y - s, w + 2 * s, h + 2 * s);
     const g = ctx.createLinearGradient(x, 0, x + w, 0);
@@ -542,7 +555,7 @@ function hud(ctx, cv) {
     // The boss's 그로기 bar, thin, under its life bar.
     const b = G.enemies.find(e => e.kind === 'boss');
     if (b && b.gro !== undefined) {
-      const w = 160 * s, h = 4 * s, x = (cv.width - w) / 2, y = 40 * s;
+      const w = 160 * s, h = 4 * s, x = (cv.width - w) / 2, y = 90 * s;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(x - s, y - s, w + 2 * s, h + 2 * s);
       ctx.fillStyle = b.groggyT > G.t ? '#ffffff' : '#ffd84a';
@@ -809,9 +822,21 @@ function grade() {
   sc += Math.max(0, 15 - (H.taken || 0) * 4);                     // 받은 피해
   sc += H.goalBonus ? 10 : H.goalDone ? 5 : 0;                    // 목표
   if (H.path === 'swift') sc += 5;
-  const g = sc >= 75 ? 'S' : sc >= 55 ? 'A' : sc >= 35 ? 'B' : 'C';
+  const g = sc >= 82 ? 'S' : sc >= 64 ? 'A' : sc >= 42 ? 'B' : 'C';
   H.grade = { g, sc: Math.round(sc), k: { S: 1.3, A: 1.2, B: 1.1, C: 1 }[g], best: m.best, execs: m.execs, sweeps: m.sweeps, reactions: m.reactions };
   G.style = { grade: g };
+  // 숙련 ★ (정복 or 숙련 도전): ★1 the conquest, ★2 the objective without a slip, ★3 an S.
+  if (H.mode !== 'rush' && G.cleared) {
+    const pr = A.progress(), id = G.stage.id;
+    pr.mastery = pr.mastery || {};
+    const stars = 1 + (H.goalBonus ? 1 : 0) + (g === 'S' ? 1 : 0);
+    H.grade.stars = stars;
+    H.grade.newStar = stars > (pr.mastery[id] || 0);
+    pr.mastery[id] = Math.max(pr.mastery[id] || 0, stars);
+  }
+  // The ★ of every ground together: a little more money from every hunt (0.5% a ★, to 25%).
+  H.grade.starK = 1 + Math.min(0.25, 0.005 * starTotal());
+  H.grade.k = Math.round(H.grade.k * H.grade.starK * 100) / 100;
   return H.grade;
 }
 
@@ -978,7 +1003,7 @@ function goalStart() {
   else if (k === 'purify') { g.items.push({ at: spotNear(6, 9), fill: 0 }); }
   else if (k === 'destroy') for (let i = 0; i < g.n; i++) nest(g, spotNear(5 + i * 2, 8 + i * 2));
   else if (k === 'defend') { g.items.push({ at: spotNear(3, 4), hp: 1 }); g.end = G.t + g.n; g.waveT = G.t + 4; }
-  else if (k === 'escort') { const [x, y] = spotNear(2, 3); g.cart = { x: x + 0.5, y: y + 0.5, hp: 1, done: 0, dx: Math.random() < 0.5 ? 1 : -1 }; }
+  else if (k === 'escort') { const [x, y] = spotNear(2, 3); g.cart = { x: x + 0.5, y: y + 0.5, hp: 1, done: 0, dx: Math.random() < 0.5 ? 1 : -1, path: cartPath(x, y, g.n) }; }
   else if (k === 'survive') { g.end = G.t + g.n; survivePrep(g); }
   else if (k === 'chase') chaseSpawn(g);
   else if (k === 'duel') g.next = G.t + 1;
@@ -1002,6 +1027,7 @@ function goalStep(text) {
 }
 
 function goalSteps(g) {
+  if (A.G().hunt.mode === 'rush') return 1;
   return g.kind === 'defend' || g.kind === 'survive' || g.kind === 'escort' ? 3 : g.n;
 }
 
@@ -1100,7 +1126,15 @@ function goalTick(dt) {
     for (const e of G.enemies) if (!e.kind && Math.abs(e.tx + 0.5 - c.x) <= 1.5 && Math.abs(e.ty + 0.5 - c.y) <= 1.5) bite++;
     c.hp -= bite * dt * 0.004;
     if (c.hp < 0.5) g.ok = false;
-    if (by && bite < 3) { c.x += c.dx * dt * 0.9; c.done += dt * 0.9; }
+    if (by && bite < 3) {
+      c.done += dt * 0.9;
+      if (c.path) {
+        const i = Math.min(c.path.length - 1, Math.floor(c.done)), j = Math.min(c.path.length - 1, i + 1), f = c.done - Math.floor(c.done);
+        const nx = c.path[i][0] + (c.path[j][0] - c.path[i][0]) * f + 0.5, ny = c.path[i][1] + (c.path[j][1] - c.path[i][1]) * f + 0.5;
+        if (nx !== c.x) c.dx = nx > c.x ? 1 : -1;
+        c.x = nx; c.y = ny;
+      } else c.x += c.dx * dt * 0.9;
+    }
     c.moving = by && bite < 3;
     const part = Math.floor(c.done / (g.n / 3));
     while (g.step < Math.min(3, part)) goalStep();
@@ -1154,6 +1188,31 @@ function goalTick(dt) {
     }
     if (g.line && (t - g.lineAt > 14 || !G.enemies.some(e => e.march))) { g.line = 0; g.next = t + 4; goalStep(); }
   }
+}
+
+/** The cart's way on a bounded map: the open tiles of a walk n long, away from where it starts. */
+function cartPath(x, y, n) {
+  const G = A.G();
+  if (!G.arena) return null;
+  const m = G.arena.map, prev = new Map(), q = [[x, y]], k = (a, b) => a * 4096 + b;
+  prev.set(k(x, y), null);
+  let far = [x, y], fd = 0;
+  const dist = new Map([[k(x, y), 0]]);
+  while (q.length) {
+    const [cx, cy] = q.shift(), d = dist.get(k(cx, cy));
+    if (d > fd) { fd = d; far = [cx, cy]; }
+    if (d >= n) continue;
+    for (const [dx, dy] of DIR4) {
+      const nx = cx + dx, ny = cy + dy;
+      if (!open(nx, ny) || dist.has(k(nx, ny))) continue;
+      dist.set(k(nx, ny), d + 1);
+      prev.set(k(nx, ny), [cx, cy]);
+      q.push([nx, ny]);
+    }
+  }
+  const path = [];
+  for (let c = far; c; c = prev.get(k(c[0], c[1]))) path.unshift(c);
+  return path.length > 4 ? path : null;
 }
 
 /** 생존: the ground's own pressure while the objective lasts. */
@@ -1405,7 +1464,7 @@ function drawGoalHud(ctx, cv) {
   if (g.over) txt = `${g.label} · ${H.goalDone ? '달성' : '실패'}`;
   ctx.font = `${Math.round(10 * s)}px G9`;
   ctx.textAlign = 'center';
-  A.outline(txt, cv.width / 2, 58 * s, g.over ? (H.goalDone ? '#9ae07a' : '#ff8a6a') : '#9ad8ff');
+  A.outline(txt, cv.width / 2, hudTop(cv) + 28 * s, g.over ? (H.goalDone ? '#9ae07a' : '#ff8a6a') : '#9ad8ff');
   const at = goalSpot();
   if (!at) return;
   const p = G.player, dx = at[0] - p.tx, dy = at[1] - p.ty;
@@ -1458,6 +1517,352 @@ function breakTick() {
   }
 }
 
+// ------------------------------------------------------------------ 실제 지도 전장 (P4)
+//
+// A ground with an arena (tools/yeon_grounds.py arena → assets/yhunt/, manifest yhunt) is fought on
+// 연's own map of it, bounded: its walls, cliffs, bridges and lava hold the hero and the monsters
+// (the wars' walk grid). The monsters find the hero by a flow field (a breadth-first search from
+// the hero's tile, again only when that tile changes), are born on open tiles the hero can reach,
+// and the camera stops at the map's edge.
+
+const arenaBms = new Map(), arenaPats = new Map();
+function arenaStart(G) {
+  const M = A.M(), map = M.yhunt && M.yhunt[G.stage.id];
+  if (!map || A.settings().arena === false || (window.__dbgHunt && window.__dbgHunt.noarena)) return;
+  const walk = new Uint8Array(map.cols * map.rows);
+  map.walk.forEach((row, y) => { for (let x = 0; x < map.cols; x++) walk[y * map.cols + x] = row[x] === '.' ? 1 : 0; });
+  G.arena = { id: G.stage.id, map, walk, flow: new Int16Array(map.cols * map.rows), at: -1 };
+  // The pieces as decoded bitmaps, kept for the hunt (drawn from an <img> a piece was decoded
+  // again whenever the browser had let it go: a long frame on a slow phone, as the wars found).
+  for (const [k, bm] of arenaBms) if (!k.startsWith(`yhunt/${G.stage.id}_`)) { if (bm.close) bm.close(); arenaBms.delete(k); arenaPats.delete(k); }
+  for (let cy = 0; cy * map.chunk < map.h; cy++)
+    for (let cx = 0; cx * map.chunk < map.w; cx++) {
+      const path = `yhunt/${G.stage.id}_${cx}_${cy}.png`;
+      if (arenaBms.has(path)) continue;
+      Promise.resolve(A.images[path] || A.loadImage(path)).then(im => (im && im.width && window.createImageBitmap ? createImageBitmap(im) : null))
+        .then(bm => { if (bm) arenaBms.set(path, bm); }).catch(() => {});
+    }
+  const p = G.player, [sx, sy] = map.start;
+  p.x = sx * A.TILE + A.TILE / 2;
+  p.y = sy * A.TILE + A.TILE - 6;
+  A.heroTile();
+}
+
+function open(tx, ty) {
+  const R = A.G().arena;
+  if (!R) return true;
+  const m = R.map;
+  return tx >= 0 && ty >= 0 && tx < m.cols && ty < m.rows && R.walk[ty * m.cols + tx] === 1;
+}
+
+/** The flow field to the hero, made again when the hero's tile changes. */
+function flowFresh() {
+  const G = A.G(), R = G.arena, m = R.map, p = G.player;
+  const k = p.ty * m.cols + p.tx;
+  if (R.at === k) return R.flow;
+  R.at = k;
+  const f = R.flow;
+  f.fill(-1);
+  // (A hero pressed onto a closed tile: the search starts from the open ones round it.)
+  const q = new Int32Array(m.cols * m.rows);
+  let h = 0, n = 0;
+  for (let r = 0; r <= 3 && !n; r++)
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !open(p.tx + dx, p.ty + dy)) continue;
+      const c = (p.ty + dy) * m.cols + p.tx + dx;
+      if (f[c] < 0) { f[c] = r; q[n++] = c; }
+    }
+  while (h < n) {
+    const c = q[h++], x = c % m.cols, y = (c - x) / m.cols, d = f[c] + 1;
+    if (x > 0 && f[c - 1] < 0 && R.walk[c - 1]) { f[c - 1] = d; q[n++] = c - 1; }
+    if (x < m.cols - 1 && f[c + 1] < 0 && R.walk[c + 1]) { f[c + 1] = d; q[n++] = c + 1; }
+    if (y > 0 && f[c - m.cols] < 0 && R.walk[c - m.cols]) { f[c - m.cols] = d; q[n++] = c - m.cols; }
+    if (y < m.rows - 1 && f[c + m.cols] < 0 && R.walk[c + m.cols]) { f[c + m.cols] = d; q[n++] = c + m.cols; }
+  }
+  return f;
+}
+
+function flowAt(tx, ty) {
+  const R = A.G().arena;
+  if (!open(tx, ty)) return -1;
+  return flowFresh()[ty * R.map.cols + tx];
+}
+
+/** Toward the hero by the flow: the neighbours nearer, best first (null: not toward the hero). */
+const DIR4 = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+function flowDirs(b, tx, ty) {
+  const G = A.G();
+  if (!G.arena || tx !== G.player.tx || ty !== G.player.ty) return null;
+  const here = flowAt(b.tx, b.ty);
+  if (here < 0) return null;
+  const out = [];
+  for (const [dx, dy] of DIR4) {
+    const d = flowAt(b.tx + dx, b.ty + dy);
+    if (d >= 0 && d < here) out.push([dx, dy, d]);
+  }
+  out.sort((a, c) => a[2] - c[2]);
+  return out.map(([dx, dy]) => [dx, dy]);
+}
+
+/** A tile a monster may be born on: open, and within 25 steps of the hero. */
+function reach(tx, ty) {
+  const d = flowAt(tx, ty);
+  return d >= 0 && d <= 25;
+}
+
+/** When the screen's rim is all wall: an open tile 7 to 18 steps away. */
+function spawnTile() {
+  const G = A.G(), R = G.arena, m = R.map, f = flowFresh();
+  const at = c => { const x = c % m.cols; return [x, (c - x) / m.cols]; };
+  for (let i = 0; i < 60; i++) {
+    const c = Math.floor(Math.random() * m.cols * m.rows);
+    if (f[c] >= 7 && f[c] <= 18 && A.free(...at(c))) return at(c);
+  }
+  // Few such tiles (a small deck): any free one the hero can reach, nearest past three steps.
+  let best = -1;
+  for (let c = 0; c < f.length; c++) if (f[c] >= 3 && (best < 0 || Math.abs(f[c] - 9) < Math.abs(f[best] - 9)) && A.free(...at(c))) best = c;
+  return best >= 0 ? at(best) : null;
+}
+
+/** The camera held inside the map. */
+function cam(camX, camY) {
+  const G = A.G(), R = G.arena, VW = A.VW(), VH = A.VH();
+  if (!R) return [camX, camY];
+  const m = R.map;
+  return [m.w <= VW ? Math.round((m.w - VW) / 2) : Math.max(0, Math.min(m.w - VW, camX)),
+    m.h <= VH ? Math.round((m.h - VH) / 2) : Math.max(0, Math.min(m.h - VH, camY))];
+}
+
+function drawMap(ctx, camX, camY) {
+  const G = A.G(), R = G.arena, m = R.map, VW = A.VW(), VH = A.VH();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(camX, camY, VW, VH);
+  const c = m.chunk;
+  for (let cy = Math.max(0, Math.floor(camY / c)); cy * c < Math.min(m.h, camY + VH); cy++)
+    for (let cx = Math.max(0, Math.floor(camX / c)); cx * c < Math.min(m.w, camX + VW); cx++) {
+      const path = `yhunt/${R.id}_${cx}_${cy}.png`, im = arenaBms.get(path) || A.images[path];
+      if (!im || !im.width) continue;
+      const sx = Math.max(0, Math.floor(camX - cx * c)), sy = Math.max(0, Math.floor(camY - cy * c));
+      const sw = Math.min(im.width - sx, Math.ceil(camX + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(camY + VH - cy * c - sy) + 1);
+      if (!(sw > 0 && sh > 0)) continue;
+      // A piece as a pattern filled over its part in view (cheaper than a cut drawImage on a slow phone).
+      let pat = arenaPats.get(path);
+      if (!pat && arenaBms.has(path)) { pat = ctx.createPattern(im, 'no-repeat'); pat.setTransform(new DOMMatrix([1, 0, 0, 1, cx * c, cy * c])); arenaPats.set(path, pat); }
+      if (pat && !(window.__dbgHunt && window.__dbgHunt.drawimg)) { ctx.fillStyle = pat; ctx.fillRect(cx * c + sx, cy * c + sy, sw, sh); }
+      else ctx.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
+    }
+  if (window.__dbgHunt && window.__dbgHunt.walls) {
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+    for (let y = Math.max(0, Math.floor(camY / A.TILE)); y * A.TILE < camY + VH && y < m.rows; y++)
+      for (let x = Math.max(0, Math.floor(camX / A.TILE)); x * A.TILE < camX + VW && x < m.cols; x++)
+        if (!R.walk[y * m.cols + x]) ctx.fillRect(x * A.TILE, y * A.TILE, A.TILE, A.TILE);
+  }
+}
+
+/** Monsters stuck in place five seconds (walled off): moved to an open tile near the hero. */
+function unstick() {
+  const G = A.G(), R = G.arena;
+  if (!R || G.t - (R.stuckT || 0) < 1) return;
+  R.stuckT = G.t;
+  let stuck = 0;
+  for (const e of G.enemies) {
+    if (e.kind === 'boss' || e.goal) continue;
+    const k = e.tx * 4096 + e.ty;
+    if (e.lastK !== k) { e.lastK = k; e.lastKt = G.t; continue; }
+    if (G.t - e.lastKt < 5 || flowAt(e.tx, e.ty) <= 1) continue;
+    stuck++;
+    const at = spawnTile();
+    if (at) { A.relocate(e, at); e.lastKt = G.t; }
+  }
+  R.stuck = (R.stuck || 0) + stuck;
+}
+
+// ------------------------------------------------------------------ 조명·분위기 (P5)
+//
+// Each group's light (the dark round the hero, with holes of light at the lit objectives and the
+// hero), its colour, and its weather: 연's own particle pictures (FXs.unity3d: weather_snow,
+// csg04_rain, bubble_blue, csg04_leaf, weather_tachukbo, fog3 → assets/yamb/, tools/yeon_grounds.py
+// ambient) drifting over the field, or the abyss's embers (k_ab_embers). The dark is drawn at a
+// fifth of the screen every third frame and stretched, as the abyss's is.
+
+const AMBIENT = {
+  cave: { light: 0.8 }, house: { light: 0.7 }, abyss: { light: 1 },
+  plain: { light: 1, tint: 'rgba(255,170,90,0.07)', fx: 'dust' },
+  snow: { light: 1, tint: 'rgba(225,238,255,0.10)', fx: 'snow' },
+  sea: { light: 0.85, tint: 'rgba(30,150,170,0.12)', fx: 'bubble' },
+  isle: { light: 0.95, tint: 'rgba(90,200,80,0.06)', fx: 'leaf' },
+  hell: { light: 0.75, tint: 'rgba(230,50,20,0.12)', fx: 'embers', edge: 'rgba(200,30,0,0.35)' },
+  sky: { light: 0.9, tint: 'rgba(255,140,40,0.10)', fx: 'leaf' },
+};
+const AMBIENT_GROUND = {
+  haunt: { light: 0.6 }, skull: { light: 0.6 }, fox: { light: 0.6 }, volcano: { fx: 'embers', light: 0.8, tint: 'rgba(230,70,20,0.10)' },
+  haya: { fx: 'embers' }, hanbing: { fx: 'snow', tint: 'rgba(200,225,255,0.14)' }, jagwi: { fx: 'rain', light: 0.8 }, lobi: { fx: 'rain' },
+  aram: { fx: 'dust' }, wolf: { light: 0.65, fx: null }, deepsea: { light: 0.7 }, tagye: { light: 0.65 }, yogoe: { light: 0.7 },
+  musin: { light: 0.85 }, royal: { light: 0.9 }, murim: { light: 0.95 }, novice: { light: 1 }, japan: { fx: 'leaf' },
+};
+const AMB_PIC = { snow: 'weather_snow', rain: 'csg04_rain', dust: 'weather_tachukbo', bubble: 'bubble_blue', leaf: 'csg04_leaf' };
+
+function ambientOf(G) {
+  const gr = ground(G).group;
+  return { ...(AMBIENT[gr] || { light: 1 }), ...(AMBIENT_GROUND[G.stage.id] || {}) };
+}
+
+let shade = null, shadeN = 0;
+const patterns = {};
+
+function ambPic(name) {
+  const im = A.images[`yamb/${name}.png`];
+  return im && im.width ? im : null;
+}
+
+/** The light and the weather, over the field and under the screen's own marks. */
+function ambient(ctx, cv, camX, camY) {
+  const G = A.G();
+  if (!G.hunt || G.stage.abyss || (window.__dbgHunt && window.__dbgHunt.noamb)) return;
+  const am = G.hunt.amb || (G.hunt.amb = ambientOf(G));
+  const Z = A.Z(), p = G.player, t = G.t;
+  // The weather layer: a tile of 연's particles scrolled over the screen.
+  const name = AMB_PIC[am.fx];
+  if (name && (am.fx === 'snow' || am.fx === 'rain' || am.fx === 'dust')) {
+    const im = ambPic(name);
+    if (im) {
+      const pat = patterns[name] || (patterns[name] = ctx.createPattern(im, 'repeat'));
+      const v = am.fx === 'rain' ? [-40, 520] : am.fx === 'snow' ? [18, 46] : [70, 8];
+      const ox = ((camX * Z * 0.6 + t * v[0]) % im.width + im.width) % im.width, oy = ((camY * Z * 0.6 + t * v[1]) % im.height + im.height) % im.height;
+      ctx.save();
+      ctx.globalAlpha = am.fx === 'dust' ? 0.55 : am.fx === 'rain' ? 0.5 : 0.75;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(-ox, -oy);
+      ctx.fillStyle = pat;
+      ctx.fillRect(0, 0, cv.width + im.width, cv.height + im.height);
+      ctx.restore();
+    }
+  } else if (am.fx === 'bubble' || am.fx === 'leaf') {
+    // A few drifting pieces: bubbles rising, leaves falling across.
+    const im = ambPic(name);
+    if (im) {
+      const n = 9;
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      for (let i = 0; i < n; i++) {
+        const seed = i * 97.3, sp = am.fx === 'bubble' ? -28 - (i % 3) * 9 : 26 + (i % 4) * 7;
+        const x = ((seed * 37 + t * (am.fx === 'leaf' ? 22 : 4) + Math.sin(t * 0.8 + i) * 18) % cv.width + cv.width) % cv.width;
+        const y = ((seed * 53 + t * sp * Z / 3) % cv.height + cv.height) % cv.height;
+        if (am.fx === 'bubble') { const s = (10 + (i % 3) * 5) * Z / 3; ctx.drawImage(im, x, y, s, s); }
+        else { const f = i % 8, fx = (f % 4) * 32, fy = Math.floor(f / 4) * 32, s = 14 * Z / 3; ctx.drawImage(im, fx, fy, 32, 32, x, y, s, s); }
+      }
+      ctx.restore();
+    }
+  } else if (am.fx === 'embers' && A.M().fx.k_ab_embers && t - (G.hunt.embT || 0) > 0.35 && A.fxBudget('amb', 4)) {
+    G.hunt.embT = t;
+    A.addFx('k_ab_embers', p.x + (Math.random() - 0.5) * A.VW(), p.y + (Math.random() - 0.5) * A.VH(), { scale: 0.8 });
+  }
+  // The colour, the dark with its holes of light and the edge: drawn together at a fifth of the
+  // screen every third frame, one stretched picture a frame (each full-screen fill costs a phone).
+  const dark = 1 - (am.light ?? 1);
+  if (dark <= 0.02 && !am.tint && !am.edge) return;
+  const q = 5, w = Math.ceil(cv.width / q), h = Math.ceil(cv.height / q);
+  if (!shade || shade.width !== w || shade.height !== h) { shade = document.createElement('canvas'); shade.width = w; shade.height = h; shadeN = 0; }
+  if (shadeN++ % 3 === 0) {
+    const g = shade.getContext('2d');
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, w, h);
+    if (dark > 0.02) {
+      g.fillStyle = `rgba(0,0,0,${Math.min(0.85, dark * 1.6)})`;
+      g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'destination-out';
+      const hole = (x, y, r) => {
+        const gr = g.createRadialGradient(x, y, r * 0.25, x, y, r);
+        gr.addColorStop(0, 'rgba(0,0,0,1)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      };
+      const sx = x => (x - camX) * Z / q, sy = y => (y - camY) * Z / q;
+      hole(sx(p.x), sy(p.y - 22), h * 0.62);
+      const gl = G.hunt.goal, T = A.TILE;
+      for (const l of (gl && gl.lit) || []) hole(sx(l[0] * T + T / 2), sy(l[1] * T + T / 2), h * 0.3);
+      if (gl && (gl.kind === 'survive' || gl.kind === 'defend')) for (const it of gl.items) hole(sx(it.at[0] * T + T / 2), sy(it.at[1] * T + T / 2), h * 0.28);
+      g.globalCompositeOperation = 'source-over';
+    }
+    if (am.tint) { g.fillStyle = am.tint; g.fillRect(0, 0, w, h); }
+    if (am.edge) {
+      const gr = g.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, Math.hypot(w, h) / 2);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, am.edge);
+      g.fillStyle = gr;
+      g.fillRect(0, 0, w, h);
+    }
+  }
+  const D = window.__dbgHunt || {};
+  if (D.noshade) return;
+  ctx.imageSmoothingEnabled = !D.shadeNN;
+  ctx.imageSmoothingQuality = 'low';
+  ctx.drawImage(shade, 0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = false;
+}
+
+/** The weather's pictures, asked for at the start of a hunt. */
+function ambientLoad(G) {
+  const am = ambientOf(G), name = AMB_PIC[am.fx];
+  if (name && (A.M().yamb || []).includes(name) && !A.images[`yamb/${name}.png`]) A.loadImage(`yamb/${name}.png`);
+}
+
+// ------------------------------------------------------------------ 반복 판 (P6)
+//
+// A ground conquered before can be entered three ways (the stage card's buttons): 정복 (the three
+// acts; 숙련 ★ counted), 보스 직행 (the class's recorded build, as a raid starts; the gauge at 70%,
+// one step of the objective; no experience: 90~120 s), 소탕 (no boss: two and a half minutes of
+// the fullest field, champions every half minute, materials ×1.5 and specials ×1.3).
+
+export const MODES = {
+  conquer: { name: '정복', desc: '세 막 · 숙련 ★' },
+  rush: { name: '보스 직행', desc: '기록 빌드로 · 토벌도 70%에서' },
+  sweep: { name: '소탕', desc: '보스 없이 2:30 · 재료 ×1.5' },
+};
+
+function starTotal() {
+  return Object.values(A.progress().mastery || {}).reduce((a, n) => a + n, 0);
+}
+
+function modeStart(G) {
+  const H = G.hunt, mode = (A.mode && A.mode()) || 'conquer';
+  const done = !!A.progress().cleared[G.stage.id];
+  H.mode = done ? mode : 'conquer';
+  if (H.mode === 'rush') {
+    const p = G.player, start = A.raidStart(A.best()[G.cls.id]);
+    p.lvl = start;
+    p.next = A.xpFor(start);
+    G.pendingLevels = 0;
+    G.firstCard = false;
+    A.applyBuild(start);
+    H.prog = 0.7;
+    H.act = 2;
+    H.intro = H.crossed = true;
+    H.floor0 = -64;
+    H.maxBoss = 75;
+    H.rushGoal = 3;
+    G.plainDropAt = Infinity;
+  }
+}
+
+/** 소탕: the run as 계속 사냥 runs, for two and a half minutes. */
+function sweep(G, from = G.t) {
+  G.endless = true;
+  G.clearT = from;
+  G.endEnd = from + 150;
+  G.endlessChamp = from + 30;
+  if (G.hunt) G.hunt.mode = 'sweep';
+}
+
+/** 소탕's richer spoils, on a kill. */
+function sweepKill(e) {
+  const G = A.G();
+  if (!G.endEnd) return;
+  if (e.kind && Math.random() < 0.5) A.rollMats(e);
+  if (Math.random() < 0.3) A.rollSpecial(e);
+}
+
 // ------------------------------------------------------------------
 
 export function initHunt(api) {
@@ -1466,7 +1871,7 @@ export function initHunt(api) {
     start, note, on, clock, tough, xpK, spawn, kill, hurt, takeK, cleared, stops, cardBonus, stepK, clockText,
     hud(ctx, cv) { drawStorm(ctx, cv); hud(ctx, cv); hud2(ctx, cv); drawGoalHud(ctx, cv); },
     ground: drawGoal, move, hurtBy, GROUNDS, GROUPS, groundOf: ground,
-    open: () => true,
+    open, cam, drawMap, flowDirs, reach, spawnTile, ambient, sweep, sweepKill, MODES, starTotal,
     world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade,
     tick(dt) { tick(dt); },
     PACE, PATHS,
@@ -1476,6 +1881,7 @@ export function initHunt(api) {
   window.__dash = () => dash();
   window.__huntGoal = () => goalSpot();
   window.__hazard = k => hazard(k);
+  window.__arena = () => { const G = A.G(); return G && G.arena && { id: G.arena.id, stuck: G.arena.stuck || 0, cols: G.arena.map.cols, rows: G.arena.map.rows }; };
   window.__momentum = () => { const G = A.G(); return G && G.momentum; };
   return H;
 }
