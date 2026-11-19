@@ -20,7 +20,11 @@ export const CLASSES = [
     desc: '체력과 방어가 높은 격수. 연속 공격으로 가까운 적을 베어 낸다.' },
   { id: 'rogue', name: '도적', hero: '1002', hp: 130, dmgK: 1.5, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
     desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다.' },
-  { id: 'mage', name: '주술사', hero: '1003', hp: 110, mp: 120, speed: 68, armor: 1, start: 'm_fire', ult: 'm_ult',
+  // dmgK 1.4: the 주술사's first weapon used to count as 태염무신's 11등급 (×2.32, avatar.js WRITTEN),
+  // and its 왕초보 balance was set on that; at its true 0등급 bot clears of 왕초보 fell from 3/3 to
+  // 1/5 (smart.js bot), 5/6 at 1.4. (도적·도사 kept theirs: 도사 3/4, and the 도적's losses
+  // were the bot's rushing, the same at 1.9 and 2.6.)
+  { id: 'mage', name: '주술사', hero: '1003', hp: 110, dmgK: 1.4, mp: 120, speed: 68, armor: 1, start: 'm_fire', ult: 'm_ult',
     desc: '원거리 공격 주술사. 신수마법으로 적을 태우고 마비시킨다.' },
   { id: 'poet', name: '도사', hero: '1004', hp: 100, mp: 120, speed: 68, armor: 0, start: 'p_orb', ult: 'p_ult',
     revive: true, desc: '회복과 보조의 달인. 몬스터를 불러내고, 한 번은 스스로 부활한다.' },

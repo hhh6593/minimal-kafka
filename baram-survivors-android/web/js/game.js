@@ -17,7 +17,7 @@ import {
 } from './items.js';
 import {
   initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
-  RAID_GEAR, plainTiers, plainList, gearPower, raidSet, CRAFT_GEAR, CRAFT_POWER, hasShield,
+  RAID_GEAR, plainTiers, plainList, gearPower, raidSet, raidTier, MOVED_TIERS, lookAt, CRAFT_GEAR, CRAFT_POWER, hasShield,
 } from './avatar.js';
 
 const $ = s => document.querySelector(s);
@@ -45,6 +45,20 @@ loadAbyssLoot(progress.abyssLoot);
 if (!progress.byClass) {
   progress.byClass = {};
   for (const c of ['warrior', 'rogue', 'mage', 'poet']) progress.byClass[c] = Object.assign({}, progress.cleared);
+}
+// A save from before the raids had their own places in the lines (avatar.js MOVED_TIERS): a raid
+// piece that shared its place with a hunting grounds' piece moves to the raid's own place, with
+// its stars and copies, worn or not. Once (gearV 2).
+if ((progress.gearV || 0) < 2) {
+  for (const [c, kinds] of Object.entries(MOVED_TIERS)) for (const [kind, moves] of Object.entries(kinds)) for (const [from, to] of Object.entries(moves)) {
+    const a = `${kind}:${from}`, b = `${kind}:${to}`, inv = (progress.inv || {})[c];
+    if (!inv || !inv.includes(a) || inv.includes(b)) continue;
+    inv.splice(inv.indexOf(a), 1, b);
+    for (const m of [progress.stars, progress.copies]) if (m && m[c] && m[c][a] !== undefined) { m[c][b] = m[c][a]; delete m[c][a]; }
+    const g = (progress.gear || {})[c];
+    if (g && g[kind] === +from && !g[kind + 'Sp']) g[kind] = to;
+  }
+  progress.gearV = 2;
 }
 // ?speed=N runs the game N times as fast, ?all opens every hunting ground (for trying things out).
 const QUERY = new URLSearchParams(location.search);
@@ -1297,8 +1311,8 @@ function pieceName(cls, kind, t) {
 function yItemIcon(cls, kind, t, spId) {
   const idx = M.yitemicon && M.yitemicon[cls.id] && M.yitemicon[cls.id][kind];
   if (!idx) return null;
-  const key = spId ? (idx[spId] ? spId : SPECIAL[spId] ? 't' + specialBase(SPECIAL[spId], cls.id) : null)
-    : kind === 'weapon' && t === dragonTier(cls) ? 'dragon' + starOf(cls, `weapon:${t}`) : 't' + t;
+  const key = spId ? (idx[spId] ? spId : SPECIAL[spId] ? 't' + lookAt(cls.id, kind, specialBase(SPECIAL[spId], cls.id)) : null)
+    : kind === 'weapon' && t === dragonTier(cls) ? 'dragon' + starOf(cls, `weapon:${t}`) : 't' + lookAt(cls.id, kind, t);
   const f = key && idx[key];
   return f ? 'assets/yitemicon/' + f : null;
 }
@@ -4409,7 +4423,11 @@ function fxBudget(kind, n) {
 
 /** The very rare special of this ground or raid: a little likelier from the strong ones. */
 function rollSpecial(e) {
-  const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.0003;
+  // A plain monster 0.003% (was 0.03%): a hunt fells ~2400 of them, so the plain ones alone gave
+  // ~0.7 specials a hunt (career sim: 0.8-1 a hunt in all), hardly "very rare". Now ~0.2 a hunt
+  // (plain 0.07, champions 0.045, leaders 0.04, boss 0.03), and 계속 사냥 (3 champions a minute)
+  // about one in 40 minutes.
+  const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003;
   if (Math.random() >= chance) return;
   const mine = SPECIALS.filter(s => s.src === G.stage.id && (s.kind !== 'shield' || hasShield(G.cls.id)));
   if (!mine.length) return;
@@ -4594,7 +4612,7 @@ function clearStage() {
     // two from 삼두룡 up — beside the boss's own drops. With the set complete, any piece (a
     // second one sells, as always).
     const p = G.player, b = bag(G.cls);
-    const set = raidSet(G.stage.id, G.cls.id).map(([kind, name]) => ({ kind, name, tier: GEAR[G.cls.id][kind].indexOf(name) }));
+    const set = raidSet(G.stage.id, G.cls.id).map(([kind, name]) => ({ kind, name, tier: raidTier(G.stage.id, G.cls.id, kind) }));
     const missing = set.filter(g => !b.includes(`${g.kind}:${g.tier}`)).sort(() => Math.random() - 0.5);
     const pool = missing.length ? missing : set.slice().sort(() => Math.random() - 0.5);
     const got = pool.slice(0, G.level >= 7 ? 2 : 1);
@@ -6249,12 +6267,14 @@ function openTrade(who) {
       });
     }
   } else {
-    // The first piece of each kind the bag lacks, priced by its tier.
+    // The first piece of each kind the bag lacks, priced by its tier: only the hunting grounds'
+    // pieces (plainList). It used to walk the whole line, so the 용무기 (10등급, made from 15 비늘 and
+    // a 여의주) sold for 9000전 and a raid's 11등급 방패 for 250전.
     const b = bag(cls);
     for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
       if (kind === 'shield' && !hasShield(cls.id)) continue;
-      const tier = (GEAR[cls.id][kind] || []).findIndex((_, i) => !b.includes(`${kind}:${i}`));
-      if (tier < 0) continue;
+      const tier = plainList(cls.id, kind).find(i => !b.includes(`${kind}:${i}`));
+      if (tier === undefined) continue;
       row(gearName(cls.id, kind, tier), `${{ weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' }[kind]} · ${tier + 1}단계`,
         250 * (tier + 1) * (tier + 1), false, () => b.push(`${kind}:${tier}`));
     }
@@ -8366,12 +8386,12 @@ function yGearVariants(cls, gear) {
     if (ab && H.layers[kind] && H.layers[kind]['c' + ab[0]]) v = 'c' + ab[0];
     else if (ab && kind === 'weapon' && H.layers[kind] && H.layers[kind][String(ab[0])]) v = String(ab[0]);
     else if (lt !== undefined && lt !== null && map['t' + lt]) v = map['t' + lt];
-    else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + specialBase(SPECIAL[sp], cls.id)] : null);
+    else if (sp) v = map[sp] || (SPECIAL[sp] ? map['t' + lookAt(cls.id, kind, specialBase(SPECIAL[sp], cls.id))] : null);
     else if (kind === 'weapon' && t === dragonTier(cls)) {
       // A step the build's map has no sword of its own for: 연's 치장용 of that step (DRAGON_LOOK).
       const step = starOf(cls, `weapon:${t}`), dl = DRAGON_LOOK[cls.id] && DRAGON_LOOK[cls.id][step];
       v = dl && H.layers.weapon && H.layers.weapon['c' + dl] ? 'c' + dl : map['dragon' + step] || map['t' + t];
-    } else if (t !== undefined && t >= 0) v = map['t' + t];
+    } else if (t !== undefined && t >= 0) v = map['t' + lookAt(cls.id, kind, t)];
     // A look the build drew wrong or lacks, by its variant or the piece's name (items.js LOOK_FIX).
     const fx = LOOK_FIX[cls.id] && LOOK_FIX[cls.id][kind];
     const fid = fx && !(v && v[0] === 'c') && ((v && fx[v]) || (t >= 0 && fx[GEAR[cls.id][kind][t]]));
@@ -10375,6 +10395,13 @@ window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
+// Test hooks (the career sim: a class played from an empty save, buying and making between hunts):
+// the save, wearing the best, the 전투력, the 필살기 key. Nothing calls these in play.
+window.__progress = () => progress;
+window.__saveProgress = () => saveJson('bs_progress', progress);
+window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
+window.__power = c => combatPower(CLASSES[c]);
+window.__ult = () => castUlt();
 
 // ---------------------------------------------------------------- 사신수 길드대항전 (war.js)
 // The war lives in war.js; these are the hunt's own pieces it builds on (the hero, its spells,
