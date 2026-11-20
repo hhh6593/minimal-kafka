@@ -902,7 +902,8 @@ const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 // its pathing); within two tiles of the hero a tile may take up to three (two on the outer ring),
 // each drawn a little off the tile's middle. The tile's first comer holds it in occ; the others
 // sharing it are in crowd. Whatever strikes a tile strikes everyone on it (bodiesAt).
-// Not in a war or a raid (war.js keeps its own one-to-a-tile order).
+// In a war, a raid or a 「쟁」 war.js decides (War.share): fighters of one side pass through and
+// share each other's tiles (and the hero's), as 연's players do; a foe's tile stays shut.
 const crowd = new Map(); // "tx,ty" -> the monsters sharing the tile with its holder
 const SHARE_NEAR = 3, SHARE_FAR = 2;
 
@@ -931,6 +932,7 @@ function leave(b) {
 
 /** May this monster press onto a taken tile beside the hero? */
 function canShare(b, nx, ny) {
+  if (G && G.war) return !!(b.war && War.share(b, nx, ny));
   if (!G || G.war || G.stage.raid || !b.m || b.ally || b.war || b.march || b.flee || b.kind === 'boss' || b.kind === 'mini') return false;
   const p = G.player, d = Math.abs(nx - p.tx) + Math.abs(ny - p.ty);
   if (d < 1 || d > 2 || (p.stepping && p.sfx === nx && p.sfy === ny)) return false;
@@ -982,7 +984,7 @@ function jostle(b, dt) {
 
 function free(tx, ty) {
   const p = G.player;
-  return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
+  return !occ.has(key(tx, ty)) && !crowd.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
     && !(p.stepping && p.sfx === tx && p.sfy === ty)
     && (!G.arena || Hunt.open(tx, ty)); // 사냥 기믹: a ground fought on 연's own map
 }
@@ -1069,6 +1071,7 @@ function startRun(cls, stage, training = false) {
     rerolls: 2 + up('reroll'), skips: 2 + up('skip'), banishes: 2 + up('banish'), banished: new Set(),
     banishing: false, extraLives: up('revive'),
   };
+  G.meta0 = training ? null : metaSnap(); // the results say what this hunt moved (pkg C)
   G.player.x = TILE / 2;
   G.player.y = TILE - 6;
   heroTile();
@@ -2347,6 +2350,7 @@ function pickGear(g) {
     saveJson('bs_progress', progress);
     say(`${R.name} 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''})`, 'sys');
     banner(`${R.name} · ${name}`);
+    specialMoment(name, R.name);
     return;
   }
   if (g.sp) {
@@ -2365,6 +2369,7 @@ function pickGear(g) {
     saveJson('bs_progress', progress);
     say(`스페셜 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text})`, 'sys');
     banner(`★ 스페셜: ${name}`);
+    specialMoment(name);
     return;
   }
   const b = bag(G.cls), id = `${g.kind}:${g.tier}`;
@@ -3655,13 +3660,13 @@ function forgeLater(ms, fn) { forgeTimers.push(setTimeout(fn, ms)); }
 function forgeSprite(id, o = {}) {
   const f = M.fx && M.fx[id];
   const im = f && images[`fx/${f.src || id}.png`];
-  if (!im || !$('#forge-fx .ffx-cv')) return;
+  if (!im || !$('.ffx-live .ffx-cv')) return;
   forgeSprites.push({ id, f, im, t0: performance.now() + (o.delay || 0), scale: o.scale || 1, dy: o.dy || 0 });
   if (!forgeRaf) forgeRaf = requestAnimationFrame(forgeDraw);
 }
 function forgeDraw(now) {
   forgeRaf = 0;
-  const cvs = [...document.querySelectorAll('#forge-fx .ffx-cv')];
+  const cvs = [...document.querySelectorAll('.ffx-live .ffx-cv')];
   if (!cvs.length) { forgeSprites = []; return; }
   // Two layers: the additive sheets (black ground) on one that blends by 'screen', the rest on a plain one.
   const cv = cvs[0], cA = cvs[1].getContext('2d'), cN = cv.getContext('2d');
@@ -3703,7 +3708,7 @@ function forgeRun(ent, raw) {
   const calm = !!settings.calmFx, label = ent.name.replace(/ \(.*\)$/, '');
   const fx = document.createElement('div');
   fx.id = 'forge-fx';
-  fx.className = 'ffx wait' + (calm ? ' calm' : '');
+  fx.className = 'ffx ffx-live wait' + (calm ? ' calm' : '');
   fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card"><div class="ffx-ico">${ent.icon ? `<img src="${ent.icon}" alt="">` : ''}</div>`
     + `<b class="ffx-name">${label}</b><div class="ffx-star">${ent.star && ent.star.n ? '★' + ent.star.n : '…'}</div><div class="ffx-msg">${kind === 'craft' ? '만드는 중…' : kind === 'promo' ? '승급 중…' : '강화 중…'}</div></div>`;
   $('#forge-box').append(fx);
@@ -4137,6 +4142,8 @@ function stepHero(dx, dy, dt) {
     // 초상비 (보조 기술): through the crowd at once, not after half a second's shove.
     const through = G.buffs.chosang > G.t && there.kind !== 'boss' && !there.cmdr;
     if (!through && (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr)) return;
+    // (A war: not while fighters of its own side share the hero's tile — the heap would land on them.)
+    if (G.war && crowd.has(key(p.tx, p.ty))) return;
     // Pushed long enough, the hero and the monsters on the tile trade places (the whole heap of
     // a crowded tile goes together): never the hero and a monster on one tile.
     const k = key(nx, ny), heap = crowd.get(k) || [];
@@ -8285,6 +8292,7 @@ function townWallet() {
   if (key === walletShown) return;
   walletShown = key;
   $('#town-gold').innerHTML = walletHTML(g, c);
+  syncTownGoal(); // what was bought or claimed may change the next goal
 }
 /** In town too, 백호환령부's tiger walks at the hero's heel (it was seen only on the hunting grounds). */
 function townTiger(dt) {
@@ -9347,7 +9355,24 @@ window.__trainRead = () => {
 // Progress counts across classes, from progress.stats.
 
 function qstats() {
-  return progress.stats = Object.assign({ kills: 0, stageKills: {}, bosses: {}, clears: {}, raids: {}, endless: 0 }, progress.stats);
+  return progress.stats = Object.assign({ kills: 0, stageKills: {}, bosses: {}, clears: {}, raids: {}, endless: 0, styleA: 0 }, progress.stats);
+}
+
+const sumOf = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
+/** A counter the 의뢰 read, by its key: a stats field (['kills'], ['clears', 'deer']) or a total of
+ *  the save's own tallies (every clear, every raid won, 대항전, 쟁, ★, this week's 괴력난신 and 쟁). */
+function statOf(key) {
+  const s = qstats(), wk = gwoeWeek();
+  switch (key[0]) {
+    case 'clearsAll': return sumOf(s.clears);
+    case 'raidsAll': return sumOf(s.raids);
+    case 'war': return (progress.war || {}).played || 0;
+    case 'jaeng': return (progress.bosspk || {}).total || 0;
+    case 'stars': return sumOf(progress.mastery);
+    case 'gwoeWeek': return progress.gwoe && progress.gwoe.week === wk ? progress.gwoe.n || 0 : 0;
+    case 'jaengWeek': return progress.bosspk && progress.bosspk.week === wk ? progress.bosspk.paid || 0 : 0;
+    default: return key.length > 1 ? ((s[key[0]] || {})[key[1]] || 0) : (s[key[0]] || 0);
+  }
 }
 
 function specialsOwned() {
@@ -9361,31 +9386,80 @@ function codexShare() {
   return have / Math.max(1, all);
 }
 
+/** How far the save has come: the level of the hardest ground or raid won (rewards grow with it). */
+function metaLevel() {
+  let lv = 0;
+  for (const [i, s] of STAGES.entries()) if (progress.cleared[s.id]) lv = Math.max(lv, s.level !== undefined ? s.level : i);
+  for (const r of RAIDS) if ((progress.raids || {})[r.id]) lv = Math.max(lv, r.level);
+  return lv;
+}
+// The plain materials a ground gives, cheapest first: what a 의뢰 on that ground pays besides money.
+const QUEST_MATS = ['fur', 'horn', 'bone', 'ember', 'jade', 'scale', 'steel', 'gold', 'soul', 'silver1', 'kalpa', 'essence'];
+function stageMat(id, lv) {
+  return QUEST_MATS.find(m => MATS[m] && MATS[m].from.includes(id)) || (lv >= 12 ? 'kalpa' : lv >= 6 ? 'silver1' : 'fur');
+}
+/** A reward as a short line: 300전 · 레이드주화 5 · 짐승 가죽 2. */
+function rewardText(r) {
+  const t = [];
+  if (r.gold) t.push(won(r.gold));
+  if (r.coins) t.push(`레이드주화 ${r.coins}`);
+  for (const [id, n] of Object.entries(r.mats || {})) if (MATS[id]) t.push(`${MATS[id].name} ${n}`);
+  if (r.cos) t.push('코디 상자');
+  return t.join(' · ');
+}
+/** Pays a reward into the save; returns what came (a costume's name when one was given). */
+function payReward(r, from) {
+  progress.gold = (progress.gold || 0) + (r.gold || 0);
+  if (r.coins) progress.coins = (progress.coins || 0) + r.coins;
+  if (r.mats) {
+    progress.mats = progress.mats || {};
+    for (const [id, n] of Object.entries(r.mats)) progress.mats[id] = (progress.mats[id] || 0) + n;
+  }
+  let cos = null;
+  if (r.cos) {
+    try { cos = dropCostume(r.cos, from); } catch (e) { cos = null; }
+    // The costume list is not read yet (or every look is owned): coins in its place.
+    if (!cos) progress.coins = (progress.coins || 0) + 40;
+  }
+  say(`${from}: ${rewardText(r)}${cos ? ` · [${cos}]` : ''}`, 'sys');
+  return cos;
+}
+
 const QUESTS = [
   { id: 'q_novice', title: '초보 사냥꾼', text: '왕초보사냥터 정복', gold: 50, need: 1, have: s => s.clears.novice || 0 },
-  { id: 'q_rat', title: '쥐잡이', text: '쥐굴의 서생원 3번 쓰러뜨리기', gold: 300, need: 3, have: s => s.bosses.rat || 0 },
-  { id: 'q_snake', title: '땅꾼', text: '뱀굴에서 몬스터 500마리', gold: 400, need: 500, have: s => s.stageKills.snake || 0 },
-  { id: 'q_deer', title: '사슴 사냥꾼', text: '사슴굴 3번 정복', gold: 500, need: 3, have: s => s.clears.deer || 0 },
-  { id: 'q_haunt', title: '퇴마사', text: '흉가 정복', gold: 800, need: 1, have: s => s.clears.haunt || 0 },
-  { id: 'q_goblin', title: '도깨비 잡이', text: '도깨비굴 정복', gold: 1000, need: 1, have: s => s.clears.goblin || 0 },
+  { id: 'q_rat', title: '쥐잡이', text: '쥐굴의 서생원 3번 쓰러뜨리기', gold: 300, mats: { fur: 2 }, need: 3, have: s => s.bosses.rat || 0 },
+  { id: 'q_snake', title: '땅꾼', text: '뱀굴에서 몬스터 500마리', gold: 400, mats: { fur: 3 }, need: 500, have: s => s.stageKills.snake || 0 },
+  { id: 'q_deer', title: '사슴 사냥꾼', text: '사슴굴 3번 정복', gold: 500, mats: { fur: 4 }, need: 3, have: s => s.clears.deer || 0 },
+  { id: 'q_haunt', title: '퇴마사', text: '흉가 정복', gold: 800, mats: { bone: 4 }, need: 1, have: s => s.clears.haunt || 0 },
+  { id: 'q_goblin', title: '도깨비 잡이', text: '도깨비굴 정복', gold: 1000, mats: { horn: 4 }, need: 1, have: s => s.clears.goblin || 0 },
   { id: 'q_promo1', title: '승급자', text: '아무 직업이나 1차 승급', gold: 300, need: 1, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
-  { id: 'q_promo4', title: '탈명의 경지', text: '아무 직업이나 4차 승급', gold: 3000, need: 4, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
-  { id: 'q_promo9', title: '천하의 지존', text: '아무 직업이나 9차 승급', gold: 20000, need: 9, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
-  { id: 'q_promo7', title: '현세의 고수', text: '아무 직업이나 7차 승급', gold: 9000, need: 7, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
-  { id: 'q_raid1', title: '레이드 대원', text: '레이드 한 번 이기기', gold: 500, need: 1, have: s => Object.values(s.raids).reduce((a, b) => a + b, 0) },
-  { id: 'q_raid7', title: '전설의 용사', text: '레이드 일곱 곳 모두 이기기', gold: 5000, need: RAIDS.length, have: s => RAIDS.filter(r => s.raids[r.id]).length },
+  { id: 'q_promo4', title: '탈명의 경지', text: '아무 직업이나 4차 승급', gold: 3000, coins: 20, need: 4, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_promo7', title: '현세의 고수', text: '아무 직업이나 7차 승급', gold: 9000, coins: 50, mats: { kalpa: 5 }, need: 7, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_promo9', title: '천하의 지존', text: '아무 직업이나 9차 승급', gold: 20000, coins: 100, mats: { essence: 5 }, need: 9, have: () => Math.max(...CLASSES.map(c => promoOf(c.id))) },
+  { id: 'q_raid1', title: '레이드 대원', text: '레이드 한 번 이기기', gold: 500, coins: 10, need: 1, have: s => sumOf(s.raids) },
+  // (was '레이드 일곱 곳' while it counted every raid: the words now say the count it checks)
+  { id: 'q_raid7', title: '전설의 용사', text: `레이드 ${RAIDS.length}곳 모두 이기기`, gold: 5000, coins: 100, mats: { scroll: 2 }, need: RAIDS.length, have: s => RAIDS.filter(r => s.raids[r.id]).length },
   { id: 'q_sp1', title: '빛을 본 자', text: '스페셜 아이템 1개 얻기', gold: 500, need: 1, have: () => specialsOwned() },
-  { id: 'q_sp10', title: '수집가', text: '스페셜 아이템 10개 얻기', gold: 3000, need: 10, have: () => specialsOwned() },
-  { id: 'q_kills', title: '백전노장', text: '몬스터 누적 10000마리', gold: 2000, need: 10000, have: s => s.kills },
+  { id: 'q_sp10', title: '수집가', text: '스페셜 아이템 10개 얻기', gold: 3000, coins: 30, need: 10, have: () => specialsOwned() },
+  { id: 'q_kills', title: '백전노장', text: '몬스터 누적 10000마리', gold: 2000, mats: { silver1: 4 }, need: 10000, have: s => s.kills },
   { id: 'q_endless', title: '불굴', text: '정복 뒤 계속 사냥에서 10분 버티기', gold: 1500, need: 10, have: s => Math.floor(s.endless / 60) },
-  { id: 'q_allclass', title: '팔방미인', text: '네 직업 모두 Lv 20 기록', gold: 2000, need: 4, have: () => CLASSES.filter(c => (best[c.id] || {}).lvl >= 20).length },
+  // (was '네 직업 모두' — any four count, so it says so; every class is its own 의뢰 below)
+  { id: 'q_allclass', title: '팔방미인', text: '아무 직업 넷 Lv 20 기록', gold: 2000, need: 4, have: () => CLASSES.filter(c => (best[c.id] || {}).lvl >= 20).length },
+  { id: 'q_every', title: '만능의 협객', text: `모든 직업(${CLASSES.length}) Lv 20 기록`, gold: 8000, coins: 60, cos: [1], need: CLASSES.length, have: () => CLASSES.filter(c => (best[c.id] || {}).lvl >= 20).length },
   { id: 'q_codex', title: '장비 수집가', text: '도감 장비 절반 모으기', gold: 2000, need: 50, have: () => Math.floor(codexShare() * 100) },
+  // 수집 목표: the ★ of the grounds, the 코디 owned.
+  { id: 'q_star30', title: '숙련자', text: '사냥터 숙련 ★ 30개', gold: 3000, mats: { kalpa: 3 }, need: 30, have: () => sumOf(progress.mastery) },
+  { id: 'q_star90', title: '사냥의 달인', text: '사냥터 숙련 ★ 90개', gold: 10000, coins: 60, need: 90, have: () => sumOf(progress.mastery) },
+  { id: 'q_cos30', title: '멋쟁이', text: '코디 30벌 모으기', gold: 3000, cos: [1], need: 30, have: () => costumeOwned() },
+  { id: 'q_cos120', title: '패션 리더', text: '코디 120벌 모으기', gold: 8000, cos: [2], need: 120, have: () => costumeOwned() },
   // 「쟁」 (war.js): first of the three guilds ten times, the boss's last blow ten times.
-  { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 길드 1위 10번', gold: 5000, need: 10, have: () => (progress.bosspk || {}).won || 0 },
-  { id: 'q_jaeng_last', title: '막타 장인', text: '쟁에서 보스 막타 10번', gold: 5000, need: 10, have: () => (progress.bosspk || {}).last || 0 },
+  { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 길드 1위 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).won || 0 },
+  { id: 'q_jaeng_last', title: '막타 장인', text: '쟁에서 보스 막타 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).last || 0 },
 ];
+function costumeOwned() { return Object.keys(((progress.costume || {}).own) || {}).length; }
 
-/** Today's three 의뢰: drawn from the grounds already open, the same all day. */
+/** Today's three 의뢰: drawn from the grounds already open, the same all day. The third turns over
+ *  among a few kinds (any ground, a raid, an A grade, a 대항전) so the board is not the same each day. */
 function dailyQuests() {
   const day = new Date().toISOString().slice(0, 10);
   const d = progress.daily;
@@ -9394,22 +9468,60 @@ function dailyQuests() {
   const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
   const open = STAGES.filter((s, i) => unlocked(i));
   const pick = () => open[Math.floor(rnd() * open.length)];
-  const s = qstats();
-  const a = pick(), b = pick();
+  const lvl = s => (s.level !== undefined ? s.level : STAGES.indexOf(s));
+  const a = pick(), b = pick(), L = metaLevel();
+  const coins = Math.max(2, Math.round(L / 2));
+  const third = [
+    { id: 'd_any', text: '아무 사냥터에서 몬스터 800마리', gold: 500, mats: { [stageMat('', L)]: 2 }, key: ['kills'], need: 800 },
+    { id: 'd_style', text: '스타일 A 이상으로 정복 2번', gold: 600, coins: coins * 2, key: ['styleA'], need: 2 },
+    { id: 'd_war', text: '대항전 한 판', gold: 600, coins, mats: { kalpa: 1 }, key: ['war'], need: 1 },
+  ];
+  if (RAIDS.some(raidOpen)) third.push({ id: 'd_raid', text: '레이드 한 번 이기기', gold: 800, coins: coins * 3, key: ['raidsAll'], need: 1 });
   const list = [
-    { id: 'd_kill', text: `${a.name}에서 몬스터 300마리`, gold: 300 + 60 * (a.level !== undefined ? a.level : STAGES.indexOf(a)), key: ['stageKills', a.id], need: 300 },
-    { id: 'd_clear', text: `${josa(b.name, '을', '를')} 정복`, gold: 400 + 80 * (b.level !== undefined ? b.level : STAGES.indexOf(b)), key: ['clears', b.id], need: 1 },
-    { id: 'd_any', text: '아무 사냥터에서 몬스터 800마리', gold: 500, key: ['kills'], need: 800 },
-  ].map(q => ({ ...q, base: q.key.length > 1 ? (s[q.key[0]][q.key[1]] || 0) : s[q.key[0]] }));
+    { id: 'd_kill', text: `${a.name}에서 몬스터 300마리`, gold: 300 + 60 * lvl(a), mats: { [stageMat(a.id, lvl(a))]: 2 }, key: ['stageKills', a.id], need: 300 },
+    { id: 'd_clear', text: `${josa(b.name, '을', '를')} 정복`, gold: 400 + 80 * lvl(b), coins, mats: { [stageMat(b.id, lvl(b))]: 3 }, key: ['clears', b.id], need: 1 },
+    third[Math.floor(rnd() * third.length)],
+  ].map(q => ({ ...q, base: statOf(q.key) }));
   progress.daily = { day, list, claimed: [] };
   saveJson('bs_progress', progress);
   return list;
 }
 
 function dailyHave(q) {
-  const s = qstats();
-  const now = q.key.length > 1 ? (s[q.key[0]][q.key[1]] || 0) : s[q.key[0]];
-  return now - q.base;
+  return (q.abs ? statOf(q.key) : statOf(q.key) - (q.base || 0));
+}
+
+// 주간 의뢰 (from Monday, as the 괴력난신 and the 쟁): five of them; all five claimed open the week's
+// chest (주간 상자: 레이드주화, 겁화의 파편·조화의 정수, a 희귀 코디).
+const WEEKLY_CHEST = L => ({ coins: 40 + 4 * L, mats: L >= 12 ? { kalpa: 4, essence: 2 } : { silver1: 4, kalpa: 2 }, gold: 2000 + 200 * L, cos: [1] });
+function weeklyQuests() {
+  const week = gwoeWeek();
+  const w = progress.weekly;
+  if (w && w.week === week) return w.list;
+  const L = metaLevel(), raid = RAIDS.some(raidOpen);
+  const list = [
+    { id: 'w_kill', text: '몬스터 5000마리', gold: 1500 + 100 * L, mats: { [stageMat('', L)]: 4 }, key: ['kills'], need: 5000 },
+    { id: 'w_clear', text: '사냥터 정복·소탕 8번', gold: 1500 + 100 * L, coins: 10, key: ['clearsAll'], need: 8 },
+    { id: 'w_style', text: '스타일 A 이상으로 정복 5번', gold: 1200, coins: 15, key: ['styleA'], need: 5 },
+    raid ? { id: 'w_raid', text: '레이드 3번 이기기', gold: 2000, coins: 30, mats: { scroll: 1 }, key: ['raidsAll'], need: 3 }
+      : { id: 'w_war', text: '대항전 3판', gold: 2000, coins: 15, mats: { kalpa: 2 }, key: ['war'], need: 3 },
+    L >= 13 ? { id: 'w_gwoe', text: '괴력난신 3번 (이번 주 괴수)', gold: 2000, coins: 30, key: ['gwoeWeek'], need: 3, abs: true }
+      : { id: 'w_jaeng', text: '쟁 3번', gold: 2000, coins: 20, key: ['jaengWeek'], need: 3, abs: true },
+  ].map(q => ({ ...q, base: q.abs ? 0 : statOf(q.key) }));
+  progress.weekly = { week, list, claimed: [], chest: false };
+  saveJson('bs_progress', progress);
+  return list;
+}
+
+/** 의뢰 ready to be claimed (the town's line and the 의뢰 key say how many). */
+function claimable() {
+  const s = qstats(), done = progress.quests || {};
+  let n = 0;
+  for (const q of dailyQuests()) if (!progress.daily.claimed.includes(q.id) && dailyHave(q) >= q.need) n++;
+  for (const q of weeklyQuests()) if (!progress.weekly.claimed.includes(q.id) && dailyHave(q) >= q.need) n++;
+  if (progress.weekly.list.every(q => progress.weekly.claimed.includes(q.id)) && !progress.weekly.chest) n++;
+  for (const q of QUESTS) if (!done[q.id] && q.have(s) >= q.need) n++;
+  return n;
 }
 
 /** The chosen 칭호, or the one the conquests give. */
@@ -9419,39 +9531,59 @@ function heroTitle(cleared) {
 
 function openQuests() {
   const box = $('#trade-rows'), s = qstats();
+  const keep = box.scrollTop;
   box.innerHTML = '';
   $('#trade-title').textContent = '관원 · 의뢰';
-  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)}`;
+  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)} · 레이드주화 ${progress.coins || 0}`;
   const done = progress.quests = progress.quests || {};
-  const row = (name, desc, label, can, act) => {
+  const row = (name, desc, label, can, act, cls = '') => {
     const r = document.createElement('div');
-    r.className = 'trade-row';
+    r.className = 'trade-row' + (cls ? ' ' + cls : '');
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
     const b = document.createElement('button');
     b.className = 'btn';
     b.textContent = label;
     b.disabled = !can;
-    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins); openQuests(); };
+    b.onclick = () => { act(); saveJson('bs_progress', progress); $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins); audio.play('chest'); openQuests(); syncTownGoal(); };
     r.append(b);
     box.append(r);
   };
   const head = text => { const h = document.createElement('h4'); h.textContent = text; h.style.margin = '6px 0 2px'; box.append(h); };
-  head('오늘의 의뢰');
+  const bar = (have, need) => `<i class="qbar"><i style="width:${Math.round(100 * Math.min(1, have / need))}%"></i></i>${have}/${need}`;
+  head('오늘의 의뢰 (매일 바뀜)');
   const daily = dailyQuests();
   for (const q of daily) {
-    const have = Math.min(q.need, dailyHave(q)), got = progress.daily.claimed.includes(q.id);
-    row(q.text, `${have}/${q.need} · ${won(q.gold)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    const have = Math.max(0, Math.min(q.need, dailyHave(q))), got = progress.daily.claimed.includes(q.id);
+    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
       progress.daily.claimed.push(q.id);
-      progress.gold = (progress.gold || 0) + q.gold;
-    });
+      payReward(q, '오늘의 의뢰');
+    }, !got && have >= q.need ? 'ready' : '');
   }
+  const weekly = weeklyQuests(), W = progress.weekly;
+  const wDone = weekly.filter(q => W.claimed.includes(q.id)).length;
+  head(`이번 주 의뢰 ${wDone}/${weekly.length} (월요일에 바뀜)`);
+  for (const q of weekly) {
+    const have = Math.max(0, Math.min(q.need, dailyHave(q))), got = W.claimed.includes(q.id);
+    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
+      W.claimed.push(q.id);
+      payReward(q, '이번 주 의뢰');
+    }, !got && have >= q.need ? 'ready' : '');
+  }
+  const chest = WEEKLY_CHEST(metaLevel()), all = wDone >= weekly.length;
+  row('주간 상자', `이번 주 의뢰를 모두 받으면 · ${rewardText(chest)}`, W.chest ? '받음' : '열기', all && !W.chest, () => {
+    W.chest = true;
+    payReward(chest, '주간 상자');
+    banner('주간 상자를 열었습니다!');
+  }, all && !W.chest ? 'ready chest' : 'chest');
   head('의뢰 · 칭호');
-  for (const q of QUESTS) {
-    const have = Math.min(q.need, q.have(s)), got = done[q.id];
-    row(`${q.text}`, `${have}/${q.need} · ${won(q.gold)} · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
+  // Ready ones first, then the nearest to done; those claimed last.
+  const order = QUESTS.map(q => ({ q, have: Math.min(q.need, q.have(s)), got: !!done[q.id] }))
+    .sort((a, b) => (a.got - b.got) || ((b.have >= b.q.need) - (a.have >= a.q.need)) || (b.have / b.q.need - a.have / a.q.need));
+  for (const { q, have, got } of order) {
+    row(`${q.text}`, `${bar(have, q.need)} · ${rewardText(q)} · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
       done[q.id] = true;
-      progress.gold = (progress.gold || 0) + q.gold;
-    });
+      payReward(q, `의뢰 「${q.title}」`);
+    }, !got && have >= q.need ? 'ready' : '');
   }
   head('칭호 고르기');
   const titles = QUESTS.filter(q => done[q.id]).map(q => q.title);
@@ -9461,6 +9593,120 @@ function openQuests() {
       progress.title = t;
     });
   $('#trade').hidden = false;
+  box.scrollTop = keep;
+}
+
+// ---------------------------------------------------------------- 다음 목표
+//
+// One line at the top of the town: the nearest thing that makes the hero stronger — a 의뢰 to claim,
+// the next 승급's ground, the next raid's gate, the next 조합 — and a tap goes there.
+
+/** The next goal for a class: { text, go } (go: an errand for townErrand, or a stage to open). */
+function nextGoal(cls, noClaim = false) {
+  const n = noClaim ? 0 : claimable();
+  if (n) return { text: `의뢰 보상 ${n}개를 받을 수 있습니다 — 관원에게`, go: 'clerk', hot: true };
+  // The next 승급: its ground, or the ground that opens it.
+  const pr = promoOf(cls.id), promos = PROMOS[cls.id] || [];
+  if (pr < promos.length) {
+    const at = promos[pr].at, i = STAGES.findIndex(s => s.id === at), st = STAGES[i];
+    const spells = Object.values(SKILLS).filter(d => d.cls === cls.id && d.promo === pr + 1 && !d.evolved).map(d => d.name).slice(0, 2);
+    const what = spells.length ? ` · ${spells.join('·')}` : '';
+    if (st && unlocked(i)) return { text: `다음 승급 ${pr + 1}차: ${josa(st.name, '을', '를')} ${cls.name}로 정복${what}`, stage: st };
+    // Walk back to the first ground not yet open on its way.
+    let j = i;
+    while (j > 0 && !unlocked(j)) {
+      const s = STAGES[j], k = s.open ? STAGES.findIndex(x => x.id === s.open) : j - 1;
+      if (k < 0 || k === j) break;
+      j = k;
+    }
+    if (st && j >= 0 && unlocked(j)) return { text: `다음 승급 ${pr + 1}차 (${st.name}) — 먼저 ${josa(STAGES[j].name, '을', '를')} 정복`, stage: STAGES[j] };
+  }
+  // The next raid: the first not won, open or the gate it waits on.
+  const raid = RAIDS.find(r => !r.gwoe && !(progress.raids || {})[r.id]);
+  if (raid && raidOpen(raid)) return { text: `레이드 도전: ${raid.name} (Lv ${raid.level}) — 이기면 세트 장비·레이드주화`, go: 'raid' };
+  // The 조합 nearest to done among the pieces this class lacks (its gate open).
+  const c = nextCraft(cls);
+  if (c) return { text: `다음 조합: ${c.name} — ${c.need}`, go: 'smith' };
+  if (raid) {
+    const gate = STAGES.find(x => x.id === raid.open);
+    return { text: `다음 레이드 ${raid.name}: ${gate && !progress.cleared[gate.id] ? `${josa(gate.name, '을', '를')} 정복하면 열림` : raidLock(raid)}`, stage: gate && !progress.cleared[gate.id] ? gate : null, go: 'raid' };
+  }
+  const W = progress.weekly, wk = weeklyQuests();
+  const left = wk.filter(q => !W.claimed.includes(q.id)).length;
+  if (left) return { text: `이번 주 의뢰 ${wk.length - left}/${wk.length} — 모두 받으면 주간 상자`, go: 'clerk' };
+  return { text: '용무기·사신수 강화로 더 강해지기 — 대장장이에게', go: 'smith' };
+}
+/** The 조합 recipe this class lacks that is nearest to done, as { name, need }. */
+function nextCraft(cls) {
+  const b = bag(cls), mats = progress.mats || {};
+  let bestC = null, bestK = -1;
+  for (const c of CRAFTS) {
+    if (c.only && !c.only.includes(cls.id)) continue;
+    if (c.kind === 'shield' && !hasShield(cls.id)) continue;
+    if (b.includes('sp:' + c.id) || (c.from && !b.includes('sp:' + c.from)) || !needsMet(c.needs, progress)) continue;
+    // Only a recipe whose materials the grounds won so far can give.
+    if (!Object.keys(c.mats).every(id => MATS[id] && MATS[id].from.some(f => progress.cleared[f] || (progress.raids || {})[f]))) continue;
+    const all = Object.values(c.mats).reduce((a, n) => a + n, 0);
+    const have = Object.entries(c.mats).reduce((a, [id, n]) => a + Math.min(n, mats[id] || 0), 0);
+    const k = have / all;
+    if (k > bestK) { bestK = k; bestC = c; }
+  }
+  if (!bestC) return null;
+  const sp = SPECIAL[bestC.id];
+  const lack = Object.entries(bestC.mats).map(([id, n]) => `${MATS[id].name} ${Math.min(n, mats[id] || 0)}/${n}`).join(' · ');
+  return { name: sp ? specialName(sp, cls.id) : bestC.id, need: bestK >= 1 ? `재료가 모였습니다! (${won(bestC.gold)})` : lack };
+}
+let townGoal = null;
+function syncTownGoal() {
+  const b = $('#town-goal');
+  if (!b || !T) return;
+  try { townGoal = nextGoal(T.cls); } catch (e) { console.error(e); townGoal = null; }
+  b.hidden = !townGoal;
+  if (!townGoal) return;
+  b.innerHTML = `<small>다음 목표</small> ${townGoal.text}`;
+  b.classList.toggle('hot', !!townGoal.hot);
+  const k = $('#town-quick button[data-go="clerk"]'), n = claimable();
+  if (k) { k.textContent = n ? `의뢰 (${n})` : '의뢰'; k.classList.toggle('hot', !!n); }
+}
+function goTownGoal() {
+  const g = townGoal;
+  if (!g) return;
+  if (g.stage) {
+    pickedStage = g.stage;
+    mapTab = g.stage.map || mapTab;
+    showScreen('stages');
+    return;
+  }
+  townErrand(g.go);
+}
+
+// ---------------------------------------------------------------- what a hunt moved
+//
+// A hunt's start keeps a snapshot of the purse, the materials, the 코디 and every 의뢰's count; the
+// results compare against it to say what the hunt gave and which 의뢰 it moved.
+
+function metaSnap() {
+  const q = {};
+  try {
+    for (const x of dailyQuests().concat(weeklyQuests())) q[x.id] = dailyHave(x);
+  } catch (e) { /* the board can wait */ }
+  return { gold: progress.gold || 0, coins: progress.coins || 0, mats: Object.assign({}, progress.mats), cos: costumeOwned(), q };
+}
+/** What the hunt moved: coins, materials by name (×n), 코디 found, 의뢰 lines. */
+function metaDiff(s) {
+  if (!s) return null;
+  const mats = [];
+  for (const [id, n] of Object.entries(progress.mats || {})) {
+    const d = n - (s.mats[id] || 0);
+    if (d > 0 && MATS[id]) mats.push({ id, n: d });
+  }
+  const quests = [];
+  for (const x of dailyQuests().concat(weeklyQuests())) {
+    const now = Math.min(x.need, dailyHave(x)), was = Math.min(x.need, s.q[x.id] || 0);
+    const claimed = (progress.daily.claimed || []).includes(x.id) || (progress.weekly.claimed || []).includes(x.id);
+    if (now > was && !claimed) quests.push({ text: x.text, now, need: x.need, done: now >= x.need, week: x.id.startsWith('w_') });
+  }
+  return { coins: (progress.coins || 0) - s.coins, mats, cos: costumeOwned() - s.cos, quests };
 }
 
 // Lasting training sold by the innkeeper, as Charsi's ranks in D2 Survivors.
@@ -9545,7 +9791,8 @@ function openTrade(who) {
 }
 
 $('#talk').onclick = talk;
-$('#close-trade').onclick = () => { $('#trade').hidden = true; };
+$('#close-trade').onclick = () => { $('#trade').hidden = true; syncTownGoal(); };
+$('#town-goal').onclick = () => goTownGoal();
 $('#town-back').onclick = () => showScreen('select');
 addEventListener('keydown', e => {
   if ((e.code === 'Enter' || e.code === 'Space') && T && !G && !$('#town').hidden) talk();
@@ -9831,9 +10078,16 @@ function updateParty(dt) {
     const tick = dt * (G.stage.raid ? 1.4 : 1);
     for (const k of Object.keys(m.cd)) m.cd[k] -= tick;
     if (G.stage.raid && m.hp < m.maxHp * 0.3 && m.cls.id !== 'poet') partyTalk(m, ['힐 좀요!!', '피 없어요!', '저 죽어요!']);
+    // What each companion did, for the results (처치 and its share of the damage).
+    const k0 = G.kills, d0 = G.dealt ? G.dealt.ally || 0 : 0;
     G.allyHitting = true;
     partyAct(m);
     G.allyHitting = false;
+    if (G.kills > k0 || (G.dealt && (G.dealt.ally || 0) > d0)) {
+      const dd = m.deeds = m.deeds || {};
+      dd.kills = (dd.kills || 0) + G.kills - k0;
+      dd.dmg = (dd.dmg || 0) + (G.dealt.ally || 0) - d0;
+    }
   }
 }
 
@@ -10364,6 +10618,8 @@ function partyAct(m) {
           addFx(FX.revive, downed.x, downed.y + 2, { anchor: 'bottom' });
           audio.play('revive');
           downed.bubble = { text: '고마워!', t: G.t + 0.3 };
+          const dd = m.deeds = m.deeds || {};
+          dd.revive = (dd.revive || 0) + 1;
         });
       } else if (G.groupHeal && G.t - G.groupHeal < 3 && m.cd.g <= 0) {
         // After a blast over everyone: the 희원 to the whole party.
@@ -10393,6 +10649,8 @@ function partyAct(m) {
         const tier = Math.min(7, m.lv + 1), fx = SKILLS.c_heal.fxs ? SKILLS.c_heal.fxs[tier] : SKILLS.c_heal.fx;
         const n = low.maxHp * (0.14 + 0.04 * m.lv);
         addShot(m, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => {
+          const dd = m.deeds = m.deeds || {};
+          dd.heal = (dd.heal || 0) + Math.min(n, low.maxHp - low.hp);
           if (low === p) { heal(n, false); addFx(fx, 0, -26, { follow: true }); } else healMember(low, n, fx);
         } });
         audio.play('skill_c_heal', 'heal', tier + 1);
@@ -11343,6 +11601,123 @@ function gainedSummary(list, most = 8) {
   return all.length > most ? `${shown} 외 ${all.length - most}종 (모두 ${list.length}개)` : shown;
 }
 
+// ---------------------------------------------------------------- results, 승급 의식, the special's moment
+//
+// The results say what the hunt gave at a glance: the grade (as large as a 연 result), the special
+// finds first in gold, then 전 · 레이드주화 · 재료 · 코디 · 장비 as chips with their icons, the 승급,
+// what the companions did, which 의뢰 moved, and the next goal.
+
+/** The results window's body. style: Hunt.grade() (S/A/B/C, sc, and its parts when hunt.js gives
+ *  them as style.parts [[label, value], ...]; else the 기세·처형·일망타진·반응 counts). */
+function resultsHTML(style, huntGold) {
+  const d = metaDiff(G.meta0);
+  const chip = (html, cls = '') => `<span class="rchip${cls ? ' ' + cls : ''}">${html}</span>`;
+  const out = [];
+  out.push(`<div class="r-head">${style ? `<b class="r-grade g${style.g}">${style.g}</b>` : ''}<div class="r-who"><b>${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}</b><br>`
+    + `버틴 시간 ${clock(G.t)}${G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : ''} · 쓰러뜨린 몬스터 ${G.kills.toLocaleString()}마리</div></div>`);
+  if (style) {
+    const parts = Array.isArray(style.parts) ? style.parts.map(([l, v]) => `${l} ${v}`)
+      : [`최고 기세 ${style.best}단`, `처형 ${style.execs}`, `일망타진 ${style.sweeps}`, `반응 ${style.reactions}`];
+    out.push(`<div class="r-style">스타일 ${style.g}${style.sc !== undefined ? ` · ${style.sc}점` : ''} · ${parts.join(' · ')}`
+      + (style.stars ? ` · 숙련 <span class="r-star">${'★'.repeat(style.stars)}${'☆'.repeat(Math.max(0, 3 - style.stars))}</span>${style.newStar ? ' <em>새 ★</em>' : ''}` : '') + '</div>');
+  }
+  // The rare finds first, in gold (스페셜, 고유, 코디).
+  const rare = (G.gained || []).filter(x => x.startsWith('★') || x.startsWith('['));
+  if (rare.length) out.push(`<div class="r-special">${[...new Set(rare)].map(x => `<span>${x.startsWith('★') ? x : '★' + x}</span>`).join('')}</div>`);
+  const gains = [];
+  gains.push(chip(`<img src="assets/hud/ui_icon_gold2.png" alt="">+${won(G.gold)}${style && style.k !== 1 ? ` <small>(${won(huntGold)} × ${style.k})</small>` : ''}`, 'gold'));
+  if (d && d.coins > 0) gains.push(chip(`<img src="assets/hud/ui_Icon_Medal_Gold_01.png" alt="">레이드주화 +${d.coins}`, 'coin'));
+  for (const m of (d ? d.mats : []).sort((a, b) => b.n - a.n)) {
+    const ic = matIcon(m.id);
+    gains.push(chip(`${ic ? `<img src="${ic}" alt="">` : ''}${MATS[m.id].name} +${m.n}`));
+  }
+  if (d && d.cos > 0) gains.push(chip(`코디 +${d.cos}`, 'cos'));
+  const matNames = new Set(Object.values(MATS).map(m => m.name));
+  const gear = (G.gained || []).filter(x => !x.startsWith('★') && !x.startsWith('[') && !matNames.has(x));
+  if (gear.length) gains.push(chip(`장비 ${gainedSummary(gear, 4)}`, 'gear'));
+  out.push(`<div class="r-gains">${gains.join('')}</div>`);
+  if (G.promoted) out.push(`<div class="r-promo">${G.promoted.join('<br>')}</div>`);
+  const comp = companionSummary() + companionDeeds();
+  if (comp) out.push(`<div class="r-comp">${comp.replace(/^<br>/, '').replace(/<br>/g, ' · ')}</div>`);
+  if (d && d.quests.length) {
+    out.push(`<div class="r-quest">${d.quests.slice(0, 3).map(q => `<span class="${q.done ? 'done' : ''}">${q.week ? '주간' : '오늘'} · ${q.text} ${q.now}/${q.need}${q.done ? ' ✔ 받기 가능' : ''}</span>`).join('')}</div>`);
+  }
+  try {
+    const nc = claimable();
+    if (nc) out.push(`<div class="r-quest"><span class="done">관원에게 받을 의뢰 보상 ${nc}개</span></div>`);
+    const g = nextGoal(G.cls, true); // (the 의뢰 to claim are listed just above)
+    if (g) out.push(`<div class="r-next"><small>다음 목표</small> ${g.text}</div>`);
+  } catch (e) { /* the goal is a hint only */ }
+  out.push(`<div class="r-skills">${G.skills.map(s => skillName(s.id, s.lv)).join(' · ')}</div>`);
+  return out.join('');
+}
+
+/** What each companion did in the hunt: 처치, 피해 몫, 회복, 부활 (updateAllies and partyAct count them). */
+function companionDeeds() {
+  const all = (G.party || []).filter(m => m.deeds);
+  if (!all.length) return '';
+  const total = Math.max(1, (G.dealt && G.dealt.all || 0) + (G.dealt && G.dealt.ally || 0));
+  const rows = all.map(m => {
+    const d = m.deeds, t = [`${m.name} 처치 ${d.kills || 0}`];
+    if (d.dmg) t.push(`피해 ${Math.round(100 * d.dmg / total)}%`);
+    if (d.heal) t.push(`회복 ${shownNum(d.heal)}`);
+    if (d.revive) t.push(`부활 ${d.revive}`);
+    return t.join(' ');
+  });
+  return `<br>동료: ${rows.join(', ')}`;
+}
+
+/** A special (or 고유, or 코디) found: the field slows for a moment, a pillar of light over the hero,
+ *  a gold line in the chat; the results list it first. Not in a 대항전 (its time is shared). */
+function specialMoment(name, kind = '스페셜') {
+  if (!G || G.over) return;
+  if (!G.war) G.slowmo = Math.max(G.slowmo || 0, 0.4);
+  if (M.fx.h_levelup) addFx('h_levelup', 0, 2, { anchor: 'bottom', follow: true, scale: 1.3 });
+  if (M.fx['131']) addFx('131', 0, -20, { follow: true, scale: 1.2 });
+  say(`★ ${kind} 획득! ${name}`, 'loot');
+}
+
+/** The 승급 의식 over the results: the hero, 'N차 승급', the title of the step, the new spells
+ *  with their icons and the 필살기 it now casts, in 연's 승급 light and sound. A tap closes it. */
+function promoCeremony(list) {
+  if (!list || !list.length || $('#promo-fx')) return;
+  const cls = list[0].cls, top = list[list.length - 1];
+  const calm = !!settings.calmFx;
+  const names = PROMO_NAMES[cls.id] || [];
+  const title = names[top.n - 1] ? ` · ${names[top.n - 1]}` : '';
+  const spells = list.flatMap(x => x.ids).slice(0, 6);
+  const icons = spells.map(id => {
+    const im = skillIcon(id, SKILLS[id].fx);
+    return `<span class="pc-sk">${im.outerHTML}<small>${SKILLS[id].name}</small></span>`;
+  }).join('');
+  const ult = ultLook(cls.id);
+  const fx = document.createElement('div');
+  fx.id = 'promo-fx';
+  fx.className = 'ffx ffx-live ok res' + (calm ? ' calm' : '');
+  fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card pc-card"><div class="ffx-ico"><img src="assets/hero/${cls.hero}.png" alt=""></div>`
+    + `<b class="pc-n">${top.n}차 승급${title}</b><div class="ffx-name">${cls.name} · 승급 효과 피해 +${Math.round(PROMO_BONUS.dmg * 100 * top.n)}% · 체력 +${PROMO_BONUS.hp * top.n}</div>`
+    + (icons ? `<div class="pc-sks">${icons}</div>` : '')
+    + `<div class="ffx-msg">필살기: ${ult.name}</div><small class="pc-tap">눌러서 닫기</small></div>`;
+  document.body.append(fx);
+  const ico = fx.querySelector('.ffx-ico').getBoundingClientRect(), fr = fx.getBoundingClientRect();
+  for (const c of ['', ' add']) {
+    const cv = document.createElement('canvas');
+    cv.className = 'ffx-cv' + c;
+    cv.width = 300; cv.height = 240;
+    cv.style.left = Math.round(ico.left - fr.left + ico.width / 2 - 150) + 'px';
+    cv.style.top = Math.round(ico.top - fr.top + ico.height / 2 - 120) + 'px';
+    fx.append(cv);
+  }
+  const end = () => { forgeSprites = []; fx.remove(); };
+  fx.onclick = end;
+  forgeSound('promote');
+  setTimeout(() => forgeSound('levelup'), 160);
+  forgeSprite('131', { scale: 2.2 });
+  forgeSprite('h_levelup', { scale: 1.6, delay: 200, dy: -10 });
+  forgeSprite('129', { scale: 1.4, delay: 500 });
+  setTimeout(() => { if ($('#promo-fx') === fx) end(); }, 6000);
+}
+
 function showResults(title) {
   if (!G || G.over) return;
   // 공대 (war.js): the contribution, the tier and its coins, then the war's spotlight result.
@@ -11358,7 +11733,10 @@ function showResults(title) {
   G.pendingLevels = 0;
   // 사냥 기믹: 스타일 등급 — money ×1.0~1.3 by the grade.
   const style = G.hunt && G.cleared && !G.dead ? Hunt.grade() : null;
+  const huntGold = G.gold;
   if (style) G.gold = Math.round(G.gold * style.k);
+  // 의뢰: a conquest graded A or better counts (오늘·이번 주의 '스타일 A 이상'), once a hunt.
+  if (style && (style.g === 'S' || style.g === 'A') && !G.styleCounted) { G.styleCounted = true; qstats().styleA++; }
   bankGold();
   keepBuild();
   progress.tradeBuys = {}; // the merchant restocks its materials
@@ -11374,23 +11752,19 @@ function showResults(title) {
     return;
   }
   $('#over-title').textContent = title;
-  $('#over-stats').innerHTML = `${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}<br>버틴 시간 ${clock(G.t)}`
-    + (G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : '') + '<br>'
-    + `쓰러뜨린 몬스터 ${G.kills}마리 · ${won(G.gold)}<br>`
-    + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
-    + (G.gained && G.gained.length ? `<br><b class="promo">얻은 것: ${gainedSummary(G.gained)}</b>` : '')
-    + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '')
-    + companionSummary()
-    + (style ? `<br><b class="grade g${style.g}">스타일 ${style.g}</b> 최고 기세 ${style.best}단 · 처형 ${style.execs} · 일망타진 ${style.sweeps} · 반응 ${style.reactions} · 돈 ×${style.k}`
-      + (style.stars ? ` · 숙련 ${'★'.repeat(style.stars)}${style.newStar ? ' (새 ★)' : ''}` : '') : '');
+  $('#over-stats').innerHTML = resultsHTML(style, huntGold);
   // A conquered ground can be hunted on, harder and harder, for its specials.
   $('#keep').hidden = !(G.cleared && !G.dead && !G.stage.raid);
   showScreen('over');
   overWearUI();
+  // 승급 의식: a 승급 won on this ground is its own moment over the results.
+  const pc = G.promoCeremony;
+  if (pc && pc.length && !G.ceremonyShown) { G.ceremonyShown = true; setTimeout(() => { if (!$('#over').hidden) promoCeremony(pc); }, 500); }
 }
 
 function leaveHunt() {
   if (G && G.training) return leaveTraining();
+  if ($('#promo-fx')) { forgeSprites = []; $('#promo-fx').remove(); } // the 승급 의식 goes with the results
   if (G) {
     if (!G.over) gatherGear();
     record();
@@ -11459,6 +11833,7 @@ function promote() {
     const what = cards.concat(grown).join(', ');
     say(`${n + 1}차 승급! 이제 ${what}.`, 'sys');
     G.promoted = (G.promoted || []).concat(`${n + 1}차 승급: ${what}`);
+    (G.promoCeremony = G.promoCeremony || []).push({ n: n + 1, cls: G.cls, ids: tierSpells.map(d => Object.keys(SKILLS).find(k => SKILLS[k] === d)) });
     later(1.5, () => banner(`${G.cls.name} ${n + 1}차 승급!`));
   }
 }
@@ -13677,6 +14052,7 @@ function syncSettings() {
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
   $('#opt-aifx').textContent = `AI 이펙트 투명도: ${Math.round((1 - aiFxAlpha()) * 100)}%`;
+  $('#opt-overlap').textContent = `겹친 캐릭터 투명도: ${overlapAlpha() >= 1 ? '끔' : Math.round((1 - overlapAlpha()) * 100) + '%'}`;
   $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
@@ -13907,6 +14283,21 @@ function aiFxAlpha() {
 $('#opt-aifx').onclick = () => {
   const i = AI_FX_STEPS.findIndex(v => Math.abs(v - aiFxAlpha()) < 0.01);
   settings.aiFxAlpha = AI_FX_STEPS[(i + 1) % AI_FX_STEPS.length];
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 겹친 캐릭터 투명도: in a war, a raid or a 「쟁」 a fighter drawn over the hero, or sharing a tile
+// with another of its side, is drawn see-through (war.js overAlpha; the hero itself never), so the
+// hero and a heap of allies on a tile still read. 연 lets its players pass through and stand on one
+// another; this keeps such a heap legible. 50% by default.
+const OVERLAP_STEPS = [0.5, 0.35, 0.7, 1];
+function overlapAlpha() {
+  const v = settings.overlapAlpha;
+  return typeof v === 'number' && v > 0 && v <= 1 ? v : 0.5;
+}
+$('#opt-overlap').onclick = () => {
+  const i = OVERLAP_STEPS.findIndex(v => Math.abs(v - overlapAlpha()) < 0.01);
+  settings.overlapAlpha = OVERLAP_STEPS[(i + 1) % OVERLAP_STEPS.length];
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -14444,6 +14835,12 @@ window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
 window.__draw = () => drawCards();
 window.__raid = (c, r) => startRun(CLASSES[c], RAIDS[r] || RAIDS.find(x => x.id === 'raid_' + r));
 window.__quests = () => openQuests();
+// Test (pkg C): the 의뢰 board as data, the next goal of a class, a piece picked up, the 승급 의식.
+window.__meta = () => ({ daily: dailyQuests(), weekly: weeklyQuests(), claimable: claimable(), level: metaLevel(),
+  quests: QUESTS.map(q => ({ id: q.id, text: q.text, need: q.need, have: q.have(qstats()) })) });
+window.__nextGoal = c => nextGoal(CLASSES[c]);
+window.__pickGear = g => pickGear(g);
+window.__promoCeremony = (c, n) => promoCeremony([{ n, cls: CLASSES[c], ids: Object.keys(SKILLS).filter(k => SKILLS[k].cls === CLASSES[c].id && SKILLS[k].promo === n) }]);
 // Test hooks (the career sim: a class played from an empty save, buying and making between hunts):
 // the save, wearing the best, the 전투력, the 필살기 key. Nothing calls these in play.
 window.__progress = () => progress;
@@ -14459,7 +14856,7 @@ const War = initWar({
   G: () => G, setG: v => { G = v; }, M: () => M, Z: () => Z, VW: () => VW, VH: () => VH, settings: () => settings,
   progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
   saveProgress: () => saveJson('bs_progress', progress),
-  ctx, canvas, images, occ, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
+  ctx, canvas, images, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
