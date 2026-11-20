@@ -276,7 +276,7 @@ export const CRAFT_GYEOK = {
 // (방어 약화 = 저주) with it.
 export const DRAGON_CORE = { warrior: ['w_frenzy'], rogue: ['r_heaven'], mage: ['m_sammae'], poet: ['p_baekho', 'p_baekho2'],
   // The seven later classes: each its signature strike of the middle 승급.
-  archer: ['a_inferno'], lancer: ['l_annihil'], monk: ['mk_kyokushin'], magus: ['md_bloodbat'], celestial: ['cl_ego'], dokkaebi: ['dk_super'], reaper: ['rp_deadly'] };
+  archer: ['a_inferno'], lancer: ['l_annihil'], monk: ['mk_kyokushin'], magus: ['md_silence'], celestial: ['cl_ego'], dokkaebi: ['dk_judgment'], reaper: ['rp_crush'] };
 export function dragonGyeok(cls, step) {
   const head = { warrior: '용마', rogue: '용천', mage: '용랑', poet: '용겸', archer: '용섬', lancer: '용무', monk: '용비', magus: '용화', celestial: '용주', dokkaebi: '용린', reaper: '용라' }[cls] || '용';
   const num = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'][step];

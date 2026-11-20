@@ -1,7 +1,7 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
   CHAMPIONS_AT, FX, ELEMENTS, PROMOS, PROMO_NAMES, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
-  skillStats, skillName, levelText, isMend, MEND_FX,
+  skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS,
 } from './data.js';
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT } from './gyeok.js';
@@ -95,6 +95,14 @@ let settings = loadJson('bs_settings', { bgm: true, sfx: true, numbers: true, bu
 if (settings.tiles === undefined) settings.tiles = true;
 let best = loadJson('bs_best', {});
 let progress = loadJson('bs_progress', { cleared: {} });
+// 스킬 2차 개편: a spell merged into another of its line, or moved up into the 필살기 (data.js
+// SKILL_ALIAS), keeps its place in a saved build and in the 숙련 list under the one it became.
+for (const b of Object.values(progress.builds || {})) {
+  if (!b || !Array.isArray(b.skills)) continue;
+  const seen = new Set();
+  b.skills = b.skills.map(([id, lv]) => [SKILL_ALIAS[id] || id, lv]).filter(([id]) => !seen.has(id) && seen.add(id));
+}
+for (const [c, l] of Object.entries(progress.mastered || {})) if (Array.isArray(l)) progress.mastered[c] = [...new Set(l.map(id => SKILL_ALIAS[id] || id))];
 // The 끝없는 지옥's weapons found so far, each with its own affixes (items.js).
 loadAbyssLoot(progress.abyssLoot);
 // Which grounds each class has conquered: its 승급 come from these. Grounds conquered before
@@ -5691,7 +5699,7 @@ function hurtEnemy(e, dmg, push = null) {
     * (G.hunt ? Hunt.takeK(e) * (own ? Hunt.react(e) : 1) : 1); // 사냥 기믹: 그로기, 폭주, 속성 반응
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
-  const lucky = Math.random() < 0.1 + (own ? GEAR_OPT.crit * opt('crit') : 0);
+  const lucky = Math.random() < 0.1 + (own ? GEAR_OPT.crit * opt('crit') + (G.buffs.crit > G.t ? G.buffs.critK || 0 : 0) : 0);
   if (lucky) dmg *= 1.8 + (own ? GEAR_OPT.critdmg * opt('critdmg') : 0);
   if (G.critProbe) { G.critProbe.n++; if (lucky) G.critProbe.c++; }
   // The 암습's hits (AMBUSH) all show as 치명타 (their weight is already in the blow).
@@ -5722,6 +5730,8 @@ function hurtEnemy(e, dmg, push = null) {
   if (e.groggyT > G.t && e.groggyShown !== e.groggyT) { e.groggyShown = e.groggyT; hitStop(0.08, 'groggy'); } // 그로기의 순간
   // 흡혈 (an armour's line): a share of the hero's own blows back, at most vampCap a second (update).
   if (own && opt('vamp') && !G.procHitting) p.vampAcc = (p.vampAcc || 0) + dmg * GEAR_OPT.vamp * opt('vamp');
+  // 흡혈 buff (스킬 2차 개편, data.js drain): straight back, at most 2% of the hero's life a blow.
+  if (own && G.buffs.drain > G.t && !G.procHitting && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + Math.min(p.maxHp * 0.02, dmg * (G.buffs.drainK || 0)));
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
   // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
   // 수련장: the dummy is struck many times a second; kept white it showed nothing but a white shape.
@@ -6741,11 +6751,21 @@ function cast(skill, st) {
   // 연's Cast → Shot → Hit, where it has the pieces: the call over the hero (독수리소환's eagle,
   // 삼족오), then the shot flying to each one (기공구슬's orbs) before the hit lands on it.
   // A row or a burst round the hero may have its own small hit on each one struck (추격, 천지파열).
-  const castPic = 'k_x_' + skill.id + '_cast', shotPic = 'k_x_' + skill.id + '_shot';
-  const hitPic = M.fx['k_x_' + skill.id + '_hit'] ? 'k_x_' + skill.id + '_hit' : null;
-  if (M.fx[castPic] && ['spell', 'strike', 'nova', 'line'].includes(def.kind)) addFx(castPic, 0, -30, { follow: true, scale: 1.3 });
+  // 스킬 2차 개편: a spell may name its stages itself (data.js fxCast · fxShot · fxHit · fxAfter), each a
+  // 연 strip of its own class: the call over the hero, the shot flying, the spark on each struck, and
+  // what stays a moment where it landed — the high tiers are several pictures in turn, not one.
+  const castPic = def.fxCast || 'k_x_' + skill.id + '_cast', shotPic = def.fxShot || 'k_x_' + skill.id + '_shot';
+  const hitPic = def.fxHit && M.fx[def.fxHit] ? def.fxHit : M.fx['k_x_' + skill.id + '_hit'] ? 'k_x_' + skill.id + '_hit' : null;
+  if (M.fx[castPic] && (def.fxCast ? def.kind !== 'heal' : ['spell', 'strike', 'nova', 'line'].includes(def.kind))) {
+    addFx(def.fxCast ? bigFx(castPic, def.castSize || 150, 'cast') : castPic, 0, -30, { follow: true, scale: def.fxCast ? 1 : 1.3 });
+  }
   let hitN = 0;
-  const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: 1.1 }); };
+  const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: def.hitScale || 1.1 }); };
+  let afterN = 0;
+  const afterAt = (x, y, delay = 0) => {
+    if (!def.fxAfter || !M.fx[def.fxAfter] || afterN++ >= 3) return;
+    later(delay, () => tkLoop(def.fxAfter, x, y, def.afterT || 0.8, { scale: def.afterScale || 1, alpha: settings.calmFx ? 0.5 : 0.8 }));
+  };
   const shoot = e => {
     if (!M.fx[shotPic] || !e) return 0;
     const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
@@ -6907,6 +6927,10 @@ function cast(skill, st) {
           // (hitAt: where in its picture the blow falls, for one cut short of its empty end)
           later(life * (def.hitAt || 0.3), () => {
             const dealt = smite(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0));
+            hitOn(e);
+            if (def.slow) e.slow = def.slow;
+            if (def.stun) { e.stun = def.stun; cutBlast(e); }
+            if (def.curse) e.curse = def.curse;
             if (def.drain && dealt) heal(dealt * def.drain, false, true);
           });
         });
@@ -6954,8 +6978,10 @@ function cast(skill, st) {
             if (def.stun) { o.stun = def.stun; cutBlast(o); }
             if (def.curse) o.curse = def.curse;
             smite(o, st.dmg);
+            hitOn(o);
             if (o !== e) fling(o, tx, ty);
           }
+          afterAt(tx * TILE + TILE / 2, ty * TILE + TILE - 10);
           // A field that stays (the 천인's 선풍 whirlpools): it strikes again where it fell, at half weight.
           for (let k = 1; k <= (def.ticks || 0); k++) {
             later(k * 0.45, () => { for (const o of around(tx, ty, st.radius)) smite(o, st.dmg * 0.5); });
@@ -6997,8 +7023,10 @@ function cast(skill, st) {
         for (const e of hit.slice(0, def.max || 99)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           smite(e, st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0), [dx, dy]);
+          hitOn(e);
           fling(e, p.tx, p.ty);
         }
+        afterAt(p.x + dx * mid * TILE, p.y - 10 + dy * mid * TILE);
       });
       break;
     }
@@ -7049,6 +7077,7 @@ function cast(skill, st) {
         });
       }
       if (MELEE_LOOK[G.cls.id]) streak(p.x, p.y - 22, dx, dy, def.depth);
+      afterAt(p.x + dx * len, p.y - 10 + dy * len, dur);
       if (def.dash) {
         const x0 = p.x, y0 = p.y;
         // Through the row to the farthest open tile along it.
@@ -7067,25 +7096,83 @@ function cast(skill, st) {
       break;
     }
     case 'screen': {
-      // The whole screen, as 지폭지술 and its kind struck.
+      // The whole screen, as 지폭지술 and its kind struck. 스킬 2차 개편: each has a way of its own
+      // (def.pattern), not one flash over everything at once:
+      //   flat  — at once (the old way), rain — falling on each foe in turn, ring — running out from
+      //   the hero, sweep — a wall crossing the screen the way it faces, pull — drawn in, then burst,
+      //   mark  — every foe marked, then all burst.
       const all = onScreen();
       if (!all.length) return retry(0.5);
-      // As 바람의나라 연 draws its great spells: one picture, most of the screen high, over the hero
-      // (it rained in fourteen small copies before), and a small spark on each one struck.
-      const [scf, scflip] = dirFx(fxReach, skill.id, p.fdx, p.fdy);
-      screenFx(scf, skill.id, 0.9, scflip);
-      later(0.35, () => {
-        G.shake = Math.max(G.shake, 0.25);
+      const pat = def.pattern || 'flat';
+      const hold = e => {
+        if (e.hp <= 0) return false;
+        if (def.slow) e.slow = def.slow;
+        if (def.curse) e.curse = def.curse;
+        if (def.stun) { e.stun = def.stun; cutBlast(e); }
+        return true;
+      };
+      const far = e => (def.falloff ? Math.max(0.2, 1 - def.falloff * tdist(e, p)) : 1);
+      const big = () => { const [scf, scflip] = dirFx(fxReach, skill.id, p.fdx, p.fdy); screenFx(scf, skill.id, def.frac || 0.9, scflip); };
+      if (pat === 'flat') {
+        big();
+        later(0.35, () => {
+          G.shake = Math.max(G.shake, 0.25);
+          for (const e of all) if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); }
+        });
+      } else if (pat === 'rain') {
+        if (!def.fxCast) big();
+        const order = all.slice().sort(() => Math.random() - 0.5), span = def.span || 1.1;
+        const drop = def.fxDrop && M.fx[def.fxDrop] ? bigFx(def.fxDrop, def.dropSize || 110, 'drop') : null;
+        order.forEach((e, i) => {
+          const at = 0.15 + (i / order.length) * span;
+          if (drop && i < 12) later(at, () => { if (e.hp > 0) addFx(drop, e.x, e.y + 4, { anchor: 'bottom' }); });
+          later(at + 0.15, () => { if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); G.shake = Math.max(G.shake, 0.08); } });
+        });
+      } else if (pat === 'ring') {
+        big();
         for (const e of all) {
-          if (e.hp <= 0) continue;
-          if (def.slow) e.slow = def.slow;
-          if (def.curse) e.curse = def.curse;
-          if (def.stun) { e.stun = def.stun; cutBlast(e); }
-          // 포효검황: weaker with every tile away.
-          const far = def.falloff ? Math.max(0.2, 1 - def.falloff * tdist(e, p)) : 1;
-          smite(e, st.dmg * far);
+          const at = 0.2 + tdist(e, p) * 0.045;
+          later(at, () => { if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); } });
         }
-      });
+        for (let k = 1; k <= 3; k++) later(0.15 + k * 0.12, () => shock(p.x, p.y - 4, k * 2.5));
+        afterAt(p.x, p.y - 10, 0.3);
+      } else if (pat === 'sweep') {
+        const dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = dx ? 0 : p.fdy, v = viewTiles();
+        const along = e => (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, from = -(dx ? v.w : v.h), span = 2 * (dx ? v.w : v.h);
+        const wall = bigFx(fxReach, def.wallSize || 130, 'wall');
+        for (let s = 0; s < 5; s++) {
+          const a = from + span * (s + 0.5) / 5;
+          later(0.08 + s * 0.12, () => {
+            for (const k of [-1, 0, 1]) addFx(wall, p.x + (dx * a + dy * k * 3) * TILE, p.y - 10 + (dy * a + dx * k * 3) * TILE, { flip: dx < 0 });
+          });
+        }
+        for (const e of all) {
+          const at = 0.12 + Math.max(0, Math.min(1, (along(e) - from) / span)) * 0.6;
+          later(at, () => { if (hold(e)) { smite(e, st.dmg * far(e), [dx, dy]); hitOn(e); } });
+        }
+      } else if (pat === 'pull') {
+        big();
+        const ring = [];
+        for (let r = 1; r <= 3; r++) for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (Math.max(Math.abs(xx), Math.abs(yy)) === r) ring.push([p.tx + xx, p.ty + yy]);
+        all.slice().sort((a, b) => tdist(a, p) - tdist(b, p)).slice(0, 16).forEach(e => {
+          const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p)).sort((a, b) => Math.hypot(a[0] - e.tx, a[1] - e.ty) - Math.hypot(b[0] - e.tx, b[1] - e.ty))[0];
+          if (spot) tkShove(e, spot[0], spot[1]);
+        });
+        later(0.55, () => {
+          G.shake = Math.max(G.shake, 0.3);
+          shock(p.x, p.y - 4, 3.5);
+          for (const e of all) if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); }
+        });
+        afterAt(p.x, p.y - 10, 0.55);
+      } else if (pat === 'mark') {
+        big();
+        const mk = def.fxMark && M.fx[def.fxMark] ? def.fxMark : null;
+        all.slice(0, 14).forEach((e, i) => { if (mk) later(0.1 + i * 0.03, () => { if (e.hp > 0) fxOn(mk, e, { scale: 0.7 }); }); });
+        for (const e of all) e.curse = Math.max(e.curse || 0, 1.2);
+        all.slice().sort((a, b) => tdist(a, p) - tdist(b, p)).forEach((e, i) => {
+          later(0.9 + Math.min(0.5, i * 0.02), () => { if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); } });
+        });
+      }
       break;
     }
     case 'nova': {
@@ -7103,6 +7190,7 @@ function cast(skill, st) {
       if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, Math.max(1.5, reach + 0.5));
       later(0.1, () => {
         meleeImpact(3);
+        afterAt(p.x, p.y - 10);
         for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hitOn(e);
@@ -7179,6 +7267,21 @@ function cast(skill, st) {
         for (const e of G.enemies) if (!e.kind && tdist(e, p) <= 8) e.lostAt = G.t;
       }
       if (def.buff === 'power') G.buffs.powerK = def.power;
+      // 스킬 2차 개편: what each class's buff brings besides (no two alike): 흡혈 (drain: a share of the
+      // blows back as life), 치명 (crit: more 치명타), 가속 (haste too), 기운 (aura: strikes round the hero).
+      if (def.drain) { G.buffs.drain = G.t + st.duration; G.buffs.drainK = def.drain; }
+      if (def.crit) { G.buffs.crit = G.t + st.duration; G.buffs.critK = def.crit; }
+      if (def.alsoHaste) G.buffs.haste = Math.max(G.buffs.haste, G.t + st.duration);
+      if (def.alsoShield) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.alsoShield);
+      if (def.aura) {
+        const n = Math.round(st.duration / 0.5), ad = def.aura * Math.pow(1.15, skill.lv - 1);
+        for (let k = 1; k <= n; k++) later(k * 0.5, () => {
+          if (G.dead) return;
+          const near = around(p.tx, p.ty, def.auraR || 1);
+          if (near.length && def.fxHit && M.fx[def.fxHit] && k % 2) fxOn(def.fxHit, near[0], { scale: 0.8 });
+          for (const e of near) hurtEnemy(e, ad);
+        });
+      }
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       const [uf, uflip] = dirFx(fxid, skill.id, p.fdx, p.fdy);
       addFx(uf, 0, -26, { follow: true, flip: uflip });
@@ -7189,7 +7292,7 @@ function cast(skill, st) {
       // back is "nothing for it yet: again in that many seconds".
       const run = TIER_KINDS[def.kind];
       if (!run) break;
-      const again = run({ skill, st, def, fxid, smite, hitOn, p });
+      const again = run({ skill, st, def, fxid, smite, hitOn, afterAt, p });
       if (again) return retry(again);
       break;
     }
@@ -8019,37 +8122,283 @@ function idleLook(dt) {
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
-/** The 필살기 grows with 승급: the class's great spell of its highest tier, by its own name and
- * picture (건곤대나이 → 혈겁만파 → 광야건곤 → 흑룡광참 → 만검귀종 for the 전사), stronger a tier. */
-const ULT_PATH = {
-  warrior: [[0, 'w_ult'], [4, 'w_blood'], [5, 'w_rush'], [8, 'w_blackdragon'], [9, 'w_myriad']],
-  rogue: [[0, 'r_ult'], [4, 'r_heaven'], [6, 'r_shuriken'], [7, 'r_kill'], [9, 'r_gale']],
-  mage: [[0, 'm_ult'], [4, 'm_fire3'], [6, 'm_twin'], [7, 'm_inferno'], [9, 'm_kalpa']],
-  // (4차 was 봉황의기원: a 기원 as the 필살기 that strikes the whole screen. 귀염추혼소, the 4차 screen spell.)
-  poet: [[0, 'p_ult'], [4, 'p_break'], [6, 'p_burst'], [7, 'p_bagua'], [9, 'p_taiji']],
-  archer: [[0, 'a_ult'], [4, 'a_allwhirl'], [5, 'a_inferno'], [9, 'a_blood5']],
-  lancer: [[0, 'l_ult'], [4, 'l_genesis'], [6, 'l_annihil'], [9, 'l_moonfull']],
-  monk: [[0, 'mk_ult'], [4, 'mk_buddha'], [5, 'mk_combo'], [9, 'mk_aventhit']],
-  magus: [[0, 'md_ult'], [4, 'md_exfrenzy'], [5, 'md_bloodbat'], [9, 'md_wavefrenzy']],
-  celestial: [[0, 'cl_ult'], [4, 'cl_thunder'], [5, 'cl_tiger'], [9, 'cl_reindeer']],
-  dokkaebi: [[0, 'dk_ult'], [4, 'dk_super'], [6, 'dk_storm'], [9, 'dk_rage']],
-  reaper: [[0, 'rp_ult'], [4, 'rp_crush'], [6, 'rp_deadly'], [9, 'rp_gate']],
-};
+/** The 필살기 grows with 승급 (data.js ULT_TIERS): a technique of its own for each band of 승급
+ * (0~2차, 3~5차, 6~8차, 9차), by the class's own name, icon and 연 effects, each with a way of
+ * striking of its own (ULT_MECH below) — not one spell drawn larger. */
+function ultTier(cls, promo = promoOf(cls)) {
+  const list = ULT_TIERS[cls] || [];
+  let t = list[0];
+  for (let i = 0; i < list.length; i++) if (promo >= ULT_BANDS[i]) t = list[i];
+  return t;
+}
 function ultLook(cls) {
-  const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
-  let id = null;
-  for (const [at, sid] of ULT_PATH[cls] || []) if (promo >= at && SKILLS[sid] && !isMend(SKILLS[sid])) id = sid;
-  const d = SKILLS[id] || base;
-  const fx = d.yeon ? d.fx : d.modern && M.fx[d.modern] ? d.modern : d.fxs ? d.fxs[d.fxs.length - 1] : d.fx;
-  return { ...base, id: id || CLASSES.find(c => c.id === cls).ult, name: d.name, fx: M.fx[fx] ? fx : base.fx };
+  const base = SKILLS[CLASSES.find(c => c.id === cls).ult], t = ultTier(cls);
+  if (!t) return { ...base, id: CLASSES.find(c => c.id === cls).ult };
+  const own = SKILLS[t.id] || base;
+  const fx = [t.main, t.cast, 'k_' + t.id, base.fx].find(f => f && M.fx[f]) || base.fx;
+  return { ...base, ...t, hpCost: t.hpCost ?? base.hpCost, darken: t.darken ?? base.darken, name: own.name, fx };
 }
 function ultIcon(cls) {
   const l = ultLook(cls);
-  if (M.skillicon && M.skillicon.includes(l.id)) return `assets/skillicon/${l.id}.png`;
-  const d = SKILLS[l.id];
-  const fx = d.fxs ? d.fxs[d.fxs.length - 1] : d.fx;
-  return `assets/icon/${fx}.png`;
+  const iid = l.icon || l.id;
+  if (M.skillicon && M.skillicon.includes(iid)) return `assets/skillicon/${iid}.png`;
+  return `assets/icon/${l.fx}.png`;
 }
+
+// ---- 필살기 ways of striking (ULT_TIERS[cls][band].mech). Each gives every foe on the screen its
+// share of the blow (`base` × the tier's k), in an order and with pictures of its own:
+//   cast  — over the hero as it begins (the call), main — the great picture(s) of the technique,
+//   hit   — on each one struck, after — what stays a moment where it landed. All 연's own strips.
+function ultPic(id, x, y, o = {}) {
+  if (!id || !M.fx[id]) return 0;
+  const want = o.want ? bigFx(id, o.want, 'u' + Math.round(o.want), M.fx[id].cls === 'yeon' ? 5 : 2.4) : id;
+  return addFx(want, x, y, o);
+}
+function ultHitPic(t, e, delay) {
+  if (!t.hit || !M.fx[t.hit]) return;
+  fxOn(t.hit, e, { delay, scale: t.hitScale || 1.1 });
+}
+function ultAfter(t, x, y, delay = 0) {
+  if (!t.after || !M.fx[t.after]) return;
+  later(delay, () => tkLoop(t.after, x, y, t.afterT || 0.9, { scale: t.afterScale || 1.2, alpha: settings.calmFx ? 0.55 : 0.8 }));
+}
+const tileX = e => e.tx * TILE + TILE / 2, tileY = e => e.ty * TILE + TILE - 6;
+const ULT_MECH = {
+  // 건곤대나이·차사강림: three great cleaves going out ahead, to the sides, then behind.
+  cleaveWave(t, seen, strike) {
+    const p = G.player, dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = p.fdy || 0;
+    const fwd = e => (e.tx - p.tx) * dx + (e.ty - p.ty) * dy;
+    const waves = [seen.filter(e => fwd(e) > 0), seen.filter(e => fwd(e) === 0), seen.filter(e => fwd(e) < 0)];
+    waves.forEach((w, i) => {
+      const sx = i === 0 ? dx : i === 2 ? -dx : dy, sy = i === 0 ? dy : i === 2 ? -dy : dx;
+      later(0.12 + i * 0.28, () => {
+        ultPic(t.main, p.x + sx * TILE * 2.2, p.y - 22 + sy * TILE * 2.2, { want: t.mainSize || 220, rot: Math.atan2(sy, sx) + Math.PI / 2 });
+        G.shake = Math.max(G.shake, 0.3);
+      });
+      w.forEach((e, j) => { ultHitPic(t, e, 0.2 + i * 0.28 + j * 0.02); later(0.22 + i * 0.28, () => strike(e, 1)); });
+    });
+    ultAfter(t, p.x, p.y - 10, 0.9);
+  },
+  // 혈겁만파·여래신장: the blow falls on each foe from above, a rain over the whole screen.
+  rain(t, seen, strike) {
+    const order = seen.slice().sort(() => Math.random() - 0.5), span = t.span || 1.4;
+    order.forEach((e, i) => {
+      const at = 0.2 + (i / Math.max(1, order.length)) * span;
+      if (i < 16) later(at, () => ultPic(t.drop || t.hit, tileX(e), tileY(e) - 8, { want: t.dropSize || 120, anchor: 'bottom' }));
+      later(at + 0.18, () => { strike(e, 1); G.shake = Math.max(G.shake, 0.12); });
+    });
+    if (t.main) later(0.05, () => screenFx(t.main, t.id, t.frac || 0.85));
+  },
+  // 헬파이어·화룡사멸·광폭멸천강: a few great blasts on the thickest heaps; each strikes all round it.
+  meteor(t, seen, strike) {
+    const left = new Set(seen), spots = [];
+    while (left.size && spots.length < (t.n || 5)) {
+      let best = null, most = -1;
+      for (const e of left) { const n = [...left].filter(o => Math.abs(o.tx - e.tx) <= 2 && Math.abs(o.ty - e.ty) <= 2).length; if (n > most) { most = n; best = e; } }
+      const grp = [...left].filter(o => Math.abs(o.tx - best.tx) <= 2 && Math.abs(o.ty - best.ty) <= 2);
+      grp.forEach(o => left.delete(o));
+      spots.push([best, grp]);
+    }
+    const rest = [...left];
+    spots.forEach(([c, grp], i) => {
+      const at = 0.15 + i * (t.gap || 0.3), x = tileX(c), y = tileY(c);
+      later(at, () => ultPic(t.main, x, y, { want: t.mainSize || 200, anchor: 'bottom' }));
+      later(at + (t.land || 0.35), () => {
+        G.shake = Math.max(G.shake, 0.35);
+        shock(x, y, 2.5);
+        grp.forEach((e, j) => { ultHitPic(t, e, j * 0.02); strike(e, 1); });
+      });
+      ultAfter(t, x, y - 6, at + (t.land || 0.35));
+    });
+    // The rest of the screen: the blasts' wave reaches them a little after.
+    const end = 0.5 + spots.length * (t.gap || 0.3);
+    rest.forEach((e, j) => { ultHitPic(t, e, end + j * 0.02); later(end, () => strike(e, 1)); });
+  },
+  // 필살검무·돌격명령·필살권무·범아귀: the hero goes from foe to foe, a blow on each; the rest by its wake.
+  dash(t, seen, strike) {
+    const p = G.player, n = Math.min(seen.length, t.n || 8), path = [];
+    let cur = p;
+    const left = seen.slice();
+    for (let i = 0; i < n; i++) {
+      left.sort((a, b) => tdist(a, cur) - tdist(b, cur));
+      const e = left.shift();
+      path.push(e);
+      cur = e;
+    }
+    if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 160 });
+    path.forEach((e, i) => later(0.12 + i * (t.gap || 0.11), () => {
+      if (G.dead) return;
+      const spot = e.hp > 0 && !G.war && !G.stage.raid ? leapSpot(e) : null;
+      if (spot) leapTo(spot[0], spot[1]);
+      p.inv = Math.max(p.inv, 0.4);
+      ultPic(t.main, tileX(e), tileY(e) - 20, { want: t.mainSize || 130, rot: rand(-0.6, 0.6) });
+      ultHitPic(t, e, 0.04);
+      strike(e, 1);
+      if (MELEE_LOOK[G.cls.id]) meleeImpact(2);
+    }));
+    const end = 0.2 + path.length * (t.gap || 0.11);
+    later(end, () => { if (t.after && M.fx[t.after]) ultPic(t.after, 0, -26, { follow: true, want: t.afterSize || 240 }); G.shake = Math.max(G.shake, 0.3); });
+    left.forEach((e, j) => { ultHitPic(t, e, end + 0.05 + j * 0.02); later(end + 0.08, () => strike(e, 1)); });
+  },
+  // 만검귀종·폭풍화우·도깨비폭풍·저승문: the foes are drawn in round the hero, then it bursts.
+  vortex(t, seen, strike) {
+    const p = G.player;
+    tkLoop(t.main, p.x, p.y - 24, t.hold || 1.1, { scale: 1, alpha: settings.calmFx ? 0.6 : 0.9 });
+    if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 200 });
+    const ring = [];
+    for (let r = 1; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) ring.push([p.tx + dx, p.ty + dy]);
+    seen.slice().sort((a, b) => tdist(a, p) - tdist(b, p)).slice(0, 24).forEach((e, i) => later(0.1 + i * 0.02, () => {
+      const spot = ring.filter(([x, y]) => free(x, y) && Math.hypot(x - p.tx, y - p.ty) < tdist(e, p)).sort((a, b) => Math.hypot(a[0] - e.tx, a[1] - e.ty) - Math.hypot(b[0] - e.tx, b[1] - e.ty))[0];
+      if (spot) tkShove(e, spot[0], spot[1]);
+    }));
+    const at = t.hold || 1.1;
+    later(at, () => {
+      if (t.burst) ultPic(t.burst, 0, -26, { follow: true, want: t.burstSize || 300 });
+      G.shake = Math.max(G.shake, 0.45);
+      shock(p.x, p.y - 4, 4);
+      seen.forEach((e, j) => { ultHitPic(t, e, j * 0.015); strike(e, 1); });
+    });
+    ultAfter(t, p.x, p.y - 10, at);
+  },
+  // 분혼경천·귀염추혼소·살극·투혈오식·전의상실: every foe is marked; then the marks burst, nearest first.
+  mark(t, seen, strike) {
+    const p = G.player, delay = t.delay || 1.0;
+    if (t.cast) later(0.02, () => screenFx(t.cast, t.id, t.frac || 0.8));
+    seen.slice(0, 18).forEach((e, i) => later(0.15 + i * 0.03, () => { if (e.hp > 0) fxOn(t.main, e, { scale: t.markScale || 0.8 }); }));
+    seen.forEach(e => { e.curse = Math.max(e.curse || 0, delay + 0.5); if (t.stun) { e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? 0.4 : t.stun); } });
+    seen.slice().sort((a, b) => tdist(a, p) - tdist(b, p)).forEach((e, i) => {
+      const at = delay + Math.min(0.6, i * 0.025);
+      ultHitPic(t, e, at);
+      later(at + 0.05, () => { strike(e, 1); G.shake = Math.max(G.shake, 0.15); });
+    });
+  },
+  // 대지진·천지파열·광폭파장·나선광륜·도깨비의 격노: rings run out from the hero, three times.
+  rings(t, seen, strike) {
+    const p = G.player, n = t.n || 3, share = 1 / n;
+    for (let k = 0; k < n; k++) {
+      const at = 0.15 + k * (t.gap || 0.4);
+      later(at, () => {
+        ultPic(t.main, 0, -20, { follow: true, want: (t.mainSize || 240) * (1 + 0.25 * k) });
+        shock(p.x, p.y - 4, 3 + k * 2);
+        G.shake = Math.max(G.shake, 0.25);
+      });
+      seen.forEach(e => {
+        const d = tdist(e, p), hitAt = at + Math.min(0.35, d * 0.03);
+        if (k === n - 1) ultHitPic(t, e, hitAt);
+        later(hitAt, () => strike(e, share));
+      });
+    }
+    ultAfter(t, p.x, p.y - 10, 0.15 + n * (t.gap || 0.4));
+  },
+  // 헬파이어'첨·백월난격: pillars along the four ways (and the slants) out from the hero; then the rest.
+  cross(t, seen, strike) {
+    const p = G.player, ways = t.diag ? [...DIRS, [1, 1], [1, -1], [-1, 1], [-1, -1]] : DIRS;
+    const onLine = e => ways.some(([dx, dy]) => { const a = (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, s = Math.abs((e.tx - p.tx) * dy - (e.ty - p.ty) * dx); return a > 0 && s <= 1; });
+    ways.forEach(([dx, dy], w) => {
+      for (let k = 1; k <= (t.len || 5); k++) {
+        later(0.1 + k * 0.07 + w * 0.02, () => ultPic(t.main, p.x + dx * k * TILE * 1.4, p.y - 6 + dy * k * TILE * 1.4, { want: t.mainSize || 110, anchor: 'bottom' }));
+      }
+    });
+    if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 200 });
+    const first = seen.filter(onLine), rest = seen.filter(e => !onLine(e));
+    first.forEach(e => { const at = 0.15 + tdist(e, p) * 0.05; ultHitPic(t, e, at); later(at, () => strike(e, 1.15)); });
+    rest.forEach((e, j) => { const at = 0.75 + j * 0.015; ultHitPic(t, e, at); later(at, () => strike(e, 0.85)); });
+    ultAfter(t, p.x, p.y - 10, 0.7);
+  },
+  // 파천검무·염화마탄시·월하멸섬·혈마광폭열파: a wall of blows sweeps across the screen the way it faces.
+  sweep(t, seen, strike) {
+    const p = G.player, v = viewTiles();
+    const dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = dx ? 0 : p.fdy;
+    const along = e => (e.tx - p.tx) * dx + (e.ty - p.ty) * dy;
+    const span = (dx ? v.w : v.h) * 2, steps = t.steps || 6, from = -(dx ? v.w : v.h);
+    for (let s = 0; s < steps; s++) {
+      const a = from + (span * (s + 0.5)) / steps;
+      later(0.1 + s * (t.gap || 0.13), () => {
+        for (let k = -1; k <= 1; k++) {
+          const side = k * (dx ? v.h : v.w) * 0.55;
+          ultPic(t.main, p.x + (dx * a + dy * side) * TILE, p.y - 6 + (dy * a + dx * side) * TILE, { want: t.mainSize || 150, anchor: 'bottom', flip: dx < 0 });
+        }
+        G.shake = Math.max(G.shake, 0.14);
+      });
+    }
+    seen.forEach(e => {
+      const s = Math.max(0, Math.min(steps - 1, Math.floor(((along(e) - from) / span) * steps)));
+      const at = 0.16 + s * (t.gap || 0.13);
+      ultHitPic(t, e, at);
+      later(at, () => strike(e, 1));
+    });
+  },
+  // 일환탄시·광폭구회격·백월난격: volleys flying out from the hero to every foe, three in turn.
+  barrage(t, seen, strike) {
+    const p = G.player, n = t.n || 3, share = 1 / n;
+    if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 180 });
+    for (let k = 0; k < n; k++) {
+      seen.forEach((e, i) => {
+        const at = 0.15 + k * (t.gap || 0.3) + (i % 12) * 0.015;
+        later(at, () => {
+          if (e.hp <= 0) return;
+          const dx = e.x - p.x, dy = e.y - 20 - (p.y - 26), fl = Math.min(0.3, 0.08 + Math.hypot(dx, dy) / 1400);
+          if (i < 12 && t.shot && M.fx[t.shot]) addFx(t.shot, p.x, p.y - 26, { mv: [dx, dy, fl], rot: Math.atan2(dy, dx) + Math.PI / 2, scale: t.shotScale || 1.2 });
+          later(fl, () => { if (k === n - 1 || i < 6) ultHitPic(t, e, 0); strike(e, share); });
+        });
+      });
+    }
+    ultAfter(t, p.x, p.y - 10, 0.2 + n * (t.gap || 0.3));
+  },
+  // 뇌격룡: a bolt leaping from foe to foe through the whole screen.
+  chain(t, seen, strike) {
+    const p = G.player, left = seen.slice(), path = [];
+    let cur = p;
+    while (left.length) { left.sort((a, b) => tdist(a, cur) - tdist(b, cur)); cur = left.shift(); path.push(cur); }
+    if (t.cast) later(0.02, () => screenFx(t.cast, t.id, t.frac || 0.8));
+    let prev = { x: p.x, y: p.y - 26 };
+    path.forEach((e, i) => {
+      const at = 0.35 + i * (t.gap || 0.05), from = prev;
+      prev = { x: e.x, y: e.y - 20 };
+      later(at, () => {
+        if (i < 20 && t.shot && M.fx[t.shot]) addFx(t.shot, from.x, from.y, { mv: [e.x - from.x, e.y - 20 - from.y, 0.06], rot: Math.atan2(e.y - 20 - from.y, e.x - from.x) + Math.PI / 2 });
+        if (i < 20) fxOn(t.main, e, { scale: t.markScale || 0.9 });
+        strike(e, 1);
+        if (t.stun) e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? 0.3 : t.stun);
+      });
+    });
+  },
+  // 태극팔괘진·권신강림·강림술'신록: a great presence stands on the thickest heap, striking round it.
+  totem(t, seen, strike) {
+    const c = seen.slice().sort((a, b) => around(b.tx, b.ty, 2).length - around(a.tx, a.ty, 2).length)[0];
+    const x = tileX(c), y = tileY(c), life = t.life || 2.4, n = t.n || 4;
+    tkLoop(t.main, x, y - (t.lift || 30), life, { scale: t.mainScale || 1.4, alpha: settings.calmFx ? 0.65 : 0.95 });
+    if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 160 });
+    for (let k = 0; k < n; k++) {
+      const at = 0.3 + (k * (life - 0.4)) / n;
+      later(at, () => {
+        shock(x, y, 3 + k);
+        G.shake = Math.max(G.shake, 0.22);
+        if (t.drop) ultPic(t.drop, x + rand(-40, 40), y, { want: t.dropSize || 140, anchor: 'bottom' });
+        seen.forEach((e, j) => { if (k === n - 1 && j < 14) ultHitPic(t, e, 0); strike(e, 1 / n); });
+      });
+    }
+  },
+  // 일격필살'괴력난신: the strongest few first, each crushed (a foe below 40% of its life twice as hard).
+  execute(t, seen, strike) {
+    const top = seen.slice().sort((a, b) => b.maxHp - a.maxHp).slice(0, t.n || 3);
+    top.forEach((e, i) => later(0.15 + i * 0.3, () => {
+      ultPic(t.main, tileX(e), tileY(e), { want: t.mainSize || 200, anchor: 'bottom' });
+      later(0.25, () => { G.shake = Math.max(G.shake, 0.4); shock(tileX(e), tileY(e), 2.5); strike(e, e.hp < e.maxHp * 0.4 ? 2.4 : 1.6); });
+    }));
+    const end = 0.3 + top.length * 0.3;
+    seen.filter(e => !top.includes(e)).forEach((e, j) => { ultHitPic(t, e, end + j * 0.02); later(end + 0.1, () => strike(e, e.hp < e.maxHp * 0.4 ? 1.6 : 1)); });
+    ultAfter(t, G.player.x, G.player.y - 10, end);
+  },
+  // 태양의희원: the hero made whole and untouchable, light falling on every foe.
+  sanctuary(t, seen, strike) {
+    const p = G.player;
+    heal(p.maxHp, true);
+    G.buffs.guard = Math.max(G.buffs.guard, G.t + (t.guard || 3));
+    ultPic(t.cast || t.main, 0, -26, { follow: true, want: t.castSize || 200 });
+    seen.forEach((e, i) => { const at = 0.3 + (i % 14) * 0.05; if (i < 14) later(at, () => fxOn(t.main, e, { scale: 1 })); ultHitPic(t, e, at + 0.2); later(at + 0.25, () => strike(e, 1)); });
+  },
+};
 
 /** The way the class's 필살기 strikes: 'hunt' (the whole screen) or 'boss' (one, eight times as hard). */
 function ultMode(cls) {
@@ -8075,34 +8424,20 @@ const ULT_REST = 25;
 const MELEE = new Set(['warrior', 'rogue', 'lancer', 'monk', 'celestial', 'dokkaebi', 'reaper']);
 // Classes whose every damaging technique is their weapon's own attack clip (연's bow draw, spear thrust).
 const WEAPON_POSE = new Set(['archer', 'lancer', 'monk', 'dokkaebi', 'reaper']);
-const BOSS_ULT = { warrior: 'w_jinseom', rogue: 'r_amsal', mage: 'm_seongryeo', poet: 'p_jiroe', archer: 'a_aim', lancer: 'l_meteor', monk: 'mk_sudden', magus: 'md_arrow', celestial: 'cl_moment', dokkaebi: 'dk_judgment', reaper: 'rp_flash' };
+// (ULT_TIERS[cls][band].boss: the 보스용 필살기 grows with the 승급 too.)
+const bossUlt = cls => { const t = ultTier(cls); return t && SKILLS[t.boss] ? t.boss : null; };
 function ultWait() {
   return G && G.ultAt !== undefined ? Math.max(0, ULT_REST - (G.t - G.ultAt)) : 0;
 }
 
 /** What the 필살기 button shows: the 보스 technique in 보스 mode, the hunting 필살기 else. */
 function ultShown(cls) {
-  if (ultMode(cls) === 'boss' && SKILLS[BOSS_ULT[cls]]) {
-    const id = BOSS_ULT[cls];
+  if (ultMode(cls) === 'boss' && bossUlt(cls)) {
+    const id = bossUlt(cls);
     const icon = M.skillicon && M.skillicon.includes(id) ? `assets/skillicon/${id}.png` : ultIcon(cls);
     return { name: SKILLS[id].name, icon };
   }
   return { name: ultLook(cls).name, icon: ultIcon(cls) };
-}
-
-// A 필살기 whose picture is a burst on each one struck, not one picture over the hero: the old
-// 파천검무 (GIF 144: a golden blast with the slashes through it, then a pillar of fire under black
-// smoke) goes off on each foe, along the row ahead first, at its own size and on its feet, as the
-// original played it. (Blown up to the screen's height over the hero, 연's narrow 67-pixel strip
-// of it stood as one blurred, squeezed column in the middle of the screen.)
-const ULT_ROW = { r_heaven: '144' };
-function ultRow(fx, seen) {
-  const p = G.player, dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = p.fdy || 0;
-  // Ahead along the way it faces (and the tiles either side), nearest first; then the rest.
-  const ahead = e => { const a = (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, side = Math.abs((e.tx - p.tx) * dy - (e.ty - p.ty) * dx); return a > 0 && a <= 7 && side <= 1; };
-  const byNear = (a, b) => tdist(a, p) - tdist(b, p);
-  const row = seen.filter(ahead).sort(byNear), rest = seen.filter(e => !ahead(e)).sort(byNear);
-  row.concat(rest).slice(0, 10).forEach((e, i) => addFx(fx, e.x, e.y + 6, { anchor: 'bottom', delay: 0.08 + i * 0.06 }));
 }
 
 // ---------------------------------------------------------------- 보조 기술
@@ -8210,36 +8545,34 @@ function castUlt() {
   // A blade's or a bow's strike for the fighters; the 천인 (in MELEE for its leap) casts its 필살기.
   strikePose(MELEE_LOOK[G.cls.id] || WEAPON_POSE.has(G.cls.id) ? 'attack' : 'magic');
   say(`${shownName}!`);
-  audio.play('skill_' + def.id, 'ult');
-  if (def.darken) G.darkUntil = G.t + def.darken;
+  const mode = ultMode(G.cls.id);
+  audio.play('skill_' + (mode === 'boss' && def.boss ? def.boss : def.id), 'ult');
+  // The field darkens a moment under a 필살기 so its light reads (never a white sheet with 번쩍임 줄이기).
+  G.darkUntil = G.t + (def.darken || 0.7);
   G.shake = 0.5;
-  // The 필살기 fills the screen, as 연's great spells do: one picture as high as the screen over the
-  // hero (it was a hand across, in ten small copies), and the screen goes white for a blink and
-  // the world stops a frame or two (not in a raid or a war, where the party's blows go on).
-  const rowLook = ultMode(G.cls.id) === 'hunt' && ULT_ROW[def.id] && M.fx[ULT_ROW[def.id]] ? ULT_ROW[def.id] : null;
-  if (ultMode(G.cls.id) === 'hunt' && !rowLook) {
-    const [uf, uflip] = dirFx(grownFx(def.fx, 8), def.id, p.fdx, p.fdy);
-    screenFx(uf, def.id, 1, uflip);
-  }
   if (!G.stage.raid && !G.war) {
     if (screenFlashOk()) G.whiteAt = G.t;
     hitStop(0.035, 'ult');
   }
   const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
-  const onScreen = () => G.enemies.filter(e => Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
+  const onScreen = () => G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === 0) && Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
   // The 필살기's two ways, switched by the player at the button: 사냥 strikes everything on the
   // screen, 보스 puts eight times the blow into the strongest foe in sight (and a little around it).
-  const mode = ultMode(G.cls.id);
-  const base = (G.cls.id === 'warrior' ? p.maxHp * 0.9 : 60 + lvl * 12) * pw;
+  const base = (G.cls.id === 'warrior' ? p.maxHp * 0.9 : 60 + lvl * 12) * pw * (def.k || 1);
   const seen = onScreen();
+  // Its call over the hero first, at a caster's size (the technique's own 연 picture).
+  if (def.cast && M.fx[def.cast] && !['dash', 'vortex', 'barrage', 'cross', 'totem', 'sanctuary', 'mark', 'chain'].includes(def.mech)) {
+    ultPic(def.cast, 0, -26, { follow: true, want: def.castSize || 180 });
+  }
   if (mode === 'boss') {
-    // A technique of its own against the strongest foe: 진섬격, 암살, 성려멸주 or 지뢰진 — five
-    // quick blows on it, each with that spell's 연 effect, the 전사 and 도적 leaping to it first.
+    // The tier's own technique against the strongest foe (data.js ULT_TIERS boss): five quick
+    // blows with that technique's 연 effect, the close-in classes leaping to it first.
     const rank = e => (e.kind === 'boss' ? 4 : e.kind === 'mini' ? 3 : e.kind === 'champ' ? 2 : 1) * 1e9 + e.hp;
     const target = seen.slice().sort((a, b) => rank(b) - rank(a))[0];
-    const tech = BOSS_ULT[G.cls.id], tfx = M.fx['k_' + tech] ? 'k_' + tech : def.fx;
-    G.bubble = { text: `${SKILLS[tech] ? SKILLS[tech].name : def.name}!`, t: G.t };
+    const tech = def.boss && SKILLS[def.boss] ? def.boss : null;
+    const tfx = tech && M.fx['k_' + tech] ? 'k_' + tech : def.hit && M.fx[def.hit] ? def.hit : def.fx;
+    G.bubble = { text: `${tech ? SKILLS[tech].name : def.name}!`, t: G.t };
     if (target) {
       if (MELEE.has(G.cls.id)) {
         const spot = leapSpot(target);
@@ -8248,10 +8581,12 @@ function castUlt() {
           p.inv = Math.max(p.inv, 1.2);
         }
       }
+      if (def.cast && M.fx[def.cast]) ultPic(def.cast, 0, -26, { follow: true, want: 150 });
       for (let k = 0; k < 5; k++) {
         later(0.15 + k * 0.22, () => {
           if (target.hp <= 0) return;
-          fxOn(tfx, target, { scale: 1.2 });
+          fxOn(tfx, target, { scale: 1.2 + 0.1 * k });
+          if (k === 4 && def.hit && M.fx[def.hit] && def.hit !== tfx) fxOn(def.hit, target, { scale: 1.4 });
           hurtEnemy(target, base * 1.6);
           G.shake = Math.max(G.shake, 0.12);
           if (k === 4) around(target.tx, target.ty, 1.5).forEach(e => { if (e !== target && e.hp > 0) hurtEnemy(e, base); });
@@ -8259,27 +8594,17 @@ function castUlt() {
       }
     }
   } else {
-    // On the struck a small hit of its own (헬파이어's burst) or the class's spark, not the great
-    // picture again on each.
-    const hitPic = M.fx['k_x_' + def.id + '_hit'] ? 'k_x_' + def.id + '_hit' : MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hit : sparkOf(def.id, def);
-    if (rowLook) ultRow(rowLook, seen);
-    else if (M.fx[hitPic]) seen.slice(0, 14).forEach((e, i) => fxOn(hitPic, e, { delay: 0.3 + i * 0.03, scale: SPARK_SCALE[hitPic] || (MELEE_LOOK[G.cls.id] ? MELEE_LOOK[G.cls.id].hs * 1.3 : 0.9) }));
-    later(0.4, () => seen.forEach(e => { if (e.hp > 0) hurtEnemy(e, base); }));
+    const strike = (e, k) => { if (e.hp > 0) hurtEnemy(e, base * k); };
+    const run = ULT_MECH[def.mech] || ULT_MECH.rain;
+    if (seen.length || def.mech === 'sanctuary') run(def, seen, strike);
   }
-  // What each class's 필살기 brings besides the blow.
-  switch (G.cls.ult) {
-    case 'm_ult': {
-      G.buffs.shield = G.t + def.shield;
-      addFx(FX.shield, 0, -26, { follow: true, scale: 0.6 });
-      break;
-    }
-    case 'p_ult': {
-      heal(p.maxHp, true);
-      G.buffs.guard = G.t + def.guard;
-      addFx(def.fx, 0, -26, { follow: true, scale: 1.3 });
-      break;
-    }
+  // What a tier brings besides the blow (헬파이어's 보호막 …).
+  if (def.shield) {
+    G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shield);
+    if (FX.shield) addFx(FX.shield, 0, -26, { follow: true, scale: 0.6 });
   }
+  if (def.guard && def.mech !== 'sanctuary') G.buffs.guard = Math.max(G.buffs.guard, G.t + def.guard);
+  if (def.heal) heal(p.maxHp * def.heal, true);
 }
 
 // ---------------------------------------------------------------- 몰이기 (기획 P1-1)
