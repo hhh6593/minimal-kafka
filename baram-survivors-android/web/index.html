@@ -299,6 +299,62 @@
   .fd-mat small { color: #8a6a40; text-align: right; }
   .fd-mat img { width: 18px; height: 18px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; margin-right: 3px; }
   .fd-go { margin-top: auto; align-self: flex-end; min-width: 90px; }
+  /* 강화·조합 연출 (forgeRun) and the 확률 강화 switch apart from the list */
+  #forge-box { position: relative; }
+  #forge-opt { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 3px 8px; background: #cfd8e6; border: 1px dashed #4a5a78; border-radius: 12px; font: 10px G9, monospace; color: #1c2a48; flex-wrap: wrap; }
+  #forge-opt[hidden] { display: none; }
+  #forge-opt.on { background: #f0d0d0; border-color: #a02020; color: #5a1010; }
+  #forge-opt .fopt { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  #forge-opt .fopt input { position: absolute; opacity: 0; pointer-events: none; }
+  #forge-opt .sw { width: 28px; height: 14px; border-radius: 7px; background: #7a8aa8; position: relative; transition: background .15s; }
+  #forge-opt .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; transition: left .15s; }
+  #forge-opt .fopt input:checked + .sw { background: #c02828; }
+  #forge-opt .fopt input:checked + .sw::after { left: 16px; }
+  #forge-opt small { flex: 1; min-width: 0; }
+  #forge-opt .fopt-warn { flex: 1; color: #a01800; font-weight: 700; }
+  #forge-opt button { font: 10px G9, monospace; padding: 1px 8px; border: 1px solid #4a5a78; border-radius: 8px; background: #fff; cursor: pointer; }
+  #forge-opt .fopt-yes { background: #c02828; color: #fff; border-color: #801010; }
+  .fd-res { padding: 3px 5px; font-weight: 700; border-left: 3px solid; }
+  .fd-res.ok { color: #0a5a10; background: #d8f0c8; border-color: #2a9a20; }
+  .fd-res.dmg { color: #4a4a4a; background: #d4d0cc; border-color: #444; }
+  .fd-res.rust { color: #a01800; background: #f4d0c4; border-color: #c02010; }
+  .ffx { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(24, 10, 4, .78); }
+  .ffx-card { position: relative; width: 190px; padding: 8px 6px; text-align: center; background: #f4e6c4; border: 3px solid #7a2a08; font: 11px G9, monospace; color: #4a2a08; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .ffx-ico { position: relative; width: 64px; height: 64px; }
+  .ffx-ico img { position: relative; width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
+  .ffx-cv { position: absolute; width: 300px; height: 240px; pointer-events: none; z-index: 4; }
+  .ffx-cv.add { mix-blend-mode: screen; }
+  .ffx-name { font-size: 12px; color: #5a1a00; }
+  .ffx-star { font-size: 20px; font-weight: 700; color: #b07800; min-height: 24px; }
+  .ffx-msg { font-size: 12px; font-weight: 700; min-height: 16px; }
+  .ffx-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 3; }
+  .ffx.wait .ffx-card { animation: ffx-pulse .26s ease-in-out infinite alternate; }
+  .ffx.wait .ffx-ico img { animation: ffx-glow .26s ease-in-out infinite alternate; }
+  .ffx.ok .ffx-card { border-color: #e0a010; box-shadow: 0 0 24px 6px #ffd860; animation: ffx-bump .35s ease-out; }
+  .ffx.ok .ffx-msg, .ffx.ok .ffx-star { color: #0a6a10; }
+  .ffx.ok .ffx-flash { animation: ffx-flash .45s ease-out; }
+  .ffx-star.pop { animation: ffx-pop .4s ease-out; color: #e08000; }
+  .ffx.dmg .ffx-card { border-color: #333; background: #cfc8bc; animation: ffx-shake .5s linear; }
+  .ffx.dmg .ffx-ico img { filter: grayscale(1) brightness(.6) contrast(1.2); }
+  .ffx.dmg .ffx-card::after { content: ''; position: absolute; left: 36%; top: 8px; width: 28%; height: 66px; background: linear-gradient(115deg, transparent 46%, #222 47% 53%, transparent 54%); z-index: 3; }
+  .ffx.dmg .ffx-msg { color: #444; }
+  .ffx.rust .ffx-card { border-color: #a01800; background: #ecc8b8; animation: ffx-shake .5s linear; }
+  .ffx.rust .ffx-ico img { filter: sepia(1) saturate(3) hue-rotate(-30deg) brightness(.75); }
+  .ffx.rust .ffx-msg, .ffx.rust .ffx-star { color: #a01800; }
+  .ffx-star.drop { animation: ffx-drop .45s ease-in; }
+  .ffx.res.done { cursor: pointer; }
+  .ffx.calm.wait .ffx-card, .ffx.calm.wait .ffx-ico img, .ffx.calm.dmg .ffx-card, .ffx.calm.rust .ffx-card { animation: none; }
+  .ffx.calm.wait .ffx-card { box-shadow: 0 0 14px 3px #ffe8a0; }
+  .ffx.calm.ok .ffx-flash { animation: ffx-flash-calm .6s ease-out; }
+  .ffx.calm .ffx-star.pop, .ffx.calm .ffx-star.drop { animation: none; }
+  @keyframes ffx-pulse { from { box-shadow: 0 0 6px 1px #ffe8a0; transform: scale(1); } to { box-shadow: 0 0 22px 6px #ffd060; transform: scale(1.04); } }
+  @keyframes ffx-glow { from { filter: brightness(1); } to { filter: brightness(1.5) saturate(1.3); } }
+  @keyframes ffx-bump { 0% { transform: scale(.94); } 55% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  @keyframes ffx-flash { 0% { opacity: .85; } 100% { opacity: 0; } }
+  @keyframes ffx-flash-calm { 0% { opacity: .3; } 100% { opacity: 0; } }
+  @keyframes ffx-pop { 0% { transform: scale(2.2); } 100% { transform: scale(1); } }
+  @keyframes ffx-drop { 0% { transform: translateY(-10px); opacity: .4; } 100% { transform: none; opacity: 1; } }
+  @keyframes ffx-shake { 0%, 100% { transform: translateX(0); } 12% { transform: translateX(-7px); } 25% { transform: translateX(6px); } 40% { transform: translateX(-5px); } 55% { transform: translateX(4px); } 70% { transform: translateX(-2px); } 85% { transform: translateX(1px); } }
   /* 코디 window: the forge's look, the hero in the chosen costume walking in four directions. */
   #coordi { position: fixed; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .6); }
   #coordi[hidden] { display: none; }
