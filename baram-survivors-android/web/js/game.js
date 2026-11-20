@@ -837,7 +837,7 @@ function raidInfo(r) {
   const rec = best[chosenClass.id], start = raidStart(rec);
   const roles = War.raidRoles(chosenClass);
   const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
-  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · 8분 안에</div>
+  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · ${RAID_LIMIT / 60}분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="assets/mon/${(namedMonster(r.boss) || r.boss).id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 공격대 25명${party.length ? ` · 내 다른 직업: ${party.slice(0, 4).join(', ')}` : ''}</div>
@@ -5720,7 +5720,7 @@ function hurtEnemy(e, dmg, push = null) {
   if (e.war || G.stage.jaeng) dmg = War.scale(dmg, e);
   // 공대: the hero's blows past about two raiders' worth a second are scaled down (war.js).
   const RW = G.war && G.war.raid;
-  if (RW) dmg = War.raidScale(dmg);
+  if (RW) dmg = War.raidScale(dmg, e);
   e.hp -= dmg;
   if (G.hunt) Hunt.hurt(e, dmg); // 사냥 기믹: 그로기, the boss's measure
   // 흡혈 (an armour's line): a share of the hero's own blows back, at most vampCap a second (update).

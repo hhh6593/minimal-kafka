@@ -1568,7 +1568,45 @@ RAIDS.push({ id: 'raid_gwoe', v2: true, gwoe: true, bgm: 'bs_suhwa', raid: true,
 // The ladder in order of strength, whatever order they were written in.
 RAIDS.sort((a, b) => a.level - b.level);
 
-export const RAID_BOSS_AT = 15, RAID_LIMIT = 8 * 60;
+// A raid is meant for three to four minutes (it was five to seven): five at most, its rage at four.
+export const RAID_BOSS_AT = 15, RAID_LIMIT = 5 * 60;
+
+/**
+ * 레이드 역할 임무 (war.js raidTasks): in each of the boss's three phases (100~70%, 70~40%, 40~0%)
+ * the hero has one clear task of its role, shown at the top of the screen with its time and a mark
+ * on what it is about; from the second phase the boss's 「모여라」 / 「흩어져」 marks come between
+ * them for everyone. A task done counts in the hero's contribution (obj) and spares the raid its
+ * blow; one failed costs the raid (a healer struck, a raider fallen, the boss mended or a blast).
+ */
+export const RAID_TASKS = {
+  tank: ['hold', 'berserk', 'hold'],
+  healer: ['focus', 'cleanse', 'focus'],
+  dps: ['totem', 'shield', 'totem'],
+  support: ['guard', 'totem', 'guard'],
+};
+export const RAID_TASK_DEF = {
+  hold: { name: '보스 붙잡기', how: '보스가 힐러에게 간다! 보스 곁 3칸에 2.5초 붙어 도발', sec: 7, obj: 9 },
+  berserk: { name: '광전사 붙잡기', how: '광전사가 뒷줄 힐러에게 달려든다! 2칸 안에 붙어 2초', sec: 10, obj: 9 },
+  focus: { name: '집중 치유', how: '표식이 붙은 공대원 곁(4칸)에 붙어 80%까지 살리기', sec: 9, obj: 9 },
+  cleanse: { name: '정화', how: '저주받은 공대원 둘 — 곁(2칸)에 1초씩 서서 풀기', sec: 11, obj: 9 },
+  totem: { name: '토템 부수기', how: '보스를 감싼 토템 셋을 부숴라 (그동안 보스 피해 60%)', sec: 15, obj: 10 },
+  shield: { name: '보호막 깨기', how: '보스의 보호막! 딜을 몰아 깨면 보스가 휘청인다', sec: 12, obj: 10 },
+  guard: { name: '광역기 대비', how: '큰 광역기가 온다! 공대원 4명 곁(3칸)에 서서 보호', sec: 8, obj: 8 },
+  soak: { name: '모여라', how: '금빛 원 안에 넷이 함께 서서 받아내기 (나 포함)', sec: 7, obj: 5, all: true },
+  spread: { name: '흩어져', how: '내게 폭탄 표식! 공대원에게서 3칸 떨어지기', sec: 6, obj: 5, all: true },
+};
+
+/**
+ * 대항전 지휘 선택 (war.js warCommand): once a minute the hero chooses how its guild's squads fight
+ * for the next minute; unchosen, the guild's own commander goes on as it was.
+ */
+export const WAR_COMMANDS = {
+  charge: { name: '돌격', desc: '모든 분대가 적 목표로 (공격 +10%, 받는 피해 +10%)', dmg: 1.1, taken: 1.1 },
+  hold: { name: '수비', desc: '분대 절반이 우리 목표를 지킨다 (받는 피해 −15%)', dmg: 1, taken: 0.85 },
+  flank: { name: '우회', desc: '두 분대가 옆길로 돌아 기습 (기습 분대 공격 +20%)', dmg: 1, taken: 1, flankDmg: 1.2 },
+  rally: { name: '집결', desc: '모든 분대가 나에게 모인다 (내 곁 5칸 공격 +8%·보호)', dmg: 1, taken: 1, nearDmg: 1.08 },
+};
+export const WAR_COMMAND_EVERY = 60, WAR_COMMAND_PICK = 12;
 export const MINI_AT = [90, 190];
 export const CHAMPIONS_AT = [60, 120, 180];
 
