@@ -5,7 +5,8 @@
   "classes": [
    "warrior"
   ],
-  "trail": true
+  "trail": true,
+  "size": 0.72
  },
  "hyeonmu": {
   "item": "현무불괴갑",
@@ -57,7 +58,10 @@
   "gauntlet": true,
   "classes": [
    "lancer"
-  ]
+  ],
+  "size": 1.15,
+  "hold": 0.7,
+  "stretch": 1.6
  },
  "tc_monk": {
   "item": "칠지천지환영검",
@@ -121,17 +125,13 @@
   ]
  },
  "ab_lancer": {
-  "item": "연옥방천극",
+  "item": "오귀창",
   "mode": "weapon",
   "classes": [
    "lancer"
   ],
-  "src": [
-   0,
-   1,
-   0
-  ],
-  "size": 0.7
+  "size": 1.15,
+  "hold": 0.7
  },
  "ab_monk": {
   "item": "주박권법혈천장갑",
@@ -248,6 +248,29 @@
    "ref": [
     "1020"
    ]
+  },
+  "lancer": {
+   "idle_up": {
+    "ang": 180
+   },
+   "walk_up": {
+    "ang": 180
+   },
+   "atk_up": {
+    "ang": 180
+   },
+   "idle_side": {
+    "ang": 180
+   },
+   "walk_side": {
+    "ang": 180
+   },
+   "atk_side": {
+    "ang": 180
+   },
+   "atk_down": {
+    "ang": 180
+   }
   }
  }
 }

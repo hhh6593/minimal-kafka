@@ -752,7 +752,7 @@ export const TAECHO_BASE = {
 };
 // The abyss uniques' looks beyond the 전사·도적: the original's black and red weapons laid on 연's
 // heroes (layers "s_ab_<class>"; ABYSS_BASE where a build lacks them), dressed black, blood and fire:
-// 주술사 고대마령의적혈장, 도사 할로윈천마적혈봉, 궁사 할로윈천마적혈궁, 창술사 연옥방천극, 격투가
+// 주술사 고대마령의적혈장, 도사 할로윈천마적혈봉, 궁사 할로윈천마적혈궁, 창술사 오귀창, 격투가
 // 주박권법혈천장갑, 마도사 할로윈천마암흑단봉, 천인 흑옥방천극, 도깨비 고대마령의적혈봉, 차사 사혼명도.
 export const ABYSS_WORN = Object.fromEntries(['mage', 'poet', 'archer', 'lancer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'].map(c => [c, 's_ab_' + c]));
 // 태초 and the abyss uniques are the top of the weapons: their 격 drawn this much larger again

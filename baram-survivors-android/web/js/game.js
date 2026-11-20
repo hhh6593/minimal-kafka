@@ -2088,8 +2088,10 @@ function taechoIcon(cls, sp) {
   if (!im || !im.complete || !im.width) return null;
   const a = H.anims.idle_down || H.anims.walk_down, box = frameBox(H, [meta]), dz = sp.dress;
   const sheets = { weapon: { im: dressedSheet(im, path, dz.tint, dz.pal), meta } };
-  if (!wn && H.layers.wback && H.layers.wback[String(ab[0])]) {
-    const wb = H.layers.wback[String(ab[0])], wp = 'yhero2/' + wb.file;
+  // (with its part behind the body: a laid spear's shaft is there)
+  const wk = wn ? sp.worn[cls.id] : String(ab[0]);
+  if (H.layers.wback && H.layers.wback[wk]) {
+    const wb = H.layers.wback[wk], wp = 'yhero2/' + wb.file;
     if (!(wp in images)) loadImage(wp);
     if (images[wp] && images[wp].width) sheets.wback = { im: dressedSheet(images[wp], wp, dz.tint, dz.pal), meta: wb };
   }
