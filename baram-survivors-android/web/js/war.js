@@ -28,14 +28,15 @@ const DIR4 = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 // Twenty-five a side: five squads of five (the squads are only how the AI is organised; the
 // commanders send most of them to the same place, so the guild fights as one crowd).
 const SQUADS = 5;
-// 대규모 전투 (the menu's switch, settings.bigBattle; on unless turned off): seven squads a side in a
-// war (35, against 25), seven parties in a raid (35) and four squads a guild in a 「쟁」 (16, against
-// 12). Measured at a quarter of a desktop's speed (4x CPU throttle) the crowd keeps nine frames in
-// ten within 20 ms once the field's drawing was made cheaper; off, the old sizes for a slow phone.
+// 대규모 전투 (the menu's switch, settings.bigBattle): seven squads a side in a war (35, against 25)
+// and seven parties in a raid (35) unless turned off (false); with 'all' also four squads a guild in
+// a 「쟁」 (16, against 12). Measured at a quarter of a desktop's speed (4x CPU throttle), a war and a
+// raid of 35 keep nine frames in ten at 16.7 ms even where the crowd is thickest; a 「쟁」 of 48 and a
+// boss did not (p90 33 ms in three runs of four), so it stays at 12 unless asked for.
 // crowdK: how much more the crowd strikes (the boss's life and the PK points are matched to it).
 const BIG = { war: 7, raid: 7, jaeng: 4 }, SMALL = { war: SQUADS, raid: SQUADS, jaeng: 3 };
-const bigOn = () => A.settings().bigBattle !== false;
-const squadsOf = mode => (bigOn() ? BIG : SMALL)[mode];
+const bigOn = mode => { const b = A.settings().bigBattle; return mode === 'jaeng' ? b === 'all' : b !== false; };
+const squadsOf = mode => (bigOn(mode) ? BIG : SMALL)[mode];
 // 전장 보정 per 승급 of the hero (W.foeK): to 5차, and from 5차 to 9차.
 const FOE_K5 = 0.024, FOE_K9 = 0;
 const ROLES = {
@@ -5159,7 +5160,7 @@ function jaengCard(cls, pr) {
   const gate = (A.SINSU_GATE[wk.sinsu] || [])[0], open = !gate || (pr.raids || {})[gate];
   return {
     jaeng: true, id: 'jaeng', name: '쟁', title: `월드 보스 · ${boss}`, locked, practice: !left, wk,
-    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(${bigOn() ? 16 : 12}명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. 9분이면 보스가 달아난다.`,
+    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(${bigOn('jaeng') ? 16 : 12}명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. 9분이면 보스가 달아난다.`,
     more: `이번 주 보상 ${left}/${JAENG_PAID}회 남음 (월요일 초기화) · 보상: 레이드주화 · ${open ? A.MATS[wk.sinsu].name : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[wk.sinsu].name})`} · 전 · 1위 보스 상자(${boss} 세트 한 부위 50%, 코디 30%) · 막타 상자`
       + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 길드대항전에서 한 번 이기면 열린다</b>' : ''),
   };

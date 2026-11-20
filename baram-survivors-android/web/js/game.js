@@ -11967,7 +11967,7 @@ function syncSettings() {
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
-  $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle !== false ? '켬' : '끔');
+  $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
 
@@ -12123,10 +12123,10 @@ $('#opt-calm').onclick = () => {
   saveJson('bs_settings', settings);
   syncSettings();
 };
-// 대규모 전투: a war, a raid and a 「쟁」 with more fighters (war.js BIG); from the next one. Off on
-// a phone that cannot keep up with the crowd.
+// 대규모 전투: a war and a raid with more fighters (war.js BIG), or a 「쟁」 too ('all'); from the next
+// one. Off on a phone that cannot keep up with the crowd. 대항전·레이드 → 쟁까지 → 끔 → ...
 $('#opt-big').onclick = () => {
-  settings.bigBattle = settings.bigBattle === false;
+  settings.bigBattle = settings.bigBattle === false ? true : settings.bigBattle === 'all' ? false : 'all';
   saveJson('bs_settings', settings);
   syncSettings();
 };
