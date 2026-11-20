@@ -4,7 +4,7 @@ import {
   skillStats, skillName, levelText,
 } from './data.js';
 import { Audio } from './audio.js';
-import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK } from './gyeok.js';
+import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
@@ -148,6 +148,15 @@ async function boot() {
     const fx = 'k_' + id;
     if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
+  // 태초광명 격: 천자의분노's blow drawn additive (its dark strokes drop out), a gold-white light.
+  if (M.fx.g_anger_son) M.fx.g_taecho_light = { ...M.fx.g_anger_son, src: M.fx.g_anger_son.src || 'g_anger_son', add: true };
+  // 현무의 철옹 (gyeok.js), out of 연's 현무 pictures only, no white: y_hyeonmu's crystals rising into the
+  // 현무 (its frames before the white shatter and the rider), g_sw_hyunmu's bubble looped as the shell
+  // and its falling crystal shards on whoever strikes the one inside. (f0: the first frame used.)
+  const part = (id, src, a, b, o = {}) => { if (M.fx[src]) M.fx[id] = { ...M.fx[src], src: M.fx[src].src || src, f0: a, n: b - a, durs: M.fx[src].durs.slice(a, b), ...o }; };
+  part('gy_hm_rise', 'y_hyeonmu', 0, 15);
+  part('gy_hm_shell', 'g_sw_hyunmu', 2, 6);
+  part('gy_hm_shard', 'g_sw_hyunmu', 6, 24);
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
     if (def.tint && M.fx[def.fx]) M.fx['s_' + id] = { ...M.fx[def.fx], src: def.fx, tint: def.tint, k: def.fxk };
@@ -1178,7 +1187,7 @@ function tierGyeok(g, rank, tint = null) {
   // (an armour's 격: as it is, whatever the weapon)
   const t = rank === null ? null : gyeokTier(rank);
   if (!t) return g;
-  return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area, flash: t.flash ? tint || '#fff2c0' : null };
+  return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area, lv: t.lv || 0, flash: t.flash ? tint || '#fff2c0' : null };
 }
 /** The colour of a worn piece's family (items.js FAMILY_TINT): the top 격's flash. */
 function familyTint(sp) {
@@ -1294,10 +1303,13 @@ function gearTick(dt) {
 }
 
 function fireGyeok(g, t) {
-  const p = G.player, base = gyeokBase();
+  const p = G.player, base = gyeokBase(), m = g.mech || null, lv = g.lv || 0;
+  // 끌어모음 (귀문진상·귀문진산): the foes round the struck dragged a tile toward it first, so the blow finds them.
+  if (m && m.pull) gyPull(t, m.pull);
   const hits = g.area ? G.enemies.filter(e => Math.abs(e.tx - t.tx) <= g.area && Math.abs(e.ty - t.ty) <= g.area)
     : g.targets ? [t, ...nearestEnemies(g.targets, 5, t).filter(e => e !== t).slice(0, g.targets - 1)] : [t];
   const fxId = M.fx[g.fx] ? g.fx : g.fxAlt && M.fx[g.fxAlt] ? g.fxAlt : null;
+  const fxK = (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1);
   if (fxId && fxBudget('gyeok', 3)) {
     // On the wearer (현무 standing over the one it guards, 주작 over the one it strengthens).
     const self = M.fx[g.fxSelf] ? g.fxSelf : g.selfAlt && M.fx[g.selfAlt] ? g.selfAlt : null;
@@ -1307,7 +1319,8 @@ function fireGyeok(g, t) {
       const f = G.fxs[G.fxs.length - 1];
       if (g.selfAlpha && f && f.id === self) f.alpha = g.selfAlpha;
     }
-    fxOn(fxId, t, { scale: (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1), tint: g.tint || null });
+    fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null });
+    gyLight(fxId);
     // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water).
     if (g.fxGrid && M.fx[g.fxGrid]) {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -1315,28 +1328,28 @@ function fireGyeok(g, t) {
       }
     }
     // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
-    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) fxOn(g.fx2, e, { scale: 0.8 * (g.fx2K || g.fxK || 1), tint: g.tint || null });
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) { fxOn(g.fx2, e, { scale: gyScale(g.fx2, 0.8 * (g.fx2K || g.fxK || 1)), tint: g.tint || null }); gyLight(g.fx2); }
   }
-  // The top weapons' 격 (신화, items.js GYEOK_TIER): the screen flashes in the family's colour.
-  if (g.flash) {
-    G.gyeokFlash = { t: G.t, color: g.flash };
-    G.shake = Math.max(G.shake, 0.14);
-    // a second, wider bloom of the same picture a moment later, seen through: the 신화 blow lands twice as large
-    if (fxId && fxBudget('gyeok', 3)) {
-      const k = (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1) * 1.35;
-      fxOn(fxId, t, { scale: k, delay: 0.12, tint: g.tint || null });
-      const f = G.fxs[G.fxs.length - 1];
-      if (f && f.id === fxId) f.alpha = 0.55;
-    }
+  // The top weapons' 격 (신화, items.js GYEOK_TIER): a soft light round the struck in the family's
+  // colour (it was the whole screen; drawn in render), and the blow's way one step further (lv).
+  if (g.flash && screenFlashOk()) {
+    G.gyeokFlash = { t: G.t, color: g.flash, x: t.x, y: t.y - 20, dark: GLOW_DARK.has(g.flash) };
+    G.shake = Math.max(G.shake, 0.1);
   }
+  // The first blow: the whole of it, or its share where the 격's way deals the rest (a ground, a
+  // second blow, the strikes after it); 처형 a boss nearly felled the harder.
+  const n = m && m.strikes ? m.strikes.n : 1;
+  const first = m && m.strikes ? m.strikes.first || 1 / n : (m && m.first) || 1;
   G.procHitting = true;
   let dealt = 0;
   for (const e of hits) {
     if (e.hp <= 0) continue;
-    if (g.dmg) dealt += hurtEnemy(e, base * g.dmg) || 0;
+    const ex = m && m.exec && (e.kind === 'boss' || e.kind === 'mini') && e.hp <= e.maxHp * m.exec.boss ? 1 + m.exec.bossK : 1;
+    if (g.dmg) dealt += hurtEnemy(e, base * g.dmg * first * ex) || 0;
     if (g.st) applyStatus(e, ...g.st);
     if (g.st2) applyStatus(e, ...g.st2);
   }
+  if (m) dealt += gyWays(g, m, t, hits, base, lv);
   G.procHitting = false;
   if (g.heal) {
     heal(p.maxHp * g.heal, true);
@@ -1352,6 +1365,344 @@ function fireGyeok(g, t) {
   floatText(p.x, p.y - 78, g.name, '#ffd27a', true);
   (G.gyeokCount = G.gyeokCount || {})[g.id] = (G.gyeokCount[g.id] || 0) + 1;
   audio.play('crit');
+}
+
+// ---------------------------------------------------------------- 격's ways (gyeok.js mech)
+//
+// Each 격 does its own thing besides its picture: a chain that leaps, a ground that burns or
+// guards for a few seconds, a blow that lands again a moment later, a line, a pull or a shove,
+// a 처형, strikes of a summoned beast, pillars of light, a rally of the allies. All of it runs
+// from two short lists (G.gq: what is still to land; G.gz: the grounds) with a cap each, the
+// grounds looking at the field twice a second, their pictures one cached sprite per colour.
+const GQ_MAX = 24, GZ_MAX = 6, GL_MAX = 10, GZ_TICK = 0.5;
+const GZ_RGB = { fire: '255,120,40', poison: '120,210,70', wood: '110,180,60', ice: '150,210,255', blood: '150,16,24', jade: '70,220,180', gold: '255,220,140', soul: '190,150,255' };
+const GLOW_DARK = new Set(['#c0201a']); // the blood families: their light darkens, never a red flash
+
+/** Is a screen-wide light allowed now? Never with 번쩍임 줄이기, and one in 0.45 s at most (no
+ *  more than ~2 a second from all sources together, never back to back). */
+function screenFlashOk() {
+  if (settings.calmFx) return false;
+  if (G.t - (G.screenFlashAt ?? -9) < 0.45) return false;
+  G.screenFlashAt = G.t;
+  return true;
+}
+/** A 격 picture drawn added (light on light: 태초광명, 주작비상) is seen through, never a white sheet. */
+function gyLight(id) {
+  const f = G.fxs[G.fxs.length - 1];
+  if (f && f.id === id && M.fx[id].add) f.alpha = settings.calmFx ? 0.5 : 0.65;
+}
+/** ...and never taller than most of the screen (주작비상's fire, grown at the top tier, was three
+ *  screens high, its own white flash at its heart lighting half the screen for a second). */
+function gyScale(id, k) {
+  const f = M.fx[id];
+  return f && f.add ? Math.min(k, (VH * 0.65) / (f.h * (f.k || 1))) : k;
+}
+
+function gyQueue(o) {
+  const q = G.gq || (G.gq = []);
+  if (q.length >= GQ_MAX) return;
+  q.push(o);
+}
+/** The foes on the tiles within r of a tile (r 0 = its own). */
+function gyArea(tx, ty, r, out) {
+  out.length = 0;
+  for (const e of G.enemies) if (e.hp > 0 && Math.abs(e.tx - tx) <= r && Math.abs(e.ty - ty) <= r) out.push(e);
+  return out;
+}
+const gyTmp = [];
+/** A body moved a tile, as 유인 moves them: never a boss, its lieutenant or a war's fighter. */
+function gyShove(e, dx, dy) {
+  if ((!dx && !dy) || e.hp <= 0 || e.moving || e.kind === 'boss' || e.kind === 'mini' || e.war || e.march || e.flee || e.ally) return;
+  step(e, dx, dy, 0.16);
+}
+function gyPull(t, o) {
+  let n = 0;
+  for (const e of G.enemies) {
+    if (e === t || n >= o.max || Math.max(Math.abs(e.tx - t.tx), Math.abs(e.ty - t.ty)) > o.r || Math.max(Math.abs(e.tx - t.tx), Math.abs(e.ty - t.ty)) < 2) continue;
+    gyShove(e, Math.sign(t.tx - e.tx), Math.sign(t.ty - e.ty));
+    n++;
+  }
+}
+
+/** A 격's way, after its first blow: what it deals now (the rest lands later). */
+function gyWays(g, m, t, hits, base, lv) {
+  const p = G.player, D = base * g.dmg;
+  let dealt = 0;
+  if (m.push) for (const e of hits) gyShove(e, Math.sign(e.tx - p.tx), Math.sign(e.ty - p.ty));
+  if (m.exec) {
+    // 처형: a crowd foe the blow left at a fifth of its life falls.
+    for (const e of hits) if (e.hp > 0 && !e.war && e.kind !== 'boss' && e.kind !== 'mini' && e.hp <= e.maxHp * m.exec.hp) {
+      tally(e, e.hp);
+      e.hp = 0;
+      killEnemy(e);
+      G.gyExec = (G.gyExec || 0) + 1;
+    }
+  }
+  if (m.line) {
+    // 돌풍: on along the line from the hero through the struck, every foe on it struck and thrown on.
+    const dx = Math.sign(t.tx - p.tx), dy = Math.sign(t.ty - p.ty);
+    if (dx || dy) {
+      const len = Math.max(Math.abs(t.tx - p.tx), Math.abs(t.ty - p.ty)) + m.line.len + lv;
+      for (let i = 1; i <= len; i++) {
+        const bs = bodiesAt(p.tx + dx * i, p.ty + dy * i);
+        if (bs) for (const e of bs.slice()) if (e.m && !e.ally && e.hp > 0 && e !== t && !(e.war && e.team === 0)) {
+          dealt += hurtEnemy(e, D * m.line.k, [dx, dy]) || 0;
+          if (m.line.push) gyShove(e, dx, dy);
+        }
+        if (i % 2 === 0 && M.fx[g.fx] && fxBudget('gyway', 4)) addFx(g.fx, (p.tx + dx * i) * TILE + TILE / 2, (p.ty + dy * i) * TILE + TILE / 2, { scale: 0.45, delay: 0.03 * i });
+      }
+    }
+  }
+  if (m.chain) gyQueue({ at: G.t + 0.08, kind: 'jump', g, x: t.x, y: t.y, tx: t.tx, ty: t.ty, left: m.chain.n + lv, dmg: D * m.chain.fall, fall: m.chain.fall, st: m.chain.st, seen: hits.slice(0, 8), color: m.chain.color === 'soul' ? '205,170,255' : '200,230,255' });
+  if (m.det) {
+    // A mark on the struck (its ring shown under it), going off a moment later round wherever it is.
+    let k = m.det.k;
+    if (m.det.bleedK && t.st && t.st.bleed) k *= 1 + Math.min(0.5, m.det.bleedK * t.st.bleed.n);
+    gyQueue({ at: G.t + m.det.delay, made: G.t, kind: 'det', g, e: t, x: t.x, y: t.y, tx: t.tx, ty: t.ty, r: m.det.r, dmg: D * k, st: m.det.st, cursed: m.det.cursed });
+  }
+  if (m.zone) gyZone(g, m.zone, t, D, lv);
+  if (m.strikes) {
+    const seen = [t];
+    for (let i = 1; i < m.strikes.n; i++) gyQueue({ at: G.t + m.strikes.gap * i, kind: 'strike', g, e: t, i, focus: m.strikes.focus, dmg: D * (m.strikes.rest || (m.strikes.n - 1) / m.strikes.n) / (m.strikes.n - 1), seen });
+  }
+  if (m.rays) {
+    // Pillars of light on the crowd outside the first blow, nearest first; alone, on the struck.
+    const r = m.rays, far = [], n = r.n + (lv >= 3 ? 1 : 0);
+    for (const e of G.enemies) {
+      const d = Math.max(Math.abs(e.tx - t.tx), Math.abs(e.ty - t.ty));
+      if (e.hp > 0 && d > (g.area || 0) && d <= 6) far.push([d, e]);
+    }
+    far.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < n; i++) {
+      const e = far[i] ? far[i][1] : t;
+      gyQueue({ at: G.t + r.gap * (i + 1), kind: 'ray', g, e, x: e.x, y: e.y, tx: e.tx, ty: e.ty, r: r.r, dmg: D * (far[i] ? r.k : r.lone) });
+    }
+  }
+  if (m.rally) {
+    // 호령: the allies near (companions, raiders, the guild's) strike harder a while (auraK).
+    G.buffs.g_rally = G.t + m.rally.sec;
+    G.buffs.g_rallyK = m.rally.k;
+  }
+  if (m.cleanse && p.sts) p.sts = {};
+  if (m.taunt) {
+    // 현무: the boss turns on the one in the shell (its 어그로 for a while).
+    G.aggro = p;
+    G.aggroT = m.taunt;
+  }
+  return dealt;
+}
+
+/** A ground of a 격: lies (or, a shell, goes with the hero) a few seconds, striking twice a second. */
+function gyZone(g, o, t, D, lv) {
+  const zs = G.gz || (G.gz = []);
+  let z = zs.find(x => !x.on);
+  if (!z) {
+    if (zs.length < GZ_MAX) zs.push(z = {});
+    else z = zs.reduce((a, b) => (a.until < b.until ? a : b));
+  }
+  const p = G.player, at = o.follow ? p : t;
+  z.on = true;
+  z.g = g;
+  z.o = o;
+  z.x = at.x;
+  z.y = at.y;
+  z.tx = at.tx;
+  z.ty = at.ty;
+  z.r = o.r + (o.follow ? 0 : Math.max(0, (g.area || 0) - (GYEOK[g.id] ? GYEOK[g.id].area || 0 : 0)));
+  z.made = G.t;
+  z.until = G.t + o.sec + 0.5 * lv;
+  z.next = G.t + GZ_TICK;
+  z.dmg = D * o.k;
+  z.rgb = GZ_RGB[o.color] || GZ_RGB.gold;
+}
+/** Is the body inside a guarding shell (현무의 철옹)? Its ward, else 0. */
+function shellWard(b) {
+  if (!G.gz) return 0;
+  for (const z of G.gz) if (z.on && z.o.allyWard && Math.abs(b.tx - z.tx) <= z.r && Math.abs(b.ty - z.ty) <= z.r) return z.o.allyWard;
+  return 0;
+}
+function shellThorns() {
+  if (!G.gz) return null;
+  for (const z of G.gz) if (z.on && z.o.thorns) return z;
+  return null;
+}
+
+/** Each frame: what is due lands, the grounds strike. No allocation in the common case. */
+function gyeokTick() {
+  const q = G.gq;
+  if (q && q.length) {
+    let n = q.length;
+    for (let i = 0; i < n;) {
+      if (q[i].at > G.t) { i++; continue; }
+      const o = q[i];
+      q[i] = q[n - 1];
+      q[n - 1] = q[q.length - 1];
+      q.pop();
+      n--;
+      G.procHitting = true;
+      gyLand(o);
+      G.procHitting = false;
+    }
+  }
+  const zs = G.gz;
+  if (!zs) return;
+  const p = G.player;
+  for (const z of zs) {
+    if (!z.on) continue;
+    if (G.t >= z.until) { z.on = false; continue; }
+    if (z.o.follow) { z.x = p.x; z.y = p.y; z.tx = p.tx; z.ty = p.ty; }
+    if (G.t < z.next) continue;
+    z.next += GZ_TICK;
+    let got = 0;
+    G.procHitting = true;
+    for (const e of gyArea(z.tx, z.ty, z.r, gyTmp)) {
+      if (z.dmg > 0) got += hurtEnemy(e, z.dmg) || 0;
+      if (z.o.st) applyStatus(e, ...z.o.st);
+      if (z.o.slow) e.slow = Math.max(e.slow || 0, 0.8);
+    }
+    G.procHitting = false;
+    if (z.o.drain && got > 0) heal(got * z.o.drain, false, true);
+    // a flicker of the 격's own picture somewhere in it, now and then
+    if (z.dmg > 0 && M.fx[z.g.fx] && fxBudget('gzone', 2)) addFx(z.g.fx, z.x + rand(-z.r, z.r) * TILE * 0.8, z.y + rand(-z.r, z.r) * TILE * 0.5, { scale: 0.32, tint: z.g.tint || null, anchor: 'bottom' });
+  }
+}
+
+function gyLand(o) {
+  const g = o.g;
+  if (o.kind === 'jump') {
+    // The next one: the nearest standing foe within four tiles not yet struck.
+    let best = null, bd = 5;
+    for (const e of G.enemies) {
+      if (e.hp <= 0 || o.seen.includes(e)) continue;
+      const d = Math.max(Math.abs(e.tx - o.tx), Math.abs(e.ty - o.ty));
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best) return;
+    hurtEnemy(best, o.dmg);
+    if (o.st) applyStatus(best, ...o.st);
+    gyLine(o.x, o.y - 20, best.x, best.y - 20, o.color);
+    if (M.fx[g.fx] && fxBudget('gyway', 4)) fxOn(g.fx, best, { scale: 0.42 * (g.fxK || 1), tint: g.tint || null });
+    if (o.left > 1 && o.seen.length < 12) {
+      o.seen.push(best);
+      gyQueue({ ...o, at: G.t + 0.08, x: best.x, y: best.y, tx: best.tx, ty: best.ty, left: o.left - 1, dmg: o.dmg * o.fall });
+    }
+  } else if (o.kind === 'det' || o.kind === 'ray') {
+    const e = o.e && o.e.hp > 0 ? o.e : null;
+    const tx = e ? e.tx : o.tx, ty = e ? e.ty : o.ty, x = e ? e.x : o.x, y = e ? e.y : o.y;
+    for (const b of gyArea(tx, ty, o.r, gyTmp)) {
+      if (o.cursed && !(b.curse > 0)) continue;
+      hurtEnemy(b, o.dmg);
+      if (o.st) applyStatus(b, ...o.st);
+    }
+    const id = M.fx[g.fx] ? g.fx : null;
+    if (id && fxBudget('gyway', 4)) { addFx(id, x, y - 14, { scale: (o.kind === 'ray' ? 0.5 : 0.55) * Math.min(1.6, g.fxK || 1), tint: g.tint || null }); gyLight(id); }
+  } else if (o.kind === 'strike') {
+    // A summoned beast's next strike: another foe near (the 용무기's, the same one), else the struck again.
+    let e = o.e && o.e.hp > 0 ? o.e : null;
+    if (!o.focus) {
+      let best = null, bd = 5;
+      const from = e || o.e;
+      for (const b of G.enemies) {
+        if (b.hp <= 0 || o.seen.includes(b)) continue;
+        const d = Math.max(Math.abs(b.tx - from.tx), Math.abs(b.ty - from.ty));
+        if (d < bd) { bd = d; best = b; }
+      }
+      if (best) e = best;
+    }
+    if (!e) return;
+    for (const b of g.area ? gyArea(e.tx, e.ty, g.area, gyTmp) : [e]) {
+      hurtEnemy(b, o.dmg);
+      if (g.st) applyStatus(b, ...g.st);
+      if (g.st2) applyStatus(b, ...g.st2);
+    }
+    const id = g.fxGrid && M.fx[g.fxGrid] ? g.fxGrid : g.fx2 && M.fx[g.fx2] ? g.fx2 : M.fx[g.fx] ? g.fx : null;
+    if (id && fxBudget('gyway', 4)) {
+      if (id === g.fxGrid) addFx(id, e.x, e.y + 6, { scale: (g.gridK || 1) * 1.1, anchor: 'bottom', flip: o.i % 2 === 1 });
+      else fxOn(id, e, { scale: (id === g.fx ? 0.75 * (g.fxK || 1) : 0.8 * (g.fx2K || 1)), tint: g.tint || null, flip: o.i % 2 === 1 });
+    }
+    o.seen.push(e); // the next strike looks for yet another
+  }
+}
+
+/** A chain's leap: a jagged line between two bodies for a fifth of a second (pooled). */
+function gyLine(x1, y1, x2, y2, rgb) {
+  const ls = G.gl || (G.gl = []);
+  let l = ls.find(x => !(G.t - x.t0 < 0.22));
+  if (!l) {
+    if (ls.length >= GL_MAX) return;
+    ls.push(l = {});
+  }
+  l.x1 = x1; l.y1 = y1; l.x2 = x2; l.y2 = y2; l.t0 = G.t; l.rgb = rgb; l.seed = Math.random() * 100;
+}
+
+/** Under the bodies: the grounds of the 격 and the marks still to go off. */
+function drawGyeokGround() {
+  if (G.gz) for (const z of G.gz) {
+    if (!z.on) continue;
+    const age = G.t - z.made, left = z.until - G.t;
+    const a = Math.min(1, age / 0.25, left / 0.5) * (z.o.follow ? 0.8 : 0.9);
+    const w = (2 * z.r + 1) * TILE * 1.05;
+    ctx.globalAlpha = a;
+    ctx.drawImage(gzSprite(z.rgb), Math.round(z.x - w / 2), Math.round(z.y - 6 - w * 0.27), Math.round(w), Math.round(w * 0.54));
+  }
+  if (G.gq) for (const o of G.gq) {
+    if (o.kind !== 'det') continue;
+    // the mark: a ring that fills in as it nears (a steady rise, no blinking)
+    const e = o.e && o.e.hp > 0 ? o.e : o, k = Math.min(1, (G.t - o.made) / Math.max(0.1, o.at - o.made));
+    const w = (2 * o.r + 1) * TILE * (0.6 + 0.4 * k);
+    ctx.globalAlpha = 0.35 + 0.45 * k;
+    ctx.drawImage(gzSprite(o.g.tint === GY_ABYSS_TINT ? GZ_RGB.blood : GZ_RGB.gold), Math.round(e.x - w / 2), Math.round(e.y - 6 - w * 0.27), Math.round(w), Math.round(w * 0.54));
+  }
+  ctx.globalAlpha = 1;
+}
+/** Over the bodies: the 현무 shell round the hero (seen through), the chains' leaps. */
+function drawGyeokLines() {
+  if (G.gz && M.fx.gy_hm_shell) for (const z of G.gz) {
+    if (!z.on || !z.o.shell) continue;
+    const age = G.t - z.made, left = z.until - G.t;
+    ctx.globalAlpha = Math.min(1, age / 0.3, left / 0.5) * 0.45;
+    drawFx('gy_hm_shell', z.x, z.y - 22, age, 1.1 + 0.55 * z.r, 0, 'mid', true);
+    ctx.globalAlpha = 1;
+  }
+  if (!G.gl) return;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  for (const l of G.gl) {
+    const age = G.t - l.t0;
+    if (age >= 0.22) continue;
+    const a = 1 - age / 0.22;
+    for (const [lw, al] of LINE_PASSES) {
+      ctx.strokeStyle = `rgba(${l.rgb},${(al * a).toFixed(2)})`;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(l.x1, l.y1);
+      for (let i = 1; i < 5; i++) {
+        const k = i / 5, j = Math.sin(l.seed + i * 2.3) * 9;
+        ctx.lineTo(l.x1 + (l.x2 - l.x1) * k - (l.y2 - l.y1) / 60 * j, l.y1 + (l.y2 - l.y1) * k + j);
+      }
+      ctx.lineTo(l.x2, l.y2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+const LINE_PASSES = [[5, 0.25], [2, 0.9]];
+const gzSprites = new Map();
+/** One soft ground ellipse per colour (made once): a glow, brighter at its rim. */
+function gzSprite(rgb) {
+  let c = gzSprites.get(rgb);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 63);
+  gr.addColorStop(0, `rgba(${rgb},0.22)`);
+  gr.addColorStop(0.75, `rgba(${rgb},0.16)`);
+  gr.addColorStop(0.9, `rgba(${rgb},0.55)`);
+  gr.addColorStop(1, `rgba(${rgb},0)`);
+  x.fillStyle = gr;
+  x.fillRect(0, 0, 128, 128);
+  gzSprites.set(rgb, c);
+  return c;
 }
 
 /** A 상태이상 on a monster (gyeok.js STATUS): bosses shake off holds sooner and do not bleed. */
@@ -1401,6 +1752,7 @@ function tally(e, d) {
   if (G.training) trainHit(d, G.allyHitting || G.procHitting);
   if (G.allyHitting) { t.ally = (t.ally || 0) + d; return; }
   t.all += d;
+  if (G.procHitting) t.proc = (t.proc || 0) + d; // (a 격's own share, for the tests)
   if (e.kind === 'boss' || e.kind === 'mini') t.big += d;
 }
 
@@ -1429,10 +1781,12 @@ function abyssBurst(e) {
 
 /** 주작의 기운 (items.js JUJAK_AURA): an ally within its reach of the hero strikes this much harder. */
 function auraK(m) {
+  // 호령 (천자의분노·태초광명 격): the allies within five tiles of the hero, a while.
+  const r = G && G.buffs && G.buffs.g_rally > G.t && m && (m.tx - G.player.tx) ** 2 + (m.ty - G.player.ty) ** 2 <= 25 ? 1 + (G.buffs.g_rallyK || 0) : 1;
   if (G && G.player && G.player.aura) G.auraAll = (G.auraAll || 0) + 1; // allies' blows while worn (for the tests)
-  if (!inAura(m)) return 1;
+  if (!inAura(m)) return r;
   G.auraN = (G.auraN || 0) + 1; // of them, strengthened
-  return 1 + G.player.aura;
+  return (1 + G.player.aura) * r;
 }
 function inAura(m) {
   const p = G && G.player;
@@ -3112,6 +3466,7 @@ function update(dt) {
   tickHeroStatus();
   updateParty(dt);
   updateShots(dt);
+  gyeokTick(); // 격's ways: what is still to land, the grounds
   updateStyle(dt);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
@@ -4427,6 +4782,15 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
   if (p.sts && heroStatusOn('curse')) taken *= 1.25;
   if (G.buffs.g_ward > G.t) taken *= 1 - (G.buffs.g_wardK || 0);
+  // 현무의 철옹's shell: whoever strikes the one in it is pricked back (each attacker twice a second at most).
+  const thorn = from && from.m && from.hp > 0 && shellThorns();
+  if (thorn && G.t - (from.thornAt || -9) >= 0.5) {
+    from.thornAt = G.t;
+    if (M.fx.gy_hm_shard && fxBudget('gyway', 4)) fxOn('gy_hm_shard', from, { scale: 1.1 });
+    G.procHitting = true;
+    hurtEnemy(from, gyeokBase() * thorn.o.thorns);
+    G.procHitting = false;
+  }
   // A boss, its lieutenant or a champion strikes in its own nature (gyeok.js SOURCE_GYEOK).
   if (from && from.m && (from.kind === 'boss' || from.kind === 'mini' || from.kind === 'champ')) {
     // Not on the first ground, where a new hero learns the hunt; rarer from champions.
@@ -4457,6 +4821,10 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (p.hp <= 0) die();
 }
 
+/** How white a struck body goes: a boss or its lieutenant (a big shape) at 0.45, 번쩍임 줄이기 lower still. */
+function hitWhite(b) {
+  return (settings.calmFx ? 0.35 : 0.75) * (b.kind === 'boss' || b.kind === 'mini' ? 0.6 : 1);
+}
 /** At most 14 bodies newly flashing white in any tenth of a second. */
 function flashRoom() {
   const f = (G.flashes = (G.flashes || []).filter(t => t > G.t));
@@ -4530,7 +4898,10 @@ function hurtEnemy(e, dmg, push = null) {
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
   // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
   // 수련장: the dummy is struck many times a second; kept white it showed nothing but a white shape.
-  if (!G.training && (e.flash > 0 || flashRoom())) e.flash = 0.12;
+  // (a big one starts a new white blink no more than three times a second: struck by a crowd of
+  // blows it blinked at the rate of the blows, a large white shape strobing)
+  const big = e.kind === 'boss' || e.kind === 'mini';
+  if (!G.training && (big ? G.t - (e.flashAt ?? -9) >= 0.34 && (e.flashAt = G.t) : e.flash > 0 || flashRoom())) e.flash = 0.12;
   e.shown = G.t;
   if (e.war) War.credit(e, dmg); // 대항전: the hero's contribution
   if (RW || (G.stage.jaeng && !e.war)) War.raidCredit(e, dmg, e.hp <= 0);
@@ -6103,7 +6474,7 @@ function castUlt() {
     screenFx(uf, def.id, 1, uflip);
   }
   if (!G.stage.raid && !G.war) {
-    G.whiteAt = G.t;
+    if (screenFlashOk()) G.whiteAt = G.t;
     G.hitstop = Math.max(G.hitstop || 0, 0.035);
     G.hitstopAt = G.t;
   }
@@ -7597,6 +7968,7 @@ function hurtMember(m, dmg, from = null) {
   if (m.down || G.dead || m.hidden > G.t) return;
   if (G.buffs.shield > G.t) dmg /= 2;
   if (G.buffs.guard > G.t) return;
+  dmg *= 1 - shellWard(m); // inside the hero's 현무 shell
   m.hp -= dmg;
   m.flash = 0.12;
   floatText(m.x, m.y - 58, '-' + Math.round(dmg), '#ff8060');
@@ -9309,6 +9681,7 @@ function durs(id) {
 }
 
 /** Starts an effect; returns how long it plays. */
+const FX_LEAD = { g_zodiac_turtle: 0.28, g_zodiac_dragon: 0.28, g_zodiac_phoenix: 0.28 };
 function addFx(id, x, y, o = {}) {
   if (!M.fx[id]) return 0;
   const life = durs(id).reduce((a, b) => a + b, 0);
@@ -9323,8 +9696,11 @@ function addFx(id, x, y, o = {}) {
   // A middling one (a meteor, a pillar of fire) four at a time: the fifth adds nothing to see
   // and much to draw.
   if (area > 12000 && G.fxs.filter(f => f.id === id).length >= 4) return life;
-  G.fxs.push({ id, x, y, t: -(o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
-    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint });
+  // 연's 신수 각인 pictures open on four frames of a pure white shape (280 ms): started past them,
+  // faded in instead (a white pop the size of the beast, seen at every 현무·청룡·주작 격).
+  const skip = FX_LEAD[id] || 0;
+  G.fxs.push({ id, x, y, t: skip - (o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
+    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint, skip, fadeIn: skip ? 0.2 : 0 });
   return life;
 }
 
@@ -9340,7 +9716,7 @@ function fxFrame(d, t, loop) {
 function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const f = M.fx[id];
   const im = images[`fx/${f.src || id}.png`];
-  const i = fxFrame(durs(id), t, loop);
+  const i = fxFrame(durs(id), t, loop) + (f.f0 || 0);
   // Long effects are folded into rows of "cols" frames (a phone holds no picture past 4096).
   const cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9;
   const sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h;
@@ -10267,7 +10643,7 @@ function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   ctx.drawImage(monsterTint ? tinted(im, monsterTint) : im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
   // The flash fades as it goes and never quite hides the monster: a blink of white, not a white shape.
   if (b.flash > 0) {
-    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * 0.75;
+    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * hitWhite(b);
     ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
   }
   ctx.restore();
@@ -10319,7 +10695,7 @@ function drawMonster(b, x, y, s, alpha = 1) {
   ctx.globalAlpha = alpha;
   ctx.drawImage(img, -w / 2, -h / 2, w, h);
   if (b.flash > 0) {
-    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * 0.75;
+    ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * hitWhite(b);
     ctx.drawImage(white(img), -w / 2, -h / 2, w, h);
   }
   ctx.restore();
@@ -10351,7 +10727,7 @@ function drawWalker(img, x, y, face, phase, moving, flash, scale = 1, alpha = 1,
   ctx.globalAlpha = alpha;
   ctx.drawImage(img, -w / 2, -h, w, h);
   if (flash > 0) {
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * (settings.calmFx ? 0.35 : 1);
     ctx.drawImage(white(img), -w / 2, -h, w, h);
   }
   ctx.restore();
@@ -10437,17 +10813,19 @@ function render(now) {
   }
 
   if (G.hunt) Hunt.ground(ctx); // 사냥 기믹: the objective, the bog
+  drawGyeokGround(); // 격's grounds and marks
   // A raid boss's marked tiles, blinking red until they are struck.
   for (const mk of G.marks) {
-    const blink = Math.floor((G.t - mk.made) * 8) % 2;
-    ctx.fillStyle = blink ? 'rgba(220, 30, 20, 0.45)' : 'rgba(220, 30, 20, 0.28)';
+    // a soft pulse 1.5 a second (it blinked hard 4 a second); steady with 번쩍임 줄이기
+    const pulse = settings.calmFx ? 0.5 : 0.5 + 0.5 * Math.sin((G.t - mk.made) * 9.4);
+    ctx.fillStyle = `rgba(220, 30, 20, ${(0.28 + 0.15 * pulse).toFixed(3)})`;
     for (const [x, y] of mk.tiles) ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
   }
 
   // A boss gathering its 광역기: the whole floor flashes red under the bodies, as 연's boss rooms do.
   if (G.blast && G.t < G.blast.at) {
     const k = 1 - (G.blast.at - G.t) / 1.6;
-    ctx.fillStyle = `rgba(210, 30, 25, ${(0.22 + 0.2 * k) * (0.75 + 0.25 * Math.sin(G.t * 18))})`;
+    ctx.fillStyle = `rgba(210, 30, 25, ${(0.22 + 0.2 * k) * (settings.calmFx ? 0.9 : 0.85 + 0.15 * Math.sin(G.t * 7.5))})`;
     ctx.fillRect(camX, camY, VW, VH);
   }
 
@@ -10597,10 +10975,11 @@ function render(now) {
       // An abyss far weapon: black smoke and embers behind it as it flies.
       if (trail && k < 1 && !f.trailFx && G.t >= (f.trailAt || 0) && puffs.length < 6) { f.trailAt = G.t + trail.cd; puffs.push([x, y]); }
     }
-    if (f.alpha) ctx.globalAlpha = f.alpha;
+    if (f.alpha || f.fadeIn) ctx.globalAlpha = (f.alpha || 1) * (f.fadeIn ? Math.min(1, (f.t - f.skip) / f.fadeIn) : 1);
     drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.loop, f.flip, f.tint);
     ctx.globalAlpha = 1;
   }
+  drawGyeokLines(); // 격 chains' leaps
   // 공대: the spells of twenty-five hid the boss. Its shape again, faint, over them.
   if (G.war && G.war.raid) {
     const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0);
@@ -10706,23 +11085,32 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  // A 신화 격's flash in its family's colour (fireGyeok), soft, a quarter second.
-  if (G.gyeokFlash && G.t - G.gyeokFlash.t < 0.26) {
+  // A 신화 격's light in its family's colour (fireGyeok): round the struck, not the whole screen,
+  // rising in 60 ms and fading over 0.4 s; the blood families darken instead of lighting red.
+  const gf = G.gyeokFlash, ga = gf ? G.t - gf.t : 9;
+  if (gf && ga < 0.46 && !settings.calmFx) {
+    const a = (ga < 0.06 ? ga / 0.06 : (1 - (ga - 0.06) / 0.4) ** 2) * (gf.dark ? 0.22 : 0.16);
+    const cx = (gf.x - camX) * Z, cy = (gf.y - camY) * Z, r = canvas.height * 0.42;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, gf.dark ? 'rgba(40,0,4,1)' : gf.color);
+    gr.addColorStop(1, gf.dark ? 'rgba(40,0,4,0)' : gf.color + '00');
     ctx.save();
-    ctx.globalAlpha = 0.32 * (1 - (G.t - G.gyeokFlash.t) / 0.26);
-    ctx.fillStyle = G.gyeokFlash.color;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = gr;
+    ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
     ctx.restore();
   }
   if (G.hunt) Hunt.ambient(ctx, canvas, camX, camY); // 사냥 기믹: light, colour, weather
   // A 필살기's blink of white over the whole screen.
-  if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.32) {
-    ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - (G.t - G.whiteAt) / 0.32)})`;
+  // (0.3 at most, fading as it goes: it was 0.75 for a third of a second over a whole screen)
+  if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.25 && !settings.calmFx) {
+    ctx.fillStyle = `rgba(255,255,255,${(0.3 * (1 - (G.t - G.whiteAt) / 0.25) ** 2).toFixed(3)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
   // A raid blast gathering: the screen's edge throbs red until it falls or is cut.
   if (G.blast) {
-    const k = 0.25 + 0.2 * Math.sin(G.t * 18);
+    // a slow throb (1.2 a second; it was 2.9, near the rate that troubles the eye), still with 번쩍임 줄이기
+    const k = settings.calmFx ? 0.3 : 0.27 + 0.08 * Math.sin(G.t * 7.5);
     const gr = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
       canvas.width / 2, canvas.height / 2, Math.hypot(canvas.width, canvas.height) / 2);
     gr.addColorStop(0, 'rgba(160,0,0,0)');
@@ -11219,6 +11607,7 @@ function syncSettings() {
   $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
+  $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
 
@@ -11364,6 +11753,13 @@ $('#opt-dash').onclick = () => {
 };
 $('#opt-info').onclick = () => {
   settings.battleInfo = settings.battleInfo === false;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 번쩍임 줄이기: no light over the screen (필살기's white, a 신화 격's glow), steady warnings, a
+// softer white on the struck, the added-light 격 pictures dimmer.
+$('#opt-calm').onclick = () => {
+  settings.calmFx = !settings.calmFx;
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -11863,6 +12259,7 @@ window.__event = k => huntEvent(k);
 window.__fx = (id, x, y, o) => addFx(id, x, y, o || {});
 window.__fireWorn = (i = 0, e) => fireGyeok(G.player.gyeoks[i], e || G.enemies.find(x => x.kind === 'boss') || G.enemies[0]); // test: a worn 격 as it is grown (GYEOK_TIER)
 window.__fireGyeok = (id, e) => fireGyeok({ id, ...GYEOK[id] }, e || G.enemies[0]); // test: a 격 goesoff
+window.__gy = id => GYEOK[id]; // test: a 격's entry
 // For trying the abyss loot out: a unique (by name, else any) dropped beside the hero.
 window.__abyssDrop = u => {
   progress.abyssLoot = progress.abyssLoot || {};

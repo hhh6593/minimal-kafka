@@ -859,7 +859,9 @@ export const JUDGE_EDGE = { cr_judge_weapon: 0.04, cr_judge_weapon2: 0.06, cr_ju
 // The rank is the weapon's as it strikes a boss (game.js weaponEff: its 공격력 options and its family's
 // edge counted), so 태초 and 악마 심판의낫 are drawn as large as they strike. The top (신화: the 용무기
 // 제십, 사신수 ★5, 악마 심판의낫, 태초) ×1.7, and the screen flashes in the family's colour (FAMILY_TINT).
-export const GYEOK_TIER = [{ at: 16.75, fxK: 1.7, area: 1, flash: true }, { at: 16, fxK: 1.5, area: 1 }, { at: 14.5, fxK: 1.35, area: 1 }, { at: 13, fxK: 1.2, area: 0 },
+// lv: the 격's way one step further (gyeok.js mech: a chain +1 leap a step, a ground +0.5 s, 태초's
+// light one pillar more at 3); flash: a soft light round the struck (no longer the whole screen).
+export const GYEOK_TIER = [{ at: 16.75, fxK: 1.7, area: 1, flash: true, lv: 3 }, { at: 16, fxK: 1.5, area: 1, lv: 2 }, { at: 14.5, fxK: 1.35, area: 1, lv: 1 }, { at: 13, fxK: 1.2, area: 0, lv: 1 },
   // and under: the lower a weapon, the smaller its 격's picture (a ground's or a material craft's).
   { at: 10, fxK: 1, area: 0 }, { at: 6, fxK: 0.85, area: 0 }, { at: -99, fxK: 0.7, area: 0 }];
 // The flash's colour by the family (the 용무기 its 사신수's when it took one, else gold-white).

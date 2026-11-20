@@ -35,41 +35,41 @@ export const STATUS = {
 // st: [status, seconds, strength]; self: a buff on the wearer [kind, seconds, amount].
 export const GYEOK = {
   // 분노 격 (연 Buff 5027-5054): a pure blow, 15%, 20 s.
-  yeomryeong: { name: '염령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_flame' },
-  noeryeong: { name: '뇌령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_astra' },
-  jiryeong: { name: '지령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_sola', st: ['poison', 5, 1] },
-  turyeong: { name: '투령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_wind' },
-  giryeong: { name: '기령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_forest' },
-  bingryeong: { name: '빙령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_island_lancer', st: ['freeze', 1.5] },
-  cheonbuyeon: { name: '천부연 격', on: 'hit', chance: 0.15, cd: 5, dmg: 1.5, fx: 'g_mountain' },
-  gwimunsan: { name: '귀문진산격', on: 'hit', chance: 0.15, cd: 20, dmg: 3.5, fx: 'g_jinsan' },
-  gwimunhon: { name: '귀문진혼격', on: 'hit', chance: 0.15, cd: 20, dmg: 3.5, fx: 'g_jinhon' },
-  jiok: { name: "극'지옥격", on: 'hit', chance: 0.15, cd: 15, dmg: 3, targets: 4, fx: 'g_hell_weapon' },
-  nakroe: { name: '낙뢰격', on: 'hit', chance: 0.1, cd: 25, dmg: 4, targets: 2, fx: 'g_harrzud', self: ['pierce', 3, 0.25] },
+  yeomryeong: { name: '염령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_flame', mech: { first: 0.6, zone: { r: 1, sec: 2.5, k: 0.09, st: ['burn', 2, 1], color: 'fire' } } },
+  noeryeong: { name: '뇌령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_astra', mech: { chain: { n: 2, fall: 0.6 } } },
+  jiryeong: { name: '지령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_sola', st: ['poison', 5, 1], mech: { first: 0.6, zone: { r: 1, sec: 3, k: 0.07, slow: true, st: ['poison', 2, 1], color: 'poison' } } },
+  turyeong: { name: '투령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_wind', mech: { line: { len: 5, k: 0.5, push: true } } },
+  giryeong: { name: '기령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_forest', mech: { first: 0.7, zone: { r: 1, sec: 3, k: 0.05, slow: true, color: 'wood' } } },
+  bingryeong: { name: '빙령의 분노', on: 'hit', chance: 0.15, cd: 20, dmg: 3, fx: 'g_island_lancer', st: ['freeze', 1.5], mech: { first: 0.6, zone: { r: 1, sec: 3, k: 0.07, slow: true, color: 'ice' } } },
+  cheonbuyeon: { name: '천부연 격', on: 'hit', chance: 0.15, cd: 5, dmg: 1.5, fx: 'g_mountain', mech: { first: 0.65, det: { delay: 0.5, r: 1, k: 0.35 } } },
+  gwimunsan: { name: '귀문진산격', on: 'hit', chance: 0.15, cd: 20, dmg: 3.5, fx: 'g_jinsan', mech: { first: 0.6, pull: { r: 3, max: 8 }, det: { delay: 0.8, r: 1, k: 0.4, st: ['stun', 0.5] } } },
+  gwimunhon: { name: '귀문진혼격', on: 'hit', chance: 0.15, cd: 20, dmg: 3.5, fx: 'g_jinhon', mech: { chain: { n: 3, fall: 0.55, st: ['despair', 3], color: 'soul' } } },
+  jiok: { name: "극'지옥격", on: 'hit', chance: 0.15, cd: 15, dmg: 3, targets: 4, fx: 'g_hell_weapon', mech: { exec: { hp: 0.2, boss: 0.3, bossK: 0.25 } } },
+  nakroe: { name: '낙뢰격', on: 'hit', chance: 0.1, cd: 25, dmg: 4, fx: 'g_harrzud', self: ['pierce', 3, 0.25], mech: { chain: { n: 4, fall: 0.75, st: ['para', 0.4] } } },
   // 상태이상 격 (연 Buff 5015-5025, 8000-8070).
-  hwaryun: { name: '화륜옥쇄 격', on: 'hit', chance: 0.15, cd: 20, dmg: 5, area: 1, fx: 'g_china', st: ['para', 1.5] },
-  saseong: { name: '사성격', on: 'hit', chance: 0.1, cd: 25, dmg: 2.5, fx: 'g_grade4', st: ['bleed', 5, 1] },
-  hwasin: { name: '화신축융 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_god_of_fire', st: ['stun', 1.5] },
-  ilwol: { name: '일월남매 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_sunmoon', st: ['curse', 5] },
-  gwimunsang: { name: '귀문진상격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_grab_ghost', st: ['despair', 6] },
-  cheonja: { name: '천자의분노 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_anger_son', self: ['pierce', 5, 0.2] },
+  hwaryun: { name: '화륜옥쇄 격', on: 'hit', chance: 0.15, cd: 20, dmg: 5, area: 1, fx: 'g_china', st: ['para', 1.5], mech: { first: 0.65, zone: { r: 2, sec: 3, k: 0.06, slow: true, st: ['burn', 2, 1], color: 'fire' } } },
+  saseong: { name: '사성격', on: 'hit', chance: 0.1, cd: 25, dmg: 2.5, fx: 'g_grade4', st: ['bleed', 5, 1], mech: { first: 0.55, det: { delay: 1, r: 1, k: 0.45, bleedK: 0.05 } } },
+  hwasin: { name: '화신축융 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_god_of_fire', st: ['stun', 1.5], mech: { push: true } },
+  ilwol: { name: '일월남매 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_sunmoon', st: ['curse', 5], mech: { first: 0.6, det: { delay: 1.2, r: 2, k: 0.3, cursed: true } } },
+  gwimunsang: { name: '귀문진상격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_grab_ghost', st: ['despair', 6], mech: { pull: { r: 3, max: 8 } } },
+  cheonja: { name: '천자의분노 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_anger_son', self: ['pierce', 5, 0.2], mech: { rally: { k: 0.12, sec: 5 } } },
   // 기원 격: the blow that heals (연 8030 진청룡마령참 격: 체력·마력 50% 회복).
-  maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', heal: 0.5 },
+  maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', heal: 0.5, mech: { strikes: { n: 2, gap: 0.35 }, cleanse: true } },
   // 심판의낫's line, one way grown at each step: a blow and a heal (연 Buff 5534-5538, 심판의 낫의 힘:
   // "피해를 입히고 체력과 마력을 회복"). 청룡참 the first (the dragon smaller), 진청룡마령참 the 군주's
   // (above), 악마 심판 격 the last: the dragon's roar in the 끝없는 지옥's black and blood (tint), wider,
   // and 절망 on the struck (they strike softer): the line's balance, a little of blow, heal and guard.
-  cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', fxK: 0.8 },
+  cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', fxK: 0.8, mech: { strikes: { n: 2, gap: 0.35 } } },
   akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', fxK: 1.3,
-    fx2: 'k_ab_darkburst', fx2K: 0.7, tint: ABYSS_TINT },
+    fx2: 'k_ab_darkburst', fx2K: 0.7, tint: ABYSS_TINT, mech: { first: 0.6, zone: { r: 2, sec: 4, k: 0.05, drain: 0.3, color: 'blood' } } },
   // 태초's own (태초광명 격): 천자의분노's wide blow in gold-white light, a stun, and the wearer's pierce.
-  taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_anger_son', fxK: 1.4,
-    tint: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)' },
+  taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_taecho_light', fxK: 1.4,
+    fx2: 'g_taecho_light', fx2K: 0.6, tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.2)', mech: { first: 0.8, rays: { n: 3, r: 1, k: 0.3, lone: 0.07, gap: 0.12 }, rally: { k: 0.1, sec: 5 } } },
   // 주작선장's own (연 8080 주작비상 격): fire around and the wearer's party strengthened. Drawn as
   // 연 plays it (g_zuzak_kyeog: the whole prefab, the fire whirling up into a white flash and the
   // phoenix in its blaze; the old g_zuzak_captain was its one texture) on the struck, and 연's 주작
   // 신수 (g_zodiac_phoenix: the red bird spreading its wings) over the wearer it strengthens.
-  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'g_zuzak_kyeog', fxAlt: 'g_zuzak_captain', altK: 0.8, fxK: 1.25, fxSelf: 'g_zodiac_phoenix', selfK: 0.7, selfDy: -34, st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true },
+  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'g_zuzak_kyeog', fxAlt: 'g_zuzak_captain', altK: 0.8, fxK: 1.25, fxSelf: 'g_zodiac_phoenix', selfK: 0.7, selfDy: -34, st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true, mech: { first: 0.65, zone: { r: 2, sec: 3, k: 0.06, st: ['burn', 2, 1], color: 'fire' } } },
   // The PC original's three common 격 (공식 지식인: 저주격 / 데미지격 / 노도성황격) and its
   // status 격 (연 skills 30701 저주, 30801 중독, 30901 마비, 31001 절망, 33101 혼마염, 3000271 흡혈).
   jeoju: { name: '저주격', on: 'hit', chance: 0.15, cd: 12, dmg: 1.5, fx: 'g_curse_zod', st: ['curse', 6] },
@@ -89,23 +89,25 @@ export const GYEOK = {
   jujakbul: { name: '주작의 불꽃', on: 'hit', chance: 0.12, cd: 8, dmg: 2, fx: 'g_sinsu_jujak', fx2: 'g_sinsu_jujak_fire', fxK: 1.6, st: ['mark', 8, 0.3], st2: ['burn', 4, 1] },
   cheongsinsok: { name: '청룡의 신속', on: 'hit', chance: 0.12, cd: 10, dmg: 1.5, fx: 'g_tf_chungryong', self: ['speed', 5, 0.35] },
   // 백호's own: 연's 백호 신수 weapon effect (Sinsu_Weapon_Backho: the ground torn, white flames) and its claws.
-  baekmaeng: { name: '백호의 맹렬', on: 'hit', chance: 0.12, cd: 10, dmg: 4, area: 1, fx: 'g_tf_backho_claw', fxK: 0.55, self: ['power', 6, 0.2] }, // the 백호 strike's own claw marks only (tools/yeon_claws.py): its tiger and roaring head hid the hero
-  // 현무불괴갑's (불괴: struck, it does not break): 연's own 현무 pictures — the 현무 신수 itself
-  // (g_zodiac_turtle: 연's 신수 각인 현무, the black tortoise and its snakes coming out of a white
-  // flash) standing over the wearer it guards, and the 현무 weapon effect (Sinsu_Weapon_Hyunmu: the
-  // crystal shell closing) on each who struck. (fxAlt / selfAlt: a build without tools/yeon_zodiac.py's
-  // strips draws 연's 신수 transforms instead.)
+  baekmaeng: { name: '백호의 맹렬', on: 'hit', chance: 0.12, cd: 10, dmg: 4, area: 1, fx: 'g_tf_backho_claw', fxK: 0.55, self: ['power', 6, 0.2], mech: { strikes: { n: 3, gap: 0.2 } } }, // the 백호 strike's own claw marks only (tools/yeon_claws.py): its tiger and roaring head hid the hero
+  // 현무불괴갑's (불괴: struck, it does not break): the tank's 격, out of 연's 현무 effects together (no
+  // summoned 신수 각인 turtle, whose white silhouette popped): 연's 현무 기술 (y_hyeonmu: blue crystals
+  // rising into the 현무, before its white shatter) over the wearer, the 현무 weapon effect's crystal
+  // shell (Sinsu_Weapon_Hyunmu, g_sw_hyunmu) closing on each who struck, its shards in them; then the
+  // shell itself (its bubble frames, looped, over a jade ground) goes with the wearer four seconds:
+  // the wearer -40%, the companions inside -25%, the foes inside slowed, each who strikes the wearer
+  // pricked by its shards, and the boss turned on the wearer (도발). (game.js gy_hm_*: frame ranges.)
   // The 용무기 제십's 백호·현무 각인: weaker kin of the 지존's own (its cape and armour keep 백호의 맹렬
   // and 현무의 철옹 to themselves; worn together they no longer go off twice).
-  baekgak: { name: '백호의 발톱', on: 'hit', chance: 0.12, cd: 10, dmg: 3, area: 1, fx: 'g_tf_backho_claw', fxK: 0.5 },
-  hyeongak: { name: '현무의 껍질', on: 'hurt', chance: 0.2, cd: 12, dmg: 0.5, area: 1, fx: 'g_sw_hyunmu', self: ['ward', 4, 0.25] },
-  hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fxSelf: 'g_zodiac_turtle', selfAlt: 'g_tf_hyunmu', selfAltK: 0.48, selfK: 1.3, selfDy: -18, selfAlpha: 0.82, fx: 'g_sw_hyunmu', fx2: 'g_sw_hyunmu', fxK: 1.5, fx2K: 1.1, st: ['stun', 2], self: ['ward', 4, 0.4] },
+  baekgak: { name: '백호의 발톱', on: 'hit', chance: 0.12, cd: 10, dmg: 3, area: 1, fx: 'g_tf_backho_claw', fxK: 0.5, mech: { strikes: { n: 2, gap: 0.2 } } },
+  hyeongak: { name: '현무의 껍질', on: 'hurt', chance: 0.2, cd: 12, dmg: 0.5, area: 1, fx: 'g_sw_hyunmu', self: ['ward', 4, 0.25], mech: { zone: { r: 1, sec: 3, k: 0, follow: true, slow: true, shell: true, color: 'jade' } } },
+  hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fxSelf: 'gy_hm_rise', selfK: 0.95, selfDy: 8, selfAlpha: 0.85, fx: 'g_sw_hyunmu', fx2: 'gy_hm_shard', fxK: 1.5, fx2K: 1.1, st: ['stun', 2], self: ['ward', 4, 0.4], mech: { zone: { r: 2, sec: 4, k: 0, follow: true, slow: true, shell: true, allyWard: 0.25, thorns: 0.6, color: 'jade' }, taunt: 4 } },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),
   // in 연's own 청룡 pictures: 연's 신수 각인 청룡 (g_zodiac_dragon: the blue dragon coiling out of a
   // white flash) over the struck, its weapon effect's splash (Sinsu_Weapon_Chungryong) bursting on
   // every tile of the 3x3 round it, and the effect's blue orbs on each struck (청린쇠약). (Not the
   // 진청룡마령참 / 심판의낫 dragon: the original's 청린수폭 is water, not that coil.)
-  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_zodiac_dragon', fxAlt: 'g_tf_chungryong', altK: 0.43, fxK: 1.45, fxGrid: 'g_sinsu_cheong', gridK: 1.15, fx2: 'g_sinsu_cheong_orb', fx2K: 1.6, st: ['curse', 5], st2: ['slow', 5], drain: 0.4 },
+  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_zodiac_dragon', fxAlt: 'g_tf_chungryong', altK: 0.43, fxK: 1.45, fxGrid: 'g_sinsu_cheong', gridK: 1.15, fx2: 'g_sinsu_cheong_orb', fx2K: 1.6, st: ['curse', 5], st2: ['slow', 5], drain: 0.4, mech: { strikes: { n: 3, gap: 0.25, first: 0.4, rest: 0.43 } } }, // (the first lays 저주: the two after land ×1.4)
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])
@@ -117,15 +119,20 @@ export const GYEOK = {
 export const ABYSS_KIN = ['saseong', 'maengdok', 'binggyeol', 'yeomryeong', 'jiok', 'nakroe', 'gijeol'];
 for (const id of ABYSS_KIN) {
   const g = GYEOK[id];
-  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT,
-    ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : { area: 1 }) };
+  // Drawn as the top weapons they are: their own picture larger, and the abyss's dark burst on the struck.
+  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT, fxK: (g.fxK || 1) * 1.7,
+    ...(g.fx2 ? {} : { fx2: 'k_ab_darkburst', fx2K: 0.9 }),
+    ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : g.mech && g.mech.chain ? {} : { area: 1 }),
+    // and its way one step further: a chain two more leaps, a ground a second longer
+    ...(g.mech ? { mech: { ...g.mech, ...(g.mech.chain ? { chain: { ...g.mech.chain, n: g.mech.chain.n + 2 } } : {}),
+      ...(g.mech.zone ? { zone: { ...g.mech.zone, sec: g.mech.zone.sec + 1 } } : {}) } } : {}) };
 }
 
 // Armour of a boss: when struck, 20% to put its status on the attacker (and those beside).
 for (const [st, sec] of [['poison', 5], ['venom', 5], ['bleed', 5], ['burn', 5], ['stun', 1.5], ['para', 1.2], ['freeze', 2], ['curse', 6], ['despair', 6]]) {
   GYEOK['ban_' + st] = { name: `${STATUS[st].name} 반격`, on: 'hurt', chance: 0.2, cd: 6, dmg: 1, area: 1,
     fx: GYEOK[{ poison: 'jungdok', venom: 'maengdok', bleed: 'saseong', burn: 'hwasang', stun: 'gijeol', para: 'mabi', freeze: 'binggyeol', curse: 'jeoju', despair: 'jeolmang' }[st]].fx,
-    st: [st, sec, 1] };
+    st: [st, sec, 1], mech: { push: true } }; // 반격 파동: those round the hero thrown back a tile
 }
 
 /** One line for a 격, for the equipment window. */
@@ -140,6 +147,21 @@ export function gyeokText(id) {
   if (g.heal) bits.push(`체력·마력 ${g.heal * 100}% 회복`);
   if (g.drain) bits.push('흡혈');
   if (g.self) bits.push({ power: '공격 강화', speed: '이동 속도', pierce: '관통', ward: '받는 피해 감소' }[g.self[0]]);
+  const m = g.mech;
+  if (m) {
+    if (m.chain) bits.push(`연쇄 ${m.chain.n}회`);
+    if (m.zone) bits.push(m.zone.follow ? '보호 껍질' : { fire: '불 장판', poison: '독 늪', wood: '속박 장판', ice: '서리 장판', blood: '흡혈 웅덩이' }[m.zone.color] || '장판');
+    if (m.det) bits.push(m.det.cursed ? '지연 추가타' : '지연 폭발');
+    if (m.line) bits.push('관통 돌풍');
+    if (m.pull) bits.push('끌어모음');
+    if (m.push) bits.push('밀쳐냄');
+    if (m.exec) bits.push('처형');
+    if (m.strikes) bits.push(`${m.strikes.n}연타`);
+    if (m.rays) bits.push('빛기둥');
+    if (m.rally) bits.push('아군 공격 강화');
+    if (m.cleanse) bits.push('상태 해제');
+    if (m.taunt) bits.push('도발·가시');
+  }
   return `${g.name}: ${when} ${Math.round(g.chance * 100)}%${g.cd ? ` (재사용 ${g.cd}초)` : ''} · ${bits.join(' · ')}`;
 }
 
@@ -257,7 +279,10 @@ export function dragonGyeok(cls, step) {
   const num = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'][step];
   return { name: `${head}제${num}격`, on: 'hit', chance: 0.04 + 0.02 * step, cd: 3, dmg: 1 + 0.6 * step,
     fx: step >= 7 ? 'g_pet_dragon' : 'g_hell_weapon', st: cls === 'mage' || cls === 'poet' ? ['curse', 4] : null,
-    cdCut: step >= 10 ? 0.5 : step >= 9 ? 0.35 : 0 };
+    cdCut: step >= 10 ? 0.5 : step >= 9 ? 0.35 : 0,
+    // 제칠 on, the dragon strikes the same foe again (제십 three times), the blow shared out:
+    // the 용무기 is the single foe's weapon and spreads to no one.
+    mech: step >= 7 ? { strikes: { n: step >= 10 ? 3 : 2, gap: 0.3, focus: true } } : null };
 }
 
 // The 용무기 at 제십 takes one 사신수 (연's 주작의/청룡의/백호의/현무의 용X제십검, items 1001119 …).
