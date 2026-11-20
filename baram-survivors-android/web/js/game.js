@@ -902,7 +902,8 @@ const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 // its pathing); within two tiles of the hero a tile may take up to three (two on the outer ring),
 // each drawn a little off the tile's middle. The tile's first comer holds it in occ; the others
 // sharing it are in crowd. Whatever strikes a tile strikes everyone on it (bodiesAt).
-// Not in a war or a raid (war.js keeps its own one-to-a-tile order).
+// In a war, a raid or a 「쟁」 war.js decides (War.share): fighters of one side pass through and
+// share each other's tiles (and the hero's), as 연's players do; a foe's tile stays shut.
 const crowd = new Map(); // "tx,ty" -> the monsters sharing the tile with its holder
 const SHARE_NEAR = 3, SHARE_FAR = 2;
 
@@ -931,6 +932,7 @@ function leave(b) {
 
 /** May this monster press onto a taken tile beside the hero? */
 function canShare(b, nx, ny) {
+  if (G && G.war) return !!(b.war && War.share(b, nx, ny));
   if (!G || G.war || G.stage.raid || !b.m || b.ally || b.war || b.march || b.flee || b.kind === 'boss' || b.kind === 'mini') return false;
   const p = G.player, d = Math.abs(nx - p.tx) + Math.abs(ny - p.ty);
   if (d < 1 || d > 2 || (p.stepping && p.sfx === nx && p.sfy === ny)) return false;
@@ -982,7 +984,7 @@ function jostle(b, dt) {
 
 function free(tx, ty) {
   const p = G.player;
-  return !occ.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
+  return !occ.has(key(tx, ty)) && !crowd.has(key(tx, ty)) && !(p.tx === tx && p.ty === ty)
     && !(p.stepping && p.sfx === tx && p.sfy === ty)
     && (!G.arena || Hunt.open(tx, ty)); // 사냥 기믹: a ground fought on 연's own map
 }
@@ -4137,6 +4139,8 @@ function stepHero(dx, dy, dt) {
     // 초상비 (보조 기술): through the crowd at once, not after half a second's shove.
     const through = G.buffs.chosang > G.t && there.kind !== 'boss' && !there.cmdr;
     if (!through && (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr)) return;
+    // (A war: not while fighters of its own side share the hero's tile — the heap would land on them.)
+    if (G.war && crowd.has(key(p.tx, p.ty))) return;
     // Pushed long enough, the hero and the monsters on the tile trade places (the whole heap of
     // a crowded tile goes together): never the hero and a monster on one tile.
     const k = key(nx, ny), heap = crowd.get(k) || [];
@@ -13677,6 +13681,7 @@ function syncSettings() {
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
   $('#opt-aifx').textContent = `AI 이펙트 투명도: ${Math.round((1 - aiFxAlpha()) * 100)}%`;
+  $('#opt-overlap').textContent = `겹친 캐릭터 투명도: ${overlapAlpha() >= 1 ? '끔' : Math.round((1 - overlapAlpha()) * 100) + '%'}`;
   $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
@@ -13907,6 +13912,21 @@ function aiFxAlpha() {
 $('#opt-aifx').onclick = () => {
   const i = AI_FX_STEPS.findIndex(v => Math.abs(v - aiFxAlpha()) < 0.01);
   settings.aiFxAlpha = AI_FX_STEPS[(i + 1) % AI_FX_STEPS.length];
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 겹친 캐릭터 투명도: in a war, a raid or a 「쟁」 a fighter drawn over the hero, or sharing a tile
+// with another of its side, is drawn see-through (war.js overAlpha; the hero itself never), so the
+// hero and a heap of allies on a tile still read. 연 lets its players pass through and stand on one
+// another; this keeps such a heap legible. 50% by default.
+const OVERLAP_STEPS = [0.5, 0.35, 0.7, 1];
+function overlapAlpha() {
+  const v = settings.overlapAlpha;
+  return typeof v === 'number' && v > 0 && v <= 1 ? v : 0.5;
+}
+$('#opt-overlap').onclick = () => {
+  const i = OVERLAP_STEPS.findIndex(v => Math.abs(v - overlapAlpha()) < 0.01);
+  settings.overlapAlpha = OVERLAP_STEPS[(i + 1) % OVERLAP_STEPS.length];
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -14459,7 +14479,7 @@ const War = initWar({
   G: () => G, setG: v => { G = v; }, M: () => M, Z: () => Z, VW: () => VW, VH: () => VH, settings: () => settings,
   progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
   saveProgress: () => saveJson('bs_progress', progress),
-  ctx, canvas, images, occ, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
+  ctx, canvas, images, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),

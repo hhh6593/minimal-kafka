@@ -770,7 +770,7 @@ function pathCells(W, a, b) {
 
 function placeBody(W, b, at) {
   const [x, y] = freeNear(W, at[0], at[1], b.team);
-  A.occ.delete(k2(b.tx, b.ty));
+  A.leave(b);
   A.place(b, x, y);
   moved(b, 'place');
 }
@@ -804,6 +804,8 @@ export const War = {
   setup: () => setup(),
   update: dt => update(dt),
   open: (x, y) => { const G = A.G(); return open(G.war, x, y, 0); },
+  /** May fighter b step onto (x, y), taken already (game.js step)? Its own side's tile, yes. */
+  share: (b, x, y) => share(b, x, y),
   /** Whether a body can be carried from (x0, y0) to (x1, y1) in one move (a leap, a dash, a pull):
    * the tile is open and no wall or shut gate stands on the straight line between. */
   clear: (x0, y0, x1, y1) => {
@@ -980,6 +982,7 @@ function update(dt) {
 
 function tickBody(W, b, dt) {
   const G = A.G();
+  if (!b.dead) stackOff(W, b, dt);
   A.advance(b, dt);
   if (b.moving) b.walkT += dt * 1000;
   b.flash = Math.max(0, b.flash - dt);
@@ -1013,10 +1016,11 @@ function tickBody(W, b, dt) {
     if (b.thinkT < 0) b.thinkT = 0.125;
     if (b.stun <= 0) (W.jaeng ? thinkJaeng : W.raid && !b.cmdr && !b.troop ? thinkRaid : think)(W, b);
   }
+  if (!b.moving && b.stun <= 0 && !b.dest && !b.troop && !b.cmdr) spread(W, b);
   if (!b.moving && b.stun <= 0 && b.dest) walk(W, b);
 }
 
-/** One tile toward the body's destination along the field's paths; around a body in the way. */
+/** One tile toward the body's destination along the field's paths; through its own side, round a foe. */
 function walk(W, b) {
   const [dx0, dy0] = b.dest;
   if (b.tx === dx0 && b.ty === dy0) { b.dest = null; return; }
@@ -1042,20 +1046,23 @@ function walk(W, b) {
   }
   const dur = 0.25 * 70 / b.speed * (b.slow > 0 ? 1.6 : 1) * (b.carry && b.role !== 'support' ? 1.25 : 1) * (b.cmdr ? 1.3 : 1);
   const safe = (W.raid || W.jaeng) && W.danger.size && !W.danger.has(dk(b.tx, b.ty));
-  for (const [dx, dy] of opts) {
-    const nx = b.tx + dx, ny = b.ty + dy;
-    if (!open(W, nx, ny, b.team)) continue;
-    // Not onto a red tile it has seen (a careless one walks in anyway).
-    if (safe && W.danger.has(dk(nx, ny)) && b.dodge > 0.6) continue;
-    if (A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.blocked = 0; moved(b, 'walk'); return; }
-  }
-  // Fighters are players: one of its own side standing in the way changes places (both step).
-  // In a war too: a crowd at the camp (its guards, the risen) boxed a fighter in for good.
+  // A free tile first; else through one of its own side (연's players pass through each other and
+  // stand on one another: the crowd at a gate or round a boss no longer jams). A foe's tile stays shut.
+  for (let pass = 0; pass < 2; pass++)
+    for (const [dx, dy] of opts) {
+      const nx = b.tx + dx, ny = b.ty + dy;
+      if (!open(W, nx, ny, b.team)) continue;
+      // Not onto a red tile it has seen (a careless one walks in anyway).
+      if (safe && W.danger.has(dk(nx, ny)) && b.dodge > 0.6) continue;
+      if (pass === 0 && !A.free(nx, ny)) continue;
+      if (A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.blocked = 0; b.side = 0; moved(b, 'walk'); return; }
+    }
+  // A tile full of its own side (three on it already): one standing there changes places (both step).
   if (opts.length) {
     const [dx, dy] = opts[0], o = A.occ.get(k2(b.tx + dx, b.ty + dy));
-    if (o && o.war && o.team === b.team && !o.moving && !o.dead && !o.cmdr && open(W, b.tx + dx, b.ty + dy, b.team) && open(W, b.tx, b.ty, o.team)) {
-      A.occ.delete(k2(o.tx, o.ty));
-      A.occ.delete(k2(b.tx, b.ty));
+    if (o && o.war && o.team === b.team && !o.moving && !o.dead && !o.cmdr && !o.gate && !o.wprop && open(W, b.tx + dx, b.ty + dy, b.team) && open(W, b.tx, b.ty, o.team)) {
+      A.leave(o);
+      A.leave(b);
       const ox = o.tx, oy = o.ty;
       startStep(o, b.tx, b.ty, dur);
       startStep(b, ox, oy, dur);
@@ -1064,11 +1071,16 @@ function walk(W, b) {
       return;
     }
   }
-  // Blocked: a sidestep now and then, so a crowd flows round instead of jamming.
+  // Blocked by a foe: round it, to one side (kept, not a random step each time: the back and forth
+  // of a jam), the side toward its goal first.
   b.blocked = (b.blocked || 0) + 1;
-  if (b.blocked > 2) {
-    const [dx, dy] = pick(DIR4);
-    if (open(W, b.tx + dx, b.ty + dy, b.team) && A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; moved(b, 'side'); }
+  if (b.blocked > 2 && opts.length) {
+    const [fx] = opts[0];
+    if (!b.side) { const along = fx ? Math.sign(dy0 - b.ty) : Math.sign(dx0 - b.tx); b.side = along || pick([-1, 1]); }
+    for (const sgn of [b.side, -b.side]) {
+      const dx = fx ? 0 : sgn, dy = fx ? sgn : 0;
+      if (open(W, b.tx + dx, b.ty + dy, b.team) && A.step(b, dx, dy, dur)) { b.fdx = dx; b.fdy = dy; b.side = sgn; moved(b, 'side'); break; }
+    }
     b.blocked = 0;
   }
 }
@@ -1083,7 +1095,161 @@ function startStep(b, nx, ny, dur) {
   const dx = nx - b.fx, dy = ny - b.fy;
   if (dx) b.face = dx > 0 ? 1 : -1;
   b.mdx = dx; b.mdy = dy;
-  A.occ.set(k2(nx, ny), b);
+  enter(b, nx, ny);
+}
+/** Onto a tile in game.js's books: its holder when none holds it, else one sharing it. */
+function enter(b, x, y) {
+  const k = k2(x, y);
+  if (!A.occ.has(k) && !A.crowd.has(k)) { A.occ.set(k, b); return; }
+  const c = A.crowd.get(k);
+  if (c) c.push(b); else A.crowd.set(k, [b]);
+}
+
+// ---------------------------------------------------------------- the crowd
+//
+// 바람의나라 연: players pass through each other and heap on a spot (its client sets unit collision
+// apart for friends and for foes, by mode: COLLIDE_FRIENDLY_BY_MODE / COLLIDE_ENEMY_BY_MODE). Here a fighter may
+// step onto a tile of its own side (up to SHARE_CAP on one, the hero counted), never onto a foe's,
+// so a gate, a line of tanks or a boss's ring still holds against the other side. Bodies sharing a
+// tile stand a little apart on it (stackOff), spread to a free tile beside when they have stood a
+// while (spread), and are drawn see-through over the hero and over each other (overAlpha).
+// A blade does not run at its target's own tile any more (taken, it left the blade circling): it
+// takes a place round the target (meleeSlot: the nearest with room, kept a while, a tile another
+// is bound for counted as taken), or turns to a foe with room round it, or waits in the second ring.
+const SHARE_CAP = 3;
+
+function share(b, x, y) {
+  const G = A.G(), W = G.war;
+  if (!W || !b.war || b.gate || b.wprop || b.cmdr) return false;
+  const k = k2(x, y), h = A.occ.get(k), c = A.crowd.get(k), p = G.player;
+  const hero = !G.dead && ((p.tx === x && p.ty === y) || (p.stepping && p.sfx === x && p.sfy === y));
+  if (h && (!h.war || h.gate || h.wprop || h.cmdr || h.team !== b.team)) return false;
+  if (hero && b.team !== 0) return false;
+  if (!h && !hero && !(c && c.length)) return false;
+  let n = (h ? 1 : 0) + (hero ? 1 : 0);
+  if (c) for (const o of c) { if (o.team !== b.team) return false; n++; }
+  return n < SHARE_CAP;
+}
+
+/** How many of b's side stand on (or are bound for) a tile; 99 when a foe holds it. */
+function slotLoad(W, b, x, y) {
+  const G = A.G(), k = k2(x, y), h = A.occ.get(k), c = A.crowd.get(k), p = G.player;
+  let n = 0;
+  if (h && h !== b) { if (!h.war || h.gate || h.wprop || h.team !== b.team) return 99; n++; }
+  if (c) for (const o of c) if (o !== b) { if (o.team !== b.team) return 99; n++; }
+  if (!G.dead && p.tx === x && p.ty === y) { if (b.team !== 0) return 99; n++; }
+  const cl = W.claims && W.claims.get(k);
+  if (cl) for (const o of cl) {
+    if (o === b) continue;
+    if (o.dead || !o.slot || o.slot[0] !== x || o.slot[1] !== y || !alive(o.slotFor)) { cl.delete(o); continue; }
+    if (!(o.tx === x && o.ty === y)) n++;
+  }
+  return n;
+}
+function claim(W, b, at, t) {
+  const G = A.G(), claims = W.claims || (W.claims = new Map());
+  if (b.slot) { const old = claims.get(k2(b.slot[0], b.slot[1])); if (old) old.delete(b); }
+  b.slot = at; b.slotFor = t; b.slotT = G.t + rnd(1.2, 2);
+  if (at) { const k = k2(at[0], at[1]); let set = claims.get(k); if (!set) claims.set(k, set = new Set()); set.add(b); }
+}
+/** The tiles from which b reaches t (a gate: the row before it; a body: the ring round it). */
+function slotTiles(W, b, t, reach) {
+  const out = [];
+  if (t.gate) {
+    const y = b.team !== t.team ? t.y1 + 1 : t.y0 - 1;
+    for (let x = t.x0 - 1; x <= t.x1 + 1; x++) { const d = gateDist(t, { tx: x, ty: y }); if (d <= reach) out.push([x, y, d]); }
+    return out;
+  }
+  const R = Math.ceil(reach);
+  for (let dx = -R; dx <= R; dx++)
+    for (let dy = -R; dy <= R; dy++) {
+      const d = Math.hypot(dx, dy);
+      if (d >= 0.9 && d <= reach) out.push([t.tx + dx, t.ty + dy, d]);
+    }
+  return out;
+}
+/** A place round t within reach for a blade (kept a while once taken), or null when none has room. */
+function meleeSlot(W, b, t, reach, keep = true) {
+  const G = A.G(), cur = b.slot;
+  if (keep && cur && b.slotFor === t && G.t < b.slotT) {
+    const d = t.gate ? gateDist(t, { tx: cur[0], ty: cur[1] }) : Math.hypot(cur[0] - t.tx, cur[1] - t.ty);
+    if (d <= reach && slotLoad(W, b, cur[0], cur[1]) < SHARE_CAP) return cur;
+  }
+  let best = null, bc = 1e9;
+  for (const [x, y, d] of slotTiles(W, b, t, reach)) {
+    if (!open(W, x, y, b.team) || (W.danger && W.danger.size && W.danger.has(dk(x, y)))) continue;
+    const load = slotLoad(W, b, x, y);
+    if (load >= SHARE_CAP) continue;
+    const c = Math.abs(x - b.tx) + Math.abs(y - b.ty) + load * 2.2 + d * 0.15;
+    if (c < bc) { bc = c; best = [x, y]; }
+  }
+  if (keep) claim(W, b, best, t);
+  return best;
+}
+/** A foe near with room round it, for a blade whose own target is ringed full. */
+function roomyFoe(W, b, r, not) {
+  let best = null, bs = 1e9;
+  for (const e of foesOf(W, b.team)) {
+    if (e === not || e.gate || unseenHid(e) || (W.jaeng && inCamp(W, e)) || (b.only !== undefined && e.team !== b.only)) continue;
+    const d = d2(b, e);
+    if (d > r || unseen(W, b, e, d)) continue;
+    const s = d + 0.8 * Math.min(4, e.engaged || 0) + (e.troop || e.cmdr ? 1 : 0);
+    if (s < bs && meleeSlot(W, b, e, 1.5, false)) { bs = s; best = e; }
+  }
+  return best;
+}
+/** Where a blade goes for t: its place round t, else a place in the second ring (waiting a step
+ * back for room rather than pushing round the first), else t's tile as before. */
+function bladeDest(W, b, t, reach) {
+  return meleeSlot(W, b, t, reach) || meleeSlot(W, b, t, reach + 1.3, false) || [t.tx, t.ty];
+}
+
+/** Standing on a shared tile a while: to a free tile beside (still in reach of its target). */
+function spread(W, b) {
+  const G = A.G();
+  if (G.t < (b.spreadT || 0)) return;
+  b.spreadT = G.t + rnd(0.7, 1.3);
+  const k = k2(b.tx, b.ty);
+  const p = G.player, hero = !G.dead && p.tx === b.tx && p.ty === b.ty;
+  if (!A.crowd.has(k) && !hero) return;
+  const t = b.target && alive(b.target) ? b.target : null;
+  const reach = t ? (W.raid || W.jaeng ? reachOf(b, t) : b.kit.range > 1 ? b.kit.range + 0.5 : 1.5) : 0;
+  for (const [dx, dy] of [...DIR4].sort(() => Math.random() - 0.5)) {
+    const x = b.tx + dx, y = b.ty + dy;
+    if (!open(W, x, y, b.team) || !A.free(x, y) || (W.danger && W.danger.size && W.danger.has(dk(x, y)))) continue;
+    if (t && (t.gate ? gateDist(t, { tx: x, ty: y }) : Math.hypot(x - t.tx, y - t.ty)) > reach) continue;
+    b.dest = [x, y];
+    return;
+  }
+}
+
+/** Where on its tile a body stands: apart from the others sharing it (and off the hero's middle). */
+function stackOff(W, b, dt) {
+  const G = A.G(), k = k2(b.tx, b.ty), h = A.occ.get(k), c = A.crowd.get(k), p = G.player;
+  const hero = !G.dead && p.tx === b.tx && p.ty === b.ty;
+  const n = (h ? 1 : 0) + (c ? c.length : 0) + (hero ? 1 : 0);
+  let tx = 0, ty = 0;
+  if (n > 1) {
+    const i = (hero ? 1 : 0) + (h === b ? 0 : c ? c.indexOf(b) + (h ? 1 : 0) : 0);
+    const a = (b.team === 0 ? 0.4 : 3.5) + (i / n) * Math.PI * 2;
+    tx = Math.cos(a) * 13;
+    ty = Math.sin(a) * 6;
+  }
+  const r = Math.min(1, dt * 8);
+  b.jx = (b.jx || 0) + (tx - (b.jx || 0)) * r;
+  b.jy = (b.jy || 0) + (ty - (b.jy || 0)) * r;
+}
+
+/** How solid a body is drawn (메뉴 「겹친 캐릭터 투명도」): see-through over the hero, or on a tile it
+ * shares and does not hold; the hero itself never. */
+function overAlpha(W, b) {
+  const G = A.G(), p = G.player;
+  const v = A.settings().overlapAlpha, k = typeof v === 'number' && v > 0 && v <= 1 ? v : 0.5;
+  if (k >= 1) return 1;
+  if (!G.dead && Math.abs(b.x - p.x) < 26 && b.y >= p.y - 4 && b.y - p.y < 44) return k;
+  const key = k2(b.tx, b.ty);
+  if (A.crowd.has(key) && A.occ.get(key) !== b) return k;
+  return 1;
 }
 
 // ---------------------------------------------------------------- thinking
@@ -1242,15 +1408,22 @@ function think(W, b) {
         b.dest = [clamp(b.tx + ax * 3, 0, W.map.cols - 1), clamp(b.ty + ay * 2, 0, W.map.rows - 1)];
       } else if (dist > range) b.dest = [t.tx, t.ty];
       else b.dest = null;
-    } else if (t.gate) {
-      b.dest = gateFront(W, b);
-    } else if (dist > 1.1) b.dest = [t.tx, t.ty];
-    else b.dest = null;
+    } else if (dist <= 1.5) b.dest = null; // (in reach, the corners too: it stepped on for the side tile while it struck)
+    else if (t.gate) b.dest = meleeSlot(W, b, t, 1.5) || gateFront(W, b);
+    else {
+      // A place round the target; ringed full, a foe near with room (not a peel, a taunt, an objective).
+      let s = meleeSlot(W, b, t, 1.5);
+      if (!s && (why === 'pick' || why === 'held' || why === 'squad')) {
+        const alt = roomyFoe(W, b, b.role === 'tank' ? 6 : 7, t);
+        if (alt) { t = b.target = alt; b.tWhy = 'room'; b.retargetT = G.t + rnd(2, 3.5); s = meleeSlot(W, b, t, 1.5); }
+      }
+      b.dest = s || bladeDest(W, b, t, 1.5);
+    }
     // The timid keep to the edge of a fight: a blade goes in only on a foe its friends are on
     // already (else it waits a few tiles back), a caster strikes from its full reach.
     if (b.timid && !t.gate && !t.cmdr && W.phase !== 'final' && b.role !== 'healer') {
       const ax = Math.sign(b.tx - t.tx), ay = Math.sign(b.ty - t.ty);
-      if (range <= 1 && !(t.engaged > 0) && dist > 1.1 && t.target !== b) b.dest = dist > 4 ? [t.tx + ax * 3, t.ty + ay * 3] : null;
+      if (range <= 1 && !(t.engaged > 0) && dist > 1.5 && t.target !== b) b.dest = dist > 4 ? [t.tx + ax * 3, t.ty + ay * 3] : null;
       else if (range > 1 && dist < range - 1 && !t.gate) b.dest = [clamp(b.tx + (ax || pick([-1, 1])) * 2, 0, W.map.cols - 1), b.ty + ay];
     }
     if (dist <= range + 0.5) act(W, b, t);
@@ -1277,12 +1450,12 @@ function gateFront(W, b) {
 function formation(W, b, order) {
   // A crowd, not a file: each fighter keeps its own spot in a loose blob round the order, the
   // tanks at its front, the healers at its back.
-  if (b.jx === undefined) { const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.6; b.jx = Math.round(Math.cos(a) * r); b.jy = Math.round(Math.sin(a) * r * 0.8); }
+  if (b.fjx === undefined) { const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.6; b.fjx = Math.round(Math.cos(a) * r); b.fjy = Math.round(Math.sin(a) * r * 0.8); }
   const toward = order.face || [0, 0];
   let ox = 0, oy = 0;
   if (b.role === 'tank') { ox = toward[0] * 2; oy = toward[1] * 2; }
   else if (b.role === 'healer') { ox = -toward[0] * 2; oy = -toward[1] * 2; }
-  return snap(W, order.x + ox + b.jx, order.y + oy + b.jy);
+  return snap(W, order.x + ox + b.fjx, order.y + oy + b.fjy);
 }
 
 function leaderPick(W, b, order) {
@@ -1391,7 +1564,7 @@ function thinkHealer(W, b, order) {
       if (foe) {
         const dx = anchor.tx - foe.tx, dy = anchor.ty - foe.ty, n = Math.hypot(dx, dy) || 1;
         at = [Math.round(anchor.tx + dx / n * 2.2), Math.round(anchor.ty + dy / n * 2.2)];
-      } else at = d2(anchor, order) < 6 ? formation(W, b, order) : [anchor.tx + (b.jx || 0), anchor.ty + 1];
+      } else at = d2(anchor, order) < 6 ? formation(W, b, order) : [anchor.tx + (b.fjx || 0), anchor.ty + 1];
     } else at = formation(W, b, order);
     const [sx, sy] = snap(W, at[0], at[1]);
     b.dest = Math.abs(sx - b.tx) + Math.abs(sy - b.ty) <= 1 ? null : [sx, sy];
@@ -1522,7 +1695,7 @@ function thinkTroop(W, b) {
   const t = nearest(W, b, 4.5);
   if (t && Math.abs(t.tx - post[0]) + Math.abs(t.ty - post[1]) < 9) {
     b.target = t;
-    b.dest = d2(b, t) > 1.1 ? [t.tx, t.ty] : null;
+    b.dest = d2(b, t) > 1.5 ? bladeDest(W, b, t, 1.5) : null;
     if (d2(b, t) <= 1.5) act(W, b, t);
   } else {
     b.target = null;
@@ -1956,7 +2129,7 @@ function kill(W, f, killer) {
   f.hp = 0;
   f.down = true;
   f.stats.deaths++;
-  A.occ.delete(k2(f.tx, f.ty));
+  A.leave(f);
   const list = listOf(f.team);
   const at = list.indexOf(f);
   if (at >= 0) list.splice(at, 1);
@@ -3207,7 +3380,7 @@ function soloThink(W, b, order) {
   // A hider found in its corner.
   if (t.hide && t.hide.phase === 'wait' && dist <= 2.5 && !t.hide.found) found(W, t, b);
   if (range > 1) b.dest = dist > range ? [t.tx, t.ty] : dist < 2 ? [clamp(b.tx + (Math.sign(b.tx - t.tx) || 1) * 2, 0, W.map.cols - 1), b.ty] : null;
-  else b.dest = dist > 1.1 ? [t.tx, t.ty] : null;
+  else b.dest = dist > 1.5 ? bladeDest(W, b, t, 1.5) : null;
   if (dist <= range + 0.5) {
     act(W, b, t);
     duelCheck(W, b, t);
@@ -3930,23 +4103,6 @@ function reachOf(b, t) {
   return t.kind === 'boss' ? 1.3 + 0.6 * (t.baseScale || t.scale || 1) : 1.5;
 }
 
-/** A free tile beside the target, within reach, off the red floor, nearest the fighter. */
-function ringSpot(W, b, t, reach) {
-  let best = null, bd = 1e9;
-  const R = Math.ceil(reach);
-  for (let dx = -R; dx <= R; dx++)
-    for (let dy = -R; dy <= R; dy++) {
-      const d = Math.hypot(dx, dy);
-      if (d < 1 || d > reach) continue;
-      const x = t.tx + dx, y = t.ty + dy;
-      if (!open(W, x, y) || W.danger.has(dk(x, y))) continue;
-      if (!(x === b.tx && y === b.ty) && !A.free(x, y)) continue;
-      const c = Math.abs(x - b.tx) + Math.abs(y - b.ty) + d * 0.1;
-      if (c < bd) { bd = c; best = [x, y]; }
-    }
-  return best;
-}
-
 /** The nearest tile off the red floor (a melee fighter keeps within reach of its foe if it can). */
 function safeNear(W, b) {
   const t = b.target && alive(b.target) ? b.target : null, reach = t ? reachOf(b, t) : 0;
@@ -4047,7 +4203,7 @@ function thinkRaid(W, b) {
       b.dest = snap(W, b.tx + ax * 3, b.ty + ay * 2);
     } else if (dist > reach) b.dest = snap(W, t.tx + Math.round((b.tx - t.tx) / dist * (reach - 1)), t.ty + Math.round((b.ty - t.ty) / dist * (reach - 1)));
     else b.dest = null;
-  } else if (dist > reach) b.dest = ringSpot(W, b, t, reach) || [t.tx, t.ty];
+  } else if (dist > reach) b.dest = bladeDest(W, b, t, reach);
   else b.dest = null;
   if (dist <= reach + 0.5) act(W, b, t);
 }
@@ -5046,7 +5202,7 @@ function thinkJaengBoss(W, b, order) {
       b.dest = snap(W, b.tx + ax * 3, b.ty + ay * 2);
     } else if (dist > reach) b.dest = snap(W, t.tx + Math.round((b.tx - t.tx) / dist * (reach - 1)), t.ty + Math.round((b.ty - t.ty) / dist * (reach - 1)));
     else b.dest = null;
-  } else if (dist > reach) b.dest = ringSpot(W, b, t, reach) || [t.tx, t.ty];
+  } else if (dist > reach) b.dest = bladeDest(W, b, t, reach);
   else b.dest = null;
   if (dist <= reach + 0.5) act(W, b, t);
 }
@@ -5451,7 +5607,7 @@ function drawBody(b) {
   if (b.gate || !onScreen(b) || (window.__dbgWar && window.__dbgWar.nobody)) return;
   const dbg = window.__dbgWar || {};
   if (b.wprop) return dbg.noprop ? null : drawWarProp(W, b);
-  const alpha = b.hidden > G.t ? 0.4 : 1;
+  const alpha = (b.hidden > G.t ? 0.4 : 1) * overAlpha(W, b);
   const pose = b.poseT > 0 ? b.pose : b.moving ? 'walk' : 'idle';
   let top = 50;
   if (dbg.noframe) top = 50;
