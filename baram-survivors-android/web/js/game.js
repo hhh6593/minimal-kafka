@@ -8247,7 +8247,7 @@ const ULT_MECH = {
   // 만검귀종·폭풍화우·도깨비폭풍·저승문: the foes are drawn in round the hero, then it bursts.
   vortex(t, seen, strike) {
     const p = G.player;
-    tkLoop(t.main, p.x, p.y - 24, t.hold || 1.1, { scale: 1, alpha: settings.calmFx ? 0.6 : 0.9 });
+    tkLoop(t.main, p.x, p.y - 24, t.hold || 1.1, { scale: t.mainScale || 1, alpha: settings.calmFx ? 0.6 : 0.9 });
     if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 200 });
     const ring = [];
     for (let r = 1; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) ring.push([p.tx + dx, p.ty + dy]);
