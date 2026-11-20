@@ -108,12 +108,20 @@ const KITS = {
 };
 
 let SK = null; // SKILLS
+const CLOSE_KIT = new Set(['lancer', 'monk', 'dokkaebi', 'reaper', 'celestial']);
+// The classes whose blows are their weapon's (blade, spear, fist, bow): the attack clip, not the cast.
+const STRIKERS = new Set(['warrior', 'rogue', 'lancer', 'monk', 'dokkaebi', 'reaper', 'archer']);
+/** The pose of a fighter's blow: its weapon's swing, a caster's cast (the 천인's plain blow a strike, its spells cast). */
+const blowPose = (b, spell) => (STRIKERS.has(b.cls.id) || (!spell && b.cls.id === 'celestial') ? 'attack' : 'cast');
 function kitFor(cls) {
   if (KITS[cls.id]) return KITS[cls.id];
   const mine = Object.entries(SK).filter(([, d]) => d.cls === cls.id && d.fx);
   const hit = mine.filter(([, d]) => d.dmg).sort((a, b) => (a[1].req || 1) - (b[1].req || 1));
   const heal = mine.find(([, d]) => d.kind === 'heal');
-  const ranged = hit.some(([, d]) => (d.range || 0) >= 4);
+  // A close-in class fights close whatever reach its later spells have (each has one of four
+  // tiles or more: the 무사, 격투가, 도깨비 and 차사 stood off and threw their blows as a caster's
+  // shots, in the casting pose). The 천인 too, its spells thrown from among the blades (hybrid).
+  const ranged = !CLOSE_KIT.has(cls.id) && hit.some(([, d]) => (d.range || 0) >= 4);
   return {
     range: ranged ? 5 : 1, basic: [hit[0] ? hit[0][0] : null, 1.0, 1.1], aoe: [hit[1] ? hit[1][0] : null, 1.6, 6.5],
     ult: [cls.ult && SK[cls.ult] ? cls.ult : null, 4.0, 18], heal: heal ? heal[0] : null,
@@ -122,8 +130,11 @@ function kitFor(cls) {
 function rolesFor(cls) {
   const r = ['dps'];
   if (cls.id === 'warrior' || cls.hp >= 160 || cls.armor >= 3) r.push('tank');
-  if (cls.id === 'poet' || (KITS[cls.id] ? KITS[cls.id].heal : kitFor(cls).heal)) r.push('healer');
-  if (cls.id === 'mage' || cls.id === 'poet' || cls.id === 'archer' || !KITS[cls.id]) r.push('support');
+  // The blades (STRIKERS) are dealers and tanks: every class has some 기원 of its own, and the 무사,
+  // 격투가, 도깨비 and 차사 were drawn as healers and supporters, casting all fight long.
+  const blade = STRIKERS.has(cls.id) && cls.id !== 'archer';
+  if (cls.id === 'poet' || (!blade && (KITS[cls.id] ? KITS[cls.id].heal : kitFor(cls).heal))) r.push('healer');
+  if (cls.id === 'mage' || cls.id === 'poet' || cls.id === 'archer' || (!KITS[cls.id] && !blade)) r.push('support');
   return r;
 }
 
@@ -590,7 +601,9 @@ function layout(W) {
 
 function mkFighter(W, team, role, squad) {
   const classes = A.CLASSES.filter(c => rolesFor(c).includes(role));
-  const cls = pick(classes.length ? classes : A.CLASSES);
+  // A healer is a 도사 more often than not (연's healer); the 마도사 and 천인 the rest.
+  const poet = role === 'healer' && Math.random() < 0.6 && classes.find(c => c.id === 'poet');
+  const cls = poet || pick(classes.length ? classes : A.CLASSES);
   const lv = Math.round(rnd(18, 42));
   // Its look by its strength (aiLooks): the step of its level, now and then one either side; the
   // same looks on every side (the ▼ over the head tells the sides apart).
@@ -1346,7 +1359,7 @@ function thinkHealer(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk() && !low.hero) { A.addFx(fx, low.x, low.y - 26, { scale: 0.8 * aiFx() }); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { on: low })); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1440,7 +1453,7 @@ function thinkHealerRaid(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk() && !low.hero) { A.addFx(fx, low.x, low.y - 26, { scale: 0.8 * aiFx() }); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { on: low })); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1522,7 +1535,7 @@ function thinkCmdr(W, b) {
       b.atkAt = G.t;
       A.faceTo(b, near[0][0].tx, near[0][0].ty);
       for (const [e] of near) hit(W, b, e, W.U * 1.6 * (b.pw || 1));
-      if (onScreen(b) && fxOk(true)) A.fxOn(SK.w_tiger.fx, near[0][0], { scale: 1.1 * aiFx() });
+      if (onScreen(b) && fxOk(true)) A.fxOn(SK.w_tiger.fx, near[0][0], aiO(1.1));
     }
     if (b.cd.d <= 0 && near.length >= 3 && !b.wind) {
       // The great one is wound up first: the floor round it flashes red (연's danger telegraph)
@@ -1539,7 +1552,7 @@ function thinkCmdr(W, b) {
         hit(W, b, e, W.U * 3.5 * (b.pw || 1));
         if (!e.hero) e.stun = Math.max(e.stun, 1);
       }
-      if (onScreen(b) && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, { scale: 1.4 * aiFx() });
+      if (onScreen(b) && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, aiO(1.4));
       if (onScreen(b)) G.shake = Math.max(G.shake, 0.25);
     }
     b.dest = null;
@@ -1571,7 +1584,7 @@ function act(W, b, t) {
       b.hidden = 0;
       b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
       hit(W, b, t, kit.basic[1] * W.U * 2.2 * b.pw * 3);
-      if (onScreen(t) && fxOk(true) && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, { scale: 0.6 * aiFx() });
+      if (onScreen(t) && fxOk(true) && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, aiO(0.75));
       if (Math.random() < 0.5) shout(W, b, '암습');
       sound(W, b, 'skill_r_amsal', 'strike');
       pose(b, 'attack');
@@ -1581,7 +1594,7 @@ function act(W, b, t) {
       b.stealthAt = G.t + rnd(12, 16);
       b.hidden = G.t + 4;
       b.stalk = G.t + 1.2;
-      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, { scale: 0.7 * aiFx() });
+      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, aiO(0.7));
       sound(W, b, 'skill_' + kit.stealth, 'buff');
       return;
     }
@@ -1606,7 +1619,7 @@ function act(W, b, t) {
     }
     shout(W, b, SK[id] ? SK[id].name : '필살');
     sound(W, b, 'skill_' + id, 'ult');
-    pose(b, kit.range > 1 ? 'cast' : 'attack');
+    pose(b, b.cls.id === 'poet' ? 'cast' : blowPose(b, true));
     return;
   }
   if (b.cd.c <= 0 && kit.aoe[0] && (many >= 2 || t.gate || t.cmdr || t.kind === 'boss')) {
@@ -1622,7 +1635,7 @@ function act(W, b, t) {
     }
     if (Math.random() < 0.5) shout(W, b, SK[id] ? SK[id].name : '광역');
     sound(W, b, 'skill_' + id, 'spell');
-    pose(b, kit.range > 1 ? 'cast' : 'attack');
+    pose(b, blowPose(b, true));
     return;
   }
   if (b.cd.a > 0) return;
@@ -1633,16 +1646,18 @@ function act(W, b, t) {
     const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
     if ((onScreen(b) || onScreen(t)) && G.shots.length < 14) {
       A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#ffe680' : '#ff8a20', size: 3, speed: 460,
-        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, { scale: 0.7 * aiFx() }); } } });
+        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, aiO(0.8)); } } });
     } else A.later(0.25, () => { if (!W.over) hit(W, b, t, n); });
     if (id) sound(W, b, 'skill_' + id, 'spell');
-    pose(b, 'cast');
+    pose(b, blowPose(b)); // a 궁사's shot is its bow's draw
   } else {
     hit(W, b, t, n);
     if (onScreen(t) && fxOk()) {
       const fx = id && SK[id] && SK[id].fx;
-      if (fx && Math.random() < 0.5) A.fxOn(fx, t, { scale: 0.6 * aiFx() });
-      else if (A.M().fx.h_hit_tiger) A.fxOn('h_hit_tiger', t, { scale: 0.45 * aiFx() });
+      // Its class's own blow on the struck (연's picture of its first technique) every other blow,
+      // the plain spark else (the big pictures on every blow of a crowd cost a phone too much).
+      if (fx && A.M().fx[fx] && Math.random() < 0.5) A.fxOn(fx, t, aiO(0.65));
+      else if (A.M().fx.h_hit_tiger) A.fxOn('h_hit_tiger', t, aiO(0.55));
     }
     sound(W, b, 'hit', null);
     pose(b, 'attack');
@@ -1661,7 +1676,13 @@ function taunt(W, b) {
   b.cd.c = 9;
   for (const [e] of enemiesNear(W, b, 3)) if (!e.hero && !e.cmdr) e.taunt = { by: b, until: G.t + 3 };
   shout(W, b, pick(['도발', '이리 와라', '어그로']));
+  tauntFx(b);
   credit(b, 'obj', 2);
+}
+/** A tank's 도발 seen: 연's roar (w_roar) round it, small, and the swing of its weapon. */
+function tauntFx(b) {
+  if (onScreen(b) && SK.w_roar && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, aiO(0.7));
+  pose(b, 'attack');
 }
 function guard(W, m, sec) {
   const G = A.G();
@@ -1681,12 +1702,24 @@ function onScreen(b) {
 // so who cast what reads at a glance.
 // (a raid's twenty-four strike one boss: a little smaller there, or they hide it)
 const aiFx = () => (A.G().war && A.G().war.raid ? 1.05 : 1.2);
-function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', 9) : A.fxBudget('war', 14)); }
+// The fighters' pictures see-through (메뉴 「AI 이펙트 투명도」, settings.aiFxAlpha: 0.65 opaque by default): every
+// blow of the field can be drawn and still the field shows through; the hero's own stay solid.
+// The budgets were 14 small and 9 great a 0.6 s for the whole field (in a fight they were spent
+// all the time, most blows showed nothing): now 18 and 10 (more cost a phone a frame in two at
+// CPU x4), and the 기원 a budget of their own.
+const AI_ALPHA = 0.65;
+function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'number' && v > 0 && v <= 1 ? v : AI_ALPHA; }
+/** An AI picture's options: its size (by aiFx) and the see-through (a 기원 or buff also { on: body }:
+ * game.js addFx keeps it on that body as it moves). */
+const aiO = (scale, o) => ({ scale: scale * aiFx(), alpha: aiAlpha(), ...o });
+function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', 10) : A.fxBudget('war', 18)); }
+/** A 기원 on a fighter: never crowded out by the blows. */
+function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
 function castFx(W, b, id, at, scale) {
-  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !fxOk(true)) return;
+  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !(SK[id].kind === 'heal' ? healFxOk() : fxOk(true))) return;
   const fx = SK[id].fx;
   cue(b, scale >= 1 ? 1 : 0.75);
-  if (fx && A.M().fx[fx]) A.fxOn(fx, at, { scale: scale * aiFx() });
+  if (fx && A.M().fx[fx]) A.fxOn(fx, at, aiO(scale));
 }
 /** The caster's cue: a glow of its side's colour under its feet for a moment. */
 function cue(b, k = 1) { b.cue = { t: A.G().t, k }; }
@@ -2079,7 +2112,7 @@ function heroRole(W, dt) {
     for (const m of W.alive[0]) if (!m.hero && !m.gate && d2(m, h) < 5 && hpk(m) < lk) { lk = hpk(m); low = m; }
     if (low) {
       const fx = SK.c_heal.fxs ? SK.c_heal.fxs[Math.min(7, Math.floor(p.lvl / 5))] : SK.c_heal.fx;
-      if (fx) A.addFx(fx, low.x, low.y - 26, { scale: 0.9 });
+      if (fx) A.addFx(fx, 0, -26, { scale: 0.9, on: low });
       healBody(W, h, low, low.maxHp * 0.08 * W.roleK);
       A.floatText(low.x, low.y - 70, '기원', '#fff', true);
       if (lk < 0.45) chat(W, low, 'thxHeal', ['힐 감사요!', '감사합니다 ㅎㅎ', '살았다 ㄳ'], { every: 25, p: 0.5, emo: Math.random() < 0.4 ? 'cute' : null });
@@ -2110,14 +2143,21 @@ function neediest() {
   return [best || p, best ? k : hk];
 }
 
-/** The hero's 기원 in a war also mends the allies close by (a healer's more). */
-function heroHeal(n, fx) {
-  const G = A.G(), W = G.war, p = G.player;
-  const k = Math.min(W.role === 'healer' ? 0.08 * W.roleK : 0.04, (W.role === 'healer' ? 1.6 * W.roleK : 0.6) * n / p.maxHp);
+/**
+ * The hero's 기원 in a war, a raid or a 「쟁」 also mends the allies close by (a healer's or a 도사's
+ * more, and five tiles round, not four). Its picture on each one it mends, solid (the hero's own
+ * spell): it was drawn only for a hero in the healer role and from the blows' budget, so a 도사's
+ * 기원 showed over the hero alone. (`skip`: the one game.js's cast() mended already, picture and all.)
+ */
+function heroHeal(n, fx, poet = false, skip = null) {
+  const G = A.G(), W = G.war, p = G.player, healer = W.role === 'healer' || poet;
+  const k = Math.min(healer ? 0.08 * W.roleK : 0.04, (healer ? 1.6 * W.roleK : 0.6) * n / p.maxHp);
+  let shown = 0;
   for (const m of G.party) {
-    if (m.dead || d2(m, W.hero) > 4) continue;
+    if (m.dead || m === skip || d2(m, W.hero) > (healer ? 5 : 4)) continue;
+    const hurt = m.hp < m.maxHp;
     healBody(W, W.hero, m, m.maxHp * k);
-    if (fx && fxOk() && W.role === 'healer') A.addFx(fx, m.x, m.y - 26, { scale: 0.6 * aiFx() });
+    if (fx && hurt && shown < 8 && onScreen(m)) { shown++; A.addFx(fx, 0, -26, { scale: 1.1, on: m }); }
   }
 }
 
@@ -2892,7 +2932,7 @@ function castBuff(W, b, to, id) {
       G.buffs.power = Math.max(G.buffs.power, G.t + dur);
     } else if (d.buff === 'guard') G.buffs.guard = Math.max(G.buffs.guard, G.t + Math.min(1.5, d.duration || 1.5));
     else G.buffs[d.buff] = Math.max(G.buffs[d.buff] || 0, G.t + dur);
-    if (fx && fxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.8 });
+    if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.8 });
     A.floatText(p.x, p.y - 84, name, '#bfe8ff', true);
     supCount(W, 'buff');
     (W.sup.names[name] = (W.sup.names[name] || 0) + 1);
@@ -2900,7 +2940,7 @@ function castBuff(W, b, to, id) {
   } else {
     if (d.buff === 'power') { to.powT = G.t + dur; to.powK = 1.15; }
     else to.shield = Math.max(to.shield || 0, G.t + dur);
-    if (fx && fxOk() && onScreen(to)) A.fxOn(fx, to, { scale: 0.6 });
+    if (fx && fxOk() && onScreen(to)) A.addFx(fx, 0, -26, aiO(0.65, { on: to }));
   }
   shout(W, b, name);
   pose(b, 'cast');
@@ -2910,7 +2950,7 @@ function castBuff(W, b, to, id) {
 /** A healer's mend has reached the hero: the 기원's picture over it, its name, a word now and then. */
 function heroMended(W, b, hid) {
   const G = A.G(), p = G.player, name = spellName(hid, b.lv), fx = spellFx(hid, b.lv);
-  if (fx && fxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.85 });
+  if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.85 });
   if (G.t - (W.mendSaidT || -99) > 2.5) { W.mendSaidT = G.t; A.floatText(p.x, p.y - 84, name, '#c8ffc0', true); }
   const names = supOf(W).names;
   names[name] = (names[name] || 0) + 1;
@@ -4011,6 +4051,7 @@ function raidTaunt(W, b) {
   W.taunted = { by: b, until: G.t + 6 };
   G.aggro = b;
   shout(W, b, pick(['도발', '이리 와라', '어그로']));
+  tauntFx(b);
   credit(b, 'obj', 4);
   if (Math.random() < 0.3) talk(W, b, ['어그로 잡았어요!', '보스 제가 잡아요!', '탱 갑니다!']);
 }
