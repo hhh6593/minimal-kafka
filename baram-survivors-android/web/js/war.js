@@ -18,7 +18,7 @@
 //   - 레이드 (공대): a raid is fought on the same fighters — the hero and twenty-four raiders against
 //     the raid's boss and servants, which stay game.js's monsters (see the 레이드 section).
 
-import { frameBox, drawLayers, dropCostume } from './costume.js';
+import { frameBox, drawLayers, dropCostume, aiCostume, loadCostumes } from './costume.js';
 import { gwoeWeek } from './data.js';
 
 let A = null; // game.js internals (initWar)
@@ -28,6 +28,15 @@ const DIR4 = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 // Twenty-five a side: five squads of five (the squads are only how the AI is organised; the
 // commanders send most of them to the same place, so the guild fights as one crowd).
 const SQUADS = 5;
+// 대규모 전투 (the menu's switch, settings.bigBattle): seven squads a side in a war (35, against 25)
+// and seven parties in a raid (35) unless turned off (false); with 'all' also four squads a guild in
+// a 「쟁」 (16, against 12). Measured at a quarter of a desktop's speed (4x CPU throttle), a war and a
+// raid of 35 keep nine frames in ten at 16.7 ms even where the crowd is thickest; a 「쟁」 of 48 and a
+// boss did not (p90 33 ms in three runs of four), so it stays at 12 unless asked for.
+// crowdK: how much more the crowd strikes (the boss's life and the PK points are matched to it).
+const BIG = { war: 7, raid: 7, jaeng: 4 }, SMALL = { war: SQUADS, raid: SQUADS, jaeng: 3 };
+const bigOn = mode => { const b = A.settings().bigBattle; return mode === 'jaeng' ? b === 'all' : b !== false; };
+const squadsOf = mode => (bigOn(mode) ? BIG : SMALL)[mode];
 // 전장 보정 per 승급 of the hero (W.foeK): to 5차, and from 5차 to 9차.
 const FOE_K5 = 0.024, FOE_K9 = 0;
 const ROLES = {
@@ -391,9 +400,8 @@ async function startWar(id, cls, role, opts = {}) {
       if (!A.images[p]) loads.push(A.loadImage(p));
       if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
-  // The fighters' looks (two outfits a class), kept for the session: a later war's frames are
-  // made already (see warmLooks).
-  sessionLooks = sessionLooks || Object.fromEntries(A.CLASSES.map(c => [c.id, [0, 1].map(() => randGear(c, rnd(18, 44)))]));
+  // The fighters' looks (aiLooks), kept for the session: a later war's frames are made already (see warmLooks).
+  await aiLooksReady();
   const looks = sessionLooks;
   // The effects of the war's spells (every class's kit, the hero's own, the hits, kills and
   // revives) decoded now: a strip is decoded the first time it is drawn, and the first clash of
@@ -418,6 +426,22 @@ async function startWar(id, cls, role, opts = {}) {
   return true;
 }
 let pendingWar = null, sessionLooks = null;
+// The fighters' looks: four a class for the session, one for each step of a fighter's strength
+// (aiLook), each in plain gear of its step and 연's own 코디 pieces (costume.js aiCostume) — a
+// crowd of fifty in some forty looks rather than two a class. Fighters of a look share its
+// composited frames (warmLooks), so the frames made stay about one look's worth (~0.5 MB) a look.
+const LOOK_STEPS = 4;
+async function aiLooksReady() {
+  if (sessionLooks) return;
+  await Promise.race([loadCostumes(), new Promise(r => setTimeout(r, 1500))]).catch(() => {});
+  sessionLooks = Object.fromEntries(A.CLASSES.map(c => [c.id, Array.from({ length: LOOK_STEPS }, (_, i) => aiLook(c, i))]));
+}
+function aiLook(cls, step) {
+  const gear = randGear(cls, 16 + step * 9 + rnd(0, 6));
+  const cos = aiCostume(cls.id, step);
+  if (cos) gear.cos = cos;
+  return gear;
+}
 const mapBms = new Map();
 
 /** Called from startRun when the stage is a war: the field, both guilds, the hero's place. */
@@ -484,7 +508,7 @@ function setup() {
   heroTo(sp[0], sp[1]);
   // Both guilds: four squads of five (the hero's squad has four besides the hero).
   for (const team of [0, 1]) {
-    for (let s = 0; s < SQUADS; s++) {
+    for (let s = 0; s < squadsOf('war'); s++) {
       const sq = { id: s, team, name: `${s + 1}분대`, members: [], leader: null, order: null, target: null, said: -9, focusT: 0 };
       W.squads.push(sq);
       W.teams[team].squads.push(sq);
@@ -568,10 +592,11 @@ function mkFighter(W, team, role, squad) {
   const classes = A.CLASSES.filter(c => rolesFor(c).includes(role));
   const cls = pick(classes.length ? classes : A.CLASSES);
   const lv = Math.round(rnd(18, 42));
-  // Two outfits per class, worn on both sides (the ▼ over the head tells the sides apart): with
-  // eleven classes, three a side made 66 looks whose frames never stopped being composited.
-  const pool = (W.looks = W.looks || {})[cls.id] = W.looks[cls.id] || [0, 1].map(() => randGear(cls, rnd(18, 44)));
-  const gear = pick(pool);
+  // Its look by its strength (aiLooks): the step of its level, now and then one either side; the
+  // same looks on every side (the ▼ over the head tells the sides apart).
+  const pool = (W.looks = W.looks || {})[cls.id] = W.looks[cls.id] || Array.from({ length: LOOK_STEPS }, (_, i) => aiLook(cls, i));
+  const step = clamp(Math.floor((lv - 18) / 6.01) + (Math.random() < 0.3 ? pick([-1, 1]) : 0), 0, pool.length - 1);
+  const gear = pool[step];
   // 전장 보정: a fighter's own strength (level and gear) counts, but pulled toward the field's.
   const own = Math.sqrt(lv / 30) * (0.85 + 0.3 * Math.random());
   const pw = (1 + (own - 1) * 0.35) * (team === 1 && !W.raid ? W.foeK || 1 : 1);
@@ -1321,7 +1346,7 @@ function thinkHealer(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk() && !low.hero) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
+      if (fx && fxOk() && !low.hero) { A.addFx(fx, low.x, low.y - 26, { scale: 0.8 * aiFx() }); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1415,7 +1440,7 @@ function thinkHealerRaid(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && fxOk() && !low.hero) A.addFx(fx, low.x, low.y - 26, { scale: 0.8 });
+      if (fx && fxOk() && !low.hero) { A.addFx(fx, low.x, low.y - 26, { scale: 0.8 * aiFx() }); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1497,7 +1522,7 @@ function thinkCmdr(W, b) {
       b.atkAt = G.t;
       A.faceTo(b, near[0][0].tx, near[0][0].ty);
       for (const [e] of near) hit(W, b, e, W.U * 1.6 * (b.pw || 1));
-      if (onScreen(b) && fxOk()) A.fxOn(SK.w_tiger.fx, near[0][0], { scale: 1.1 });
+      if (onScreen(b) && fxOk(true)) A.fxOn(SK.w_tiger.fx, near[0][0], { scale: 1.1 * aiFx() });
     }
     if (b.cd.d <= 0 && near.length >= 3 && !b.wind) {
       // The great one is wound up first: the floor round it flashes red (연's danger telegraph)
@@ -1514,7 +1539,7 @@ function thinkCmdr(W, b) {
         hit(W, b, e, W.U * 3.5 * (b.pw || 1));
         if (!e.hero) e.stun = Math.max(e.stun, 1);
       }
-      if (onScreen(b) && fxOk()) A.addFx(SK.w_roar.fx, b.x, b.y - 30, { scale: 1.4 });
+      if (onScreen(b) && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, { scale: 1.4 * aiFx() });
       if (onScreen(b)) G.shake = Math.max(G.shake, 0.25);
     }
     b.dest = null;
@@ -1546,7 +1571,7 @@ function act(W, b, t) {
       b.hidden = 0;
       b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
       hit(W, b, t, kit.basic[1] * W.U * 2.2 * b.pw * 3);
-      if (onScreen(t) && fxOk() && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, { scale: 0.6 });
+      if (onScreen(t) && fxOk(true) && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, { scale: 0.6 * aiFx() });
       if (Math.random() < 0.5) shout(W, b, '암습');
       sound(W, b, 'skill_r_amsal', 'strike');
       pose(b, 'attack');
@@ -1556,7 +1581,7 @@ function act(W, b, t) {
       b.stealthAt = G.t + rnd(12, 16);
       b.hidden = G.t + 4;
       b.stalk = G.t + 1.2;
-      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, { scale: 0.7 });
+      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, { scale: 0.7 * aiFx() });
       sound(W, b, 'skill_' + kit.stealth, 'buff');
       return;
     }
@@ -1608,7 +1633,7 @@ function act(W, b, t) {
     const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
     if ((onScreen(b) || onScreen(t)) && G.shots.length < 14) {
       A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#ffe680' : '#ff8a20', size: 3, speed: 460,
-        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, { scale: 0.7 }); } } });
+        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, { scale: 0.7 * aiFx() }); } } });
     } else A.later(0.25, () => { if (!W.over) hit(W, b, t, n); });
     if (id) sound(W, b, 'skill_' + id, 'spell');
     pose(b, 'cast');
@@ -1616,8 +1641,8 @@ function act(W, b, t) {
     hit(W, b, t, n);
     if (onScreen(t) && fxOk()) {
       const fx = id && SK[id] && SK[id].fx;
-      if (fx && Math.random() < 0.5) A.fxOn(fx, t, { scale: 0.6 });
-      else if (A.M().fx.h_hit_tiger) A.fxOn('h_hit_tiger', t, { scale: 0.45 });
+      if (fx && Math.random() < 0.5) A.fxOn(fx, t, { scale: 0.6 * aiFx() });
+      else if (A.M().fx.h_hit_tiger) A.fxOn('h_hit_tiger', t, { scale: 0.45 * aiFx() });
     }
     sound(W, b, 'hit', null);
     pose(b, 'attack');
@@ -1649,12 +1674,22 @@ function onScreen(b) {
   const G = A.G(), c = window.__warCam, x = c ? c[0] : G.player.x, y = c ? c[1] : G.player.y;
   return Math.abs(b.x - x) < A.VW() / 2 + 60 && Math.abs(b.y - y) < A.VH() / 2 + 80;
 }
-function fxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('war', 12); }
+// The fighters' spells were drawn small (half the hero's size) and a dozen at most in 0.6 s for the
+// whole field: in a crowd hardly one in four showed, and those as specks. Now they are drawn near
+// the hero's own size (aiFx), the great ones (광역기·필살기) from a budget of their own so the
+// blows of fifty never crowd them out, and the caster lights up under its feet as it casts (cue),
+// so who cast what reads at a glance.
+// (a raid's twenty-four strike one boss: a little smaller there, or they hide it)
+const aiFx = () => (A.G().war && A.G().war.raid ? 1.05 : 1.2);
+function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', 9) : A.fxBudget('war', 14)); }
 function castFx(W, b, id, at, scale) {
-  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !fxOk()) return;
+  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !fxOk(true)) return;
   const fx = SK[id].fx;
-  if (fx && A.M().fx[fx]) A.fxOn(fx, at, { scale });
+  cue(b, scale >= 1 ? 1 : 0.75);
+  if (fx && A.M().fx[fx]) A.fxOn(fx, at, { scale: scale * aiFx() });
 }
+/** The caster's cue: a glow of its side's colour under its feet for a moment. */
+function cue(b, k = 1) { b.cue = { t: A.G().t, k }; }
 function sound(W, b, name, kind) {
   const G = A.G();
   if (!onScreen(b) || G.t < W.sndT) return;
@@ -2082,7 +2117,7 @@ function heroHeal(n, fx) {
   for (const m of G.party) {
     if (m.dead || d2(m, W.hero) > 4) continue;
     healBody(W, W.hero, m, m.maxHp * k);
-    if (fx && fxOk() && W.role === 'healer') A.addFx(fx, m.x, m.y - 26, { scale: 0.6 });
+    if (fx && fxOk() && W.role === 'healer') A.addFx(fx, m.x, m.y - 26, { scale: 0.6 * aiFx() });
   }
 }
 
@@ -3725,7 +3760,7 @@ function raidSetup() {
   };
   heroTo(...W.camp);
   // Five parties of five, as a 연 raid is gathered (the hero's party has four besides it).
-  for (let s = 0; s < SQUADS; s++) {
+  for (let s = 0; s < squadsOf('raid'); s++) {
     const sq = { id: s, team: 0, name: `${s + 1}파티`, members: [], leader: null, order: null, target: null, said: -9, focusT: 0 };
     W.squads.push(sq);
     W.teams[0].squads.push(sq);
@@ -3739,6 +3774,8 @@ function raidSetup() {
   }
   W.squads[0].members.push(W.hero);
   W.hero.squad = W.squads[0];
+  // The boss's life by the raid's size (the hero counts about three raiders and a half).
+  W.crowdK = (W.bodies.length + 3.5) / (24 + 3.5);
   // The player's own other grown classes come along, by their names and gear, among the crowd.
   const best = A.best();
   const alts = A.CLASSES.filter(c => c.id !== G.cls.id && best[c.id] && best[c.id].lvl >= 8).sort(() => Math.random() - 0.5).slice(0, 4);
@@ -4166,7 +4203,7 @@ function raidSpot(r0 = 4, r1 = 9) {
 /** The boss's life, in the raid's own measure: a fight of several minutes for twenty-five. */
 function raidBossHp() {
   const G = A.G(), W = G.war;
-  return W.U * RAID_BOSS_U;
+  return W.U * RAID_BOSS_U * (W.crowdK || 1);
 }
 const RAID_BOSS_U = 23500; // with the hero's larger share (heroK): the raiders alone no longer finish an easy raid in time (at 21500 they did at 7:19 now and then)
 
@@ -4267,7 +4304,7 @@ async function startJaeng(cls, role, opts = {}) {
     }
   for (const n of ['war_sealstone1', 'war_sealstone2', 'war_sealstone3', 'war_sealring', 'war_bossmark', 'war_bossaltar', 'war_totem', 'war_totem_r', 'war_brazier'])
     if (!A.images[`prop/${n}.png`] && (A.M().prop || {})[n]) loads.push(A.loadImage(`prop/${n}.png`));
-  sessionLooks = sessionLooks || Object.fromEntries(A.CLASSES.map(c => [c.id, [0, 1].map(() => randGear(c, rnd(18, 44)))]));
+  await aiLooksReady();
   await Promise.all(loads);
   const boss = raid.boss || {};
   const stage = {
@@ -4337,7 +4374,7 @@ function jaengSetup() {
   heroTo(...W.teams[0].spawn);
   // Three squads of four a guild (the hero's in the second, with every role: it takes one's place).
   for (const team of [0, 1, 2]) {
-    for (let s = 0; s < 3; s++) {
+    for (let s = 0; s < squadsOf('jaeng'); s++) {
       const sq = { id: s, team, name: `${s + 1}분대`, members: [], leader: null, order: null, target: null, said: -9, focusT: 0 };
       W.squads.push(sq);
       W.teams[team].squads.push(sq);
@@ -4353,6 +4390,8 @@ function jaengSetup() {
   if (jaeng.aiOnly) { G.dead = true; W.heroOut = true; W.heroBack = 0; W.aiOnly = true; const p = G.player; p.tx = p.ty = -20; p.x = p.y = -20 * TILE; }
   W.squads[1].members.push(W.hero);
   W.hero.squad = W.squads[1];
+  // The boss's life and a kill's points by the crowd's size (35 fighters and the hero at the design's).
+  W.crowdK = (W.bodies.length + 1) / 36;
   const pocket = (role === 'dps' || role === 'support') && W.squads[1].members.find(m => m.role === 'healer');
   if (pocket) pocket.pocket = true;
   for (const b of W.bodies) {
@@ -4448,7 +4487,9 @@ function bossEnter(W) {
   const at = freeNear(W, W.lair[0], W.lair[1], -1);
   const e = A.addEnemy(G.boss.m, 'boss', G.boss, 0, at);
   if (!e) return;
-  e.hp = e.maxHp = W.U * JAENG.bossU;
+  // (a larger crowd fells it faster than by its size: more of it reaches the boss while the seals
+  // and the other guilds hold the same few; at 16 a guild its life x1.5 keeps the fall at 6~7 minutes)
+  e.hp = e.maxHp = W.U * JAENG.bossU * (W.crowdK || 1) ** 1.4;
   const yu = A.M().yunit && A.M().yunit[e.m.id], tall = (yu ? yu.foot[1] - 4 : e.m.h) * e.scale;
   e.baseScale = e.scale;
   e.scale *= clamp(150 / Math.max(1, tall), 1, 2.2);
@@ -4733,10 +4774,10 @@ function jaengTick(W, dt) {
 function jaengPk(W, f, by) {
   const G = A.G();
   if (!by || !(by.team >= 0) || by.team === f.team) return;
-  W.pts[by.team].pk += JAENG.pts.kill;
+  W.pts[by.team].pk += JAENG.pts.kill / (W.crowdK || 1);
   if (W.diag) W.diag.pkKills++;
   const dealt = f.dmgBy || new Map(), seen = new Set([by.team]);
-  for (const [who, t] of f.hitBy) if (who.team >= 0 && who.team !== f.team && !seen.has(who.team) && G.t - t < 6 && (dealt.get(who) || 0) >= f.maxHp * 0.1) { seen.add(who.team); W.pts[who.team].pk += JAENG.pts.assist; }
+  for (const [who, t] of f.hitBy) if (who.team >= 0 && who.team !== f.team && !seen.has(who.team) && G.t - t < 6 && (dealt.get(who) || 0) >= f.maxHp * 0.1) { seen.add(who.team); W.pts[who.team].pk += JAENG.pts.assist / (W.crowdK || 1); }
 }
 /** How long a fallen one lies: ten seconds and two a fall (five at most), ten more in the rage; a
  * guild ahead a little longer, one behind a little sooner. */
@@ -5119,7 +5160,7 @@ function jaengCard(cls, pr) {
   const gate = (A.SINSU_GATE[wk.sinsu] || [])[0], open = !gate || (pr.raids || {})[gate];
   return {
     jaeng: true, id: 'jaeng', name: '쟁', title: `월드 보스 · ${boss}`, locked, practice: !left, wk,
-    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(12명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. 9분이면 보스가 달아난다.`,
+    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(${bigOn('jaeng') ? 16 : 12}명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. 9분이면 보스가 달아난다.`,
     more: `이번 주 보상 ${left}/${JAENG_PAID}회 남음 (월요일 초기화) · 보상: 레이드주화 · ${open ? A.MATS[wk.sinsu].name : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[wk.sinsu].name})`} · 전 · 1위 보스 상자(${boss} 세트 한 부위 50%, 코디 30%) · 막타 상자`
       + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 길드대항전에서 한 번 이기면 열린다</b>' : ''),
   };
@@ -5246,19 +5287,25 @@ function showJaengResult(W) {
 
 function drawMap(camX, camY) {
   const G = A.G(), W = G.war, m = W.map, ctx = A.ctx, VW = A.VW(), VH = A.VH();
-  ctx.fillStyle = '#000';
-  ctx.fillRect(camX, camY, VW, VH);
-  if (window.__dbgWar && window.__dbgWar.nomap) return;
+  if (window.__dbgWar && window.__dbgWar.nomap) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(camX, camY, VW, VH);
+    return;
+  }
   const c = m.chunk;
-  // Only the part of each piece in view (a whole 1024-pixel piece per frame was most of the cost).
-  for (let cy = Math.max(0, Math.floor(camY / c)); cy * c < Math.min(m.h, camY + VH); cy++)
-    for (let cx = Math.max(0, Math.floor(camX / c)); cx * c < Math.min(m.w, camX + VW); cx++) {
-      const path = `ywar/${W.def.id}_${cx}_${cy}.png`, im = mapBms.get(path) || A.images[path];
-      if (!im || !im.width) continue;
-      const sx = Math.max(0, Math.floor(camX - cx * c)), sy = Math.max(0, Math.floor(camY - cy * c));
-      const sw = Math.min(im.width - sx, Math.ceil(camX + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(camY + VH - cy * c - sy) + 1);
-      if (sw > 0 && sh > 0) ctx.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
-    }
+  // Into the ground's buffer (game.js drawGroundCached): painted again only as the view leaves it.
+  A.drawGroundCached(`war:${W.def.id}`, camX, camY, (g, x0, y0, w, h) => {
+    let ok = true;
+    for (let cy = Math.max(0, Math.floor(y0 / c)); cy * c < Math.min(m.h, y0 + h); cy++)
+      for (let cx = Math.max(0, Math.floor(x0 / c)); cx * c < Math.min(m.w, x0 + w); cx++) {
+        const path = `ywar/${W.def.id}_${cx}_${cy}.png`, im = mapBms.get(path) || A.images[path];
+        if (!im || !im.width) { ok = false; continue; }
+        const sx = Math.max(0, Math.floor(x0 - cx * c)), sy = Math.max(0, Math.floor(y0 - cy * c));
+        const sw = Math.min(im.width - sx, Math.ceil(x0 + w - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(y0 + h - cy * c - sy) + 1);
+        if (sw > 0 && sh > 0) g.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
+      }
+    return ok;
+  });
   // Test (__dbgWar.walls): the walk grid's closed tiles over the map, to hold against its walls.
   if (window.__dbgWar && window.__dbgWar.walls) {
     ctx.save();
@@ -5361,6 +5408,7 @@ function drawBody(b) {
   let top = 50;
   if (dbg.noframe) top = 50;
   else if (b.cls) {
+    if (b.cue && G.t - b.cue.t < 0.5 && !dbg.nocue) drawCue(ctx, b, G.t - b.cue.t);
     drawFighter(b, b.x, b.y, pose, alpha) || A.drawYhero2(b.cls, b.gear, b, b.x, b.y, pose, alpha) || A.drawYhero(b.cls.id, b.gear ? b.gear.armor : 0, b, b.x, b.y, pose, alpha);
     if (b.flash > 0) { /* a struck fighter shows it in its bar */ }
     top = 50;
@@ -5425,6 +5473,38 @@ function drawBody(b) {
   }
 }
 
+// The caster's cue (castFx): a soft glow of its side's colour, flat on the ground under it, swelling
+// and fading over half a second; one small kept picture a side, laid on additively.
+const cuePics = [null, null, null];
+function drawCue(ctx, b, t) {
+  const team = b.team === 0 ? 0 : b.team === 2 ? 2 : 1;
+  let pic = cuePics[team];
+  if (!pic) {
+    pic = cuePics[team] = document.createElement('canvas');
+    pic.width = 64;
+    pic.height = 64;
+    const g = pic.getContext('2d'), col = ['90,255,120', '255,90,60', '200,120,255'][team];
+    const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${col},0.95)`);
+    gr.addColorStop(0.45, `rgba(${col},0.55)`);
+    gr.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const k = b.cue.k, grow = 0.6 + 0.8 * Math.min(1, t / 0.18), w = 58 * k * grow, h = w * 0.42;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = (t < 0.1 ? 1 : 1 - (t - 0.1) / 0.4) * 0.9;
+  ctx.drawImage(pic, Math.round(b.x - w / 2), Math.round(b.y - 2 - h / 2), Math.round(w), Math.round(h));
+  // and a column of light rising over it for a great one
+  if (k >= 1) {
+    const ch = 70 * Math.min(1, t / 0.12);
+    ctx.globalAlpha *= 0.55;
+    ctx.drawImage(pic, Math.round(b.x - 9), Math.round(b.y - ch), 18, Math.round(ch));
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
 /**
  * Keeps a composited picture, and swaps it for an ImageBitmap once one is made: a bitmap stays on
  * the GPU, while a plain canvas drawn into the field is uploaded again at every draw — with fifty
@@ -5455,7 +5535,7 @@ function keepFrame(key, c) {
   // box is made (a second, cropped canvas cost as much again).
   const e = x1 >= x0 ? { pic: c, sx: x0, sy: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, ox: x0, oy: y0 } : { pic: c, sx: 0, sy: 0, w: W, h: H, ox: 0, oy: 0 };
   framesMade++;
-  if (frames.size > 2400) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
+  if (frames.size > 3600) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
   frames.set(key, e);
   lookAny.set(key.slice(0, key.indexOf('|')), key);
   if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src, e.sx, e.sy, e.w, e.h).then(bm => { if (e.pic === src) { e.pic = bm; e.sx = e.sy = 0; } }).catch(() => {}); }
@@ -5837,7 +5917,7 @@ function hud() {
   const prog = W.jaeng ? null : sideProgress(W);
   // The bars stop short of 연's HP/MP panel at the top left (it ends 189 CSS px in, drawYeonStatus),
   // which on a narrow phone they ran under.
-  const d = cw / (A.canvas.getBoundingClientRect().width || cw);
+  const d = cw / (A.boxOf(A.canvas).width || cw);
   const room = cw / 2 - 27 * u - 4 * u - 196 * d;
   const boxW = 54 * u, boxH = 18 * u, bx = cw / 2 - boxW / 2, by0 = 4 * u,
     barW = Math.min(190 * u, cw / 2 - boxW / 2 - 12 * u, Math.max(room, 60 * d));

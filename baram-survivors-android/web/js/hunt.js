@@ -1526,7 +1526,7 @@ function breakTick() {
 // the hero's tile, again only when that tile changes), are born on open tiles the hero can reach,
 // and the camera stops at the map's edge.
 
-const arenaBms = new Map(), arenaPats = new Map();
+const arenaBms = new Map();
 function arenaStart(G) {
   const M = A.M(), map = M.yhunt && M.yhunt[G.stage.id];
   if (!map || A.settings().arena === false || (window.__dbgHunt && window.__dbgHunt.noarena)) return;
@@ -1535,7 +1535,7 @@ function arenaStart(G) {
   G.arena = { id: G.stage.id, map, walk, flow: new Int16Array(map.cols * map.rows), at: -1 };
   // The pieces as decoded bitmaps, kept for the hunt (drawn from an <img> a piece was decoded
   // again whenever the browser had let it go: a long frame on a slow phone, as the wars found).
-  for (const [k, bm] of arenaBms) if (!k.startsWith(`yhunt/${G.stage.id}_`)) { if (bm.close) bm.close(); arenaBms.delete(k); arenaPats.delete(k); }
+  for (const [k, bm] of arenaBms) if (!k.startsWith(`yhunt/${G.stage.id}_`)) { if (bm.close) bm.close(); arenaBms.delete(k); }
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
       const path = `yhunt/${G.stage.id}_${cx}_${cy}.png`;
@@ -1635,24 +1635,22 @@ function cam(camX, camY) {
 }
 
 function drawMap(ctx, camX, camY) {
-  const G = A.G(), R = G.arena, m = R.map, VW = A.VW(), VH = A.VH();
-  ctx.fillStyle = '#000';
-  ctx.fillRect(camX, camY, VW, VH);
-  const c = m.chunk;
-  for (let cy = Math.max(0, Math.floor(camY / c)); cy * c < Math.min(m.h, camY + VH); cy++)
-    for (let cx = Math.max(0, Math.floor(camX / c)); cx * c < Math.min(m.w, camX + VW); cx++) {
-      const path = `yhunt/${R.id}_${cx}_${cy}.png`, im = arenaBms.get(path) || A.images[path];
-      if (!im || !im.width) continue;
-      const sx = Math.max(0, Math.floor(camX - cx * c)), sy = Math.max(0, Math.floor(camY - cy * c));
-      const sw = Math.min(im.width - sx, Math.ceil(camX + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(camY + VH - cy * c - sy) + 1);
-      if (!(sw > 0 && sh > 0)) continue;
-      // A piece as a pattern filled over its part in view (cheaper than a cut drawImage on a slow phone).
-      let pat = arenaPats.get(path);
-      if (!pat && arenaBms.has(path)) { pat = ctx.createPattern(im, 'no-repeat'); pat.setTransform(new DOMMatrix([1, 0, 0, 1, cx * c, cy * c])); arenaPats.set(path, pat); }
-      if (pat && !(window.__dbgHunt && window.__dbgHunt.drawimg)) { ctx.fillStyle = pat; ctx.fillRect(cx * c + sx, cy * c + sy, sw, sh); }
-      else ctx.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
-    }
+  const G = A.G(), R = G.arena, m = R.map, c = m.chunk;
+  // Into the ground's buffer (game.js drawGroundCached): painted again only as the view leaves it.
+  A.drawGroundCached(`hunt:${R.id}`, camX, camY, (g, x0, y0, VW, VH) => {
+    let ok = true;
+    for (let cy = Math.max(0, Math.floor(y0 / c)); cy * c < Math.min(m.h, y0 + VH); cy++)
+      for (let cx = Math.max(0, Math.floor(x0 / c)); cx * c < Math.min(m.w, x0 + VW); cx++) {
+        const path = `yhunt/${R.id}_${cx}_${cy}.png`, im = arenaBms.get(path) || A.images[path];
+        if (!im || !im.width) { ok = false; continue; }
+        const sx = Math.max(0, Math.floor(x0 - cx * c)), sy = Math.max(0, Math.floor(y0 - cy * c));
+        const sw = Math.min(im.width - sx, Math.ceil(x0 + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(y0 + VH - cy * c - sy) + 1);
+        if (sw > 0 && sh > 0) g.drawImage(im, sx, sy, sw, sh, cx * c + sx, cy * c + sy, sw, sh);
+      }
+    return ok;
+  });
   if (window.__dbgHunt && window.__dbgHunt.walls) {
+    const VW = A.VW(), VH = A.VH();
     ctx.fillStyle = 'rgba(255,0,0,0.3)';
     for (let y = Math.max(0, Math.floor(camY / A.TILE)); y * A.TILE < camY + VH && y < m.rows; y++)
       for (let x = Math.max(0, Math.floor(camX / A.TILE)); x * A.TILE < camX + VW && x < m.cols; x++)
@@ -1708,7 +1706,7 @@ function ambientOf(G) {
   return { ...(AMBIENT[gr] || { light: 1 }), ...(AMBIENT_GROUND[G.stage.id] || {}) };
 }
 
-let shade = null, shadeN = 0;
+let shade = null, shadeN = 0, shadeBig = null;
 const patterns = {};
 
 function ambPic(name) {
@@ -1764,6 +1762,13 @@ function ambient(ctx, cv, camX, camY) {
   if (dark <= 0.02 && !am.tint && !am.edge) return;
   const q = 5, w = Math.ceil(cv.width / q), h = Math.ceil(cv.height / q);
   if (!shade || shade.width !== w || shade.height !== h) { shade = document.createElement('canvas'); shade.width = w; shade.height = h; shadeN = 0; }
+  const D = window.__dbgHunt || {};
+  if (!shadeBig || shadeBig.width !== cv.width || shadeBig.height !== cv.height) {
+    shadeBig = document.createElement('canvas');
+    shadeBig.width = cv.width;
+    shadeBig.height = cv.height;
+    shadeN = 0;
+  }
   if (shadeN++ % 3 === 0) {
     const g = shade.getContext('2d');
     g.globalCompositeOperation = 'source-over';
@@ -1794,13 +1799,16 @@ function ambient(ctx, cv, camX, camY) {
       g.fillStyle = gr;
       g.fillRect(0, 0, w, h);
     }
+    // Stretched to the screen's size here, once in three frames; each frame copies it as it is
+    // (a stretch with smoothing over the whole screen every frame cost as much as the ground).
+    const b = shadeBig.getContext('2d');
+    b.clearRect(0, 0, cv.width, cv.height);
+    b.imageSmoothingEnabled = !D.shadeNN;
+    b.imageSmoothingQuality = 'low';
+    b.drawImage(shade, 0, 0, cv.width, cv.height);
   }
-  const D = window.__dbgHunt || {};
   if (D.noshade) return;
-  ctx.imageSmoothingEnabled = !D.shadeNN;
-  ctx.imageSmoothingQuality = 'low';
-  ctx.drawImage(shade, 0, 0, cv.width, cv.height);
-  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(shadeBig, 0, 0);
 }
 
 /** The weather's pictures, asked for at the start of a hunt. */

@@ -206,6 +206,36 @@ export function dropCostume(tiers, from) {
   return it.name;
 }
 
+// An AI fighter's 코디 (war.js aiLook): 연's own pieces worn in the field, more and finer the higher
+// its step (0-3): a hair and a face most of the time, an outfit, a hat, a cape or a weapon look
+// now and then, of grades that rise with the step. Lists by class and kind made once.
+const aiLists = new Map();
+const AI_WEAR = { // chance by step, and the grades drawn from at each step
+  armor: [[0.12, 0.3, 0.5, 0.7], [[0, 1], [1, 2], [1, 2, 3], [2, 3, 4]]],
+  helmet: [[0.06, 0.15, 0.25, 0.35], [[0, 1], [1], [1, 2], [2, 3, 4]]],
+  cape: [[0, 0.12, 0.25, 0.4], [[0, 1], [1], [1, 2], [2, 3, 4]]],
+  weapon: [[0, 0.08, 0.18, 0.3], [[0, 1], [1], [1, 2], [2, 3, 4]]],
+};
+export function aiCostume(clsId, step) {
+  if (!D) return null;
+  const items = costumeItems();
+  const list = (kind, grades) => {
+    const key = clsId + kind + grades.join();
+    if (!aiLists.has(key)) aiLists.set(key, Object.keys(items).filter(id => items[id].kind === kind && grades.includes(items[id].grade) && items[id].classes.includes(clsId)));
+    return aiLists.get(key);
+  };
+  const any = ids => (ids.length ? ids[Math.floor(Math.random() * ids.length)] : null);
+  const out = {};
+  if (Math.random() < 0.8) out.hair = any(list('hair', [0]));
+  if (Math.random() < 0.55) out.head = any(list('head', [0]));
+  for (const [kind, [chance, grades]] of Object.entries(AI_WEAR)) {
+    const i = Math.max(0, Math.min(3, step));
+    if (Math.random() < chance[i]) out[kind] = any(list(kind, grades[i]));
+  }
+  for (const k of Object.keys(out)) if (!out[k]) delete out[k];
+  return Object.keys(out).length ? out : null;
+}
+
 /** The 코디 수집 bonuses of what is owned. */
 export function costumeBonus() {
   const n = A ? ownedCount() : 0, b = { hp: 0, armor: 0, dmg: 0, n };

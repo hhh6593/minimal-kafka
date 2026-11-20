@@ -27,6 +27,60 @@ const $ = s => document.querySelector(s);
 const canvas = $('#game');
 const ctx = canvas.getContext('2d');
 
+// A picture drawn straight from an <img> goes through the browser's decode cache on every draw;
+// with a crowd of monster sheets, digits and effects in a frame that cache overflowed and was
+// trimmed and refilled all the time (a third of the field's drawing cost under a slow CPU). Each
+// <img> the field draws is decoded once into an ImageBitmap and drawn from that instead, and a
+// bitmap not drawn for a while is let go (sweepBitmaps) so a long session does not hoard them.
+// They are held to a budget (the least lately drawn let go past it), and a sheet past 8 MB decoded
+// (a few long effect strips) stays with the browser's own cache.
+const bitmapOf = new WeakMap(), bitmapsLive = new Set();
+const BITMAP_BUDGET = 128e6, BITMAP_MAX = 8e6;
+const rawDrawImage = ctx.drawImage;
+let bitmapClock = 0, bitmapBytes = 0;
+ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
+  if (im instanceof HTMLImageElement && window.createImageBitmap) {
+    const bm = bitmapOf.get(im);
+    if (bm === undefined) {
+      const bytes = im.naturalWidth * im.naturalHeight * 4;
+      if (im.complete && bytes && bytes <= BITMAP_MAX) {
+        const rec = { bm: null, im, used: bitmapClock, bytes };
+        bitmapOf.set(im, rec);
+        createImageBitmap(im).then(x => { rec.bm = x; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps(); }).catch(() => {});
+      }
+    } else if (bm.bm) {
+      bm.used = bitmapClock;
+      im = bm.bm;
+    }
+  }
+  switch (arguments.length) {
+    case 3: return rawDrawImage.call(this, im, a, b);
+    case 5: return rawDrawImage.call(this, im, a, b, c, d);
+    default: return rawDrawImage.call(this, im, a, b, c, d, e, f, g, h);
+  }
+};
+function dropBitmap(rec) {
+  bitmapsLive.delete(rec);
+  bitmapOf.delete(rec.im);
+  bitmapBytes -= rec.bytes;
+  rec.bm.close();
+}
+/** Past the budget: the least lately drawn let go, to three quarters of it. */
+function trimBitmaps() {
+  const old = [...bitmapsLive].sort((x, y) => x.used - y.used);
+  for (const rec of old) {
+    if (bitmapBytes <= BITMAP_BUDGET * 0.75) break;
+    dropBitmap(rec);
+  }
+}
+/** Once a second: the bitmaps not drawn for half a minute closed (made again when next drawn). */
+function sweepBitmaps(now) {
+  bitmapClock = now;
+  if (now - (sweepBitmaps.at || 0) < 1) return;
+  sweepBitmaps.at = now;
+  for (const rec of bitmapsLive) if (now - rec.used >= 30) dropBitmap(rec);
+}
+
 let M; // assets/manifest.json
 let audio;
 const images = {};
@@ -395,7 +449,22 @@ const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35,
   // 연's grounds under the earth or the sea (tools/yeon_grounds.py).
   y_raid_hell: 0.45, y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
 
+// Where the canvas and the keys stand on the screen, for the HUD drawn on the canvas: read at most
+// twice a second (and afresh after a resize). Read every frame, each read made the browser lay
+// the page out again after the HUD's text had changed (a forced layout or five a frame).
+const boxes = new Map();
+function boxOf(el) {
+  const now = performance.now();
+  let b = boxes.get(el);
+  if (!b || now - b.at > 500) {
+    b = { r: el.getBoundingClientRect(), at: now };
+    boxes.set(el, b);
+  }
+  return b.r;
+}
+
 function resize() {
+  boxes.clear();
   // The side panel keeps the old client's 272 x 640 layout, scaled to the screen's height.
   // On a short phone screen the whole panel would shrink past reading: keep it at 0.7 or more
   // and let its top (the CLAN / C.T. / TITLE fields) go past the screen's top edge instead,
@@ -5855,7 +5924,7 @@ function lure() {
 function drawChain() {
   const c = G.chainRun;
   if (!c || G.dead) return;
-  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const cr = boxOf(canvas), d = canvas.width / cr.width;
   const sz = 26 * d, gap = 4 * d, n = c.ids.length;
   const w = n * sz + (n - 1) * gap + 12 * d, h = sz + 24 * d;
   const x = 8 * d, y = 64 * d;
@@ -7339,7 +7408,7 @@ let townMapBig = false;
 function townMinimapRect() {
   const a = townArea();
   if (!a || !a.mm) return null;
-  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const cr = boxOf(canvas), d = canvas.width / cr.width;
   const k = (townMapBig ? 1.6 : 0.82) * d;
   const w = a.mm[0] * k, h = a.mm[1] * k;
   return { x: canvas.width - w - 10 * d, y: 34 * d, w, h, d };
@@ -8354,15 +8423,15 @@ function skillIconImage(id) {
 function drawSkillBar() {
   if (!G.skills.length || G.dead) return;
   const W = canvas.width, u = W / 860;
-  const cr = canvas.getBoundingClientRect(), dl = $('#chat') && $('#chat').getBoundingClientRect();
+  const cr = boxOf(canvas), dl = $('#chat') && boxOf($('#chat'));
   const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
   const yeon = document.body.classList.contains('yeon'), dpr = canvas.width / cr.width;
   const sz = Math.round((yeon ? 38 : 30) * u), gap = Math.round(5 * u);
   // 연: two rows of four at the bottom right, left of the 필살기 button; else a row at the bottom left.
   // 연: ends left of the keys (현황·모여 / 메뉴·사냥 over the 필살기), wherever their grid stands.
-  const kr = yeon && $('#keys') ? $('#keys').getBoundingClientRect() : null;
+  const kr = yeon && $('#keys') ? boxOf($('#keys')) : null;
   // The 보조 기술 button stands left of the 필살기, outside the keys' grid: the bar ends left of it too.
-  const ub = yeon && $('#util-btn') && !$('#util-btn').hidden ? $('#util-btn').getBoundingClientRect() : null;
+  const ub = yeon && $('#util-btn') && !$('#util-btn').hidden ? boxOf($('#util-btn')) : null;
   const keyLeft = Math.min(kr && kr.width ? kr.left : Infinity, ub && ub.width ? ub.left : Infinity);
   const right = keyLeft < Infinity ? Math.min(W - 100 * dpr, (keyLeft - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
   const x0 = yeon ? right - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
@@ -8442,7 +8511,7 @@ function classFlourish(def, skill, st) {
  * under it, then flat red and blue bars in a black line with their numbers in white. */
 function drawYeonStatus() {
   if (!document.body.classList.contains('yeon')) return;
-  const p = G.player, cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const p = G.player, cr = boxOf(canvas), d = canvas.width / cr.width;
   const x = 8 * d, y = 8 * d, w = 150 * d, h = 15 * d;
   ctx.save();
   const wp = gearImage({ kind: 'weapon', tier: p.gear ? p.gear.weapon : 0 });
@@ -8488,7 +8557,7 @@ function coinIcon() { return images['hud/ui_icon_gold2.png']; }
 function drawLootFeed() {
   G.feed = G.feed.filter(f => G.t - f.t < 4);
   if (!G.feed.length) return;
-  const cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const cr = boxOf(canvas), d = canvas.width / cr.width;
   // Right of it the 상태창 tab; above it the 연속 처치 count.
   // In a war or raid, under its kill feed (which is under the 연속 처치 count), not across it.
   const xr = canvas.width - 26 * d, y0 = Math.max(96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0), h = 16 * d, gap = 19 * d;
@@ -8543,7 +8612,7 @@ function battleInfo(key, n, text) {
 }
 function drawBattleInfo() {
   if (!document.body.classList.contains('yeon') || G.war || settings.battleInfo === false) return;
-  const p = G.player, cr = canvas.getBoundingClientRect(), d = canvas.width / cr.width;
+  const p = G.player, cr = boxOf(canvas), d = canvas.width / cr.width;
   const x = 6 * d, y = 50 * d, w = 124 * d, th = 14 * d, lh = 10.5 * d, MAXROWS = 4;
   ctx.save();
   ctx.font = `${Math.round(8.5 * d)}px G9`;
@@ -9781,6 +9850,16 @@ function josa(word, withFinal, without) {
 function thick(text, x, y, color) {
   x = Math.round(x);
   y = Math.round(y);
+  const e = textPic('t', text, color, (g, x0, y0) => {
+    g.fillStyle = '#1a1a1a';
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) g.fillText(text, x0 + dx, y0 + dy);
+    g.fillStyle = color;
+    g.fillText(text, x0, y0);
+  }, 3, 3, 3, 4);
+  if (e) {
+    ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
+    return;
+  }
   ctx.fillStyle = '#1a1a1a';
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) ctx.fillText(text, x + dx, y + dy);
   ctx.fillStyle = color;
@@ -9850,20 +9929,40 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9;
   const sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h;
   const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
-  ctx.save();
+  // No save()/restore() round each one: with forty effects up in a crowded fight the restores were
+  // a fifth of the frame on a slow phone. The two settings it changes are put back by hand, and the
+  // move (with a turn or a flip) undone in reverse.
+  const op0 = ctx.globalCompositeOperation, sm0 = ctx.imageSmoothingEnabled;
   if (f.add) ctx.globalCompositeOperation = 'lighter';
   const pic = tint || f.tint ? tinted(im, tint || f.tint) : im;
   // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks.
   if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
-  ctx.translate(x, y);
-  if (rot) ctx.rotate(rot);
-  if (flip) ctx.scale(-1, 1);
-  if (f.ax !== undefined && anchor !== 'mid') {
-    // 연's effects carry their pivot: the target's feet (a little under a body's middle).
-    const k = scale * (f.k || 1);
-    ctx.drawImage(pic, sx, sy, f.w, f.h, -f.ax * k, -f.ay * k + (anchor === 'bottom' ? 0 : 14), w, h);
-  } else ctx.drawImage(pic, sx, sy, f.w, f.h, -w / 2, anchor === 'bottom' ? -h : -h / 2, w, h);
-  ctx.restore();
+  const turn = rot || flip;
+  let ox = x, oy = y;
+  if (turn) {
+    ctx.translate(x, y);
+    if (rot) ctx.rotate(rot);
+    if (flip) ctx.scale(-1, 1);
+    ox = oy = 0;
+  }
+  // The cell's top left: 연's effects carry their pivot (the target's feet, a little under a body's
+  // middle), the others are centred.
+  const k = scale * (f.k || 1);
+  const dx = f.ax !== undefined && anchor !== 'mid' ? ox - f.ax * k : ox - w / 2;
+  const dy = f.ax !== undefined && anchor !== 'mid' ? oy - f.ay * k + (anchor === 'bottom' ? 0 : 14) : oy + (anchor === 'bottom' ? -h : -h / 2);
+  // Only the part of the cell that shows (tools/fx_trim.py): most of a cell is empty, and every
+  // pixel drawn is blended.
+  const bb = (f.src ? M.fx[f.src] : f).bb, b4 = i * 4;
+  if (bb && b4 + 3 < bb.length) {
+    if (bb[b4 + 2]) ctx.drawImage(pic, sx + bb[b4], sy + bb[b4 + 1], bb[b4 + 2], bb[b4 + 3], dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k);
+  } else ctx.drawImage(pic, sx, sy, f.w, f.h, dx, dy, w, h);
+  if (turn) {
+    if (flip) ctx.scale(-1, 1);
+    if (rot) ctx.rotate(-rot);
+    ctx.translate(-x, -y);
+  }
+  if (f.add) ctx.globalCompositeOperation = op0;
+  ctx.imageSmoothingEnabled = sm0;
 }
 
 // ---------------------------------------------------------------- input
@@ -10761,28 +10860,59 @@ function whiteFrame(im, sx, sy, w, h) {
   return c;
 }
 
+// The shadow under a monster's feet: its ellipse drawn once into a small picture (by its size, in
+// half pixels, at the screen's scale) and laid down with the shadow's alpha; a crowd of ninety
+// filled ninety ellipse paths a frame.
+const shadowPics = new Map();
+function footShadow(x, y, rx, ry, a) {
+  const sc = ctx.getTransform().a;
+  rx = Math.round(rx * 2) / 2;
+  ry = Math.round(ry * 2) / 2;
+  const key = rx * 1000 + ry + sc * 1e7;
+  let e = shadowPics.get(key);
+  if (!e) {
+    const c = document.createElement('canvas'), mx = Math.ceil(rx) + 1, my = Math.ceil(ry) + 1;
+    c.width = Math.ceil(2 * mx * sc);
+    c.height = Math.ceil(2 * my * sc);
+    const g = c.getContext('2d');
+    g.scale(sc, sc);
+    g.fillStyle = '#000';
+    g.beginPath();
+    g.ellipse(mx, my, rx, ry, 0, 0, Math.PI * 2);
+    g.fill();
+    e = { c, mx, my, w: c.width / sc, h: c.height / sc };
+    if (shadowPics.size > 400) shadowPics.clear();
+    shadowPics.set(key, e);
+  }
+  ctx.globalAlpha = a;
+  ctx.drawImage(e.c, x - e.mx, y - e.my, e.w, e.h);
+}
+
 function drawYunit(y, b, x, yy, s, alpha, row, f, mirror) {
   const { u, im } = y, [cw, ch] = u.cell, [fx, fy] = u.foot;
   const w = cw * s, h = ch * s;
-  ctx.save();
-  ctx.globalAlpha = 0.3 * alpha;
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(Math.round(x), Math.round(yy - 1), Math.max(6, (u.foot_w || 16) * s * 0.6), 3.5 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  ctx.save();
+  const a0 = ctx.globalAlpha;
+  footShadow(Math.round(x), Math.round(yy - 1), Math.max(6, (u.foot_w || 16) * s * 0.6), 3.5 * s, 0.3 * alpha);
+  // (no save/restore: the alpha is set back and a mirror's move undone by hand)
   ctx.globalAlpha = alpha;
-  ctx.translate(Math.round(x), Math.round(yy));
-  if (mirror) ctx.scale(-1, 1);
+  const X = Math.round(x), Y = Math.round(yy);
+  if (mirror) {
+    ctx.translate(X, Y);
+    ctx.scale(-1, 1);
+  }
+  const ox = mirror ? 0 : X, oy = mirror ? 0 : Y;
   const cols = u.cols || 1e9, sx = (f % cols) * cw, sy = (row + Math.floor(f / cols)) * ch;
-  ctx.drawImage(monsterTint ? tinted(im, monsterTint) : im, sx, sy, cw, ch, -fx * s, -fy * s, w, h);
+  ctx.drawImage(monsterTint ? tinted(im, monsterTint) : im, sx, sy, cw, ch, ox - fx * s, oy - fy * s, w, h);
   // The flash fades as it goes and never quite hides the monster: a blink of white, not a white shape.
   if (b.flash > 0) {
     ctx.globalAlpha *= Math.min(1, b.flash / 0.12) * hitWhite(b);
-    ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), -fx * s, -fy * s, w, h);
+    ctx.drawImage(whiteFrame(im, sx, sy, cw, ch), ox - fx * s, oy - fy * s, w, h);
   }
-  ctx.restore();
+  if (mirror) {
+    ctx.scale(-1, 1);
+    ctx.translate(-X, -Y);
+  }
+  ctx.globalAlpha = a0;
 }
 
 function drawMonster(b, x, y, s, alpha = 1) {
@@ -10893,12 +11023,54 @@ function drawTargetFrame() {
   ctx.restore();
 }
 
+// The ground under the bodies (a map's pieces, or a terrain's pattern) drawn into a buffer a margin
+// wider than the view and painted again only when the view leaves it: each frame is then one
+// straight copy of opaque pixels (a black fill, the ground's pieces and a second black fill under
+// them were three passes over the screen every frame, the costliest of a slow phone's drawing).
+const groundBuf = { c: null, g: null, key: null, z: 0, x0: 0, y0: 0, ok: false, tries: 0 };
+const GROUND_MARGIN = 112;
+
+/** The ground for the view at camX, camY. paint(g, x, y, w, h) paints that part of the world into
+ *  g (its transform set, black under it) and returns false while one of its pieces is still loading. */
+function drawGroundCached(key, camX, camY, paint) {
+  const B = groundBuf, m = GROUND_MARGIN;
+  const w = Math.ceil((VW + 2 * m) * Z), h = Math.ceil((VH + 2 * m) * Z);
+  if (!B.c || B.c.width !== w || B.c.height !== h) {
+    B.c = document.createElement('canvas');
+    B.c.width = w;
+    B.c.height = h;
+    B.g = B.c.getContext('2d', { alpha: false });
+    B.key = null;
+  }
+  const out = camX < B.x0 || camY < B.y0 || (camX + VW - B.x0) * Z > w || (camY + VH - B.y0) * Z > h;
+  if (B.key !== key || B.z !== Z || out || (!B.ok && B.tries++ % 6 === 0)) {
+    B.x0 = Math.round(camX - m);
+    B.y0 = Math.round(camY - m);
+    B.key = key;
+    B.z = Z;
+    const g = B.g;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, w, h);
+    g.setTransform(Z, 0, 0, Z, -B.x0 * Z, -B.y0 * Z);
+    // (a piece that never comes is let be after a while: the rest is not painted again for it)
+    B.ok = paint(g, B.x0, B.y0, w / Z, h / Z) !== false || B.tries > 120;
+    if (B.ok) B.tries = 0;
+  }
+  const t = ctx.getTransform();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(B.c, Math.round((camX - B.x0) * Z), Math.round((camY - B.y0) * Z), canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(t);
+}
+
 function render(now) {
+  sweepBitmaps(now);
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!G) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (T && !$('#town').hidden) drawTown(now);
     else drawMenuBackdrop(now);
     return;
@@ -10922,8 +11094,9 @@ function render(now) {
     War.drawGround();
   } else if (G.arena) Hunt.drawMap(ctx, camX, camY); // 사냥 기믹: 연's own map of the ground
   else {
-    ctx.fillStyle = G.ground;
-    ctx.fillRect(camX, camY, VW, VH);
+    // (every ground covers the whole view: no black fill under it)
+    const pat = G.ground;
+    drawGroundCached(pat, camX, camY, (g, x, y, w, h) => { g.fillStyle = pat; g.fillRect(x, y, w, h); });
     if (G.war) War.drawGround(); // 공대: the arena's edge and the camp
   }
 
@@ -11461,43 +11634,65 @@ function drawEmote(who, x, y) {
 
 function drawBubble(text, x, y, age = 0) {
   // A shout over a character's head, as 바람의나라 연 draws them: a dark see-through pill with a
-  // thin light rim and white letters, a small tail below.
+  // thin light rim and white letters, a small tail below. Drawn once into a kept picture (textPic).
   if (!settings.bubbles) return;
-  const RIM = 'rgba(230,230,235,0.9)', EDGE = 'rgba(0,0,0,0.5)', FILL = 'rgba(22,22,28,0.82)';
   ctx.save();
   ctx.globalAlpha = age < 1 ? 1 : Math.max(0, 1 - (age - 1) / 0.3);
   ctx.font = 'bold 12px G11';
   ctx.textAlign = 'center';
-  const h = 20, r = h / 2;
+  const h = 20;
   const w = Math.max(h + 8, Math.ceil(ctx.measureText(text).width) + 18);
   x = Math.round(x);
   const l = x - Math.round(w / 2), t = Math.round(y) - h - 4;
+  const tr = ctx.getTransform(), sc = tr.a;
+  if (!tr.b && !tr.c && tr.d === sc && sc > 0 && sc <= 6 && (!document.fonts || document.fonts.check(ctx.font))) {
+    const key = 'b|' + sc + '|' + text;
+    let e = textPics.get(key);
+    if (!e) {
+      const c = document.createElement('canvas'), g = c.getContext('2d');
+      c.width = Math.ceil(w * sc);
+      c.height = Math.ceil((h + 2) * sc);
+      g.scale(sc, sc);
+      g.font = ctx.font;
+      g.textAlign = 'center';
+      paintBubble(g, text, Math.round(w / 2), 0, w, h);
+      e = { c, w: c.width / sc, h: c.height / sc };
+      keepTextPic(key, e);
+    }
+    ctx.drawImage(e.c, l, t, e.w, e.h);
+  } else paintBubble(ctx, text, x, t, w, h);
+  ctx.restore();
+}
+
+/** The bubble's pill (x its middle, t its top, w wide, h high) with its text. */
+function paintBubble(g, text, x, t, w, h) {
+  const RIM = 'rgba(230,230,235,0.9)', EDGE = 'rgba(0,0,0,0.5)', FILL = 'rgba(22,22,28,0.82)';
+  const r = h / 2, l = x - Math.round(w / 2);
   // Row by row, so the rounded ends stay pixel-sharp.
   for (let row = 0; row < h; row++) {
     const dy = row + 0.5 - r;
     const inset = Math.round(r - Math.sqrt(Math.max(0, r * r - dy * dy)));
     const yy = t + row;
-    ctx.fillStyle = EDGE;
-    ctx.fillRect(l + inset, yy, w - inset * 2, 1);
+    g.fillStyle = EDGE;
+    g.fillRect(l + inset, yy, w - inset * 2, 1);
     if (row === 0 || row === h - 1) continue;
     const dy2 = row + 0.5 - r, r2 = r - 1;
     const in2 = Math.round(r - Math.sqrt(Math.max(0, r2 * r2 - dy2 * dy2)));
-    ctx.fillStyle = RIM;
-    ctx.fillRect(l + in2, yy, w - in2 * 2, 1);
+    g.fillStyle = RIM;
+    g.fillRect(l + in2, yy, w - in2 * 2, 1);
     if (row === 1 || row === h - 2) continue;
     const r3 = r - 2.5, in3 = Math.round(r - Math.sqrt(Math.max(0, r3 * r3 - dy2 * dy2)));
-    ctx.fillStyle = FILL;
-    ctx.fillRect(l + in3, yy, w - in3 * 2, 1);
+    g.fillStyle = FILL;
+    g.fillRect(l + in3, yy, w - in3 * 2, 1);
   }
   // The tail.
-  ctx.fillStyle = RIM;
-  ctx.fillRect(x - 2, t + h - 1, 5, 1);
-  ctx.fillRect(x - 1, t + h, 3, 1);
-  ctx.fillStyle = EDGE;
-  ctx.fillRect(x, t + h + 1, 1, 1);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(text, x, t + 14);
-  ctx.restore();
+  g.fillStyle = RIM;
+  g.fillRect(x - 2, t + h - 1, 5, 1);
+  g.fillRect(x - 1, t + h, 3, 1);
+  g.fillStyle = EDGE;
+  g.fillRect(x, t + h + 1, 1, 1);
+  g.fillStyle = '#ffffff';
+  g.fillText(text, x, t + 14);
 }
 
 /** A gauge in steps, as the old client drew them. */
@@ -11513,10 +11708,59 @@ function bar(x, y, w, h, k, color, back = 'rgba(0,0,0,0.65)') {
   ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, k))), h);
 }
 
+// Text with an edge (outline, thick) and the shouts' bubbles, each drawn once into a small picture
+// at the screen's own scale and kept: a crowd's names, calls and bubbles were some hundred fills a
+// frame (a bubble alone fifty rows), now one drawImage each. The picture is drawn where the text
+// would be; under a turn or an uneven scale, or while the font is still loading, the text is
+// drawn as before.
+const textPics = new Map();
+let textPicN = 0;
+function textPic(kind, text, color, paint, padL = 2, padR = 2, padT = 2, padB = 3) {
+  const tr = ctx.getTransform(), sc = tr.a;
+  if (tr.b || tr.c || tr.d !== sc || !(sc > 0) || sc > 6) return null;
+  const key = kind + '|' + ctx.font + '|' + ctx.textAlign + '|' + ctx.textBaseline + '|' + color + '|' + sc + '|' + text;
+  let e = textPics.get(key);
+  if (e) return e;
+  if (document.fonts && !document.fonts.check(ctx.font)) return null;
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = ctx.font;
+  g.textAlign = ctx.textAlign;
+  g.textBaseline = ctx.textBaseline;
+  const m = g.measureText(text);
+  const ox = Math.ceil(m.actualBoundingBoxLeft) + padL, oy = Math.ceil(m.actualBoundingBoxAscent) + padT;
+  const w = ox + Math.ceil(m.actualBoundingBoxRight) + padR, h = oy + Math.ceil(m.actualBoundingBoxDescent) + padB;
+  c.width = Math.max(1, Math.ceil(w * sc));
+  c.height = Math.max(1, Math.ceil(h * sc));
+  g.scale(sc, sc);
+  g.font = ctx.font;
+  g.textAlign = ctx.textAlign;
+  g.textBaseline = ctx.textBaseline;
+  paint(g, ox, oy);
+  e = { c, ox, oy, w: c.width / sc, h: c.height / sc };
+  keepTextPic(key, e);
+  return e;
+}
+function keepTextPic(key, e) {
+  if (++textPicN > 900) { textPics.clear(); textPicN = 0; }
+  textPics.set(key, e);
+}
+
 /** Text with a one-pixel dark edge, crisp at any whole scale. */
 function outline(text, x, y, color = '#efe3c2') {
   x = Math.round(x);
   y = Math.round(y);
+  const e = textPic('o', text, color, (g, x0, y0) => {
+    g.fillStyle = '#000';
+    g.fillText(text, x0 + 1, y0);
+    g.fillText(text, x0, y0 + 1);
+    g.fillText(text, x0 + 1, y0 + 1);
+    g.fillStyle = color;
+    g.fillText(text, x0, y0);
+  });
+  if (e) {
+    ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
+    return;
+  }
   ctx.fillStyle = '#000';
   ctx.fillText(text, x + 1, y);
   ctx.fillText(text, x, y + 1);
@@ -11745,6 +11989,7 @@ function syncSettings() {
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
+  $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
 
@@ -11897,6 +12142,13 @@ $('#opt-info').onclick = () => {
 // softer white on the struck, the added-light 격 pictures dimmer.
 $('#opt-calm').onclick = () => {
   settings.calmFx = !settings.calmFx;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 대규모 전투: a war and a raid with more fighters (war.js BIG), or a 「쟁」 too ('all'); from the next
+// one. Off on a phone that cannot keep up with the crowd. 대항전·레이드 → 쟁까지 → 끔 → ...
+$('#opt-big').onclick = () => {
+  settings.bigBattle = settings.bigBattle === false ? true : settings.bigBattle === 'all' ? false : 'all';
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -12441,7 +12693,7 @@ const War = initWar({
   progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
   saveProgress: () => saveJson('bs_progress', progress),
   ctx, canvas, images, occ, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
-  place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble,
+  place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
   SINSU_GATE, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
@@ -12462,7 +12714,7 @@ const Hunt = initHunt({
   M: () => M, images, occ, TILE, MELEE, free, bodiesAt, heroTile, dashFrom, stats, hurtEnemy, applyStatus, around, later, addFx, fxBudget,
   walled: (tx, ty) => !!(G.arena && !Hunt.open(tx, ty)),
   heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
-  VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
+  VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, drawGroundCached, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
 });
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.
