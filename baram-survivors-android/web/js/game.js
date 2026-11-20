@@ -7120,7 +7120,7 @@ function cast(skill, st) {
           for (const e of all) if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); }
         });
       } else if (pat === 'rain') {
-        if (!def.fxCast) big();
+        if (!def.fxCast && !def.noBig) big();
         const order = all.slice().sort(() => Math.random() - 0.5), span = def.span || 1.1;
         const drop = def.fxDrop && M.fx[def.fxDrop] ? bigFx(def.fxDrop, def.dropSize || 110, 'drop') : null;
         order.forEach((e, i) => {
@@ -7292,7 +7292,9 @@ function cast(skill, st) {
       // back is "nothing for it yet: again in that many seconds".
       const run = TIER_KINDS[def.kind];
       if (!run) break;
-      const again = run({ skill, st, def, fxid, smite, hitOn, afterAt, p });
+      // (its hit picture, def.fxHit, on the first few each blow of it strikes)
+      const smiteHit = def.fxHit ? (e, d, push) => { const r = smite(e, d, push); hitOn(e); return r; } : smite;
+      const again = run({ skill, st, def, fxid, smite: smiteHit, hitOn, afterAt, p });
       if (again) return retry(again);
       break;
     }
@@ -8125,7 +8127,7 @@ function idleLook(dt) {
 /** The 필살기 grows with 승급 (data.js ULT_TIERS): a technique of its own for each band of 승급
  * (0~2차, 3~5차, 6~8차, 9차), by the class's own name, icon and 연 effects, each with a way of
  * striking of its own (ULT_MECH below) — not one spell drawn larger. */
-function ultTier(cls, promo = promoOf(cls)) {
+function ultTier(cls, promo = G && G.ultPromo !== undefined ? G.ultPromo : promoOf(cls)) {
   const list = ULT_TIERS[cls] || [];
   let t = list[0];
   for (let i = 0; i < list.length; i++) if (promo >= ULT_BANDS[i]) t = list[i];
@@ -8142,7 +8144,8 @@ function ultIcon(cls) {
   const l = ultLook(cls);
   const iid = l.icon || l.id;
   if (M.skillicon && M.skillicon.includes(iid)) return `assets/skillicon/${iid}.png`;
-  return `assets/icon/${l.fx}.png`;
+  // (no 연 icon: the old client's own icon of that spell, iconFx — 태양의희원, 귀염추혼소)
+  return `assets/icon/${l.iconFx && M.fx[l.iconFx] ? l.iconFx : l.fx}.png`;
 }
 
 // ---- 필살기 ways of striking (ULT_TIERS[cls][band].mech). Each gives every foe on the screen its
@@ -15502,6 +15505,7 @@ window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
 window.__ult = () => castUlt();
+window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
 window.__main = () => castMain(); // 몰이기 (test: a player pressing it into a heap)
 window.__mainCount = () => (G && mainOn() ? mainCount() : 0);
 
