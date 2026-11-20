@@ -785,7 +785,11 @@ def main():
                 for piece, meta in pieces.items():
                     shutil.copyfile(os.path.join(sw, os.path.basename(meta["file"])), os.path.join(out, "yhero2", meta["file"]))
                     layer = {k: meta[k] for k in ("file", "cols", "cell", "foot", "side")}
-                    manifest["yhero2"][cls_id]["layers"].setdefault(meta["kind"], {})["s_" + piece] = layer
+                    # A 코디 hair (사신수 무신의 헤어) is a variant "c<piece>" of its layers, as 연's own
+                    # hairs are (costume.js MUSIN_HAIR), its picture the item's official render.
+                    if meta.get("icon"):
+                        shutil.copyfile(os.path.join(sw, os.path.basename(meta["icon"])), os.path.join(out, "yhero2", meta["icon"]))
+                    manifest["yhero2"][cls_id]["layers"].setdefault(meta["kind"], {})[meta.get("variant") or "s_" + piece] = layer
 
     # 바람의나라 연's 외형 (코디) items as more layers of the same heroes (GEAR_DIR/ycostume/: s/*.webp,
     # icons/, index.json, from tools/yeon_costume.py) and 연's pets (GEAR_DIR/ypet/, from

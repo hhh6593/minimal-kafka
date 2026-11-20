@@ -170,5 +170,37 @@
    "rogue",
    "mage"
   ]
+ },
+ "musin_cheong_m": {
+  "item": "헤어:청룡무신의헤어(남)",
+  "mode": "hair"
+ },
+ "musin_cheong_f": {
+  "item": "헤어:청룡무신의헤어(여)",
+  "mode": "hair"
+ },
+ "musin_baekho_m": {
+  "item": "헤어:백호무신의헤어(남)",
+  "mode": "hair"
+ },
+ "musin_baekho_f": {
+  "item": "헤어:백호무신의헤어(여)",
+  "mode": "hair"
+ },
+ "musin_jujak_m": {
+  "item": "헤어:주작무신의헤어(남)",
+  "mode": "hair"
+ },
+ "musin_jujak_f": {
+  "item": "헤어:주작무신의헤어(여)",
+  "mode": "hair"
+ },
+ "musin_hyeonmu_m": {
+  "item": "헤어:현무무신의헤어(남)",
+  "mode": "hair"
+ },
+ "musin_hyeonmu_f": {
+  "item": "헤어:현무무신의헤어(여)",
+  "mode": "hair"
  }
 }

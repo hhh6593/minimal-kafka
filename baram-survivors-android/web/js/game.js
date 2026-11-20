@@ -9,7 +9,7 @@ import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sou
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet, costumeItems } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -5596,6 +5596,9 @@ function clearStage() {
     if (G.stage.gwoe) gwoeCards();
     // 코디: a raid won gives a costume now and then (the higher raids the rarer ones).
     if (Math.random() < 0.4 + 0.03 * G.level) dropCostume(G.level >= 10 ? [1, 2] : [0, 1, 2], '레이드 보상');
+    // 사신수 무신의 헤어: the pair of the 신수 whose 성물's raid this is (costume.js MUSIN_HAIR).
+    const mh = unlockMusinHair('사신수 레이드 승리');
+    if (mh.length) later(3.6, () => banner(`코디 헤어 · ${mh.join(' · ')}`));
   } else {
     progress.cleared[G.stage.id] = true;
     if (G.hunt) Hunt.cleared(); // 사냥 기믹: the slow moment, the 갈림길's spoils

@@ -4,7 +4,7 @@
     sinsu_worn.py fetch GEAR_DIR [CONFIG_JSON] [--quick]
     sinsu_worn.py build GEAR_DIR [CONFIG_JSON] [OUT_DIR]
 
-CONFIG_JSON (default tools/sinsu_worn.json): {key: {"item": name, "mode": "weapon" | "wings",
+CONFIG_JSON (default tools/sinsu_worn.json): {key: {"item": name, "mode": "weapon" | "wings" | "hair",
 "classes": [cls, ...] (absent: all), "gauntlet": true (a hilt worn as a glove: always on the fist)}}. --quick fetches only standing and striking (front, back,
 left): enough for candidate sheets; build then shows the stand where a walk or a cast is missing.
 OUT_DIR (default GEAR_DIR/sinsu_worn) takes the layers and index.json.
@@ -31,6 +31,10 @@ top of the head):
     over it from behind. The body itself stays 연's outfit (items.js).
 Writes GEAR_DIR/sinsu_worn/<piece>_<class>.png and GEAR_DIR/sinsu_worn/index.json:
     {cls: {piece: {"kind", "file", "cols", "cell", "foot", "side"}}}
+  - 사신수 무신의 헤어 (mode 'hair', every class, 남 and 여): the hair off the plain figure, on 연's
+    hairless head (hair_layers): layers "hair" and "back" with the variant "c<piece>", worn as a
+    코디 hair (costume.js MUSIN_HAIR); fetch also takes the item's official render (Item/Render) as
+    its picture (raw/icon_<hex>.png). build --pieces=a,b rebuilds those only.
 (prepare_assets.py copies them to yhero2/sinsu/ and adds them to the heroes' layers as "s_<piece>").
 Each laid piece is touched up for 연: scaled to 연's figure, specks dropped, a dark outline round its
 solid parts (touch_up). Any other original piece can be laid the same way (a CONFIG_JSON entry: its
@@ -50,6 +54,7 @@ import numpy as np
 from PIL import Image
 
 COORDI = "https://avatar.baram.nexon.com/Coordi/RenderAvatar/M"
+RENDER = "https://avatar.baram.nexon.com/Item/Render/"
 FEET = (167, 231)
 HERE = os.path.dirname(os.path.abspath(__file__))
 # The 연 weapon layer whose hand (its skin pixels) a class's laid weapon is held by, frame by frame:
@@ -93,6 +98,16 @@ def fetch(gear, *argv):
                         time.sleep(2)
                 open(path, 'wb').write(data)
                 print(path, len(data))
+    # A hair's picture for the 코디 list: the item's official render (the site's escape for ':').
+    for c in config(argv).values():
+        path = os.path.join(raw, f"icon_{rawkey(c['item'])}.png")
+        if c['mode'] != 'hair' or os.path.exists(path):
+            continue
+        with urllib.request.urlopen(RENDER + urllib.parse.quote(c['item'].replace(':', '＃')), timeout=40) as r:
+            data = r.read()
+        if data.startswith(b'\x89PNG'):
+            open(path, 'wb').write(data)
+            print(path, len(data))
 
 
 def frames(path):
@@ -222,6 +237,232 @@ def hand_layer(h2, H, cls):
     return best[1], best[2]
 
 
+def scaled2(rgba, kx, ky):
+    """scaled() with its own factor across and down."""
+    if abs(kx - ky) < 1e-6:
+        return scaled(rgba, kx)
+    im = Image.fromarray(rgba)
+    w, h = max(1, round(im.width * kx)), max(1, round(im.height * ky))
+    a = np.asarray(im).astype(float)
+    pm = a.copy()
+    pm[..., :3] *= a[..., 3:4] / 255
+    r = np.asarray(Image.fromarray(pm.astype(np.uint8)).resize((w, h), Image.BOX)).astype(float)
+    al = np.asarray(im.getchannel('A').resize((w, h), Image.BOX)).astype(float)
+    outp = np.zeros((h, w, 4), np.uint8)
+    outp[..., :3] = np.where(al[..., None] > 0, np.clip(r[..., :3] * 255 / np.maximum(al[..., None], 1), 0, 255), 0).astype(np.uint8)
+    outp[..., 3] = np.where(al > 100, 255, 0)
+    return outp
+
+
+# The original figure's head, from the top of the plain figure's hair (its first drawn row): the
+# top of its eyes (their black rims), its chin, and its face's width (skin, ears included).
+O_EYE, O_CHIN, O_FACE_W = 18, 29, 24
+
+
+def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
+    """A hair of the original (사신수 무신의 헤어) on 연's hero, frame by frame: the hair's own pixels
+    (its render against the plain figure's, the figure's own face left out), set on 연's hairless
+    head (ycostume's head "nohair", which 연 draws under a hair look: costume.js headParts):
+      - the head part scaled so the original's face is as wide as 연's, its eye line on 연's;
+      - what hangs below the chin shortened to 연's shorter body (the original's feet on 연's),
+        narrowed a little less (연's body is broad);
+      - 연's face (its skin, eyes and mouth, from the eyes down) left clear of the hair, facing
+        down or aside, so the hero keeps its face as with 연's own hairs.
+    Two layers, as 연's own hairs: "hair" (over the head: all of it from behind; from the front and
+    the side what the original draws over the figure and the top of the head) and "back" (the
+    rest, behind the body, where the class's clips draw 연's long hairs). Each is touched up for 연
+    (a dark outline round the whole hair, then split). icon: the item's official render
+    (Item/Render), the 코디 list's picture."""
+    from scipy.ndimage import binary_closing, binary_fill_holes, distance_transform_edt
+    ci = json.load(open(os.path.join(gear, 'ycostume', 'index.json'), encoding='utf-8'))
+    nh = ci['layers'].get(cls, {}).get('head', {}).get('nohair')
+    if not nh:
+        print(cls, piece, 'no nohair head: skipped')
+        return None
+    nim = np.asarray(Image.open(os.path.join(gear, 'ycostume', nh['file'])).convert('RGBA'))
+    ncw, nch = nh['cell']
+    nfx, nfy = nh['foot']
+
+    def yhead(row, f):
+        """연's hairless head in a frame, from the feet: (centre x, top y, chin y, width, its face
+        mask (skin with the eyes and mouth inside) and where that mask sits)."""
+        c = nim[row * nch:(row + 1) * nch, f * ncw:(f + 1) * ncw]
+        if c.shape[0] != nch or c.shape[1] != ncw:
+            return None
+        bb = bbox(c[..., 3] > 30)
+        if not bb:
+            return None
+        x0, y0, x1, y1 = bb
+        sk = skin_yeon(c) & (c[..., 3] > 100)
+        face = binary_fill_holes(sk) | sk
+        return ((x0 + x1 + 1) / 2 - nfx, y0 - nfy, y1 + 1 - nfy, x1 - x0 + 1, face, (-nfx, -nfy))
+
+    i0 = H['anims']['idle_down']
+    h0 = yhead(i0['row'], 0)
+    if not h0:
+        return None
+    k_head = h0[3] / O_FACE_W
+    # 연's eye line: two fifths down its head (its brows and eyes; the original's are under the fringe)
+    eye_of = lambda yh: yh[1] + 0.4 * (yh[2] - yh[1])
+
+    def hair_frame(it, ba, front_all, side=False):
+        """The hair's own pixels in a frame, and which of them go over the figure (from the side,
+        over the head only: what hangs down the original's narrow back would hide 연's broader
+        body, and goes behind it)."""
+        oi, ob = opaque(it), opaque(ba)
+        diff = np.abs(it[..., :3].astype(int) - ba[..., :3].astype(int)).sum(-1) > 24
+        own = in_palette(it, skin_palette(ba))
+        # the figure's face as the hair leaves it (its eyes and mouth inside the skin): not the hair's
+        top = np.nonzero(ob)[0].min()
+        head = np.arange(it.shape[0])[:, None] < top + O_CHIN + 2
+        own |= binary_fill_holes(own & head) & head
+        keep = oi & (~ob | diff) & ~own
+        keep |= binary_closing(keep, iterations=1) & oi & ~own  # (pixels the two happen to share)
+        if front_all:
+            front = keep.copy()
+        else:
+            # over the figure in the original, or the top of the head (down to the eyes)
+            front = keep & (ob | (np.arange(it.shape[0])[:, None] < top + O_EYE))
+            if side:
+                front &= np.arange(it.shape[0])[:, None] < top + O_CHIN
+        return keep, front
+
+    def ohead(ba):
+        """The original's head in a frame: (centre x, top y, feet y) of the plain figure."""
+        m = opaque(ba)
+        ys, xs = np.nonzero(m)
+        top = ys.min()
+        bx = np.nonzero(m[top:top + O_CHIN].any(0))[0]
+        return (bx.min() + bx.max() + 1) / 2, top, ys.max() + 1
+
+    pieces = {}
+    PAD = 2
+    for name, a in H['anims'].items():
+        motion, d = name.split('_') if name != 'dead' else ('dead', 'down')
+        cd = DIRS[d]
+        mt = {'idle': 1, 'walk': 2, 'atk': 3, 'cast': 4, 'dead': 1}[motion]
+        its, bas = render(item, cd, mt), render(None, cd, mt)
+        for f in range(a['n']):
+            yh = yhead(a['row'], f if motion != 'dead' else 0)
+            carve = yh is not None and d != 'up'
+            if not yh:
+                # (연 draws no face from behind, the hair over all of it: the head where the same
+                # frame facing down has it)
+                dn = H['anims'].get(motion + '_down')
+                yh = dn and yhead(dn['row'], min(f, dn['n'] - 1))
+            if not yh:
+                continue
+            if motion == 'atk':
+                j = min(len(its) - 1, f)
+            elif motion == 'dead':
+                j = 0
+            else:
+                j = min(len(its) - 1, f * len(its) // a['n'])
+            it, ba = its[j], bas[min(j, len(bas) - 1)]
+            keep, front = hair_frame(it, ba, d == 'up', d == 'side')
+            ohx, otop, ofeet = ohead(ba)
+            oeye, ochin = otop + O_EYE, otop + O_CHIN
+            if motion == 'dead':  # 연's ghost is a head: the hair's head part only
+                keep &= np.arange(it.shape[0])[:, None] < ochin + 2
+                front = keep.copy()
+            bb = bbox(keep)
+            if not bb:
+                continue
+            x0, y0, x1, y1 = bb
+            rgba = it.copy()
+            rgba[..., 3] = np.where(keep, 255, 0)
+            fm = np.zeros_like(rgba)
+            fm[..., 3] = np.where(front, 255, 0)
+            # 연's knots: the eye line, and where the original's chin falls at the head's scale
+            yeye = eye_of(yh)
+            ychin = yeye + (ochin - oeye) * k_head
+            k_low = max(0.3, min(k_head, -ychin / max(1, ofeet - ochin)))
+            k_lx = (k_head + k_low) / 2
+            bands = []
+            if y0 < ochin:
+                bands.append((y0, min(y1 + 1, ochin), k_head, k_head, yeye + (y0 - oeye) * k_head))
+            if y1 + 1 > ochin:
+                ya = max(y0, ochin)
+                bands.append((ya, y1 + 1, k_lx, k_low, ychin + (ya - ochin) * k_low))
+            parts = []
+            for ya, yb, kx, ky, yo in bands:
+                p = scaled2(rgba[ya:yb, x0:x1 + 1], kx, ky)
+                fp = scaled2(fm[ya:yb, x0:x1 + 1], kx, ky)[..., 3] > 0
+                parts.append((p, fp, round((x0 - ohx) * kx), round(yo)))
+            # stacked without a gap: each band from where the one above ends
+            for i in range(1, len(parts)):
+                p, fp, xx, _ = parts[i]
+                pp = parts[i - 1]
+                parts[i] = (p, fp, xx, pp[3] + pp[0].shape[0])
+            gx0 = min(xx for _, _, xx, _ in parts)
+            gy0 = parts[0][3]
+            gx1 = max(xx + p.shape[1] for p, _, xx, _ in parts)
+            gy1 = parts[-1][3] + parts[-1][0].shape[0]
+            can = np.zeros((gy1 - gy0, gx1 - gx0, 4), np.uint8)
+            fcan = np.zeros(can.shape[:2], bool)
+            for p, fp, xx, y_ in parts:
+                sl = (slice(y_ - gy0, y_ - gy0 + p.shape[0]), slice(xx - gx0, xx - gx0 + p.shape[1]))
+                m = p[..., 3] > 0
+                can[sl] = np.where(m[..., None], p, can[sl])
+                fcan[sl] |= fp & m
+            tu = touch_up(can, 'hair')
+            solid = np.pad(can[..., 3] > 0, 1)
+            fpad = np.pad(fcan, 1)
+            # an outline pixel goes with the hair it rings (the nearest drawn pixel's layer)
+            _, (iy, ix) = distance_transform_edt(~solid, return_indices=True)
+            fr_ = np.where(solid, fpad, fpad[iy, ix]) & (tu[..., 3] > 0)
+            bk_ = (tu[..., 3] > 0) & ~fr_
+            # the canvas's origin from the feet: 연's head centre, the touch-up's margin of one pixel
+            ox = round(yh[0]) + gx0 - 1
+            oy = gy0 - 1
+            if carve:
+                # 연's face from its eyes down stays clear of what goes over it
+                face, (fx0, fy0) = yh[4], yh[5]
+                ys_, xs_ = np.nonzero(face)
+                for y_, x_ in zip(ys_, xs_):
+                    if y_ + fy0 < yeye - 0.5:
+                        continue
+                    cy, cx = y_ + fy0 - oy, x_ + fx0 - ox
+                    if 0 <= cy < tu.shape[0] and 0 <= cx < tu.shape[1]:
+                        fr_[cy, cx] = False
+            for kind, m in (('hair', fr_), ('back', bk_)):
+                if not m.any():
+                    continue
+                lay = tu.copy()
+                lay[~m] = 0
+                pieces.setdefault(kind, {})[(a['row'], f)] = (lay, ox, oy)
+    if 'hair' not in pieces:
+        return None
+    rows = max(a['row'] for a in H['anims'].values()) + 1
+    cols = max(a['n'] for a in H['anims'].values())
+    got = {}
+    for kind, fr in pieces.items():
+        bx0 = min(ox for _, ox, _ in fr.values()) - PAD
+        by0 = min(oy for _, _, oy in fr.values()) - PAD
+        bx1 = max(ox + l.shape[1] for l, ox, _ in fr.values()) + PAD
+        by1 = max(oy + l.shape[0] for l, _, oy in fr.values()) + PAD
+        cw, ch = bx1 - bx0, by1 - by0
+        sheet = np.zeros((rows * ch, cols * cw, 4), np.uint8)
+        for (r, f), (l, ox, oy) in fr.items():
+            y_, x_ = r * ch + oy - by0, f * cw + ox - bx0
+            sl = sheet[y_:y_ + l.shape[0], x_:x_ + l.shape[1]]
+            sheet[y_:y_ + l.shape[0], x_:x_ + l.shape[1]] = np.where(l[..., 3:4] > 0, l, sl)
+        key = piece if kind == 'hair' else piece + '_b'
+        fname = f'{key}_{cls}.png'
+        Image.fromarray(sheet).save(os.path.join(root, fname), optimize=True)
+        # variant "c<piece>": the 코디 hair's own layers (costume.js headParts: hair and back "c<id>")
+        got[key] = {'kind': kind, 'variant': 'c' + piece, 'file': 'sinsu/' + fname, 'cols': cols,
+                    'cell': [cw, ch], 'foot': [-bx0, -by0], 'side': [], 'k': round(k_head, 3)}
+    # the 코디 list's picture: the official item render, as fetched (its own pixels, cropped)
+    ic = os.path.join(root, f'{piece}_icon.png')
+    if icon and os.path.exists(icon):
+        im = Image.open(icon).convert('RGBA')
+        im = im.crop(im.getbbox() or (0, 0, im.width, im.height))
+        im.save(ic, optimize=True)
+        got[piece]['icon'] = f'sinsu/{piece}_icon.png'
+    return got
+
+
 def build(gear, *argv):
     pieces = config(argv)
     raw = os.path.join(gear, 'sinsu_worn', 'raw')
@@ -229,6 +470,8 @@ def build(gear, *argv):
     os.makedirs(root, exist_ok=True)
     h2 = os.path.join(gear, 'yhero2')
     index = json.load(open(os.path.join(h2, 'index.json'), encoding='utf-8'))
+    # --pieces=a,b: only those rebuilt (the index keeps the others' entries)
+    want = next((set(a.split('=', 1)[1].split(',')) for a in argv if a.startswith('--pieces=')), None)
     R = {}
 
     def render(item, cd, mt):
@@ -274,6 +517,14 @@ def build(gear, *argv):
         for piece, conf in pieces.items():
             mode, only, item = conf['mode'], conf.get('classes'), conf['item']
             if only and cls not in only:
+                continue
+            if want and piece not in want:
+                continue
+            if mode == 'hair':
+                got = hair_layers(gear, root, H, cls, piece, item, render, os.path.join(raw, f'icon_{rawkey(item)}.png'))
+                if got:
+                    out.setdefault(cls, {}).update(got)
+                    print(cls, piece, 'hair', got[piece]['k'])
                 continue
             # the 연 hand per frame: skin pixels of the class's own weapon layer
             wl = None
@@ -458,7 +709,13 @@ def build(gear, *argv):
                                                'cols': cols, 'cell': [ocw, och], 'foot': [ofx, ofy],
                                                'side': [side.get(r, '') for r in range(rows)], 'k': round(k, 3)}
             print(cls, piece, 'k', round(k, 3))
-    json.dump(out, open(os.path.join(root, 'index.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    ip = os.path.join(root, 'index.json')
+    if want and os.path.exists(ip):
+        old = json.load(open(ip, encoding='utf-8'))
+        for cls, ps in out.items():
+            old.setdefault(cls, {}).update(ps)
+        out = old
+    json.dump(out, open(ip, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 
 if __name__ == '__main__':

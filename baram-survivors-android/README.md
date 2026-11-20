@@ -775,6 +775,14 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
 - 새 빌드 입력: `python3 tools/sinsu_worn.py fetch GEAR_DIR`(→ `GEAR_DIR/sinsu_worn/raw/*.gif`, 네트워크; `--quick`은 서기·공격만)
   다음 `python3 tools/sinsu_worn.py build GEAR_DIR`(→ `GEAR_DIR/sinsu_worn/<키>_<직업>.png` + `index.json`; `GEAR_DIR/yhero2`
   필요). `prepare_assets.py`가 `yhero2/sinsu/`로 복사하고 각 직업 레이어에 `s_<키>`로 넣습니다. 렌더는 커밋하지 않습니다.
+- **사신수 무신의 헤어** (코디 헤어, 능력치 없음; mode `hair`, 키 `musin_<신수>_<m|f>`): 청룡·백호·주작·현무무신의헤어(남·여) 8종.
+  공식 코디룸 렌더에서 맨몸 렌더와 다른 픽셀(머리카락)만 떼어, 연의 민머리 얼굴(ycostume head `nohair`) 위에 눈높이를 맞춰
+  얼굴 폭 비율로 줄이고(턱 아래로 늘어진 머리는 연의 짧은 몸에 맞춰 더 줄임), 연의 얼굴(눈 아래)은 가리지 않게 비웁니다.
+  층은 연의 헤어처럼 `hair`(머리 위)·`back`(몸 뒤)이고 변형 이름은 `c<키>`(코디 헤어와 같은 길: `costume.js` `headParts`).
+  `fetch`가 공식 아이템 그림(`Item/Render`)도 받아 코디 목록 아이콘으로 씁니다. `build --pieces=a,b`는 그 키만 다시 만듭니다.
+  얻는 법(`costume.js` `MUSIN_HAIR`·`unlockMusinHair`): 그 신수 성물의 레이드(`SINSU_GATE`)를 이기면 남·여 한 쌍을 얻고
+  모든 직업이 함께 씁니다 — 청룡 바루나, 주작 아그니, 백호 아이라바타, 현무 해왕과 바루나 둘 다. 전설 등급이지만 상점·뽑기·
+  보상에는 나오지 않습니다. 이미 이긴 세이브는 코디 목록을 읽을 때 받습니다.
 
 **사신수 격** (`gyeok.js`의 `cheongrin`·`hyeoncheorong`·`jujakbisang`, `game.js` `fireGyeok`의 `fxSelf`·`fxGrid`·`fxAlt`):
 연의 신수 그림 가운데 가장 또렷하고 크게 보이는 것을 골라 겹칩니다(백호환령부가 연의 백호 신수 효과에서 발톱만 떼어 쓴 것과 같은 방식).

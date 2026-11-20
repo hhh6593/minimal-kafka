@@ -17,7 +17,7 @@
 export const KINDS = [['armor', '의상'], ['hair', '헤어'], ['head', '얼굴'], ['helmet', '모자'], ['cape', '등'], ['face', '장식'], ['weapon', '무기'], ['shield', '방패'], ['pet', '환수']];
 // Kinds every class has for free: not bought, not dropped, not counted in 코디 수집.
 const FREE = new Set(['hair', 'head']);
-const isFree = it => !!it && FREE.has(it.kind);
+const isFree = it => !!it && FREE.has(it.kind) && !it.musin;
 // 연's grades (the items' MinGrade). 일반·고급 can be bought at any time; 희귀·영웅 when the shop
 // has them in its stock (it turns over every six hours); 전설 only from 뽑기 and the best rewards.
 export const GRADES = [
@@ -46,6 +46,29 @@ const HIDE_WHAT = { helmet: '투구·모자', cape: '망토', shield: '방패' }
 const SLOT_LAYERS = { helmet: ['helmet'], cape: ['cape'], shield: ['shield', 'sback'] };
 // 아바타 프리셋: each class keeps this many whole looks (progress.costume.presets[cls]).
 const PRESETS = 5;
+// 사신수 무신의 헤어: the original's own hairs (its dress room's renders laid on 연's hairless head,
+// tools/sinsu_worn.py hair: layers hair and back "c<id>", picture yhero2/sinsu/<id>_icon.png). Looks
+// only, 전설, never sold, pulled or dropped: each 신수's pair (남·여, worn by any class) comes with its
+// 성물's raid won (items.js SINSU_GATE: 청룡 바루나, 주작 아그니, 백호 아이라바타; 현무 해왕 and
+// 바루나 both), shared by every class.
+export const MUSIN_HAIR = [];
+for (const [s, name, raids, gate] of [['cheong', '청룡', ['raid_varuna'], '바루나 레이드'], ['baekho', '백호', ['raid_airavata'], '아이라바타 레이드'],
+  ['jujak', '주작', ['raid_agni'], '아그니 레이드'], ['hyeonmu', '현무', ['raid_varuna', 'raid_sea'], '바루나 레이드와 해왕 레이드']]) {
+  for (const [g, gn] of [['m', '남'], ['f', '여']]) MUSIN_HAIR.push({ id: `musin_${s}_${g}`, name: `${name}무신의헤어(${gn})`, raids, gate });
+}
+const MUSIN_ORDER = Object.fromEntries(MUSIN_HAIR.map((h, i) => [h.id, i]));
+
+/** Gives the 사신수 무신의 헤어 whose raids are all won (progress.raids); their names. */
+export function unlockMusinHair(from) {
+  if (!A || !D) return [];
+  const won = A.progress().raids || {}, items = costumeItems(), got = [];
+  for (const h of MUSIN_HAIR) {
+    if (items[h.id] && h.raids.every(r => won[r]) && giveCostume(h.id)) got.push(h.name);
+  }
+  if (got.length && from) A.say(`${from}: 코디 헤어 [${got.join('], [')}]을(를) 얻었습니다! (마을의 코디 · 헤어에서 입습니다)`, 'sys');
+  return got;
+}
+
 // Given at the first visit: something to wear before the first purchase.
 const STARTER = ['76017', '202093', '804206'];
 
@@ -90,8 +113,15 @@ export function loadCostumes() {
       items['p' + id] = { id: 'p' + id, kind: 'pet', name, grade: Math.max(0, Math.min(4, grade - 1)), set: '', icon: icon ? `ycostume/i/p${id}.png` : null,
         classes: Object.keys(H2), pet: { file, cols, cell: [cw, ch], foot: [fx, fy], anims: an } };
     }
+    // 사신수 무신의 헤어: their layers came with the heroes' own (the manifest, prepare_assets.py).
+    for (const h of MUSIN_HAIR) {
+      const classes = Object.keys(H2).filter(c => H2[c].layers.hair && H2[c].layers.hair['c' + h.id]);
+      if (classes.length) items[h.id] = { id: h.id, kind: 'hair', name: h.name, grade: 4, set: '사신수 무신', whole: false, musin: h, icon: `yhero2/sinsu/${h.id}_icon.png`, classes };
+    }
     for (const id of Object.keys(items)) if (!items[id].classes.length) delete items[id];
     D = { items };
+    // A save whose raids were won before these hairs came gets them now.
+    unlockMusinHair('사신수 레이드 승리');
     version++;
     if (A.changed) A.changed();
     return D;
@@ -160,7 +190,7 @@ export function giveCostume(id) {
 /** Not owned yet, at random, of the grades given; null when none is left. */
 export function randomCostume(grades = [0, 1, 2, 3]) {
   const items = costumeItems(), own = state().own;
-  const left = Object.keys(items).filter(id => !own[id] && !isFree(items[id]) && grades.includes(items[id].grade));
+  const left = Object.keys(items).filter(id => !own[id] && !isFree(items[id]) && !items[id].musin && grades.includes(items[id].grade));
   return left.length ? left[Math.floor(Math.random() * left.length)] : null;
 }
 
@@ -274,6 +304,14 @@ export function layerOrder(a, f, kinds) {
     const i = z.indexOf('head');
     if (i >= 0) z.splice(i + 1, 0, 'hair');
   }
+  // 사신수 무신의 헤어 (MUSIN_HAIR): what of it hangs is behind the body in every frame, as the
+  // original draws it (its part over the body is in its hair layer); 연's own long hairs come over
+  // the body striking aside.
+  if (kinds.back && kinds.back.meta && /^sinsu\//.test(kinds.back.meta.file || '')) {
+    const i = z.indexOf('back');
+    if (i >= 0) z.splice(i, 1);
+    if (z.indexOf('body') >= 0) z.splice(z.indexOf('body'), 0, 'back');
+  }
   if (kinds.wback && !z.includes('wback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'wback');
   if (kinds.sback && !z.includes('sback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'sback');
   if (kinds.aback && !z.includes('aback')) z.splice(Math.max(0, z.indexOf('body')), 0, 'aback');
@@ -380,7 +418,7 @@ function shop() {
   const s = state(), items = costumeItems(), slot = Math.floor(Date.now() / SHOP_MS);
   if (!s.shop || s.shop.slot !== slot || !s.shop.ids.every(id => items[id])) {
     // Mostly 희귀 and 영웅 (the grades not for sale at all times), some of the others.
-    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id] && !isFree(items[id]));
+    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id] && !isFree(items[id]) && !items[id].musin);
     const ids = [];
     for (let i = 0; i < SHOP_N * 6 && ids.length < SHOP_N && pool.length; i++) {
       const id = pool[Math.floor(Math.random() * pool.length)], g = items[id].grade;
@@ -521,7 +559,8 @@ function listIds(cls) {
     return !q || it.name.toLowerCase().includes(q) || (it.set && it.set.toLowerCase().includes(q));
   });
   // (헤어·얼굴 in 연's own order, its ids: the plain ones first.)
-  if (FREE.has(tab)) ids.sort((x, y) => +x - +y);
+  // (사신수 무신의 헤어 first.)
+  if (FREE.has(tab)) ids.sort((x, y) => (items[y].musin ? 1 : 0) - (items[x].musin ? 1 : 0) || (items[x].musin ? MUSIN_ORDER[x] - MUSIN_ORDER[y] : +x - +y));
   else ids.sort((x, y) => ((own[y] ? 1 : 0) - (own[x] ? 1 : 0)) || items[y].grade - items[x].grade || items[x].name.localeCompare(items[y].name, 'ko'));
   return ids;
 }
@@ -635,6 +674,7 @@ function repaint(cls) {
 
 function howToGet(it, inShop) {
   const g = GRADES[it.grade];
+  if (it.musin) return `${it.musin.gate}를 이기면 얻습니다(남·여 모두, 모든 직업 공용)`;
   if (it.grade <= 1) return `${A.won(g.gold)}에 삽니다`;
   if (it.grade <= 3) return inShop ? `상점 진열 중: 레이드주화 ${g.coins}개` : '상점 진열(6시간마다 바뀜)·뽑기·레이드·대항전·보스에서 얻습니다';
   return '뽑기와 레이드·대항전 승리, 보스의 보물에서만 나옵니다';
