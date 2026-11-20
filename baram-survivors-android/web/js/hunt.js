@@ -62,7 +62,8 @@ function on(G = A.G()) {
 
 function start(G) {
   G.pace = { s: [], ev: [], cards: 0, manual: 0, last: -1 };
-  if (A.settings().legacyPace || G.stage.raid || G.war || G.training) return;
+  // G.war is set after this (War.setup runs later): the 대항전·쟁 known by their stage too.
+  if (A.settings().legacyPace || G.stage.raid || G.stage.war || G.war || G.training) return;
   G.hunt = {
     prog: 0, act: 1, lastNew: 0, killSec: -1, killGot: 0, intro: false, crossed: false, path: null,
     champsAt: PACE.champsAt.slice(), minisAt: PACE.minisAt.slice(), treasures: 0, warnAt: null,
