@@ -152,8 +152,21 @@ def units(dec, out):
 ROOF = 2  # 연's tile layer drawn over the walkers: roofs, the caps of walls, a gate's lintel
 
 
+FLOOR_PATCH = 25  # 「쟁」: a patch of other ground (nothing standing on it) smaller than this is walked over
+FLOOR_BIT = 2     # 「쟁」: a group of drawn things this small (a pebble, a sprout, a starfish) is walked over
+
+
 def floor_open(data, crop):
-    """FLOOR_OPEN's rule: 연's own movables, and its square's ground tiles wherever no upper layer is drawn."""
+    """FLOOR_OPEN's rule: 연's own movables, and its square's ground tiles wherever no upper layer is drawn.
+
+    Round 연's square the ground is painted, not built: what this rule shut there beyond the
+    arena's own borders (a sea's deep water, a cliff's rim, a reef, a thicket's corner) was bits
+    the eye reads as ground — a patch of brambles or a pool's rim (other ground tiles, nothing on
+    them), a lone pebble, a sprout, a starfish (one or two drawn tiles). On the 48-pixel grid each
+    shut a cell or two with nothing to see there, by the camps where the fights are: the hero was
+    stopped by thin air and leapt short. Those are open now; a patch of other ground of
+    FLOOR_PATCH tiles or more, and a group of drawn things of more than FLOOR_BIT, still shut.
+    """
     from collections import Counter
     W, H = data['width'], data['height']
     x0, y0, x1, y1 = crop
@@ -163,7 +176,26 @@ def floor_open(data, crop):
     floor = Counter(gid(x, y) for y in range(H) for x in range(W) if mv[y * W + x])
     keep = {k for k, v in floor.items() if v >= 8}
     up = lambda x, y: any(L[i]['tiles'][y * W + x]['aioTileID'] >= 0 for i in (1, 2, 3))
-    return [[not (mv[y * W + x] or (gid(x, y) in keep and not up(x, y))) for x in range(x0, x1)] for y in range(y0, y1)]
+    shut = {(x, y) for y in range(y0, y1) for x in range(x0, x1) if not (mv[y * W + x] or (gid(x, y) in keep and not up(x, y)))}
+    ground = {c for c in shut if not up(*c)}
+    drawn = shut - ground
+    for cells, small in ((ground, lambda n: n < FLOOR_PATCH), (drawn, lambda n: n <= FLOOR_BIT)):
+        seen = set()
+        for c in cells:
+            if c in seen:
+                continue
+            part, st = [c], [c]
+            seen.add(c)
+            while st:
+                x, y = st.pop()
+                for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if n in cells and n not in seen:
+                        seen.add(n)
+                        part.append(n)
+                        st.append(n)
+            if small(len(part)):
+                shut.difference_update(part)
+    return [[(x, y) in shut for x in range(x0, x1)] for y in range(y0, y1)]
 
 
 def blocked32(data, crop):

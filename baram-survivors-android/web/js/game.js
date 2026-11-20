@@ -5996,6 +5996,32 @@ function holdGround(tx, ty) {
   return !!z && Math.hypot(tx - z.x, ty - z.y) > z.r;
 }
 
+/**
+ * Where a leap to a foe (돌진, the 필살기's) lands: the open tile beside it nearest the hero that
+ * the leap may reach (holdGround). Before, only the nearest was tried, and when a wall stood
+ * between (a 대항전's, 「쟁」's) the hero did not leap at all though the far side was open.
+ */
+function leapSpot(e) {
+  const p = G.player;
+  return DIRS.map(([dx, dy]) => [e.tx + dx, e.ty + dy]).filter(([x, y]) => free(x, y) && !holdGround(x, y))
+    .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0] || null;
+}
+
+/**
+ * The hero carried to a tile in one move, set down on its middle. A step it was in the middle of
+ * is over: left on, the next frame carried the walk on from the tile it had stepped off toward
+ * the new one — the hero was drawn back where it had been and slid the leap again (the 필살기's
+ * leap did so, mid-step, in a war where every walk is a tile's step).
+ */
+function leapTo(tx, ty) {
+  const p = G.player, x0 = p.x, y0 = p.y;
+  p.x = tx * TILE + TILE / 2;
+  p.y = ty * TILE + TILE - 6;
+  heroTile();
+  p.stepping = false;
+  dashFrom(x0, y0);
+}
+
 /** A tile under one of the boss's red marks not yet fallen. */
 function onRed(tx, ty) {
   for (const mk of G.marks) if (!mk.done && mk.tiles.some(([x, y]) => x === tx && y === ty)) return true;
@@ -6004,10 +6030,12 @@ function onRed(tx, ty) {
 
 /**
  * 돌진 (the melee classes' own close-in) waits in a raid while the player steers, or while the
- * hero stands on red: the player's own dodge wins over a leap back to the boss.
+ * hero stands on red: the player's own dodge wins over a leap back to the boss. So in a 대항전 and
+ * 「쟁」 (the war's fields, walked a tile a step): there a 돌진 thrown while the player walked off
+ * pulled the hero back to a foe five tiles away, against the key held — the walk seemed to hitch.
  */
 function steering() {
-  if (!G.marks.length && !(G.war && G.war.raid)) return false;
+  if (!G.marks.length && !G.war) return false;
   return G.t - (G.steerAt || -9) < 0.6 || onRed(G.player.tx, G.player.ty);
 }
 
@@ -7424,14 +7452,9 @@ function castUlt() {
     G.bubble = { text: `${SKILLS[tech] ? SKILLS[tech].name : def.name}!`, t: G.t };
     if (target) {
       if (MELEE.has(G.cls.id)) {
-        const spot = DIRS.map(([dx, dy]) => [target.tx + dx, target.ty + dy]).filter(([x, y]) => free(x, y))
-          .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-        if (spot && !holdGround(spot[0], spot[1])) {
-          const x0 = p.x, y0 = p.y;
-          p.x = spot[0] * TILE + TILE / 2;
-          p.y = spot[1] * TILE + TILE - 6;
-          heroTile();
-          dashFrom(x0, y0);
+        const spot = leapSpot(target);
+        if (spot) {
+          leapTo(spot[0], spot[1]);
           p.inv = Math.max(p.inv, 1.2);
         }
       }
@@ -9290,17 +9313,12 @@ function classFlourish(def, skill, st) {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
     const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); });
     if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > (G.dashUsed ? 3 : 1.5) && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
-      const spot = DIRS.map(([dx, dy]) => [near.tx + dx, near.ty + dy]).filter(([x, y]) => free(x, y))
-        .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
-      if (spot && !holdGround(spot[0], spot[1])) {
+      const spot = leapSpot(near);
+      if (spot) {
         G.dashAt = G.t;
         // Landing in the crowd, the hero is untouchable for a moment (it chose the fight, not the blows).
         p.inv = Math.max(p.inv, 0.5);
-        const x0 = p.x, y0 = p.y;
-        p.x = spot[0] * TILE + TILE / 2;
-        p.y = spot[1] * TILE + TILE - 6;
-        heroTile();
-        dashFrom(x0, y0);
+        leapTo(spot[0], spot[1]);
         const dx = near.tx - p.tx, dy = near.ty - p.ty;
         if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
       }
