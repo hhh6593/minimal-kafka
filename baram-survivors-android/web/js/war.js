@@ -2007,11 +2007,12 @@ function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'numb
 /** An AI picture's options: its size (by aiFx) and the see-through (a 기원 or buff also { on: body }:
  * game.js addFx keeps it on that body as it moves). */
 const aiO = (scale, o) => ({ scale: scale * aiFx(), alpha: aiAlpha(), ...o });
-function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', AI_FX_BIG) : A.fxBudget('war', AI_FX)); }
+function fxOk(big) { const r = A.G().war && A.G().war.raid ? 1 : 0; return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', AI_FX_BIG[r]) : A.fxBudget('war', AI_FX[r])); }
 /** A plain blow's spark (a budget of its own, so the skills' pictures show first). */
-function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', 8); }
+function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', A.G().war && A.G().war.raid ? 4 : 8); }
 // (2차 피드백: the skills cast together round the boss — 18 and 10 the 0.6 s before, the sparks among them.)
-const AI_FX = 20, AI_FX_BIG = 12;
+// [war, raid]: a raid's thirty-five on one boss, all on the screen at once, fewer (measured at CPU x4).
+const AI_FX = [20, 13], AI_FX_BIG = [12, 8];
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
 function castFx(W, b, id, at, scale) {
@@ -2886,6 +2887,7 @@ function applyPersonas(W) {
     const mean = own.reduce((x, b) => x + b.pw, 0) / Math.max(1, own.length) / (team === 1 && !W.raid ? W.foeK || 1 : 1);
     if (mean > 0) for (const b of own) { b.pw /= mean; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; }
     for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
+    warmKitFx(W);
     for (const b of own) setPlay(W, b, defaultPlay(b));
     // The ones who play badly: not a squad's leader nor the hero's own healer.
     const cand = own.filter(b => !b.leader && !b.pocket);
@@ -3087,10 +3089,23 @@ function aiKit(cls, promo, lv, sl, n) {
   if (shield && out.length < n + 1) out.push({ id: shield[0], kind: 'shield', cd: Math.max(12, (shield[1].cd || 14) * AI_CD), d: shield[1] });
   return out;
 }
-/** A skill's picture as the fighter knows it (its 단's; the companions' own rule). */
+/** A skill's picture as the fighter knows it: its own picture at its 단 (the spell's fxs), not the
+ *  hero's enlarged modern one (thirty-five fighters each with its own big modern sheets decoded mid-fight
+ *  cost a phone its frames in a raid: measured, the effects alone). */
 function aiSkillFx(b, id) {
-  const fx = A.memberFx ? A.memberFx(id, b.skl || 1) : spellFx(id, b.lv);
-  return fx && A.M().fx[fx] ? fx : spellFx(id, b.lv);
+  const d = SK[id], M = A.M();
+  if (!d) return null;
+  const own = d.fxs ? d.fxs[Math.min(d.fxs.length - 1, (b.skl || 1) - 1)] : d.fx;
+  if (own && M.fx[own]) return own;
+  const fx = A.memberFx ? A.memberFx(id, 1) : null;
+  return fx && M.fx[fx] ? fx : null;
+}
+/** The kits' pictures decoded ahead, in the opening count (a sheet first drawn mid-fight stalls a frame). */
+function warmKitFx(W) {
+  const seen = new Set();
+  for (const b of W.bodies) for (const s of b.skills || []) { const fx = aiSkillFx(b, s.id); if (fx) seen.add(A.M().fx[fx].src || fx); }
+  for (const id of seen) { const im = A.images[`fx/${id}.png`]; if (im && im.decode) im.decode().catch(() => {}); }
+  W.kitFx = seen.size;
 }
 /** One skill of the fighter's turn, if one is ready and it suits; true when it cast. */
 function castSkills(W, b, t, many, big) {
@@ -3128,7 +3143,7 @@ function castSkill(W, b, t, s) {
   const n = W.U * b.pw * SK_K * s.k;
   if (fx && (onScreen(b) || onScreen(t)) && fxOk(s.kind === 'aoe')) {
     cue(b, s.kind === 'aoe' ? 1 : 0.75);
-    A.fxOn(fx, t, aiO(s.kind === 'aoe' ? 0.72 : 0.62));
+    A.fxOn(fx, t, aiO(fitFx(fx, s.kind === 'aoe' ? 0.72 : 0.62)));
   }
   if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
   else if (s.kind === 'aoe') {
@@ -3149,6 +3164,15 @@ function castSkill(W, b, t, s) {
   if (Math.random() < (b.tier === 'server' ? 0.5 : 0.3)) shout(W, b, name);
   sound(W, b, 'skill_' + s.id, 'spell');
   pose(b, blowPose(b, true));
+}
+/** An AI skill's picture no bigger than AI_FX_AREA on the screen (the 승급 skills' great pictures,
+ *  thirty-five at once round a boss, were what cost a phone its frames: measured, the effects alone). */
+const AI_FX_AREA = { raid: 120 * 120, war: 150 * 150 };
+function fitFx(fx, scale) {
+  const f = A.M().fx[fx];
+  if (!f || !f.w || !f.h) return scale;
+  const s = scale * aiFx(), area = f.w * f.h * (f.k || 1) ** 2 * s * s, max = A.G().war && A.G().war.raid ? AI_FX_AREA.raid : AI_FX_AREA.war;
+  return area > max ? scale * Math.sqrt(max / area) : scale;
 }
 /** Test counters: what each fighter cast (kinds as the 'before' build counted them). */
 function tally(b, k) { const T = b.tally || (b.tally = {}); T[k] = (T[k] || 0) + 1; }
