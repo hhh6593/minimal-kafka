@@ -143,7 +143,9 @@ function teamCol(kind, team) { return TEAM_COL[kind][team === 0 ? 0 : team === 2
 /** 「쟁」, each frame: every guild's foes (the living of the other two) and the boss's living monsters. */
 function jaengLists(W) {
   const G = A.G(), ids = W.teamIds;
-  W.foes = ids.map(t => { const out = []; for (const o of ids) if (o !== t) for (const b of W.alive[o]) out.push(b); return out; });
+  // (Each guild's foes in turn after it — 1, 2 for 0; 2, 0 for 1; 0, 1 for 2: a look-around's ties
+  // fall on each guild alike, not on the first.)
+  W.foes = ids.map(t => { const out = []; for (let k = 1; k < ids.length; k++) for (const b of W.alive[ids[(t + k) % ids.length]]) out.push(b); return out; });
   W.mobs = G.enemies.filter(e => !e.war && e.hp > 0);
   W.boss = W.mobs.find(e => e.kind === 'boss') || null;
 }
@@ -780,7 +782,7 @@ export const War = {
     const G = A.G(), W = G.war;
     if (!W || !(dmg > 0)) return dmg;
     // 「쟁」: no blow into or out of a camp.
-    if (W.jaeng && e && e.war && (inCamp(W, e) || inCamp(W, W.hero))) return 0;
+    if (W.jaeng && e && e.war && (e.team === 0 || inCamp(W, e) || inCamp(W, W.hero))) return 0; // (nor on its own guild: a status ticking on one)
     const win = W.rawWin || (W.rawWin = []);
     win.push([G.t, dmg]);
     W.rawSum = (W.rawSum || 0) + dmg;
@@ -850,7 +852,9 @@ export const War = {
     const G = A.G(), W = G.war, ag = G.aggro;
     if (ag && (ag === G.player ? !G.dead : !ag.down)) return ag;
     let best = null, bd = 1e9;
-    for (const t of W.jaeng ? W.teamIds : [0]) for (const m of W.alive[t]) { const d = W.boss ? d2(m, W.boss) : 0; if (d < bd) { bd = d; best = m; } }
+    // (「쟁」: the guilds looked at from a turning first, so a tie falls on none in particular.)
+    const off = W.jaeng ? (W.aimOff = ((W.aimOff || 0) + 1) % 3) : 0;
+    for (const k of W.jaeng ? W.teamIds : [0]) for (const m of W.alive[(k + off) % (W.jaeng ? 3 : 1)]) { const d = W.boss ? d2(m, W.boss) : 0; if (d < bd) { bd = d; best = m; } }
     return best ? (best.hero ? G.player : best) : G.player;
   },
   raidSpot: () => raidSpot(),
@@ -890,7 +894,10 @@ function update(dt) {
   for (const t of teams) for (const b of W.alive[t]) b.engaged = 0;
   for (const t of teams) for (const b of W.alive[t]) if (b.target && b.target.engaged !== undefined && !b.target.dead) b.target.engaged++;
   // Bodies: steps, statuses, timers every frame; thinking ~8 times a second, staggered.
-  for (const b of W.bodies) {
+  // (「쟁」: from a turning first body, so no guild steps first into the free tiles every frame.)
+  const nb = W.bodies.length, off = W.jaeng ? (W.tickOff = ((W.tickOff || 0) + 7) % nb) : 0;
+  for (let i = 0; i < nb; i++) {
+    const b = W.bodies[(i + off) % nb];
     if (b.dead) {
       if (G.t >= b.respawnAt && b.respawnAt > 0) respawn(W, b);
       continue;
@@ -1041,6 +1048,7 @@ function enemiesNear(W, b, r) {
   const out = [];
   for (const e of foesOf(W, b.team)) {
     if (e.gate) continue;
+    if (W.jaeng && inCamp(W, e)) continue;
     const d = d2(b, e);
     if (d <= r) out.push([e, d]);
   }
@@ -1064,6 +1072,7 @@ function nearest(W, b, r) {
   for (const e of foesOf(W, b.team)) {
     if (e.gate) continue;
     if (unseenHid(e)) continue;
+    if (W.jaeng && inCamp(W, e)) continue;
     const d = d2(b, e);
     if (d <= bd && !unseen(W, b, e, d)) { bd = d; best = e; }
   }
@@ -1084,6 +1093,7 @@ function pickFoe(W, b, r) {
     if (e.gate) continue;
     if (unseenHid(e)) continue;
     if (b.only !== undefined && e.team !== b.only) continue; // 「쟁」: a squad sent on one guild
+    if (W.jaeng && inCamp(W, e)) continue; // (none is struck in its own camp)
     const d = d2(b, e);
     if (d > r || unseen(W, b, e, d)) continue;
     const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
@@ -1842,7 +1852,7 @@ function afk() {
 /** The hero's own blow on a fighter (hurtEnemy has dealt it): counted, and turns the struck. */
 function heroHit(e, dmg) {
   const G = A.G(), W = G.war;
-  if (!W) return;
+  if (!W || (W.jaeng && e.team === 0)) return;
   e.hitBy && e.hitBy.set(W.hero, G.t);
   if (e.hitBy) (e.dmgBy || (e.dmgBy = new Map())).set(W.hero, (e.dmgBy.get(W.hero) || 0) + dmg);
   e.lastHitBy = W.hero;
@@ -2825,7 +2835,8 @@ function partyCasts(W, b) {
   const has = m => m.hero ? G.buffs[kind === 'guard' ? 'guard' : kind] > G.t + 1 : (kind === 'power' ? m.powT > G.t + 1 : m.shield > G.t + 1);
   if (b.team === 0 && !G.dead && d2(W.hero, b) <= 6 && !has(W.hero) && (Math.random() < 0.7 || W.raid)) to = W.hero;
   // The enemy guild's buffs go first to its own leaders, as ours go to the hero.
-  else if (b.team === 1 && Math.random() < 0.7) { for (const m of W.alive[1]) if (m.leader && !m.cmdr && m !== b && d2(m, b) <= 6 && !has(m)) { to = m; break; } }
+  // (「쟁」: every guild's alike, ours too while the hero sits out.)
+  else if ((b.team === 1 || (W.jaeng && (b.team === 2 || G.dead))) && Math.random() < 0.7) { for (const m of W.alive[b.team]) if (m.leader && !m.cmdr && m !== b && d2(m, b) <= 6 && !has(m)) { to = m; break; } }
   if (!to) for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && !m.troop && !m.hero && d2(m, b) <= 5 && !has(m) && (!to || (m.lastHitT || 0) > (to.lastHitT || 0))) to = m;
   if (!to) { b.cd.f = 2; return false; }
   b.cd.f = rnd(9, 15) / Math.max(0.7, b.skill || 1);
@@ -4198,7 +4209,7 @@ function clock(t) {
 // boss (its phases, red floor, blasts and servants, as in a raid — game.js bossBrain) and each other.
 // The boss is sealed for the first two minutes (the 봉인전: three 봉인석 to hold, the servants
 // about the field); then it wakes, strikes whoever is near whatever their guild, and the guild
-// that dealt the most of its life (a thousand points between them), struck its last blow (+150),
+// that dealt the most of its life (a thousand points between them), struck its last blow (+100),
 // held the seals and won the fights in between comes first. It flees at nine minutes.
 // Everything else is the war's: the fighters, roles, squads, the hero, the countdown and results.
 
@@ -4211,13 +4222,18 @@ export const JAENG_MAPS = {
 };
 const JAENG_GUILDS = [['청운', '#7cf08a'], ['흑월', '#ff7a6a'], ['백야', '#c88aff']];
 // gather: the count and the first orders; bossAt: the seals break; rage: 광폭화; time: it flees.
-// bossU: its life in the field's units. Points as the design: the boss's life 1000 between the
-// guilds, the last blow 150, a cut blast 30, a seal 1 a second (0.5 once the boss is up), a kill 8,
-// an assist 3, a servant 0.2 (60 at most).
+// bossU: its life in the field's units (the design's 21000 left a boss that fled nine times in ten:
+// a third of the crowd is always at a seal or another guild; 7000 falls at 6~7 minutes).
+// Points: the boss's life 1000 between the guilds, the last blow 100, a cut blast 15 (a guild once
+// in 25 s), a seal 1 a second (0.5 once the boss is up), a kill 3, an assist 1, a servant 0.2 (60
+// at most). The design's 150 / 30 / 8 / 3 made the last blow decide 89% of the 「쟁」 and the PK
+// outweigh the boss (balance runs, README); pkK: the guilds' blows on each other at 0.45 of a war's
+// (the arena is small and every fight is close: at 1, 220 kills a 「쟁」 against 40~90 wanted).
+// heroK: the hero's blows' cap (War.scale) at 0.85 of a war's; afkK: a hero away barely scratches.
 const JAENG = {
-  gather: 30, bossAt: 120, rage: 450, time: 540, bossU: 8500, campR: 3, pkK: 0.45,
-  pts: { boss: 1000, last: 40, cut: 30, seal: 1, sealBoss: 0.5, kill: 8, assist: 3, mob: 0.2, mobCap: 60 },
-  sealBuff: 0.15, sealBuffT: 30, heroK: 1, afkK: 0.3,
+  gather: 30, bossAt: 120, rage: 450, time: 540, bossU: 7000, campR: 3, pkK: 0.45,
+  pts: { boss: 1000, last: 100, cut: 15, seal: 1, sealBoss: 0.5, kill: 3, assist: 1, mob: 0.2, mobCap: 60 },
+  sealBuff: 0.15, sealBuffT: 30, heroK: 0.85, afkK: 0.05,
 };
 /** The week's 「쟁」: its boss by the hero's 승급 (하급 ~6차, 중급 7~8차, 상급 9차), its arena by the boss. */
 export function jaengWeek(tier, week = gwoeWeek()) {
@@ -4309,7 +4325,8 @@ function jaengSetup() {
   W.lvRec = clamp(Math.round(12 + 1.4 * G.level), 14, 33);
   W.heroArmorK = Math.sqrt((20 + Math.min(46.7, Math.max(0, (p.armor || 0) + 2 * ((G.passives && G.passives.armor) || 0)))) / 20);
   // The camps drawn by lot: no guild has the near seal or the short way every time.
-  const camps = def.camps.slice().sort(() => Math.random() - 0.5);
+  const camps = def.camps.slice();
+  for (let i = camps.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [camps[i], camps[j]] = [camps[j], camps[i]]; } // (a fair shuffle: sort by chance is not)
   W.teams = [0, 1, 2].map(i => ({ id: i, name: JAENG_GUILDS[i][0], color: JAENG_GUILDS[i][1], cmd: null, squads: [], spawn: snap(W, ...camps[i]), kills: 0, troops: [] }));
   W.lair = snap(W, ...def.lair);
   W.seals = def.seals.map((at, i) => { const s = snap(W, at[0], at[1]); return { x: s[0], y: s[1], owner: -1, cap: -1, prog: 0, name: ['비석', '구슬', '돌무지'][i], stone: `war_sealstone${i + 1}`, i }; });
@@ -4332,7 +4349,8 @@ function jaengSetup() {
     }
   }
   // Test (opts.aiOnly): the hero's place an AI fighter's; the hero sits it out (the balance runs).
-  if (jaeng.aiOnly) { G.dead = true; W.heroOut = true; W.heroBack = 0; W.aiOnly = true; }
+  // (Off the field: standing in its camp's mouth it held its own guild's way out.)
+  if (jaeng.aiOnly) { G.dead = true; W.heroOut = true; W.heroBack = 0; W.aiOnly = true; const p = G.player; p.tx = p.ty = -20; p.x = p.y = -20 * TILE; }
   W.squads[1].members.push(W.hero);
   W.hero.squad = W.squads[1];
   const pocket = (role === 'dps' || role === 'support') && W.squads[1].members.find(m => m.role === 'healer');
@@ -4528,7 +4546,8 @@ function mobAct(e, dt) {
     if (!ok(e.mt) || G.t > (e.mtT || 0)) {
       e.mtT = G.t + 0.6;
       let best = null, bd = e.kind === 'boss' ? 30 : 8;
-      for (const t of W.teamIds) for (const b of W.alive[t]) {
+      if (e.toff === undefined) e.toff = Math.floor(Math.random() * 3); // (ties on no guild in particular)
+      for (let k = 0; k < 3; k++) for (const b of W.alive[(k + e.toff) % 3]) {
         const x = b.hero ? p : b;
         if (!ok(x) || inCamp(W, b)) continue;
         const d = Math.abs(b.tx - e.tx) + Math.abs(b.ty - e.ty);
@@ -4619,13 +4638,22 @@ function jaengCut(W, b) {
   shout(W, c, '마비');
   credit(c, 'obj', 8);
   W.stat.cuts++;
-  W.pts[c.team].cut += JAENG.pts.cut;
+  if (cutOk(W, c.team)) W.pts[c.team].cut += JAENG.pts.cut;
   W.feed.push({ t: G.t, a: c.name, at: c.team, b: '광역기 끊기', bt: -1, gold: true });
   if (c.team === 0) A.say(`${c.name}: 마비! 광역기 끊었어요! (+${JAENG.pts.cut})`, 'party');
+}
+/** A guild's cut scores once in 25 seconds at most (a hero's holds cut nearly every blast). */
+function cutOk(W, team) {
+  const at = (W.cutAt = W.cutAt || [-99, -99, -99]);
+  if (W.t - at[team] < 25) return false;
+  at[team] = W.t;
+  return true;
 }
 /** The hero's own hold cut the blast (game.js cutBlast → raidCut). */
 function jaengHeroCut(W) {
   const G = A.G();
+  if (afk()) return; // (a hero away cut it by its spells alone: no points)
+  if (!cutOk(W, 0)) return;
   W.pts[0].cut += JAENG.pts.cut;
   W.feed.push({ t: G.t, a: W.hero.name, at: 0, b: '광역기 끊기', bt: -1, gold: true });
 }
