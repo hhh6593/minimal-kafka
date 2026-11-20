@@ -235,6 +235,15 @@ async function boot() {
   setTimeout(() => loadCostumes(), 50);
 }
 
+/** A boss or leader's monster. One that wore an old picture and now wears a 연 unit (was: the old
+ *  id) keeps the old picture's size for its life, so the fight is as long as before; without the
+ *  연 sheet in the build it is the old monster again. */
+function namedMonster(d) {
+  const m = monsterById[d.id], old = d.was && monsterById[d.was];
+  if (!m) return old;
+  return old ? { ...m, area: old.area } : m;
+}
+
 /** The monsters of a hunting ground, weakest first, with its boss and middle boss. */
 function stageMonsters(stage) {
   let list;
@@ -242,9 +251,9 @@ function stageMonsters(stage) {
   else list = Object.values(monsterById).filter(m => m.pages.some(p => stage.pages.includes(p)));
   list = list.slice().sort((a, b) => a.area - b.area);
   let boss, mini;
-  if (stage.boss) boss = { m: monsterById[stage.boss.id], name: stage.boss.name, scale: stage.boss.scale || 1.4,
+  if (stage.boss) boss = { m: namedMonster(stage.boss), name: stage.boss.name, scale: stage.boss.scale || 1.4,
     beast: stage.boss.beast && M.beast && M.beast[stage.boss.beast] ? stage.boss.beast : null };
-  if (stage.mini) mini = { m: monsterById[stage.mini.id], name: stage.mini.name, scale: stage.mini.scale || 1.2 };
+  if (stage.mini) mini = { m: namedMonster(stage.mini), name: stage.mini.name, scale: stage.mini.scale || 1.2 };
   // Grounds known only by their page: the biggest monsters lead.
   if (!boss) boss = { m: list[list.length - 1], name: stage.name + '의 주인', scale: 1.3 };
   if (!mini) mini = { m: list[Math.max(0, list.length - 2)], name: stage.name + ' 우두머리', scale: 1.2 };
@@ -667,7 +676,7 @@ function buildStages() {
       const b = document.createElement('button');
       b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
       const done = (progress.raids || {})[r.id];
-      b.innerHTML = `<img src="assets/mon/${r.boss.id}.png" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
+      b.innerHTML = `<img src="assets/mon/${(namedMonster(r.boss) || r.boss).id}.png" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
         + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : raidLock(r)}</span></div>`;
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
@@ -830,7 +839,7 @@ function raidInfo(r) {
   const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · 8분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
-    <div class="mons"><img src="assets/mon/${r.boss.id}.png" alt=""></div>
+    <div class="mons"><img src="assets/mon/${(namedMonster(r.boss) || r.boss).id}.png" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 공격대 25명${party.length ? ` · 내 다른 직업: ${party.slice(0, 4).join(', ')}` : ''}</div>
     <div class="party raid-roles">역할 ${Object.entries(War.ROLES).map(([id, x]) => `<button data-rrole="${id}" title="${x.desc}" style="font:11px G9,sans-serif;padding:0 5px;margin:0 1px;border:1px solid ${id === role ? '#c08a10' : '#8a7050'};background:${id === role ? '#ffe9a8' : '#f4e6c4'};color:${id === role ? '#7a3a00' : '#4a3a28'}${roles.includes(id) ? '' : ';opacity:0.7'}">${x.name}</button>`).join('')} <small>· 보상 등급은 역할별 기여로</small></div>
     <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${won(120 * r.level)} · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>

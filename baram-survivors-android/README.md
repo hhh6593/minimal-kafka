@@ -1150,6 +1150,12 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
   풀, 끝에 24바이트 노드(이름, 값, 자식 위치·수, 잎 위치·수). `yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR`이 사냥터마다
   몬스터 시트(`GEAR_DIR/yunit/y<유닛 id>.png`, `"own": true`), 바닥과 조형물(`floor_y/y_<id>.png`, `prop_y/y_<id>_a<n>.png`),
   음악(`AUDIO_DIR/bgm/<곡>.mp3`), 지도 탭의 핀(`ymap/index.json`, 새 탭의 지도 그림)을 만듭니다.
+- **옛 그림 보스 → 연 유닛** (`tools/yeon_grounds.json` `"bosses"`, `yeon_grounds.py bosses SPEC DEC_DIR GEAR_DIR`): 옛
+  클라이언트의 몇 장짜리 그림으로 서 있던 사냥터 보스·우두머리와 레이드 보스(서생원, 구미호, 도깨비대장, 해골왕, 우마왕, 삼두룡,
+  화령, 제천대성, 태염무신 등 37자리)는 연에서 같은 이름의 유닛을, 없으면 이름·종류가 가장 가까운 유닛(연 필드보스·레이드보스
+  우선)을 입습니다. 이 모드는 그 유닛 시트만 `GEAR_DIR/yunit/y<유닛 id>.png`(`"own": true`)로 만듭니다(바닥·음악 없음).
+  data.js에서는 `id: 'y<유닛>'`에 `was: '<옛 id>'`가 붙고, 체력은 옛 그림의 크기 그대로라 싸움 길이는 같습니다(빌드에 시트가
+  없으면 옛 몬스터로 돌아갑니다). 괴수의상(바루나·아그니·아이라바타·괴력난신)은 네 방향 걷기·치기 그림이 있어 그대로입니다.
 - **바닥·조형물 자동** (`tools/yeon_maps.py`의 `auto_floor_tiles`, `auto_props`): 바닥은 지도가 걸을 수 있다고 적은 칸
   (`movables` 1)의 바닥층 타일 중 가장 흔한 것과 그와 색이 가까운 변형(20% 이상 쓰인 것)을 섞습니다(검은 허공·반투명 조각 제외).
   조형물은 위 층들을 그려 이어진 조각 중 한 변이 16~180픽셀이고 타일 경계에서 잘리지 않은 것(곧은 불투명 변이 없는 것)을 모양별로

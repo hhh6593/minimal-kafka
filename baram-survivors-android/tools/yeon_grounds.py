@@ -6,6 +6,7 @@ asset a ground of tools/yeon_grounds.json needs.
     yeon_grounds.py build SPEC DEC_DIR GEAR_DIR AUDIO_DIR [ID ...]   (only those grounds / raids)
     yeon_grounds.py arena DEC_DIR GEAR_DIR [ID ...]      bounded fields from 연's maps (yhunt/)
     yeon_grounds.py ambient DEC_DIR GEAR_DIR             weather particles from 연's FXs (yamb/)
+    yeon_grounds.py bosses SPEC DEC_DIR GEAR_DIR         SPEC "bosses": old-picture bosses as 연 units
 
 DEC_DIR holds the decrypted bundles (tools/yeon_dexor.py): Commons, Units, Image, Sounds and the
 Maps_* bundles.
@@ -34,6 +35,8 @@ build, for each ground of SPEC ({"tabs": {...}, "grounds": [...]}, see tools/yeo
     (a Texture2D of Image.unity3d) where SPEC names one.
 SPEC "raids": raids out of 연's own (data.js RAIDS with a terrain y_<id>): the same units (from
 Units_RaidBoss too), floor, props and music, no pin (the raid list is the game's own).
+SPEC "bosses": the bosses and leaders that wore the old client's few-frame pictures, each as the
+연 unit of its name (or the nearest by name and kind): their sheets only (bosses mode).
 With IDs, only those grounds and raids are built (the indexes keep everything else).
 """
 import json
@@ -201,19 +204,15 @@ def survey(dec, out):
               + (' || ' + ', '.join(r['name'] for r in G['boss'][:2]) if G['boss'] else ''))
 
 
-def build(spec_path, dec, gear, audio, *only):
-    import yeon_maps
-    spec = json.load(open(spec_path, encoding='utf-8'))
-    R = Res(dec)
-    grounds = [g for g in spec['grounds'] if not only or g['id'] in only]
-    raids = [g for g in spec.get('raids', []) if not only or g['id'] in only]
-    # Monsters, leaders and bosses.
+def draw_units(R, dec, gear, uids):
+    """연 units as tools/yeon_units.py sheets: GEAR_DIR/yunit/y<unit>.png, merged into its
+    index.json with "own": true (prepare_assets.py gives them a monster entry of their own),
+    연's name, unit id and MoveSpeed."""
     match = {}
-    for g in grounds + raids:
-        for uid in g['units'] + [g['mini'], g['boss']]:
-            u = R.units[str(uid)]
-            match['y%s' % uid] = {'prefab': u['prefab'], 'name': R.unit_name(str(uid)), 'yeon': R.unit_name(str(uid)),
-                                  'unit': str(uid), 'tier': 0, 'own': True, 'move': u['move'], 'atk': u['atk']}
+    for uid in uids:
+        u = R.units[str(uid)]
+        match['y%s' % uid] = {'prefab': u['prefab'], 'name': R.unit_name(str(uid)), 'yeon': R.unit_name(str(uid)),
+                              'unit': str(uid), 'tier': 0, 'own': True, 'move': u['move'], 'atk': u['atk']}
     udir = os.path.join(gear, 'yunit')
     os.makedirs(udir, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -233,6 +232,23 @@ def build(spec_path, dec, gear, audio, *only):
             raise SystemExit(f'units not drawn: {missing}')
         json.dump(idx, open(ip, 'w'), ensure_ascii=False)
     print(len(got), 'units')
+
+
+def bosses(spec_path, dec, gear):
+    """SPEC "bosses": the old-picture bosses and leaders of data.js (grounds, raids) worn as 연
+    units: only their sheets into GEAR_DIR/yunit/ (no floor, props or music)."""
+    spec = json.load(open(spec_path, encoding='utf-8'))
+    draw_units(Res(dec), dec, gear, sorted({b['unit'] for b in spec['bosses']}))
+
+
+def build(spec_path, dec, gear, audio, *only):
+    import yeon_maps
+    spec = json.load(open(spec_path, encoding='utf-8'))
+    R = Res(dec)
+    grounds = [g for g in spec['grounds'] if not only or g['id'] in only]
+    raids = [g for g in spec.get('raids', []) if not only or g['id'] in only]
+    # Monsters, leaders and bosses.
+    draw_units(R, dec, gear, [uid for g in grounds + raids for uid in g['units'] + [g['mini'], g['boss']]])
     # Floors and props, a terrain of its own for each ground.
     terr = {}
     for g in grounds + raids:
@@ -367,6 +383,8 @@ def main():
         survey(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'build':
         build(*sys.argv[2:])
+    elif sys.argv[1] == 'bosses':
+        bosses(sys.argv[2], sys.argv[3], sys.argv[4])
     elif sys.argv[1] == 'ambient':
         ambient(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'arena':
