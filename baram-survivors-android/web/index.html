@@ -157,7 +157,7 @@
   .raid { flex: none; }
   .raid { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; padding: 4px 8px; text-align: left;
       color: #2a1606; background: #e0c088; border: 2px solid; border-color: #f4dca8 #7a4a1e #7a4a1e #f4dca8; }
-  .raid img { max-width: 64px; max-height: 64px; justify-self: center; image-rendering: pixelated; }
+  .raid img, #map.raids .raid img { width: 64px; height: 64px; max-width: 64px; max-height: 64px; object-fit: contain; justify-self: center; image-rendering: pixelated; }
   .raid b { display: block; font: 700 13px G11, monospace; color: #7a1800; }
   .raid span { display: block; font: 10px/13px G9, monospace; }
   .raid.on { background: #fff0c0; border-color: #7a1800; }
@@ -166,8 +166,9 @@
   #map.gungnae .pin span { display: none; }
   #map.gungnae .pin.on span, #map.gungnae .pin.next span { display: inline; }
   #map.gungnae .pin i { border-width: 6px; border-top-width: 9px; filter: drop-shadow(0 0 1px #000); }
-  .info-col { display: flex; flex-direction: column; gap: 6px; width: min(300px, 42%); justify-content: center; }
-  #stage-info { padding: 0 10px 8px; }
+  .info-col { display: flex; flex-direction: column; gap: 6px; width: min(300px, 42%); justify-content: center; min-height: 0; box-sizing: border-box; padding: 4px 0; }
+  #stage-info { padding: 0 10px 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .info-col > .row { flex: none; }
   #stage-info h3 { margin: 0; font-size: 16px; color: #7a1800; }
   #stage-info .lv { font: 10px G9, monospace; color: #8a3a10; }
   #stage-info p { margin: 4px 0; font: 10px/1.5 G9, monospace; }
@@ -417,21 +418,25 @@
   .spell.final b { color: #7a1800; }
   #equip { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, .6); }
-  #equip-box { width: min(96vw, 560px); max-height: 92vh; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
+  #equip-box { width: min(96vw, 640px); max-height: 94vh; overflow-y: auto; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
       background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
       box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; }
   #equip-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
   /* One line per kind: its name at the left, the pieces found side by side (scrolling when many). */
-  #equip-rows { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 34px 1fr; gap: 4px 6px;
+  #equip-rows { flex: 1 1 auto; min-height: min(250px, 46vh); overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 34px 1fr; gap: 4px 6px;
     grid-auto-rows: max-content; align-content: start;
       align-items: center; }
-  #equip-rows h4 { margin: 0; font-size: 12px; color: #7a1800; }
-  .equip-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
-  .equip { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-      width: 72px; height: 58px; padding: 2px; font: 10px/12px G9, monospace; color: #2a1606; background: #e0c088;
-      border: 2px solid; border-color: #f4dca8 #7a4a1e #7a4a1e #f4dca8; overflow: hidden; }
-  .equip img { max-width: 40px; max-height: 36px; margin: auto 0; }
-  .equip span { width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  #equip-rows h4 { margin: 0; font-size: 12px; color: #7a1800; align-self: start; padding-top: 30px; }
+  .equip-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: stretch; min-width: 0; padding-bottom: 2px; }
+  /* One card size: a fixed icon box, the name on two lines at most, then one-line option and change rows. */
+  .equip { position: relative; flex: none; box-sizing: border-box; display: grid; grid-template-rows: 34px 24px auto auto; row-gap: 1px;
+      justify-items: center; align-content: start; width: 76px; min-height: 80px; padding: 3px 2px 2px; font: 10px/12px G9, monospace; color: #2a1606;
+      background: #e0c088; border: 2px solid; border-color: #f4dca8 #7a4a1e #7a4a1e #f4dca8; overflow: hidden; }
+  .equip img { grid-row: 1; align-self: center; max-width: 40px; max-height: 32px; width: auto; height: auto; }
+  .equip span { grid-row: 2; width: 100%; max-height: 24px; overflow: hidden; text-align: center; overflow-wrap: anywhere; word-break: break-all;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .equip small { grid-row: 3; display: block; width: 100%; font: 9px/11px G9, monospace; color: #2a5a10; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+  .equip em.cmp { grid-row: 4; display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .equip.on { background: #fff0c0; border-color: #7a1800; }
   /* Against what is worn: 전투력 up or down, and the row's strongest marked 추천. */
   .equip em.cmp { font: normal 9px G9, monospace; font-style: normal; }
@@ -439,10 +444,8 @@
   .equip.best { box-shadow: 0 0 0 2px #2a9a20 inset; position: relative; }
   .equip.best::before { content: '추천'; position: absolute; top: -1px; right: -1px; font: 8px G9, monospace; color: #fff; background: #2a9a20; padding: 0 3px; }
   .wear-best { grid-column: 1 / -1; justify-self: center; margin: 2px 0 4px; padding: 4px 12px; font-size: 11px; }
-  .equip.special { width: 96px; height: 66px; background: #f0d890; border-color: #ffe890 #a07010 #a07010 #ffe890; }
+  .equip.special { width: 96px; min-height: 96px; background: #f0d890; border-color: #ffe890 #a07010 #a07010 #ffe890; }
   .equip.special span { color: #7a3a00; font-weight: 700; }
-  .equip.special small { display: block; width: 100%; font: 9px/11px G9, monospace; color: #2a5a10; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; text-align: center; }
   .promo-path { font: 10px/15px G9, monospace; color: #6a3e16; margin: 2px 0 6px; }
   .promo-path b { color: #7a1800; margin-right: 4px; }
   .promo-path span { white-space: nowrap; opacity: .55; }
@@ -466,8 +469,7 @@
   .pact.on { background: #8a1800; color: #ffe8c0; border-color: #3a0800; }
   #equip-stats { margin: 6px 0; font: 10px G9, monospace; color: #6a3e16; }
   #equip-gyeok { margin: -2px 0 6px; font: 10px G9, monospace; color: #7a1800; max-height: 72px; overflow-y: auto; }
-  .equip i.fam { display: block; width: 100%; font: normal 8px/10px G9, monospace; color: #8a3a08; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
-  .equip:has(i.fam) { height: 80px; } .equip.special:has(i.fam) { height: 80px; } .equip:has(i.fam) img { max-height: 30px; }
+  .equip i.fam { position: absolute; left: 0; top: 0; max-width: 58%; padding: 0 3px; font: normal 8px/10px G9, monospace; color: #fff; background: #8a3a08; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #equip-gyeok .none { color: #8a6a40; }
   /* A piece's card: pointed at (or just worn), its rank, its option lines and its feature. */
   #equip-tip { margin: 6px 0 0; padding: 4px 8px; font: 10px/14px G9, monospace; color: #2a1606; background: #f4e2b8;
@@ -475,7 +477,7 @@
   #equip-tip b { font-size: 12px; color: #7a1800; }
   #equip-tip .o1 { color: #2a5a10; } #equip-tip .o2 { color: #1a4a9a; } #equip-tip .pr { color: #8a3a08; } #equip-tip .gy { color: #7a1800; }
   #equip-tip .sub { color: #6a5030; }
-  .equip.util { height: 68px; } .equip.util img { max-width: 30px; max-height: 30px; margin: 0 auto; }
+  .equip.util img { max-width: 30px; max-height: 30px; }
   #sort { padding: 4px 0 8px; }
   .sort-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .sort-head b { font-size: 20px; color: #7a1800; min-width: 80px; }

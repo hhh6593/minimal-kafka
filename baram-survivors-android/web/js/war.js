@@ -365,7 +365,7 @@ function loadoutHtml(cls, role) {
       const def = A.SPECIAL[sp];
       const gy = def && def.gyeok && A.GYEOK[def.gyeok];
       if (!gy || !gyeokRoles(gy).has(role) || g[kind + 'Sp'] === sp) continue;
-      bag.push(`<div class="fit">✓ ${def.name || sp} — ${gy.name}<button class="btn" data-wear="${kind}|${tier}|${sp}">착용</button></div>`);
+      bag.push(`<div class="fit">✓ ${def ? A.specialName(def, cls.id) : sp} — ${gy.name}<button class="btn" data-wear="${kind}|${tier}|${sp}">착용</button></div>`);
     }
   }
   return `<div class="wb-load"><b>장비 격</b> — 역할에 맞는 격 ${fitN}개 (격 하나당 역할 효과 +8%, 최대 +24%)<br>

@@ -12696,7 +12696,7 @@ const War = initWar({
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
-  SINSU_GATE, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
+  SINSU_GATE, specialName, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
   heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
   // 공대 (the raid on the war's fighters)
   strike: allyStrike, auraK, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
