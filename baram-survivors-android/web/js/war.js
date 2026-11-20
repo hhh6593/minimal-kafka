@@ -20,6 +20,8 @@
 
 import { frameBox, drawLayers, dyeImage, dropCostume, aiCostume, loadCostumes } from './costume.js';
 import { gwoeWeek, isMend, MEND_FX, RAID_TASKS, RAID_TASK_DEF, WAR_COMMANDS, WAR_COMMAND_EVERY, WAR_COMMAND_PICK } from './data.js';
+import { SPECIAL, specialBase, DRAGON_LOOK, ABYSS_BASE } from './items.js';
+import { GEAR as GEAR_LINES, RAID_GEAR, raidTier, hasShield } from './avatar.js';
 
 let A = null; // game.js internals (initWar)
 const TILE = 48;
@@ -179,6 +181,24 @@ export function initWar(api) {
   injectUi();
   window.__war = (id, cls, role, opts = {}) => startWar(id, typeof cls === 'number' ? A.CLASSES[cls] : cls, role, opts);
   window.__warState = () => warState();
+  // Test: what each fighter cast (casts a minute) and every fighter's persona and spec.
+  window.__tallies = () => { const W = A.G() && A.G().war; return W ? W.bodies.filter(b => b.cls).map(b => ({ team: b.team, role: b.role, cls: b.cls.id, tier: b.tier, play: b.play, alive: b.aliveT || 0, t: b.tally || {} })).concat([{ W: W.t, fx: A.G().fxs.length }]) : null; };
+  window.__aiPersonas = () => aiPersonas();
+  // Test (screenshots): fighters of each 급 of our side in a row just below the hero.
+  window.__aiLineup = (tiers = ['server', 'server', 'high', 'mid', 'low', 'newbie']) => {
+    const G = A.G(), W = G && G.war;
+    if (!W) return null;
+    const used = new Set(), out = [];
+    tiers.forEach((t, i) => {
+      const b = W.bodies.find(x => x.cls && x.team === 0 && x.tier === t && !used.has(x) && !x.dead) || W.bodies.find(x => x.cls && x.team === 0 && x.tier === t && !x.dead);
+      if (!b || used.has(b)) return;
+      used.add(b);
+      placeBody(W, b, [G.player.tx + 2 * (i - Math.floor(tiers.length / 2)), G.player.ty + 2]);
+      b.dest = null; b.fdx = 0; b.fdy = 1;
+      out.push(`${b.name} ${AI_TIERS[t].name} ${b.cls.name} ${b.gearDesc}`);
+    });
+    return out;
+  };
   window.__warBoard = () => openBoard();
   // 「쟁」: window.__jaeng(classIndex | class, role, { map, raid, week, idle, practice })
   window.__jaeng = (cls, role, opts = {}) => startJaeng(typeof cls === 'number' ? A.CLASSES[cls] : cls, role, opts);
@@ -558,6 +578,7 @@ function setup() {
   // tank, and mends the hero first. Without one the hero roamed out of every healer's reach.
   const pocket = (role === 'dps' || role === 'support') && W.squads[1].members.find(m => m.role === 'healer');
   if (pocket) pocket.pocket = true;
+  applyPersonas(W);
   mkCommanders(W);
   mkTroops(W);
   // The escort's camps are set by its road (and the troops' posts by the camps), before anyone stands.
@@ -1032,7 +1053,9 @@ function tickBody(W, b, dt) {
     // (Stepping apart from a spread spell's wind-up: that step is taken before the next thought;
     // it still strikes what is in reach.)
     if (b.scatterT > G.t && b.dest) { const t = b.target; if (t && t.team !== b.team && b.role !== 'healer' && alive(t) && d2(b, t) <= (b.kit.range > 1 ? b.kit.range + 0.5 : 1.5)) act(W, b, t); }
-    else if (b.stun <= 0) (W.jaeng ? thinkJaeng : W.raid && !b.cmdr && !b.troop ? thinkRaid : think)(W, b);
+    else if (b.stun <= 0 && !trollThink(W, b)) (W.jaeng ? thinkJaeng : W.raid && !b.cmdr && !b.troop ? thinkRaid : think)(W, b);
+    // Its own words now and then (its 급 and way: the server's best, a 뉴비, a 힐 집착 …).
+    if (b.play && b.team === 0 && Math.random() < 0.006) personaTalk(W, b);
   }
   if (!b.moving && b.stun <= 0 && !b.dest && !b.troop && !b.cmdr) spread(W, b);
   if (!b.moving && b.stun <= 0 && b.dest) walk(W, b);
@@ -1398,7 +1421,7 @@ function think(W, b) {
   // The timid: tucked behind a wall or in a corner while the odds are bad (hideThink).
   if (hideThink(W, b, order)) return;
   // Low: back to a healer or the camp; back in once mended.
-  if (b.state !== 'retreat' && (k < (b.role === 'tank' ? 0.2 : 0.3)) && !b.carry) {
+  if (b.state !== 'retreat' && k < retreatAt(b, 0.2, 0.3) && !b.carry) {
     b.state = 'retreat';
     chat(W, b, 'low', ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐', '저 죽어요!'], { every: 10, p: 0.5, emo: Math.random() < 0.3 ? 'dizzy' : null });
   }
@@ -1572,7 +1595,7 @@ function thinkHealer(W, b, order) {
   // healers stood by their squad's leader — in the hero's squad, with the hero as its tank, the
   // healer itself: it walked out, saw a foe, stepped back three tiles from it, again and again,
   // at the camp, and the hero-tank was never in its reach.
-  let low = null, lk = 0.92;
+  let low = null, lk = b.play === 'healbot' ? 0.97 : 0.92;
   for (const m of W.alive[b.team]) {
     if (m.gate || m.cmdr) continue;
     const d = d2(m, b);
@@ -1587,6 +1610,7 @@ function thinkHealer(W, b, order) {
   const bu = W.burst && W.burst[b.team], burst = bu && G.t - bu.t < 1.8 && Math.hypot(bu.x - b.tx, bu.y - b.ty) < 6;
   if ((hurt >= 3 || (burst && hurt >= 2)) && b.cd.d <= 0 && b.mp >= 0.1) {
     b.cd.d = burst ? 8 : 12;
+    tally(b, 'heal');
     b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
@@ -1595,11 +1619,13 @@ function thinkHealer(W, b, order) {
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
   } else if (low && b.cd.a <= 0 && d2(low, b) <= 7) {
-    b.cd.a = b.mp < 0.1 ? 4.4 : 3.2;
-    b.mp = Math.max(0, b.mp - 0.05);
+    const hcd = healWait(b);
+    b.cd.a = b.mp < 0.1 ? hcd * 1.4 : hcd;
+    tally(b, 'heal');
+    b.mp = Math.max(0, b.mp - 0.05 * hcd / 3.2);
     // Its class's own 기원 (누리의 기원's grade by its level, a poet's 천공·생명의 기원 …).
     const hid = b.party && b.party.heals.length ? pick(b.party.heals) : b.kit.heal || 'c_heal';
-    const n = low.maxHp * (0.08 + 0.02 * b.pw);
+    const n = low.maxHp * (0.08 + 0.02 * b.pw) * hcd / 3.2;
     A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => { healBody(W, b, low, n); if (low.hero && b.team === 0 && !A.G().dead) heroMended(W, b, hid); } });
     if (onScreen(b)) {
       const d = SK[hid];
@@ -1612,6 +1638,7 @@ function thinkHealer(W, b, order) {
   } else if (b.cd.b <= 0) {
     // 보호: the squad near takes less for a while.
     b.cd.b = 14;
+    tally(b, 'buff');
     for (const m of W.alive[b.team]) if (!m.gate && d2(m, b) < 4) guard(W, m, 5);
     shout(W, b, '보호');
     pose(b, 'cast');
@@ -1672,7 +1699,7 @@ function thinkHealerRaid(W, b, order) {
   // The hero raised, a buff on a mate, mana (see partyCasts).
   if (!close && partyCasts(W, b)) return;
   // The lowest of the near allies (the hero too).
-  let low = null, lk = 0.85;
+  let low = null, lk = b.play === 'healbot' ? 0.93 : 0.85;
   for (const m of W.alive[b.team]) {
     if (m.gate || m.cmdr || d2(m, b) > (m.hero ? 8.5 : 7)) continue;
     const k = hpk(m) - (m.squad === sq ? 0.05 : 0) - (m.role === 'tank' ? 0.05 : 0);
@@ -1684,6 +1711,7 @@ function thinkHealerRaid(W, b, order) {
   const bu = W.burst && W.burst[b.team], burst = bu && G.t - bu.t < 1.8 && Math.hypot(bu.x - b.tx, bu.y - b.ty) < 6;
   if ((hurt >= 3 || (burst && hurt >= 2)) && b.cd.d <= 0 && b.mp >= 0.1) {
     b.cd.d = burst ? 8 : 12;
+    tally(b, 'heal');
     b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
@@ -1692,11 +1720,13 @@ function thinkHealerRaid(W, b, order) {
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
   } else if (low && b.cd.a <= 0) {
-    b.cd.a = b.mp < 0.1 ? 4.4 : 3.2;
-    b.mp = Math.max(0, b.mp - 0.05);
+    const hcd = healWait(b);
+    b.cd.a = b.mp < 0.1 ? hcd * 1.4 : hcd;
+    tally(b, 'heal');
+    b.mp = Math.max(0, b.mp - 0.05 * hcd / 3.2);
     // Its class's own 기원 (누리의 기원's grade by its level, a poet's 천공·생명의 기원 …).
     const hid = b.party && b.party.heals.length ? pick(b.party.heals) : b.kit.heal || 'c_heal';
-    const n = low.maxHp * (0.08 + 0.02 * b.pw);
+    const n = low.maxHp * (0.08 + 0.02 * b.pw) * hcd / 3.2;
     A.addShot(b, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => { healBody(W, b, low, n); if (low.hero && b.team === 0 && !A.G().dead) heroMended(W, b, hid); } });
     if (onScreen(b)) {
       const d = SK[hid];
@@ -1709,6 +1739,7 @@ function thinkHealerRaid(W, b, order) {
   } else if (b.cd.b <= 0) {
     // 보호: the squad near takes less for a while.
     b.cd.b = 14;
+    tally(b, 'buff');
     for (const m of W.alive[b.team]) if (!m.gate && d2(m, b) < 4) guard(W, m, 5);
     shout(W, b, '보호');
     pose(b, 'cast');
@@ -1737,6 +1768,7 @@ function supportBuffs(W, b) {
     const mates = W.alive[b.team].filter(m => !m.gate && d2(m, b) < 4);
     if (mates.length >= 2 && nearest(W, b, 7)) {
       b.cd.b = 13;
+      tally(b, 'buff');
       for (const m of mates) guard(W, m, 5);
       shout(W, b, pick(['보호', '무장', '의지의 외침']));
       // 차폐's ground ward round the supporter: the squad within takes less.
@@ -1749,6 +1781,7 @@ function supportBuffs(W, b) {
     const t = nearest(W, b, 6);
     if (t) {
       b.cd.c = 9;
+      tally(b, 'aoe');
       const ids = b.kit.curse || 'm_curse';
       for (const [e] of packNear(W, t, 1.5)) { e.curse = Math.max(e.curse, 4); if (Math.random() < 0.35) e.slow = Math.max(e.slow, 2); }
       castFx(W, b, ids, t, 0.9);
@@ -1823,6 +1856,7 @@ function act(W, b, t) {
     hit(W, b, t, W.U * 0.75 * b.pw);
     return;
   }
+  if (b.play === 'afk' && W.t >= b.afkAt && W.t < b.afkUntil) return;
   face(b, t);
   // The 도적's 투명 and 암습 (game.js AMBUSH): it fades (foes pass it over), closes in a moment, and
   // its first blow out of hiding lands three times as hard, with 연's 암살 on the struck.
@@ -1831,6 +1865,7 @@ function act(W, b, t) {
       if (G.t < b.stalk) return;
       b.hidden = 0;
       b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
+      tally(b, 'single');
       hit(W, b, t, kit.basic[1] * W.U * 2.2 * b.pw * 3);
       if (onScreen(t) && fxOk(true) && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, aiO(0.75));
       if (Math.random() < 0.5) shout(W, b, '암습');
@@ -1849,8 +1884,9 @@ function act(W, b, t) {
   }
   const many = t.gate ? 0 : packNear(W, t, 1.5).length;
   const big = t.cmdr || t.gate || t.hero || t.kind === 'boss' || many >= 3;
-  if (b.cd.d <= 0 && kit.ult[0] && (big || hpk(t) < 0.5)) {
-    b.cd.d = kit.ult[2] * rnd(0.9, 1.2);
+  if (b.cd.d <= 0 && kit.ult[0] && (big || hpk(t) < 0.5 || (b.play === 'greedy' && b.role !== 'healer'))) {
+    b.cd.d = (b.ultCd || kit.ult[2]) * rnd(0.9, 1.2);
+    tally(b, 'ult');
     const id = kit.ult[0];
     if (b.cls.id === 'poet') {
       // 태양의희원 / its like: everyone near is mended and guarded.
@@ -1872,8 +1908,11 @@ function act(W, b, t) {
     pose(b, b.cls.id === 'poet' ? 'cast' : blowPose(b, true));
     return;
   }
-  if (b.cd.c <= 0 && kit.aoe[0] && (many >= 2 || t.gate || t.cmdr || t.kind === 'boss')) {
+  // The class's skills in turn (castSkills); the old spread spell only for a fighter with none.
+  if (castSkills(W, b, t, many, big)) return;
+  if (!(b.skills && b.skills.length) && b.cd.c <= 0 && kit.aoe[0] && (many >= 2 || t.gate || t.cmdr || t.kind === 'boss')) {
     b.cd.c = kit.aoe[2] * rnd(0.9, 1.15);
+    tally(b, 'aoe');
     const id = kit.aoe[0];
     castFx(W, b, id, t, 0.9);
     const n = kit.aoe[1] * W.U * 2 * b.pw;
@@ -1894,7 +1933,8 @@ function act(W, b, t) {
   }
   if (b.cd.a > 0) return;
   b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
-  const id = kit.basic[0], n = kit.basic[1] * W.U * 2.2 * b.pw * (t.gate ? 1.3 : 1);
+  tally(b, 'basic');
+  const id = kit.basic[0], n = kit.basic[1] * W.U * 2.2 * b.pw * (t.gate ? 1.3 : 1) * (b.skills && b.skills.length ? BASIC_K : 1);
   if (kit.range > 1) {
     const d = id && SK[id];
     const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
@@ -1907,7 +1947,7 @@ function act(W, b, t) {
     pose(b, blowPose(b)); // a 궁사's shot is its bow's draw
   } else {
     hit(W, b, t, n);
-    if (onScreen(t) && fxOk()) {
+    if (onScreen(t) && hitFxOk()) {
       const fx = id && SK[id] && SK[id].fx;
       // Its class's own blow on the struck (연's picture of its first technique) every other blow,
       // the plain spark else (the big pictures on every blow of a crowd cost a phone too much).
@@ -1928,7 +1968,7 @@ function pose(b, kind) { b.pose = kind; b.poseT = kind === 'attack' ? 0.22 : 0.3
 
 function taunt(W, b) {
   const G = A.G();
-  b.cd.c = 9;
+  b.cd.c = b.aggro ? 5.5 : 9;
   for (const [e] of enemiesNear(W, b, 3)) if (!e.hero && !e.cmdr) e.taunt = { by: b, until: G.t + 3 };
   shout(W, b, pick(['도발', '이리 와라', '어그로']));
   tauntFx(b);
@@ -1967,7 +2007,11 @@ function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'numb
 /** An AI picture's options: its size (by aiFx) and the see-through (a 기원 or buff also { on: body }:
  * game.js addFx keeps it on that body as it moves). */
 const aiO = (scale, o) => ({ scale: scale * aiFx(), alpha: aiAlpha(), ...o });
-function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', 10) : A.fxBudget('war', 18)); }
+function fxOk(big) { return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', AI_FX_BIG) : A.fxBudget('war', AI_FX)); }
+/** A plain blow's spark (a budget of its own, so the skills' pictures show first). */
+function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', 8); }
+// (2차 피드백: the skills cast together round the boss — 18 and 10 the 0.6 s before, the sparks among them.)
+const AI_FX = 20, AI_FX_BIG = 12;
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
 function castFx(W, b, id, at, scale) {
@@ -2234,6 +2278,7 @@ function kill(W, f, killer) {
   f.hitBy.clear();
   dealt.clear();
   if (W.raid) raidDown(W, f, by);
+  if (f.play === 'suicide' && f.team === 0 && Math.random() < 0.6) A.later(rnd(0.8, 1.6), () => { if (!W.over) { f.talked = -99; chat(W, f, 'p' + f.id, ['아 또 죽었네 ㅋㅋ', '혼자 들어갔다가 ㅠ', '부활 좀요 ㅋㅋ'], { every: 10, must: true, emo: 'gone' }); } });
   if (f.cmdr) credit(by, 'obj', 60);
   else if (f.carry) credit(by, 'obj', 10);
   // The hero gains as from a kill.
@@ -2746,6 +2791,474 @@ function spellFx(id, lv) {
   if (!d) return null;
   const fx = d.fxs ? d.fxs[Math.min(d.fxs.length - 1, Math.floor((lv || 1) / 6))] : d.fx;
   return fx && A.M().fx[fx] ? fx : null;
+}
+
+// ================================================================ AI 동료: 급 · 성격 · 기술 (2차 피드백)
+// Each fighter is a player of its own. Its 급 (서버 최강급 · 상위 · 중간 · 약함 · 뉴비) is drawn round the
+// hero's own 전투력 — one or two of the server's best on every side, some above the hero, most about
+// it, some below — and sets its level, 승급, skill 단, life and blows, and the gear it wears from the
+// game's own ladders (plain pieces for a 뉴비, raid sets and 전설 for the 상위, the 용무기·사신수·태초·
+// 심연 with the 무신 갑옷·기운 or wings for the 서버급, drawn in their layers with a glow round them).
+// Its 성격 sets how it plays (돌격형, 후방형, 힐 집착, 딜 욕심, 어그로 탱커), and a few a match play
+// badly (잠수, 엉뚱한 곳, 혼자 돌격, 늦게 합류, 채팅만). Its kit is its class's own skills up to its
+// 승급, read from SKILLS as they stand, cast in turn on their own waits (a little slower than the
+// hero's) with plain blows between: everyone round a boss throws its spells together.
+// cp: the least 전투력 of the 급; lv, promo, sl (skill 단), g (its gear's rank) drawn in the ranges;
+// gcd: the wait after any skill; n: skills in its kit; ult: its 필살기's wait; heal: a healer's 기원 wait;
+// dodge: how much better it reads a red floor; edge: its hand (how fast it acts on an order).
+const AI_TIERS = {
+  server: { name: '서버 최강급', short: '서버', col: '#ffd040', cp: 38000, lv: [46, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
+  high: { name: '상위', short: '상위', col: '#ff9a5a', cp: 22000, lv: [40, 46], promo: [5, 7], sl: [6, 7], g: [9, 13.5], gcd: 0.74, n: 5, ult: 16, heal: 2.7, dodge: 0.06, edge: 0.12, step: 2 },
+  mid: { name: '중간', short: '중간', col: '#a8d8ff', cp: 10000, lv: [30, 40], promo: [2, 4], sl: [4, 5], g: [4.5, 8.5], gcd: 0.88, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
+  low: { name: '약함', short: '약함', col: '#c0c0c0', cp: 4500, lv: [22, 30], promo: [1, 2], sl: [2, 3], g: [1.5, 4.5], gcd: 1.05, n: 3, ult: 23, heal: 3.6, dodge: -0.04, edge: -0.1, step: 0 },
+  newbie: { name: '뉴비', short: '뉴비', col: '#9fe08a', cp: 0, lv: [12, 22], promo: [0, 1], sl: [1, 2], g: [0, 1.5], gcd: 1.3, n: 2, ult: 28, heal: 4.3, dodge: -0.1, edge: -0.2, step: 0 },
+};
+const TIER_ORDER = ['server', 'high', 'mid', 'low', 'newbie'];
+// The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
+const CP_TOP = 60000;
+// Its 전투력 as the game reckons a hero's (combatPower: the gear's ranks, the 승급, the level).
+const cpOf = (g, promo, lv) => Math.round((g * 1440 + promo * 800 + lv * 60) * (1 + 0.04 * promo));
+const tierByCp = cp => TIER_ORDER.find(k => cp >= AI_TIERS[k].cp) || 'newbie';
+const rint = ([a, b]) => a + Math.floor(Math.random() * (b - a + 1));
+// Ways of playing. retreat: the share of its life at which it backs off (its role's own when unset).
+const PLAYS = {
+  steady: { name: '무난형' },
+  charger: { name: '공격적 돌격형', retreat: 0.15, greedy: true, timid: false },
+  careful: { name: '신중한 후방형', retreat: 0.45, timid: true },
+  healbot: { name: '힐 집착', retreat: 0.35 },
+  greedy: { name: '딜 욕심', greedy: true },
+  aggro: { name: '어그로 탱커', retreat: 0.12, timid: false },
+  afk: { name: '잠수', troll: true },
+  wander: { name: '엉뚱한 곳 공격', troll: true },
+  suicide: { name: '혼자 돌격', troll: true, retreat: 0, timid: false },
+  late: { name: '늦게 합류', troll: true },
+  chatter: { name: '채팅만 함', troll: true },
+};
+const TROLLS = ['afk', 'wander', 'suicide', 'late', 'chatter'];
+// Their words (the party chat and bubbles, our guild's only) and the emoticon that goes with them.
+const P_LINES = {
+  server: ['뒤로 빠져요 제가 잡음', '필살 들어갑니다', '딜 미터기 보세요 ㅋ', '이 정도야 뭐', '제 대상 같이 쳐요', '장비빨 ㅋㅋ', '쫄지 말고 들어와요'],
+  high: ['광역 들어가요', '집중 공격!', '스킬 쿨 돌았다', '좋아 밀어요', '힐러님 감사요'],
+  newbie: ['이거 어떻게 해요?', '스킬 뭐 눌러요?', '처음 와봤어요 ㅎㅎ', '저 죽으면 살려주세요 ㅠ', '와 다들 세다…', '저 따라가면 돼요?'],
+  charger: ['돌격!!', '들어가요!', '앞으로!', '밀어붙여!'],
+  careful: ['뒤에서 칠게요', '무리하지 마요', '피 조심요', '천천히 가요'],
+  healbot: ['힐 걱정 마세요', '피 빠지면 말해요', '제 근처로 오세요!', '힐 들어갑니다~'],
+  greedy: ['딜 1등 가즈아', '막타는 내꺼', '딜량 보셈 ㅋ', '내 딜 어때?'],
+  aggro: ['다 나한테 와!', '어그로 제가 끕니다', '탱 믿고 딜해요', '내 뒤로!'],
+  afk: ['ㅈㅅ 잠수였음', '아 밥 먹고 옴', '어 벌써 시작함?', '잠깐 자리 비움'],
+  wander: ['어 보스 어딨음?', '이쪽 아님?', '이거 맞나?', '여기 몹 많은데요'],
+  suicide: ['나만 믿어!!', '혼자 쓸어버림', '돌격!!!', '아 또 죽었네 ㅋㅋ'],
+  late: ['늦었습니다!', '지금 갑니다 ㅈㅅ', '어디로 가요?'],
+  chatter: ['ㅋㅋㅋㅋㅋ', '오늘 뭐 먹지', '길마님 저 옷 샀어요', '다들 레벨 몇?', '이번 주 이벤트 뭐임?', '아 졸리다', '이따 사냥 갈 사람?', 'ㅎㅇㅎㅇ', '방금 렉 걸림 ㅋㅋ'],
+};
+const P_EMO = { server: 'gains', high: 'ready', newbie: 'what', chatter: 'hehe', afk: 'gone', wander: 'look', suicide: 'rage', healbot: 'cute', greedy: 'godgame', aggro: 'rage', late: 'really', charger: 'ready', careful: 'look' };
+/** A name in its 급's style (the server's best wear theirs as a title; a 뉴비 a number). */
+function styledName(tier, base) {
+  if (tier === 'server') return pick([`絶${base}`, `${base}神`, `ㆍ${base}ㆍ`, `霸${base}`, `${base}★`]);
+  if (tier === 'high') return Math.random() < 0.5 ? pick([`${base}님`, `${base}x`, `천상${base}`, `${base}왕`]) : base;
+  if (tier === 'newbie') return pick([`초보${base}`, `${base}${100 + Math.floor(Math.random() * 900)}`, `뉴비${base}`, `${base}입문`]);
+  return base;
+}
+/** The 급 of every fighter of a side: one or two of the server's best and, in a big field, one of the
+ *  상위 whatever the hero is; of the rest some above the hero (×1.5-4.5 its 전투력), most about it
+ *  (×0.8-1.25), some below (×0.35-0.78). */
+function aiPlan(n) {
+  const out = [], ns = n >= 18 ? 2 : 1, nh = n >= 18 ? 1 : 0, left = n - ns - nh, up = Math.round(left * 0.12), lo = Math.round(left * 0.28);
+  for (let i = 0; i < ns; i++) out.push({ server: true });
+  for (let i = 0; i < nh; i++) out.push({ high: true });
+  for (let i = 0; i < left; i++) out.push({ r: i < up ? Math.exp(rnd(Math.log(1.5), Math.log(4.5))) : i < up + lo ? rnd(0.35, 0.78) : rnd(0.8, 1.25) });
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+/** Every fighter of the war, raid or 「쟁」 its 급, gear, kit and way (called once its squads are made). */
+function applyPersonas(W) {
+  const G = A.G();
+  W.heroCp = Math.max(1500, A.combatPower ? A.combatPower(G.cls) : 3000);
+  // As many play badly on every side (two or three in a field of twenty and more, one in a small guild).
+  const per = W.raid ? W.bodies.length : W.bodies.filter(b => b.cls && b.team === 0).length + 1;
+  if (W.nTroll === undefined) W.nTroll = per >= 20 ? 2 + (Math.random() < 0.35 ? 1 : 0) : 1;
+  for (const team of W.raid ? [0] : teamsOf(W)) {
+    const list = W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop);
+    const own = list.filter(b => !b.alt);
+    const plan = aiPlan(own.length);
+    own.forEach((b, i) => setPersona(W, b, plan[i]));
+    // The side's strength on the whole as before (about the hero's): the spread is in who is strong.
+    const mean = own.reduce((x, b) => x + b.pw, 0) / Math.max(1, own.length) / (team === 1 && !W.raid ? W.foeK || 1 : 1);
+    if (mean > 0) for (const b of own) { b.pw /= mean; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; }
+    for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
+    for (const b of own) setPlay(W, b, defaultPlay(b));
+    // The ones who play badly: not a squad's leader nor the hero's own healer.
+    const cand = own.filter(b => !b.leader && !b.pocket);
+    for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+    const kinds = TROLLS.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(W.nTroll, cand.length); i++) setPlay(W, cand[i], kinds[i]);
+  }
+}
+function setPersona(W, b, slot) {
+  const heroCp = W.heroCp;
+  let tier, promo, lv, g;
+  if (slot.alt) {
+    // The player's own other class: its own level and 승급, its own gear as it is.
+    promo = A.promo ? A.promo(b.cls.id) : 0;
+    lv = b.lv;
+    g = clamp(lv / 6, 1, 9);
+    tier = tierByCp(cpOf(g, promo, lv));
+  } else {
+    const want = slot.server ? Math.min(CP_TOP * 0.95, Math.max(heroCp * rnd(1.3, 1.9), rnd(40000, 52000)))
+      : slot.high ? Math.min(CP_TOP * 0.6, Math.max(heroCp * rnd(1.1, 1.5), rnd(23000, 33000))) : clamp(heroCp * slot.r, 800, Math.max(heroCp * 1.25, AI_TIERS.server.cp * 0.97));
+    tier = slot.server ? 'server' : slot.high ? 'high' : tierByCp(want);
+    const T = AI_TIERS[tier];
+    promo = rint(T.promo);
+    lv = rint(T.lv);
+    g = clamp((want / (1 + 0.04 * promo) - promo * 800 - lv * 60) / 1440, T.g[0], T.g[1]);
+  }
+  const T = AI_TIERS[tier];
+  Object.assign(b, { tier, promo, lv, skl: rint(T.sl), cp: cpOf(g, promo, lv), gcd: T.gcd, ultCd: T.ult, healCd: T.heal });
+  if (!slot.alt) {
+    b.gear = aiGear(W, b.cls, tier, g);
+    b.name = styledName(tier, b.name);
+    // Its strength against the hero's (전장 보정 keeps a little of the pull toward the field).
+    const rel = clamp(Math.sqrt(b.cp / heroCp), 0.55, 1.8);
+    b.pw = (1 + (rel - 1) * 0.85) * (b.team === 1 && !W.raid ? W.foeK || 1 : 1);
+    b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw;
+  }
+  b.gearDesc = b.gearDesc || (b.gear && b.gear.desc) || (slot.alt ? '내 장비' : '일반 장비');
+  b.yvKey = null;
+  b.dodge = clamp(b.dodge + T.dodge, 0.3, 0.98);
+  b.skill = clamp(b.skill + T.edge, 0.45, 1.4);
+  b.lagK = rnd(0.2, 2.6) / b.skill;
+  b.party = partyKit(b.cls, lv);
+  b.skills = aiKit(b.cls, promo, lv, b.skl, T.n);
+  b.style = warStyle(W, b);
+  b.timid = timidOf(W, b);
+}
+function defaultPlay(b) {
+  const r = Math.random(), ranged = b.kit.range > 1;
+  if (b.role === 'tank') return r < 0.45 ? 'aggro' : r < 0.65 ? 'charger' : 'steady';
+  if (b.role === 'healer') return r < 0.45 ? 'healbot' : r < 0.7 ? 'careful' : 'steady';
+  if (b.role === 'support') return r < 0.35 ? 'careful' : r < 0.55 ? 'greedy' : 'steady';
+  if (ranged) return r < 0.35 ? 'greedy' : r < 0.6 ? 'careful' : r < 0.72 ? 'charger' : 'steady';
+  return r < 0.4 ? 'charger' : r < 0.6 ? 'greedy' : r < 0.7 ? 'careful' : 'steady';
+}
+function setPlay(W, b, play) {
+  const P = PLAYS[play];
+  b.play = play;
+  b.greedy = P.greedy !== undefined ? P.greedy : b.greedy;
+  if (P.timid !== undefined) b.timid = P.timid;
+  b.retreatK = P.retreat;
+  b.aggro = play === 'aggro';
+  if (play === 'suicide') { b.dodge = 0.3; b.style = W.raid ? 'obj' : 'diver'; }
+  if (play === 'late') b.lateT = rnd(35, 65);
+  if (play === 'afk') { b.afkAt = rnd(8, 30); b.afkUntil = b.afkAt + rnd(25, 45); }
+  if (play === 'chatter') b.chatty = 1;
+}
+/** The share of its life at which a fighter backs off (its way's, else its role's as before). */
+function retreatAt(b, tank, other) { return b.retreatK !== undefined ? b.retreatK : b.role === 'tank' ? tank : other; }
+/** A healer's 기원 wait: its 급's (3.2 s before), a 힐 집착 sooner. Each mends as much less, so the mending a minute holds. */
+function healWait(b) { return (b.healCd || 3.2) * (b.play === 'healbot' ? 0.85 : 1); }
+
+/** Its gear by its 급 and rank (g, 0-17): pieces of the game's ladders, worn in their own looks. */
+function aiGear(W, cls, tier, g) {
+  const c = cls.id, H = A.M().yhero2 && A.M().yhero2[c];
+  const pool = (W.looks = W.looks || {})[c + ':' + tier] = W.looks[c + ':' + tier] || [];
+  // A look shared by a few of a 급 (their frames made once): two a class and 급, three for the best.
+  if (pool.length >= (tier === 'server' || tier === 'high' ? 3 : 2) && Math.random() < 0.8) return pick(pool);
+  const gear = { armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 };
+  const desc = [];
+  const sp = (id, why) => {
+    const s = SPECIAL[id];
+    if (!s || (s.craft && s.craft.only && !s.craft.only.includes(c)) || (s.kind === 'shield' && !hasShield(c))) return false;
+    const t = specialBase(s, c);
+    if (t === undefined || t < 0) return false;
+    gear[s.kind] = t;
+    gear[s.kind + 'Sp'] = id;
+    if (why) desc.push(why);
+    return true;
+  };
+  const line = kind => (A.plainList ? A.plainList(c, kind) : null) || [];
+  const plain = (kind, k) => { const l = line(kind); return l.length ? l[clamp(Math.round(k * (l.length - 1)), 0, l.length - 1)] : -1; };
+  const top = H && H.layers && H.layers.weapon;
+  if (tier === 'newbie' || tier === 'low' || tier === 'mid') {
+    const k = clamp(g / 8.5, 0, 1);
+    for (const kind of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
+      if (kind === 'shield' && !hasShield(c)) continue;
+      if ((kind === 'helmet' || kind === 'cape') && Math.random() < (tier === 'newbie' ? 0.75 : 0.4)) continue;
+      gear[kind] = plain(kind, clamp(k + rnd(-0.12, 0.12), 0, 1));
+    }
+    desc.push(tier === 'newbie' ? '초보 장비' : '사냥터 장비');
+    if (tier === 'mid' && Math.random() < 0.5) sp(pick(['cr_horn_weapon', 'cr_bone_weapon', 'cr_ember_weapon']), '조합 무기');
+    if (tier === 'mid' && Math.random() < 0.35) sp(pick(['cr_bone_armor', 'cr_ember_armor', 'cr_jade_armor']), '조합 갑옷');
+  } else {
+    // A raid's set of about its rank (the 상위: 삼두룡 … 아이라바타; the server's best under the rest).
+    const ids = Object.keys(RAID_GEAR).filter(id => Math.abs(RAID_GEAR[id].pow - Math.min(g, 14)) <= 2);
+    const rid = ids.length ? pick(ids) : 'raid_hydra';
+    for (const kind of ['weapon', 'armor', 'shield']) { const t = raidTier(rid, c, kind); if (t >= 0) gear[kind] = t; }
+    desc.push(`${(A.raidName ? A.raidName(rid) : rid)} 세트`);
+    gear.helmet = GEAR_LINES[c] && GEAR_LINES[c].helmet ? GEAR_LINES[c].helmet.length - 1 : -1; // the 용 투구
+    gear.cape = plain('cape', rnd(0.6, 1));
+    if (tier === 'high') {
+      if (Math.random() < 0.45) sp(pick(['cr_gold_weapon', 'cr_steel_weapon']), '전설 무기');
+      if (Math.random() < 0.45) sp(pick(['cr_gold_armor', 'cr_maryeong_armor', 'cr_steel_armor', 'cr_dragon_armor']), '전설 갑옷');
+      if (Math.random() < 0.35) sp(pick(['cr_cape_bukdu', 'cr_cape_sari']), null);
+    } else {
+      // 서버 최강급: the top of the weapon ladder, worn and glowing.
+      const fams = ['dragon', 'taecho', 'abyss', 'dragon'];
+      if (c === 'warrior') fams.push('cheong');
+      if (c === 'mage') fams.push('jujak');
+      if (['warrior', 'rogue', 'mage'].includes(c)) fams.push('akma');
+      const fam = pick(fams);
+      const layer = v => (top && top[v] ? ((gear.aiLayer = { weapon: v }), true) : false);
+      if (fam === 'dragon') {
+        const step = 8 + Math.floor(Math.random() * 3), dl = DRAGON_LOOK[c] && DRAGON_LOOK[c][step];
+        const v = dl && top && top['c' + dl] ? 'c' + dl : H && H.map && H.map.weapon ? H.map.weapon['dragon' + step] : null;
+        if (v && layer(v)) { gear.glow = '#7fe8ff'; desc.unshift(`용무기 제${'일이삼사오육칠팔구십'[step - 1]}`); }
+      } else if (fam === 'taecho' && layer('s_tc_' + c)) { gear.glow = '#ffd75a'; desc.unshift('태초의 무기'); }
+      else if (fam === 'abyss' && (layer('s_ab_' + c) || (ABYSS_BASE[c] && layer('c' + ABYSS_BASE[c][0])))) { gear.glow = '#ff3a1a'; desc.unshift('심연 고유 무기'); }
+      else if (fam === 'cheong' && sp('cr_sinsu_cheong', null)) { gear.glow = '#3f9dff'; desc.unshift('청룡신검'); }
+      else if (fam === 'jujak' && sp('cr_sinsu_jujak', null)) { gear.glow = '#ff7a2a'; desc.unshift('주작선장'); }
+      else if (fam === 'akma' && sp('cr_judge_weapon3', null)) { gear.glow = '#d0101a'; desc.unshift('악마 심판의낫'); }
+      if (!gear.glow && layer('s_tc_' + c)) { gear.glow = '#ffd75a'; desc.unshift('태초의 무기'); }
+      // Its armour: 현무불괴갑 (wings), a 무신 set with its 기운, or the 용 파천갑.
+      const r = Math.random(), s = pick(['cheong', 'baekho', 'jujak', 'hyeonmu']);
+      if (r < 0.35 && sp('cr_sinsu_hyeonmu', '현무불괴갑')) gear.cape = plain('cape', 1);
+      else if (r < 0.75 && sp(`cr_musin_armor_${s}`, '무신 세트')) sp(`cr_musin_cape_${s}`, '무신의 기운');
+      else { sp('cr_dragon_armor', '용 파천갑'); gear.cape = plain('cape', 1); }
+      if (hasShield(c)) sp(pick(['cr_shield_jibae', 'cr_shield_sura']), null);
+    }
+  }
+  // 연's 코디 over it: a hair and a face, finer pieces higher up (never over the top weapon or armour).
+  const cos = aiCostume(c, AI_TIERS[tier].step);
+  if (cos) {
+    if (tier === 'server' || tier === 'high') delete cos.weapon;
+    if (tier === 'server') { delete cos.armor; delete cos.cape; }
+    if (Object.keys(cos).length) gear.cos = cos;
+  }
+  gear.desc = desc.join(' · ');
+  pool.push(gear);
+  return gear;
+}
+/** A fighter's layers: its gear's as the hero's are worn (yGearVariants), the top weapons' own laid over. */
+function aiVariants(cls, gear) {
+  const yv = A.yGearVariants(cls, gear || {});
+  const L = gear && gear.aiLayer, H = A.M().yhero2 && A.M().yhero2[cls.id];
+  if (!yv || !L || !H) return yv;
+  for (const [kind, v] of Object.entries(L)) {
+    if (!H.layers[kind] || !H.layers[kind][v]) continue;
+    yv[kind] = v;
+    if (kind === 'weapon') { if (H.layers.wback && H.layers.wback[v]) yv.wback = v; else delete yv.wback; }
+  }
+  return yv;
+}
+
+// The skills a fighter casts: its class's attacks up to its 승급 (the strongest few, of different
+// kinds where it can), its power or haste and its guard. Each on its own wait (the hero's at its 단,
+// AI_CD slower), AI_GCD between any two; plain blows between.
+const AI_ATK = new Set(['spell', 'strike', 'spell4', 'nova', 'cleave', 'line', 'screen', 'slash', 'blink']);
+const AOE_KINDS = new Set(['screen', 'nova', 'cleave', 'line', 'spell4']);
+const AI_CD = 1.25;
+// A skill's blow in the field's units: SK_K × its wait^0.7 (a long wait a heavy blow), less on
+// each of a spread's victims; the plain blows between at BASIC_K of what they were (the skills
+// take their place: the AI's damage a minute stays about as it was, measured).
+const SK_K = 1.75, SK_AOE = 0.62, BASIC_K = 0.6;
+function aiKit(cls, promo, lv, sl, n) {
+  const def = id => (A.tierDef ? A.tierDef(id) : SK[id]);
+  const mine = [];
+  for (const id of Object.keys(SK)) {
+    const d = def(id);
+    if (!d || d.cls !== cls.id || (d.promo || 0) > promo || (d.req || 1) > lv + 4 || d.hpCost || d.kind === 'ult' || d.kind === 'none') continue;
+    if (d.evolved && sl < 8) continue;
+    mine.push([id, d]);
+  }
+  const atk = mine.filter(([, d]) => AI_ATK.has(d.kind) && !isMend(d) && (d.dmg || 0) > 0)
+    .sort((a, b) => (b[1].promo || 0) - (a[1].promo || 0) || (b[1].dmg || 0) - (a[1].dmg || 0));
+  const pickd = [], kinds = new Set();
+  const nAtk = Math.max(1, n - 1);
+  for (const e of atk) if (pickd.length < nAtk && !kinds.has(e[1].kind)) { kinds.add(e[1].kind); pickd.push(e); }
+  for (const e of atk) if (pickd.length < nAtk && !pickd.includes(e)) pickd.push(e);
+  const out = pickd.map(([id, d]) => {
+    const aoe = AOE_KINDS.has(d.kind) || (d.radius || 0) >= 1 || (d.count || 1) >= 2;
+    const cd = Math.max(1.3, (d.cd || 3) * Math.pow(0.93, sl - 1) * AI_CD);
+    return { id, kind: aoe ? 'aoe' : 'single', cd, k: Math.pow(clamp(d.cd || 2, 1, 8), 0.7) * (aoe ? SK_AOE : 1), r: d.kind === 'screen' ? 2.2 : 1.5, d };
+  });
+  // Its own power (or haste), then its guard, if it has room.
+  const buff = mine.filter(([, d]) => d.kind === 'buff' && (d.buff === 'power' || d.buff === 'haste')).sort((a, b) => (b[1].promo || 0) - (a[1].promo || 0))[0];
+  if (buff && out.length < n) out.push({ id: buff[0], kind: 'buff', cd: Math.max(10, (buff[1].cd || 12) * AI_CD), d: buff[1] });
+  const shield = mine.filter(([, d]) => d.kind === 'buff' && (d.buff === 'shield' || d.buff === 'guard'))[0];
+  if (shield && out.length < n + 1) out.push({ id: shield[0], kind: 'shield', cd: Math.max(12, (shield[1].cd || 14) * AI_CD), d: shield[1] });
+  return out;
+}
+/** A skill's picture as the fighter knows it (its 단's; the companions' own rule). */
+function aiSkillFx(b, id) {
+  const fx = A.memberFx ? A.memberFx(id, b.skl || 1) : spellFx(id, b.lv);
+  return fx && A.M().fx[fx] ? fx : spellFx(id, b.lv);
+}
+/** One skill of the fighter's turn, if one is ready and it suits; true when it cast. */
+function castSkills(W, b, t, many, big) {
+  const G = A.G();
+  if (!b.skills || !b.skills.length || G.t < (b.gcdT || 0)) return false;
+  if (b.role === 'healer' && (b.play === 'healbot' || (t && t.kind === 'boss' && Math.random() < 0.4))) return false;
+  const sk = b.sk || (b.sk = {});
+  const haste = b.hasteT > G.t ? 0.65 : 1;
+  for (const s of b.skills) {
+    if (G.t < (sk[s.id] || 0)) continue;
+    if (s.kind === 'shield' && hpk(b) > 0.6) continue;
+    if (s.kind === 'buff' && (b.powT > G.t || b.hasteT > G.t)) continue;
+    // A spread spell where it spreads (a crowd, the gate, a boss), else the single blows.
+    if (s.kind === 'aoe' && !(many >= 2 || big) && b.skills.some(x => x.kind === 'single' && G.t >= (sk[x.id] || 0))) continue;
+    sk[s.id] = G.t + s.cd * rnd(0.9, 1.15) * haste;
+    b.gcdT = G.t + b.gcd * (b.role === 'healer' ? 1.7 : 1) * (b.play === 'chatter' ? 2 : 1) * rnd(0.85, 1.2) * haste;
+    castSkill(W, b, t, s);
+    return true;
+  }
+  return false;
+}
+function castSkill(W, b, t, s) {
+  const G = A.G(), d = s.d, fx = aiSkillFx(b, s.id), name = spellName(s.id, b.lv);
+  tally(b, s.kind === 'shield' ? 'buff' : s.kind);
+  if (s.kind === 'buff' || s.kind === 'shield') {
+    if (s.kind === 'shield') b.shield = Math.max(b.shield || 0, G.t + 3);
+    else if (d.buff === 'haste') b.hasteT = G.t + Math.min(5, d.duration || 4);
+    else { b.powT = G.t + Math.min(5, d.duration || 4); b.powK = 1 + Math.min(0.3, (d.power || 0.4) * 0.4); }
+    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { on: b })); cue(b, 0.75); }
+    if (Math.random() < 0.4) shout(W, b, name);
+    sound(W, b, 'skill_' + s.id, 'buff');
+    pose(b, 'cast');
+    return;
+  }
+  const n = W.U * b.pw * SK_K * s.k;
+  if (fx && (onScreen(b) || onScreen(t)) && fxOk(s.kind === 'aoe')) {
+    cue(b, s.kind === 'aoe' ? 1 : 0.75);
+    A.fxOn(fx, t, aiO(s.kind === 'aoe' ? 0.72 : 0.62));
+  }
+  if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
+  else if (s.kind === 'aoe') {
+    const vs = aoeVictims(W, t, s.r);
+    for (const [e] of vs) {
+      hit(W, b, e, e === t ? n : n * 0.6);
+      if (e.war && !e.cmdr) {
+        if (d.stun && Math.random() < 0.35) e.stun = Math.max(e.stun, Math.min(1, d.stun));
+        if (d.curse) e.curse = Math.max(e.curse, Math.min(4, d.curse));
+        if (d.slow) e.slow = Math.max(e.slow, Math.min(2, d.slow));
+      }
+    }
+    if (!W.raid && vs.length >= 3 && Math.random() < 0.5) { scatterFrom(W, t, s.r); burstAt(W, t); }
+  } else {
+    hit(W, b, t, n);
+    if (t.war && !t.cmdr && d.curse) t.curse = Math.max(t.curse, Math.min(4, d.curse));
+  }
+  if (Math.random() < (b.tier === 'server' ? 0.5 : 0.3)) shout(W, b, name);
+  sound(W, b, 'skill_' + s.id, 'spell');
+  pose(b, blowPose(b, true));
+}
+/** Test counters: what each fighter cast (kinds as the 'before' build counted them). */
+function tally(b, k) { const T = b.tally || (b.tally = {}); T[k] = (T[k] || 0) + 1; }
+
+/** The ones who play badly, before they think as the rest: true when this thought was theirs. */
+function trollThink(W, b) {
+  const pl = b.play;
+  if (!pl || !PLAYS[pl].troll) return false;
+  const G = A.G();
+  if (pl === 'late') {
+    if (W.t < b.lateT) { b.dest = W.raid ? W.camp : W.teams[b.team].spawn; b.target = null; return true; }
+    if (!b.joined) { b.joined = true; personaTalk(W, b, true); }
+    return false;
+  }
+  if (pl === 'afk') {
+    if (W.t >= b.afkAt && W.t < b.afkUntil && b.state !== 'retreat') {
+      b.dest = null;
+      b.target = null;
+      if (!b.afkSaid) { b.afkSaid = true; emo(b, 'gone'); }
+      return true;
+    }
+    if (W.t >= b.afkUntil) {
+      b.afkAt = W.t + rnd(30, 60);
+      b.afkUntil = b.afkAt + rnd(20, 40);
+      b.afkSaid = false;
+      personaTalk(W, b, true);
+    }
+    return false;
+  }
+  if (pl === 'chatter') {
+    if (Math.random() < 0.04) personaTalk(W, b);
+    return Math.random() < 0.4;
+  }
+  if (pl === 'wander') {
+    if (W.t > (b.wanderUntil || 0)) {
+      b.wanderUntil = W.t + rnd(6, 11);
+      b.wanderTo = Math.random() < 0.55 ? snap(W, rnd(2, W.map.cols - 3), rnd(2, W.map.rows - 3)) : null;
+      if (b.wanderTo && Math.random() < 0.3) personaTalk(W, b);
+    }
+    if (!b.wanderTo) return false;
+    b.dest = Math.abs(b.wanderTo[0] - b.tx) + Math.abs(b.wanderTo[1] - b.ty) > 1 ? b.wanderTo : null;
+    const t = nearest(W, b, b.kit.range + 0.5);
+    if (t) act(W, b, t);
+    else if (!b.dest && Math.random() < 0.15) pose(b, blowPose(b, true)); // swinging at the air
+    return true;
+  }
+  if (pl === 'suicide') {
+    b.state = 'go';
+    if (W.raid) return false; // (it stands in front of the boss and never steps back)
+    const foes = teamsOf(W).filter(x => x !== b.team), ft = W.teams[b.goTeam !== undefined ? b.goTeam : (b.goTeam = pick(foes))];
+    const goal = ft.cmd && !ft.cmd.dead ? ft.cmd : { tx: ft.spawn[0], ty: ft.spawn[1] };
+    if (Math.abs(goal.tx - b.tx) + Math.abs(goal.ty - b.ty) > 3) {
+      b.dest = [goal.tx, goal.ty];
+      const t = nearest(W, b, b.kit.range + 0.5);
+      if (t) act(W, b, t);
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+/** A fighter's own words by its 급 and way (our guild's only; bubbles near the hero, a line in the chat). */
+function personaTalk(W, b, must = false) {
+  if (!b.play || b.team !== 0) return;
+  const P = PLAYS[b.play];
+  const pool = P.troll ? P_LINES[b.play] : (b.tier === 'server' || b.tier === 'newbie' || b.tier === 'high') && Math.random() < 0.6 ? P_LINES[b.tier] : P_LINES[b.play];
+  if (!pool) return;
+  const key = P.troll ? b.play : b.tier;
+  chat(W, b, 'p' + b.id, pool, { every: b.play === 'chatter' ? 7 : 26, p: must ? 1 : 0.7, must, gap: 6, emo: Math.random() < 0.45 ? P_EMO[b.play] || P_EMO[key] : null });
+}
+/** A glow round the best weapons (태초 gold, 심연 red, 사신수 blue/fire, 용무기 cyan): one kept picture a colour. */
+const glowPics = new Map();
+function drawGlow(ctx, b, col) {
+  let pic = glowPics.get(col);
+  if (!pic) {
+    pic = document.createElement('canvas');
+    pic.width = pic.height = 64;
+    const g = pic.getContext('2d'), gr = g.createRadialGradient(32, 32, 3, 32, 32, 32);
+    gr.addColorStop(0, col + 'cc');
+    gr.addColorStop(0.5, col + '55');
+    gr.addColorStop(1, col + '00');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    glowPics.set(col, pic);
+  }
+  const G = A.G(), a = 0.7 + 0.25 * Math.sin(G.t * 4 + b.id);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = a;
+  ctx.drawImage(pic, Math.round(b.x - 34), Math.round(b.y - 62), 68, 68);
+  ctx.restore();
+}
+/** The 급 and spec of a body for the boards (the hero's from its own 전투력 and 승급). */
+function specOf(W, b) {
+  if (b.hero) {
+    const cp = W.heroCp || (A.combatPower ? A.combatPower(A.G().cls) : 0), tier = tierByCp(cp);
+    return { tier, cp, promo: W.tier !== undefined ? W.tier : A.promo ? A.promo(A.G().cls.id) : 0, lv: A.G().player.lvl, play: '나', gear: '내 장비' };
+  }
+  if (!b.tier) return null;
+  return { tier: b.tier, cp: b.cp, promo: b.promo, lv: b.lv, sl: b.skl, play: PLAYS[b.play] ? PLAYS[b.play].name : '', gear: b.gearDesc || '' };
+}
+/** Test: every fighter's persona and spec (and, at the end, what it did). */
+function aiPersonas() {
+  const G = A.G(), W = G && G.war;
+  if (!W) return null;
+  return W.bodies.filter(b => b.cls).map(b => ({
+    name: b.name, team: b.team, cls: b.cls.name, role: b.role, tier: b.tier, play: b.play, lv: b.lv, promo: b.promo, sl: b.skl, cp: b.cp, pw: +(b.pw || 1).toFixed(2),
+    hp: Math.round(b.maxHp / W.refHp * 100) / 100, kit: (b.skills || []).map(s => SK[s.id] ? SK[s.id].name : s.id), gear: b.gearDesc, glow: b.gear && b.gear.glow || null,
+    dmg: Math.round(b.stats.dmg / (W.refHp / 22)), heal: Math.round(b.stats.heal / (W.refHp / 22)), deaths: b.stats.deaths, alive: Math.round(b.aliveT || 0), tally: b.tally || {},
+  })).concat([{ hero: true, cp: W.heroCp, t: W.t, refU: W.refHp / 22, heroDmg: Math.round(W.hero.stats.dmg / (W.refHp / 22)), heroBoss: Math.round((W.hero.stats.boss || 0) / (W.refHp / 22)) }]);
 }
 
 // ------------------------------------------------ words: the chat and the bubbles
@@ -3389,6 +3902,7 @@ function partyCasts(W, b) {
 function castBuff(W, b, to, id) {
   const G = A.G(), d = SK[id], name = spellName(id, b.lv), fx = spellFx(id, b.lv);
   const dur = Math.min(6, d.duration || 4);
+  tally(b, 'buff');
   if (to.hero) {
     const p = G.player;
     if (d.buff === 'power') {
@@ -4042,12 +4556,15 @@ function finish(W, win, why) {
 }
 
 function rowHtml(W, x, i) {
-  const s = x.s, me = x.b === W.hero;
-  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td>${x.b.name}${x.b.leader ? '★' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
-    <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${s.kills}/${s.deaths}/${s.assists}</td><td>${s.revives}</td></tr>`;
+  const s = x.s, me = x.b === W.hero, sp = specOf(W, x.b), T = sp && AI_TIERS[sp.tier];
+  // Its 급 as a badge; the spec on hover (전투력, level, 승급, 단, way, gear).
+  const tip = sp ? `${T.name} · 전투력 ${sp.cp.toLocaleString()} · Lv${sp.lv} · ${sp.promo}차 승급${sp.sl ? ` · 기술 ${sp.sl}단` : ''}${sp.play ? ` · ${sp.play}` : ''}${sp.gear ? ` · ${sp.gear}` : ''}` : '';
+  const badge = sp ? `<span class="ai-tier" style="color:${T.col};font-weight:bold" title="${tip}">${T.short}</span>` : '';
+  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}">${x.b.name}${x.b.leader ? '★' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
+    <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${s.kills}/${s.deaths}/${Math.round(s.assists)}</td><td>${s.revives}</td></tr>`;
 }
 function tables(W, rows) {
-  const head = '<tr><th>#</th><th>이름</th><th>직업</th><th>역할</th><th>기여</th><th>피해</th><th>회복</th><th>받은</th><th>목표</th><th>K/D/A</th><th>부활</th></tr>';
+  const head = '<tr><th>#</th><th>이름</th><th>급</th><th>전투력</th><th>승급</th><th>직업</th><th>역할</th><th>기여</th><th>피해</th><th>회복</th><th>받은</th><th>목표</th><th>K/D/A</th><th>부활</th></tr>';
   return `<div class="wr-cols">${(W.raid ? [0] : teamsOf(W)).map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 길드'}${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
 }
 
@@ -4305,6 +4822,7 @@ function raidSetup() {
     f.maxHp = f.hp = W.refHp * fighterHpK(f.role, c) * f.pw;
     altNames.push(`${f.name}(${c.name})`);
   }
+  applyPersonas(W);
   W.leaderBody = W.squads[1].leader;
   for (const b of W.bodies) {
     placeBody(W, b, W.camp);
@@ -4454,7 +4972,7 @@ function thinkRaid(W, b) {
   }
   const k = hpk(b);
   // Low: back to the healers (to the camp when none is near); in again once mended.
-  if (b.state !== 'retreat' && b.role !== 'healer' && k < (b.role === 'tank' ? 0.18 : 0.28)) {
+  if (b.state !== 'retreat' && b.role !== 'healer' && k < retreatAt(b, 0.18, 0.28)) {
     b.state = 'retreat';
     if (Math.random() < 0.4) talk(W, b, ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐', '저 죽어요!']);
   }
@@ -4514,7 +5032,7 @@ function thinkRaid(W, b) {
 
 function raidTaunt(W, b) {
   const G = A.G();
-  b.cd.c = 10;
+  b.cd.c = b.aggro ? 6.5 : 10;
   W.taunted = { by: b, until: G.t + 6 };
   G.aggro = b;
   shout(W, b, pick(['도발', '이리 와라', '어그로']));
@@ -5306,6 +5824,7 @@ function jaengSetup() {
   W.crowdK = (W.bodies.length + 1) / 36;
   const pocket = (role === 'dps' || role === 'support') && W.squads[1].members.find(m => m.role === 'healer');
   if (pocket) pocket.pocket = true;
+  applyPersonas(W);
   for (const b of W.bodies) {
     b.bthr = 0;
     placeBody(W, b, W.teams[b.team].spawn);
@@ -5875,7 +6394,7 @@ function nearestFighter(W, b, r) {
 function thinkJaengBoss(W, b, order) {
   const G = A.G(), boss = W.boss;
   const k = hpk(b);
-  if (b.state !== 'retreat' && k < (b.role === 'tank' ? 0.2 : 0.3)) {
+  if (b.state !== 'retreat' && k < retreatAt(b, 0.2, 0.3)) {
     b.state = 'retreat';
     chat(W, b, 'low', ['피 없어요 빠질게요!', '힐 좀요!!', '잠깐 빠짐'], { every: 10, p: 0.5 });
   }
@@ -6339,6 +6858,7 @@ function drawBody(b) {
   if (dbg.noframe) top = 50;
   else if (b.cls) {
     if (b.cue && G.t - b.cue.t < 0.5 && !dbg.nocue) drawCue(ctx, b, G.t - b.cue.t);
+    if (b.gear && b.gear.glow && !b.dead && !dbg.noglow) drawGlow(ctx, b, b.gear.glow);
     drawFighter(b, b.x, b.y, pose, alpha) || A.drawYhero2(b.cls, b.gear, b, b.x, b.y, pose, alpha) || A.drawYhero(b.cls.id, b.gear ? b.gear.armor : 0, b, b.x, b.y, pose, alpha);
     if (b.flash > 0) { /* a struck fighter shows it in its bar */ }
     top = 50;
@@ -6594,7 +7114,7 @@ const nowMs = () => performance.now();
 function composeTick() { composeMs = 0; }
 function lookOf(cls, gear) {
   const H = A.M().yhero2 && A.M().yhero2[cls.id];
-  const yv2 = H && A.yGearVariants(cls, gear || {});
+  const yv2 = H && aiVariants(cls, gear || {});
   return yv2 ? { cls, yv2, yvKey: cls.id + JSON.stringify(yv2), H } : null;
 }
 function lookFrames(H) {
@@ -6705,7 +7225,7 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   const M = A.M(), H = M.yhero2 && M.yhero2[b.cls.id];
   if (!H) return false;
   if (!b.yvKey) {
-    b.yv2 = A.yGearVariants(b.cls, b.gear || {});
+    b.yv2 = aiVariants(b.cls, b.gear || {});
     if (!b.yv2) return false;
     b.yvKey = b.cls.id + JSON.stringify(b.yv2);
   }
