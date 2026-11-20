@@ -5979,7 +5979,7 @@ function sumNumber(dmg) {
   const p = G.player, f = feel();
   let s = G.sumText;
   if (!s || !G.texts.includes(s) || G.t - G.sumAt > 1.2) {
-    s = G.sumText = { x: p.x, y: p.y - 104, text: '', t: 0, num: true, sum: true, heavy: true, v: 0, crit: false, color: '#ffb43a' };
+    s = G.sumText = { x: p.x, y: p.y - 118, text: '', t: 0, num: true, sum: true, heavy: true, v: 0, crit: false, color: '#ffb43a' };
     G.sumTotal = 0;
     G.sumAt = G.t;
     G.texts.push(s);
@@ -5990,7 +5990,7 @@ function sumNumber(dmg) {
   s.v = G.sumTotal;
   s.text = hitNum(G.sumTotal);
   s.x = p.x;
-  s.y = p.y - 104;
+  s.y = p.y - 118;
   if (s.t > 0.2) s.t = 0.2; // kept alive while it counts, without popping again
 }
 
@@ -10598,7 +10598,7 @@ function drawLootFeed() {
   const cr = boxOf(canvas), d = canvas.width / cr.width;
   // Right of it the 상태창 tab; above it the 연속 처치 count.
   // In a war or raid, under its kill feed (which is under the 연속 처치 count), not across it.
-  const xr = canvas.width - 26 * d, y0 = Math.max(96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0), h = 16 * d, gap = 19 * d;
+  const xr = canvas.width - 26 * d, y0 = Math.max(G.hunt ? Math.max(112 * d, 106 * canvas.width / 860) : 96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0), h = 16 * d, gap = 19 * d;
   ctx.save();
   ctx.textAlign = 'left';
   ctx.font = `${Math.round(10 * d)}px G9`;
