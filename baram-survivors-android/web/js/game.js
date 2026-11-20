@@ -8141,7 +8141,10 @@ function townMinimapRect() {
   const a = townArea();
   if (!a || !a.mm) return null;
   const cr = boxOf(canvas), d = canvas.width / cr.width;
-  const k = (townMapBig ? 1.6 : 0.82) * d;
+  // Small by default (about a sixth of the screen's width at most); a tap shows it large.
+  let k = (townMapBig ? 1.3 : 0.55) * d;
+  const cap = canvas.width * (townMapBig ? 0.42 : 0.17);
+  if (a.mm[0] * k > cap) k = cap / a.mm[0];
   const w = a.mm[0] * k, h = a.mm[1] * k;
   return { x: canvas.width - w - 10 * d, y: 34 * d, w, h, d };
 }
