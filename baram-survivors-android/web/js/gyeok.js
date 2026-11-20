@@ -103,11 +103,14 @@ export const GYEOK = {
   hyeongak: { name: '현무의 껍질', on: 'hurt', chance: 0.2, cd: 12, dmg: 0.5, area: 1, fx: 'g_sw_hyunmu', self: ['ward', 4, 0.25], mech: { zone: { r: 1, sec: 3, k: 0, follow: true, slow: true, shell: true, color: 'jade' } } },
   hyeoncheorong: { name: '현무의 철옹', on: 'hurt', chance: 0.25, cd: 10, dmg: 1, area: 1, fxSelf: 'gy_hm_rise', selfK: 0.95, selfDy: 8, selfAlpha: 0.85, fx: 'g_sw_hyunmu', fx2: 'gy_hm_shard', fxK: 1.5, fx2K: 1.1, st: ['stun', 2], self: ['ward', 4, 0.4], mech: { zone: { r: 2, sec: 4, k: 0, follow: true, slow: true, shell: true, allyWard: 0.25, thorns: 0.6, color: 'jade' }, taunt: 4 } },
   // 진'청룡신검's 격 (the original: 20%, a 3x3 burst of the blue dragon's water, 청린쇠약 on the struck),
-  // in 연's own 청룡 pictures: 연's 신수 각인 청룡 (g_zodiac_dragon: the blue dragon coiling out of a
-  // white flash) over the struck, its weapon effect's splash (Sinsu_Weapon_Chungryong) bursting on
-  // every tile of the 3x3 round it, and the effect's blue orbs on each struck (청린쇠약). (Not the
-  // 진청룡마령참 / 심판의낫 dragon: the original's 청린수폭 is water, not that coil.)
-  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_zodiac_dragon', fxAlt: 'g_tf_chungryong', altK: 0.43, fxK: 1.45, fxGrid: 'g_sinsu_cheong', gridK: 1.15, fx2: 'g_sinsu_cheong_orb', fx2K: 1.6, st: ['curse', 5], st2: ['slow', 5], drain: 0.4, mech: { strikes: { n: 3, gap: 0.25, first: 0.4, rest: 0.43 } } }, // (the first lays 저주: the two after land ×1.4)
+  // in 연's own 청룡 pictures (game.js crBurst, draw 'cr'): its 청룡 변신's storm cloud and the
+  // blue-lightning 청룡 coiling down out of it onto the struck (g_cr_storm), the lightning body alone
+  // on each strike after (g_cr_bolt), 진청룡마령참's brush-stroke dragons in the 청룡's blues swimming
+  // round the 3x3, one more with each strike (g_cr_brush), over a ground of water; then its weapon
+  // effect's splash (Sinsu_Weapon_Chungryong) on every tile of the 3x3 as the lightning lands (gridAt)
+  // and the effect's blue orbs on each struck (청린쇠약). (Not the 신수 각인 청룡 popping out of a white
+  // shape: crude beside 진청룡마령참. g_tf_chungryong where the build lacks the parts.)
+  cheongrin: { name: '청린수폭', on: 'hit', chance: 0.2, cd: 6, dmg: 3.5, area: 1, fx: 'g_cr_storm', draw: 'cr', fxAlt: 'g_tf_chungryong', altK: 0.43, fxK: 1.45, fxGrid: 'g_sinsu_cheong', gridK: 1.15, gridAt: 0.2, gridMid: true, fx2: 'g_sinsu_cheong_orb', fx2K: 1.6, fx2At: 0.3, st: ['curse', 5], st2: ['slow', 5], drain: 0.4, mech: { strikes: { n: 3, gap: 0.25, first: 0.4, rest: 0.43 } } }, // (the first lays 저주: the two after land ×1.4)
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])

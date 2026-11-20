@@ -494,7 +494,8 @@ def main():
                 manifest["fx"][fid]["reach"] = k["reach"]
 
     # 연's 격 and status effects (GEAR_DIR/ygyeok/: strips rendered by tools/yeon_skills.py from
-    # the 격·debuff prefabs, two assembled from their own atlases in play order, + index.json):
+    # the 격·debuff prefabs, some assembled from their own atlases in play order (tools/yeon_zodiac.py,
+    # tools/yeon_claws.py, tools/yeon_cheongrin.py), + index.json):
     # fx "g_<name>", pivot on the target's feet like the k_ spells; status icons (icons/*.png)
     # copied to hud/st_<name>.png and listed in manifest["status_icons"].
     gdir = os.path.join(gear_src, "ygyeok") if gear_src else None
@@ -509,7 +510,9 @@ def main():
             (cw, ch), n = k["cell"], k["n"]
             sheet = Image.open(gsrc).convert("RGBA")
             pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
-            z = min(1.0, 170 / max(cw, ch))
+            # (shrunk to 170 pixels at most; a strip whose index says "cap" keeps up to that many:
+            # 청린수폭's 청룡 pictures, tools/yeon_cheongrin.py)
+            z = min(1.0, k.get("cap", 170) / max(cw, ch))
             if z < 1:
                 pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
             fid = "g_" + name
