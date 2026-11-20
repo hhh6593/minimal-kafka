@@ -15,25 +15,53 @@ let A = null; // game.js internals (initHunt)
 
 // ------------------------------------------------------------------ tuning
 export const PACE = {
-  introAt: 20, crossAt: 40, act1End: 50, maxBoss: 210, warn: 2,
-  gap: 18,                   // seconds with nothing new before a filler beat
+  introAt: 14, act1End: 50, maxBoss: 210, warn: 2,
+  gap: 15,                   // seconds with nothing new before a filler beat
   killK: 0.0004, killCap: 0.002,  // per plain kill, and at most this much a second from kills
   champ: 0.02, mini: 0.12, treasure: 0.05,
   champsAt: [0.12, 0.5, 0.82], minisAt: [0.32, 0.68],
   open: 1.6, openHp: 0.6,    // 1막: the field at the gate ×1.6, each weaker
-  floorT: [20, 110],         // the gauge's ceiling: (t - 20) / 110
-  boss: { cap: 0.03, decayAt: 75, decay: 0.006, enrageAt: 90, killAt: 150, fight: 40, lo: 0.4, hi: 1.8 },
+  // The gauge's ceiling: (t - 20) / (110 × k), k by the hero's strength (개편 A, P0-2): the strong
+  // (k 0.55) may meet the boss at 1:20, the weak (k 1.35) at about 2:50, 3:30 at the latest.
+  floorT: [20, 110], strength: { lo: 0.55, hi: 1.6, pow: 0.9, mid: 0.7, from: 62 },
+  boss: {
+    cap: 0.03, decayAt: 75, decay: 0.006, enrageAt: 90, killAt: 150, fight: 40, life: 26, lo: 0.4, hi: 1.8,
+    // The field stays full while the boss stands (개편 A, P0-1): 0.45 of the field's floor, and
+    // a few called every 8 s about the boss; each of the crowd felled fills its 그로기 a little.
+    floorK: 0.45, floorMin: 50, floorMax: 90, every: 8, call: [4, 6], gro: 0.008,
+  },
   groggy: { fill: 0.25, stun: 3, take: 1.5 },
   share: 0.5,                // a red tile in a hunt takes half a raid's share
+  // 몰이 파도 (개편 A, P1-2): every 45 s from 0:35 — a warning (5 s) from one side, a big crowd
+  // from there in three rows, quick (13 s at most), then 수확 (the drops pulled in, a chest for a
+  // clean drive) and 5 s of breath (the field ×0.6).
+  // The drive's size: about 7 s of the hero's own kills of late (no fewer than 16, no more than the
+  // field's floor), in rows a beat apart on a band of the side 11 tiles wide, so they come in a heap.
+  wave: { first: 38, every: 45, warn: 5, len: 15, rest: 5, k: 1, secs: 6, min: 16, max: 140, hp: 0.2, step: 0.6, done: 0.75, restK: 0.6, warnK: 0.6, span: 5, rowEvery: 0.4, rows: 8 },
+  // 판 중 선택 (개편 A, P1-3): a two-way pick on a strip that does not stop the hunt; after 5 s
+  // the one picked last time (or the first) is taken.
+  choice: { first: 55, second: 35, wait: 5 },
+  stopMax: 6,
+  // 필드 보스 (개편 A, P2-4, 연): on a ground conquered before, three runs in ten a roaming one of the
+  // ground's boss comes past 60% of the gauge, with its blows; 레이드주화, a special's chance.
+  field: { chance: 0.3, at: 0.6, life: 0.35, every: 5 },                // cards that stop the hunt (자동 선택 off), the 정비 among them
 };
 
-// 갈림길 (0:40): one of these, as 연's 의뢰 (the last only on a ground conquered before).
+// 판 중 선택: two of these at a time, as 연's 의뢰 (위험 감수 only on a ground conquered before).
 export const PATHS = {
-  elite: { name: '정예 토벌', desc: '챔피언 무리 ×2 · 재료 ×1.5 · 장비 +1' },
+  elite: { name: '정예 토벌', desc: '챔피언 무리 ×2 · 재료 ×1.5' },
   treasure: { name: '보물 사냥', desc: '보물 도깨비 3회 · 돈 ×1.6' },
-  swift: { name: '속공', desc: '토벌도 ×1.3 · 몬스터 걸음 +15% · 등급 가산' },
-  pact: { name: '위험 감수', desc: '규약 하나를 이 판에 켬 · 그 보상' },
+  swift: { name: '속공', desc: '토벌도 ×1.3 · 몬스터 걸음 +15%' },
+  pact: { name: '위험 감수', desc: '규약 하나를 켬 · 그 보상' },
+  jar: { name: '회복 항아리', desc: '체력 가득 · 회복약 셋' },
+  tune: { name: '정비', desc: '보스 전 카드 한 장 고르기' },
+  rage: { name: '광폭 도전', desc: '보스 광폭화 상태로 · 보상 ×1.3' },
 };
+const CHOICES = [
+  { id: 'c1', title: '어느 쪽을 노릴까?', opts: () => ['elite', 'treasure'] },
+  { id: 'c2', title: '속도를 낼까, 숨을 고를까?', opts: G => ['swift', G.wasCleared ? 'pact' : 'jar'] },
+  { id: 'c3', title: '보스를 어떻게 맞을까?', opts: () => ['tune', 'rage'] },
+];
 
 // The boss's own blows on a hunting ground (the raid patterns' names), by ground; by its group
 // when the ground has none of its own (design §4.5).
@@ -64,10 +92,13 @@ function start(G) {
   G.pace = { s: [], ev: [], cards: 0, manual: 0, last: -1 };
   // G.war is set after this (War.setup runs later): the 대항전·쟁 known by their stage too.
   if (A.settings().legacyPace || G.stage.raid || G.stage.war || G.war || G.training) return;
+  choiceHide();
   G.hunt = {
-    prog: 0, act: 1, lastNew: 0, killSec: -1, killGot: 0, intro: false, crossed: false, path: null,
+    prog: 0, act: 1, lastNew: 0, killSec: -1, killGot: 0, intro: false, path: null, paths: {},
     champsAt: PACE.champsAt.slice(), minisAt: PACE.minisAt.slice(), treasures: 0, warnAt: null,
-    bigDmg: 0, bigTime: 0, bonusLv: 0, beat: 0,
+    bigDmg: 0, bigTime: 0, bonusLv: 0, beat: 0, k: 1, str: 0,
+    wv: { n: 0, state: 'idle', next: PACE.wave.first, ok: 0, clean: 0 },
+    asked: 0, choice: null,
   };
   G.phase = 0;
   arenaStart(G);
@@ -104,8 +135,8 @@ function sample() {
 function gain(k) {
   const G = A.G(), H = G.hunt;
   if (!H || H.act >= 3) return;
-  if (H.path === 'swift') k *= 1.3;
-  k *= surgeK(); // 폭주, 일망타진
+  if (H.paths.swift) k *= 1.3;
+  k *= surgeK(); // 폭주, 일망타진, 몰이 파도
   // However strong the hero, the gauge cannot run ahead of the run's own time (full at 2:10 at the
   // soonest): what comes in over that is kept and paid out as the time allows.
   H.bank = (H.bank || 0) + k;
@@ -115,10 +146,33 @@ function gain(k) {
 function release() {
   const G = A.G(), H = G.hunt;
   if (!H || !H.bank) return;
-  const room = Math.max(0, Math.min(1, (G.t - (H.floor0 ?? PACE.floorT[0])) / PACE.floorT[1]) - H.prog);
+  const room = Math.max(0, Math.min(1, (G.t - (H.floor0 ?? PACE.floorT[0])) / (PACE.floorT[1] * H.k)) - H.prog);
   const k = Math.min(room, H.bank);
   H.prog = Math.min(1, H.prog + k);
   H.bank -= k;
+}
+
+/** The boss's life as callBoss would make it before matching it to the hero (addEnemy's boss at
+ *  the third act: tough() = 2.3, then the level's and 승급's growth). */
+function bossLifeOld() {
+  const G = A.G(), m = G.boss.m, area = G.stage.big ? Math.min(m.area, 5200) : m.area;
+  const tough = (1 + G.level * 0.1) * 2.3 * (G.cleared ? 1.5 : 1) * (G.stage.ease || 1);
+  const grow = 1 + 0.04 * Math.max(0, G.player.lvl - 15) + 0.1 * A.promoOf(G.cls.id);
+  return (180 + area / 5) * tough * 4 * (A.pactOn('hp') ? 1.4 : 1) * grow;
+}
+
+/** 힘지수 (개편 A, P0-2), once a second from the second act: the hero's blow on one foe against
+ *  what the boss's fight of 40 s asks. k (the gauge's ceiling stretched or shortened) follows. */
+function strengthTick() {
+  const G = A.G(), H = G.hunt, S = PACE.strength;
+  if (H.act !== 2 || H.mode === 'rush' || G.t < S.from || G.t - (H.strT || 0) < 1) return;
+  H.strT = G.t;
+  const dps = dpsEstimate();
+  if (!dps) return;
+  H.str = dps * PACE.boss.fight / Math.max(1, bossLifeOld());
+  H.k = Math.max(S.lo, Math.min(S.hi, Math.pow(H.str / S.mid, -S.pow))) * (H.paths.swift ? 0.85 : 1);
+  G.pace.str = Math.round(H.str * 100) / 100;
+  G.pace.k = Math.round(H.k * 100) / 100;
 }
 
 /** The time on the old clock this run stands at: the field and the monsters grow with the gauge. */
@@ -134,14 +188,17 @@ function tough() {
   return 1 + 0.9 * (H.act >= 3 ? 1 : H.prog) + 0.2 * (H.act - 1);
 }
 
+const XP = { act2: 0.65, act3: 0.6, k20: 0.15, k25: 0.25 };
+
 /** Experience by act: the first 15 seconds ×2.5, easing to ×1.5 by 0:50; ×1.3 in the second act. */
 function xpK() {
   const G = A.G(), H = G.hunt;
   if (!H) return 1;
   if (H.mode === 'rush') return 0; // 보스 직행: no experience (the build comes made)
-  const t = G.t, act = H.act === 1 ? (t < 15 ? 2.5 : 2.5 - (Math.min(t, PACE.act1End) - 15) / (PACE.act1End - 15)) : H.act === 2 ? 1.15 : 0.9;
-  // A steeper climb past 20: the run ends about Lv 30~38, each card weighing more.
-  return act * surgeK() / (1 + 0.1 * Math.max(0, G.player.lvl - 20));
+  const t = G.t, act = H.act === 1 ? (t < 15 ? 2.5 : 2.5 - (Math.min(t, PACE.act1End) - 15) / (PACE.act1End - 15)) : H.act === 2 ? XP.act2 : XP.act3;
+  // A steeper climb past 20, steeper again past 25: the run ends about Lv 32~38 (개편 A, P1-4).
+  const l = G.player.lvl;
+  return act * surgeK() / (1 + XP.k20 * Math.max(0, l - 20) + XP.k25 * Math.max(0, l - 25));
 }
 
 // ------------------------------------------------------------------ the field
@@ -150,12 +207,17 @@ function spawn(dt) {
   const G = A.G(), H = G.hunt, t = G.t;
   const boss = G.bossT !== undefined;
   const ct = clock();
-  const floor = Math.round((boss ? 25 : A.floorCount(ct) * (H.act === 1 ? PACE.open : 1)) * (A.pactOn('horde') ? 1.35 : 1) * (G.arena ? 0.8 : 1));
+  const B = PACE.boss, rest = H.wv.state === 'rest';
+  const base = boss ? Math.max(B.floorMin, Math.min(B.floorMax, A.floorCount(ct) * B.floorK))
+    : A.floorCount(ct) * (H.act === 1 ? PACE.open : 1) * (rest ? PACE.wave.restK : H.wv.state === 'warn' ? PACE.wave.warnK : 1);
+  const floor = Math.round(base * (A.pactOn('horde') ? 1.35 : 1) * (G.arena ? 0.8 : 1));
+  H.floor = floor;
   for (let i = 0; i < 4 && G.enemies.length < floor; i++) {
     const e = A.addEnemy(A.pickMonster());
     if (e && H.act === 1) { e.hp *= PACE.openHp; e.maxHp *= PACE.openHp; }
   }
-  if (!boss) {
+  if (!boss && (rest || H.wv.state === 'run')) beats(dt); // a drive, or the breath after it: no trickle on top
+  else if (!boss) {
     G.spawnT -= dt;
     if (G.spawnT <= 0) {
       G.spawnT = 1;
@@ -181,12 +243,14 @@ function spawn(dt) {
 
 function champs(n = 1, aff = null) {
   const G = A.G();
-  const k = G.hunt.path === 'elite' && !aff ? 2 : 1;
+  const H = G.hunt, k = H.paths.elite && !aff ? 2 : 1;
   let pack = 0, named = '';
   for (let j = 0; j < n * k; j++) {
     const m = A.pickMonster(true), a = aff || affixOf(G);
+    // Later in the run (or on 정예 토벌) a pack may carry a second affix of the ground's or the common ones.
+    const a2 = !aff && (H.prog >= 0.5 || H.paths.elite) && Math.random() < 0.35 ? affixOf(G, a) : null;
     pack = ++G.packs;
-    for (let i = 0; i < 3; i++) { const e = A.addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack); if (e) { affix(e, a); named = e.name; } }
+    for (let i = 0; i < 3; i++) { const e = A.addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack); if (e) { affix(e, a); affix(e, a2); named = e.name; } }
   }
   A.say(`${named || '챔피언'} 무리가 나타났습니다!`, 'warn');
   if (Math.random() < 0.6) A.emote('surprise');
@@ -204,7 +268,8 @@ function leader() {
   return true;
 }
 
-/** The acts' beats: the intro, the 갈림길, champions and leaders on the gauge, fillers in the gaps. */
+/** The acts' beats: the intro, the 몰이 파도 every 45 s, the two-way picks, champions and leaders
+ *  on the gauge, a 보물 도깨비 or a pack in the gaps, the boss. */
 function beats(dt) {
   const G = A.G(), H = G.hunt, t = G.t;
   if (!H.intro && t >= PACE.introAt) {
@@ -213,44 +278,317 @@ function beats(dt) {
     A.huntEvent(Math.random() < 0.5 ? 'march' : 'ring');
     note('intro');
   }
-  if (!H.crossed && t >= PACE.crossAt) {
-    H.crossed = true;
-    crossroad();
-  }
   if (H.act === 1 && t >= PACE.act1End && H.mode !== 'rush') {
     H.act = 2;
     note('act2');
     goalStart();
   }
   if (H.rushGoal && t >= H.rushGoal) { H.rushGoal = 0; goalStart(); }
-  if (H.act === 2) { goalTick(dt); hazardTick(); }
+  if (H.act === 2) { goalTick(dt); hazardTick(); strengthTick(); }
   affixTick();
   breakTick();
+  waveTick();
+  choiceTick();
+  if (H.warnAt === null && !H.choice) {
+    // 판 중 선택: the first in the second act, the second half a minute on with the gauge past half.
+    if (H.asked === 0 && t >= PACE.choice.first && H.act >= 2) ask(CHOICES[0]);
+    else if (H.asked === 1 && t >= H.askedAt + PACE.choice.second && H.prog >= 0.45 && H.wv.state !== 'run') ask(CHOICES[1]);
+  }
+  if (H.act >= 2) fieldTick();
   if (H.act >= 2) {
     if (H.champsAt.length && H.prog >= H.champsAt[0]) { H.champsAt.shift(); champs(); }
     if (H.minisAt.length && H.prog >= H.minisAt[0] && G.mini && leader()) H.minisAt.shift();
     else if (H.minisAt.length && H.prog >= H.minisAt[0] && !G.mini) { H.minisAt.shift(); champs(); }
-    // 보물 사냥: three treasure goblins over the second act.
-    if (H.path === 'treasure' && H.treasures < 3 && t >= 60 + H.treasures * 35) { H.treasures++; A.huntEvent('treasure'); }
+    // 보물 사냥: three treasure goblins, one at once and then every 35 s.
+    if (H.paths.treasure && H.treasures < 3 && t >= H.treasureAt && H.warnAt === null) { H.treasures++; H.treasureAt = t + 35; goblin(); }
   }
-  // Nothing new for a while: one of the old events, or a pack.
-  if (t >= PACE.introAt && t - H.lastNew >= PACE.gap && H.warnAt === null) {
-    const kinds = ['march', 'champ', 'ring', H.treasures < 1 ? 'treasure' : 'champ', 'march', 'champ'];
+  // Nothing new for a while (between the drives): a champion pack, a 보물 도깨비, a pack again.
+  if (t >= PACE.introAt && t - H.lastNew >= PACE.gap && H.warnAt === null && H.wv.state === 'idle') {
+    const kinds = ['champ', H.treasures < 1 ? 'treasure' : 'champ', 'champ', 'treasure'];
     const k = kinds[H.beat++ % kinds.length];
-    if (k === 'champ') champs();
-    else { if (k === 'treasure') H.treasures++; A.huntEvent(k); }
+    if (k === 'treasure' && H.treasures < 4) { H.treasures++; goblin(); } else champs();
   }
   // The boss is called: at 100%, or at the latest by 3:30 (a weak hero still gets there).
   if (H.warnAt === null && H.act >= 2 && (H.prog >= 1 || t >= (H.maxBoss || PACE.maxBoss))) {
     H.warnAt = t;
+    H.warn = PACE.warn;
     A.banner(`${G.boss.name}의 기운이 다가온다!`);
     A.say(`토벌도가 가득 찼습니다. ${A.josa(G.boss.name, '이', '가')} 나타납니다!`, 'warn');
     A.audio() && A.audio().play('boss');
     note('act3');
-    // 정비 카드: one big pick before the fight.
-    tune();
+    if (H.wv.state === 'run') harvest(); // the drive's spoils in before the fight
+    H.wv.state = 'done';
+    // 정비 or 광폭 도전: the last pick, while the boss's air gathers.
+    if (H.choice) choicePick(H.choice.def);
+    ask(CHOICES[2]);
+    H.warn = Math.max(H.warn, PACE.choice.wait + 0.3);
   }
-  if (H.warnAt !== null && t >= H.warnAt + PACE.warn) callBoss();
+  if (H.warnAt !== null && t >= H.warnAt + H.warn) callBoss();
+}
+
+// ------------------------------------------------------------------ 몰이 파도 (개편 A, P1-2)
+
+const SIDE = { '1,0': '동', '-1,0': '서', '0,1': '남', '0,-1': '북' };
+
+/** The view's half size, in tiles. */
+function halfView() {
+  return [Math.ceil(A.VW() / A.TILE / 2), Math.ceil(A.VH() / A.TILE / 2)];
+}
+
+/** Open tiles on a row k tiles past the screen's edge on side d, across the side (or a band of it). */
+function edgeRow(d, k, band = 99) {
+  const G = A.G(), p = G.player, [w, h] = halfView(), out = [];
+  const span = Math.min(band, d[0] ? h + 1 : w + 1);
+  for (let j = -span; j <= span; j++) {
+    const tx = d[0] ? p.tx + d[0] * (w + k) : p.tx + j, ty = d[0] ? p.ty + j : p.ty + d[1] * (h + k);
+    if (A.free(tx, ty) && (!G.arena || reach(tx, ty))) out.push([tx, ty]);
+  }
+  return out;
+}
+
+/** The side a drive comes from: the one with most room (on a bounded map). */
+function waveSide() {
+  const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => Math.random() - 0.5);
+  if (!A.G().arena) return sides[0];
+  let best = sides[0], n = -1;
+  for (const d of sides) { const k = edgeRow(d, 1).length; if (k > n) { n = k; best = d; } }
+  return best;
+}
+
+function waveTick() {
+  const G = A.G(), H = G.hunt, W = H.wv, P = PACE.wave, t = G.t;
+  if (H.act >= 3 || H.warnAt !== null || W.state === 'done') return;
+  if (W.state === 'idle' && t >= W.next && H.prog < 0.92) {
+    W.state = 'warn';
+    W.n++;
+    W.warnedAt = t;
+    W.side = waveSide();
+    W.until = t + P.warn;
+    W.elite = W.n % 3 === 0;
+    // the hero's kills a second over the last ten (before the field thins for the warning)
+    const s = G.pace.s, back = s[Math.max(0, s.length - 11)];
+    W.rate = back && s.length > 1 ? (s[s.length - 1][1] - back[1]) / Math.max(1, s[s.length - 1][0] - back[0]) : 3;
+    const side = SIDE[W.side.join(',')];
+    A.banner(`${side}쪽에서 ${W.elite ? '정예가 이끄는 ' : ''}무리가 몰려온다!`);
+    A.say(`몰이 파도: ${side}쪽에서 몬스터 무리가 몰려옵니다! 모아서 쓸어 버리세요.`, 'warn');
+    const au = A.audio();
+    if (au) au.play('skill_nova');
+    note('event:wavewarn');
+  } else if (W.state === 'warn' && t >= W.until) {
+    W.state = 'run';
+    W.id = (W.id || 0) + 1;
+    W.at = t;
+    W.until = t + P.len;
+    W.killed = 0;
+    W.left = 0;
+    W.total = 0;
+    W.taken = H.taken || 0;
+    const want = Math.round(Math.max(P.min, Math.min(P.max, A.floorCount(clock()) * P.k, W.rate * P.secs)));
+    // Rows a beat apart, from just past the screen's edge, on a band of that side: they come as one heap.
+    const R = Math.max(2, Math.min(P.rows, Math.ceil(want / Math.max(4, edgeRow(W.side, 1, P.span).length))));
+    for (let r = 0; r < R; r++) A.later(r * P.rowEvery, () => { if (A.G() === G && W.state === 'run') waveRow(W, r, Math.ceil(want / R)); });
+    W.want = want;
+    W.spawnEnd = t + R * P.rowEvery + 0.3;
+    if (W.elite) champs(1);
+    G.shake = Math.max(G.shake || 0, 0.25);
+    note('event:wave');
+  } else if (W.state === 'run') {
+    if (t - (W.cntT || 0) >= 0.5) {
+      W.cntT = t;
+      W.left = 0;
+      for (const e of G.enemies) if (e.wave === W.id && e.hp > 0) W.left++;
+    }
+    const spawned = t >= W.spawnEnd;
+    if ((spawned && W.total && W.left <= W.total * (1 - P.done)) || t >= W.until) harvest();
+  } else if (W.state === 'rest' && t >= W.until) {
+    W.state = 'idle';
+    W.next = Math.max(W.warnedAt + P.every, t + 8);
+  }
+}
+
+function waveRow(W, r, n) {
+  const G = A.G(), m = A.pickMonster();
+  // On the band, a row in and the next behind it; not enough room there (a wall): a row further
+  // out, then the whole side; what finds no room there (a walled map) comes in from wherever the field may.
+  const P = PACE.wave, sh = a => a.sort(() => Math.random() - 0.5);
+  const spots = [...sh(edgeRow(W.side, 1 + (r & 1), P.span)), ...sh(edgeRow(W.side, 3, P.span)), ...sh(edgeRow(W.side, 2 - (r & 1)))];
+  for (let i = 0; i < n && G.enemies.length < 420; i++) {
+    const at = spots[i] && A.free(spots[i][0], spots[i][1]) ? spots[i] : null;
+    const e = A.addEnemy(i % 5 === 4 ? A.pickMonster() : m, null, null, 0, at);
+    if (!e) continue;
+    e.wave = W.id;
+    e.stepTime *= PACE.wave.step;
+    e.hp = e.maxHp = e.maxHp * PACE.wave.hp; // a drive falls in heaps
+    W.total++;
+  }
+}
+
+/** 수확: what the drive left flies to the hero; a clean drive leaves a chest too. */
+function harvest() {
+  const G = A.G(), H = G.hunt, W = H.wv, t = G.t;
+  const ok = W.total > 0 && W.killed >= W.total * PACE.wave.done;
+  if (G.pace) (G.pace.waves = G.pace.waves || []).push([Math.round(W.at), Math.round(t - W.at), W.want, W.total, W.killed, Math.round(W.rate || 0)]);
+  W.state = 'rest';
+  W.until = t + PACE.wave.rest;
+  G.vacuumAt = t;
+  G.vacuumEnd = t + 1.6;
+  G.vacuumSaid = false;
+  if (ok) {
+    W.ok++;
+    const clean = (H.taken || 0) - W.taken < 0.15;
+    if (clean) W.clean++;
+    G.drops.push({ x: G.player.x, y: G.player.y + 14, kind: 'chest' });
+    for (let i = 0; i < 4; i++) G.drops.push({ x: G.player.x + (i - 1.5) * 18, y: G.player.y - 12, kind: 'coin' });
+    gain(0.04);
+    A.banner(clean ? '몰이 완수 · 무피해 수확!' : '몰이 완수 · 수확!');
+    G.shake = Math.max(G.shake || 0, 0.2);
+    note('event:harvest');
+  } else {
+    A.lootFeed(`몰이 파도 ${W.killed}/${W.total}`);
+    note('event:harvest0');
+  }
+}
+
+// ------------------------------------------------------------------ 필드 보스 (P2-4)
+
+function fieldTick() {
+  const G = A.G(), H = G.hunt, F = PACE.field, t = G.t;
+  // (decided here: G.wasCleared is known only after start())
+  if (H.fieldBoss === undefined) H.fieldBoss = !!(G.wasCleared && (Math.random() < F.chance || (window.__dbgHunt && window.__dbgHunt.field)));
+  const f = H.fieldBoss;
+  if (f === true) {
+    if (H.mode !== 'conquer' || H.prog < F.at || H.warnAt !== null || H.wv.state !== 'idle') return;
+    const e = A.addEnemy(G.boss.m, 'mini', { name: `떠도는 ${G.boss.name}`, scale: (G.boss.scale || 1.6) * 0.8 });
+    if (!e) return;
+    e.field = true;
+    e.hp = e.maxHp = bossLifeOld() * F.life;
+    e.patT = t + 3;
+    H.fieldBoss = e;
+    A.banner(`필드 보스 · 떠도는 ${G.boss.name}!`);
+    A.say(`떠도는 ${A.josa(G.boss.name, '이', '가')} 나타났습니다! 붉은 칸을 피하며 잡으면 레이드주화를 얻습니다.`, 'warn');
+    const au = A.audio();
+    if (au) au.play('boss');
+    note('mini:field');
+  } else if (f && f.hp > 0 && G.enemies.includes(f) && t >= f.patT && !(f.stun > 0)) {
+    f.patT = t + F.every;
+    const pool = BOSS_PATTERNS[G.stage.id] || ['charge', 'ring'];
+    const k = pool[Math.floor(Math.random() * pool.length)];
+    A.raidPattern(f, k);
+    note('pat:field');
+  }
+}
+
+/** The roaming boss fell: 레이드주화 and a special's chance. */
+function fieldDeath(e) {
+  const G = A.G(), pr = A.progress(), n = 5 + Math.round(G.level / 2);
+  pr.coins = (pr.coins || 0) + n;
+  A.say(`필드 보스를 쓰러뜨렸습니다! 레이드주화 ${n}개를 받았습니다.`, 'sys');
+  A.lootFeed(`레이드주화 ${n}개`);
+  if (Math.random() < 0.5) A.rollSpecial(e);
+  A.rollMats(e);
+  gain(0.08);
+  G.vacuumAt = G.t + 0.3;
+  G.vacuumEnd = G.t + 1.8;
+  G.vacuumSaid = false;
+}
+
+// ------------------------------------------------------------------ 보물 도깨비 추격
+
+/** A 보물 도깨비: runs from the hero, scattering coins as it is struck, gone in 15 s unless struck. */
+function goblin() {
+  const G = A.G(), p = G.player;
+  let spot = null;
+  for (let i = 0; i < 30 && !spot; i++) {
+    const a = Math.random() * Math.PI * 2, tx = p.tx + Math.round(Math.cos(a) * 4), ty = p.ty + Math.round(Math.sin(a) * 3);
+    if (A.free(tx, ty) && (!G.arena || reach(tx, ty))) spot = [tx, ty];
+  }
+  const e = A.addEnemy(A.pickMonster(true), 'treasure', { name: '보물 도깨비', scale: 1.1 }, 0, spot);
+  if (!e) return;
+  e.flee = G.t + 15;
+  e.fleeMax = G.t + 24;
+  e.hp = e.maxHp = e.maxHp * 0.6;
+  e.stepTime = Math.min(e.stepTime, 0.3);
+  e.coinAt = 0.85;
+  A.say('보물 도깨비가 나타났습니다! 때릴수록 엽전을 흘립니다. 달아나기 전에 잡으세요.', 'warn');
+  A.banner('보물 도깨비 출현! 쫓아라');
+  note('event:treasure');
+}
+
+/** The goblin struck: coins on the ground behind it, and a little longer before it gets away. */
+function goblinHurt(e) {
+  const G = A.G();
+  while (e.coinAt > 0.1 && e.hp < e.maxHp * e.coinAt) {
+    e.coinAt -= 0.15;
+    G.drops.push({ x: e.x + (Math.random() - 0.5) * 20, y: e.y + 8, kind: 'coin' });
+    e.flee = Math.min(e.fleeMax, e.flee + 1.5);
+  }
+}
+
+// ------------------------------------------------------------------ 판 중 선택 (개편 A, P1-3)
+
+let bar = null;
+
+function choiceHide() {
+  if (bar) bar.hidden = true;
+}
+
+/** A pick on the strip over the chat: two buttons, the hunt going on. */
+function ask(c) {
+  const G = A.G(), H = G.hunt, S = A.settings();
+  const opts = c.opts(G), pref = (S.huntPicks || {})[c.id];
+  const def = opts.includes(pref) ? pref : opts[0];
+  H.asked++;
+  H.askedAt = G.t;
+  H.choice = { id: c.id, opts, def, until: G.t + PACE.choice.wait };
+  note('cross:ask');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'hunt-pick';
+    bar.style.cssText = 'position:fixed;z-index:9;bottom:66px;left:calc((100% - var(--side, 0px)) / 2);transform:translateX(-50%);'
+      + 'display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px 5px;background:rgba(0,0,0,.72);'
+      + 'border:2px solid #c8a050;border-radius:3px;font:11px G9,monospace;color:#f0e0c0;pointer-events:auto;user-select:none;';
+    document.body.append(bar);
+  }
+  bar.innerHTML = '';
+  const head = document.createElement('div');
+  head.textContent = c.title;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;';
+  for (const k of opts) {
+    const b = document.createElement('button');
+    b.dataset.pick = k;
+    b.style.cssText = 'min-height:34px;min-width:120px;padding:2px 8px;font:11px G9,monospace;color:#fff;background:#1a1208;'
+      + `border:1px solid ${k === def ? '#ffd84a' : '#806040'};border-radius:2px;line-height:13px;`;
+    b.innerHTML = `<b style="color:#ffd84a">${PATHS[k].name}</b><br><small>${PATHS[k].desc}</small>`;
+    b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); choicePick(k, true); });
+    row.append(b);
+  }
+  const time = document.createElement('div');
+  time.style.cssText = 'height:3px;width:100%;background:#ffd84a;transform-origin:left;';
+  bar.append(head, row, time);
+  bar._time = time;
+  bar.hidden = false;
+}
+
+function choiceTick() {
+  const G = A.G(), H = G.hunt, c = H.choice;
+  if (!c) return;
+  if (G.t >= c.until) { choicePick(c.def); return; }
+  if (bar && bar._time) bar._time.style.transform = `scaleX(${Math.max(0, (c.until - G.t) / PACE.choice.wait).toFixed(2)})`;
+}
+
+function choicePick(k, byHand = false) {
+  const G = A.G(), H = G && G.hunt, c = H && H.choice;
+  if (!c || !c.opts.includes(k)) return;
+  H.choice = null;
+  choiceHide();
+  if (byHand) {
+    const S = A.settings();
+    S.huntPicks = { ...(S.huntPicks || {}), [c.id]: k };
+    A.saveSettings();
+  }
+  takePath(k);
+  A.lootFeed(`${byHand ? '선택' : '기본 선택'} · ${PATHS[k].name}`);
 }
 
 /** A pick of three before a big moment (the 갈림길, the boss): it stops even with few cards. */
@@ -283,15 +621,23 @@ function callBoss() {
   // strikes one foe, so the fight is about forty to seventy seconds for the weak and the strong.
   const grow = 1 + 0.04 * Math.max(0, G.player.lvl - 15) + 0.1 * A.promoOf(G.cls.id);
   const old = bo.maxHp * grow, dps = dpsEstimate(), B = PACE.boss;
-  const want = dps ? dps * B.fight : old;
+  // (the fight's own crowd takes some of the blows: a little less than the 40 s the measure asks)
+  const want = dps ? dps * B.life : old;
   bo.hp = bo.maxHp = Math.max(old * B.lo, Math.min(old * B.hi, want));
   bo.guardT = t + 2;
   bo.capPerSec = B.cap;
   bo.gro = 0;
   bo.groNeed = 1;
   G.raidT = 3;
-  G.waveT = t + 25;
-  H.boss = { old: Math.round(old), dps: Math.round(dps), hp: Math.round(bo.maxHp) };
+  G.waveT = t + PACE.boss.every;
+  H.bossE = bo;
+  // 광폭 도전: it comes in its rage (its blows ×1.3, its patterns quicker); the spoils ×1.3.
+  if (H.paths.rage) {
+    G.enraged = true;
+    bo.dmg *= 1.3;
+    A.banner(`${G.boss.name} 광폭화! 도전을 받아들였다`);
+  }
+  H.boss = { old: Math.round(old), dps: Math.round(dps), hp: Math.round(bo.maxHp), k: H.k, str: Math.round(H.str * 100) / 100 };
   G.pace.boss = H.boss;
   note('boss');
   const au = A.audio();
@@ -345,9 +691,13 @@ function bossFight(dt) {
   const groggy = b.groggyT > t;
   if (groggy) return; // 그로기: no blows, no calls
   if (t >= G.waveT) {
-    G.waveT = t + 25;
-    A.raidWave(b, 5 + 2 * G.phase);
-    note('pat:summon');
+    // A few of the crowd called about the boss every 8 s, more as it grows fierce (not past the floor
+    // and half a hundred: the field stays full, not swollen).
+    G.waveT = t + B.every;
+    if (G.enemies.length < (H.floor || 60) + 50) {
+      A.raidWave(b, B.call[0] + Math.floor(Math.random() * (B.call[1] - B.call[0] + 1)) + 2 * G.phase);
+      note('pat:summon');
+    }
   }
   G.raidT -= dt;
   if (G.raidT <= 0 && !(t < (G.seqTill || 0))) {
@@ -362,6 +712,7 @@ function bossFight(dt) {
 function hurt(e, dmg) {
   const G = A.G(), H = G.hunt;
   if (!H || !(dmg > 0)) return;
+  if (e.kind === 'treasure' && e.coinAt) goblinHurt(e);
   if (e.kind === 'boss' && e.gro !== undefined && !(e.groggyT > G.t)) {
     const heavy = G.castCd >= 2.5 || G.heavyHit;
     e.gro += dmg / (e.maxHp * PACE.groggy.fill) * (heavy ? 2 : 1) / e.groNeed;
@@ -394,6 +745,7 @@ function tick(dt) {
   sample();
   const G = A.G(), H = G.hunt;
   if (H) { momentumTick(); release(); unstick(); }
+  if (bar && !bar.hidden && (!H || !H.choice || G.over || G.dead)) choiceHide();
   if (!H || H.act >= 3 || !dt) return;
   const p = G.player;
   let n = 0;
@@ -407,6 +759,14 @@ function kill(e) {
   if (!H) return;
   momentumKill(e);
   if (e.affix) affixDeath(e);
+  if (e.wave && H.wv.id === e.wave) H.wv.killed++;
+  if (e.field) fieldDeath(e);
+  // During the boss: each of the crowd felled fills its 그로기 a little (개편 A, P0-1).
+  const b = H.bossE;
+  if (H.act >= 3 && b && b !== e && b.hp > 0 && b.gro !== undefined && !(b.groggyT > G.t) && e.kind !== 'boss') {
+    b.gro += PACE.boss.gro * (e.kind ? 3 : 1) / b.groNeed;
+    if (b.gro >= 1) groggy(b);
+  }
   if (!e.kind || e.kind === 'minion') {
     const sec = Math.floor(G.t);
     if (H.killSec !== sec) { H.killSec = sec; H.killGot = 0; }
@@ -416,7 +776,7 @@ function kill(e) {
   else if (e.kind === 'mini') gain(PACE.mini);
   else if (e.kind === 'treasure') gain(PACE.treasure);
   // 정예 토벌: the champions' spoils half again.
-  if (H.path === 'elite' && e.kind === 'champ' && Math.random() < 0.5) A.rollMats(e);
+  if (H.paths.elite && e.kind === 'champ' && Math.random() < 0.5) A.rollMats(e);
 }
 
 /** The conquest: the 갈림길's own spoils. */
@@ -425,8 +785,10 @@ function cleared() {
   if (!H) return;
   G.slowmo = Math.max(G.slowmo || 0, 0.8);
   G.marks = [];
-  if (H.path === 'treasure') G.gold = Math.round(G.gold * 1.6);
-  if (H.path === 'elite') { const b = { x: G.player.x, y: G.player.y + 20, kind: 'boss' }; A.dropGear(b, 30); }
+  choiceHide();
+  if (H.paths.treasure) G.gold = Math.round(G.gold * 1.6);
+  if (H.paths.rage) G.gold = Math.round(G.gold * 1.3);
+  if (H.paths.elite) { const b = { x: G.player.x, y: G.player.y + 20, kind: 'boss' }; A.dropGear(b, 30); }
 }
 
 // ------------------------------------------------------------------ cards
@@ -435,8 +797,12 @@ function cleared() {
 function stops(picks) {
   const G = A.G();
   if (!G.hunt) return true;
-  // (a new spell only while the build is still being chosen: the first four)
-  return picks.some(o => o.type === 'skill' && (o.from || o.mastered || (o.lv === 1 && G.skills.length < 4)));
+  // (a new spell only while the build is still being chosen: the first three; and no more than
+  // six stops a run, one kept for the 정비 — 개편 A, P1-4)
+  // (the 정비 is held a place until it is dealt or the boss is up: it stops without asking here)
+  const H = G.hunt, keep = H.paths.tune || H.act >= 3 ? 0 : 1;
+  if (G.pace && G.pace.manual >= PACE.stopMax - keep) return false;
+  return picks.some(o => o.type === 'skill' && (o.from || o.mastered || (o.lv === 1 && G.skills.length < 3)));
 }
 
 /** Past Lv 20 a card weighs two steps: the extra one, if the spell or skill may take it. */
@@ -455,53 +821,47 @@ function cardBonus(o) {
   return 0;
 }
 
-// ------------------------------------------------------------------ 갈림길
+// ------------------------------------------------------------------ 수련장 → 첫 카드 (개편 A, P1-10)
 
-function pathsFor() {
-  const G = A.G();
-  const out = ['elite', 'treasure', 'swift'];
-  if (G.wasCleared) out.push('pact');
-  return out;
+/** A spell tried in the 수련장: the class's last three tried are its preset (kept with the progress). */
+function trainTried(cls, id) {
+  const pr = A.progress();
+  pr.trainPreset = pr.trainPreset || {};
+  pr.trainPreset[cls] = [id, ...(pr.trainPreset[cls] || []).filter(x => x !== id)].slice(0, 3);
+  if (A.saveProgress) A.saveProgress();
 }
 
-function crossroad() {
-  const G = A.G(), S = A.settings();
-  note('cross');
-  const list = pathsFor();
-  if (S.autoPick) {
-    const k = list.includes(S.crossPref) ? S.crossPref : 'swift';
-    takePath(k);
-    A.lootFeed(`갈림길 · ${PATHS[k].name}`);
-    return;
-  }
-  const box = document.querySelector('#crossroad'), ch = document.querySelector('#cr-choices');
-  if (!box) { takePath('swift'); return; }
-  ch.innerHTML = '';
-  for (const k of list) {
-    const b = document.createElement('button');
-    b.className = 'choice';
-    b.dataset.path = k;
-    b.innerHTML = `<div><b>${PATHS[k].name}</b><span>${PATHS[k].desc}</span></div>`;
-    b.onclick = () => {
-      box.hidden = true;
-      G.choosing = false;
-      S.crossPref = k;
-      A.saveSettings();
-      takePath(k);
-      if (G.pendingLevels) A.nextChoice();
-    };
-    ch.append(b);
-  }
-  G.choosing = true;
-  box.hidden = false;
+/** The first card of a 정복/소탕 on a ground conquered before: the preset's spells this first card may
+ *  hold (ok: a first-tier attack or a 숙련 one), the rest of the deal after; null when none fit. */
+function firstPicks(cls, ok, rest) {
+  const G = A.G(), H = G && G.hunt;
+  if (!H || H.mode === 'rush' || !G.wasCleared) return null;
+  const pre = ((A.progress().trainPreset || {})[cls] || []).filter(ok);
+  if (!pre.length) return null;
+  note('cross:preset');
+  const cards = pre.map(id => ({ type: 'skill', id, lv: 1, preset: true }));
+  for (const o of rest) if (cards.length < 3 && !cards.some(c => c.id === o.id)) cards.push(o);
+  return cards;
 }
+
+// ------------------------------------------------------------------ the picks' effects
 
 function takePath(k) {
   const G = A.G(), H = G.hunt;
   H.path = k;
+  H.paths[k] = true;
   note('cross:' + k);
-  A.say(`갈림길: ${PATHS[k].name} — ${PATHS[k].desc}`, 'sys');
-  A.banner(`갈림길 · ${PATHS[k].name}`);
+  A.say(`선택: ${PATHS[k].name} — ${PATHS[k].desc}`, 'sys');
+  if (k !== 'tune') A.banner(PATHS[k].name);
+  if (k === 'elite') champs(1);
+  if (k === 'treasure') H.treasureAt = G.t + 1;
+  if (k === 'jar') {
+    const p = G.player;
+    p.hp = p.maxHp;
+    for (let i = 0; i < 3; i++) G.drops.push({ x: p.x + (i - 1) * 40, y: p.y + 30, kind: 'heal' });
+  }
+  if (k === 'tune') tune();
+  if (k === 'swift') H.k *= 0.85;
   if (k === 'pact') {
     const off = Object.keys(A.PACTS).filter(id => !A.pactOn(id));
     const id = off[Math.floor(Math.random() * off.length)];
@@ -513,7 +873,7 @@ function takePath(k) {
 /** A monster's step on the 속공 path. */
 function stepK() {
   const H = A.G().hunt;
-  return H && H.path === 'swift' ? 0.87 : 1;
+  return H && H.paths.swift ? 0.87 : 1;
 }
 
 // ------------------------------------------------------------------ the screen
@@ -589,7 +949,7 @@ function hud(ctx, cv) {
 const MOMENTUM_AT = [10, 40, 100, 200];
 const MOMENTUM_NAME = ['', '기세 1단', '기세 2단', '기세 3단', '폭주'];
 const EXEC_AT = 0.15;
-const DASH = { tiles: 3, inv: 0.25, cd: 3, quick: 1.2, cancel: 0.3, dmg: 0.6 };
+const DASH = { tiles: 3, inv: 0.25, cd: 2.2, quick: 0.9, cancel: 0.3, dmg: 0.6 }; // (B: 질주 손맛 — cd 3 → 2.2, after a kill 1.2 → 0.9)
 
 function mo() {
   const G = A.G();
@@ -801,7 +1161,8 @@ function mightK() {
 /** Experience and 토벌도 on top: 폭주, and the kills of a 일망타진. */
 function surgeK() {
   const G = A.G();
-  return (G.momentum && G.momentum.frenzy > G.t ? 1.5 : 1) * (G.t - (G.sweepAt || -9) < 2 ? 1.5 : 1);
+  return (G.momentum && G.momentum.frenzy > G.t ? 1.5 : 1) * (G.t - (G.sweepAt || -9) < 2 ? 1.5 : 1)
+    * (G.hunt && G.hunt.wv && G.hunt.wv.state === 'run' ? 1.3 : 1);
 }
 
 function hurtTaken(dmg) {
@@ -809,22 +1170,38 @@ function hurtTaken(dmg) {
   if (G.hunt && G.player.maxHp) G.hunt.taken = (G.hunt.taken || 0) + dmg / G.player.maxHp;
 }
 
-/** 스타일 등급: time, the best 기세, 처형, 일망타진, health lost, the objective. */
+/** 스타일 등급: S 10~20%, A 35%, B 35%, C 15% of runs (개편 A, P1-5). */
+// (set from 48 bot runs, 4 classes × 4 grounds × 3: S 19% · A 35% · B 27% · C 19%; the 몰이기's
+// part, about 4 with B's auto-cast, on top)
+const GRADE = { S: 67, A: 58, B: 48 };
+
+/** 스타일 등급: time, the best 기세, 처형, 일망타진, the drives, health lost, the objective, the risks. */
 function grade() {
   const G = A.G(), H = G.hunt, m = mo();
   if (!H) return null;
   if (H.grade) return H.grade;
-  const run = G.clearT || G.t;
-  let sc = 0;
-  sc += Math.max(0, Math.min(30, (240 - run) / 3 + 10));          // quick: up to 30
-  sc += [0, 5, 10, 16, 22][m.best];                               // 기세: up to 22
-  sc += Math.min(15, m.execs * 3);                                // 처형: up to 15
-  sc += Math.min(10, m.sweeps * 5);                               // 일망타진
-  sc += Math.max(0, 15 - (H.taken || 0) * 4);                     // 받은 피해
-  sc += H.goalBonus ? 10 : H.goalDone ? 5 : 0;                    // 목표
-  if (H.path === 'swift') sc += 5;
-  const g = sc >= 82 ? 'S' : sc >= 64 ? 'A' : sc >= 42 ? 'B' : 'C';
-  H.grade = { g, sc: Math.round(sc), k: { S: 1.3, A: 1.2, B: 1.1, C: 1 }[g], best: m.best, execs: m.execs, sweeps: m.sweeps, reactions: m.reactions };
+  const run = G.clearT || G.t, W = H.wv || { ok: 0, clean: 0 };
+  // 개편 A (P1-5): the time weighs half what it did; the hunt's own moments the rest — the
+  // drives taken whole, 처형, 일망타진, the 몰이기's crowd (B's G.feel: casts and foes struck).
+  const ms = G.feel, mainAvg = ms && ms.mainN ? ms.mainHits / ms.mainN : 0;
+  const part = {
+    quick: Math.max(0, Math.min(15, (260 - run) / 8)),               // quick: up to 15
+    best: [0, 4, 8, 12, 16][m.best],                                 // 기세: up to 16
+    execs: Math.min(12, m.execs * 2),                                // 처형
+    sweeps: Math.min(12, m.sweeps * 3),                              // 일망타진
+    waves: Math.min(16, W.ok * 4 + W.clean * 2),                     // 몰이 파도 완수, 무피해
+    taken: Math.max(0, 12 - (H.taken || 0) * 3),                     // 받은 피해
+    goal: H.goalBonus ? 10 : H.goalDone ? 5 : 0,                     // 목표
+    risk: (H.paths.rage ? 5 : 0) + (H.paths.swift ? 3 : 0) + (H.paths.pact ? 3 : 0), // 위험 선택
+    main: Math.min(4, mainAvg / 4),                                  // 몰이기 평균 맞은 수
+  };
+  const sc = Object.values(part).reduce((a, b) => a + b, 0);
+  const g = sc >= GRADE.S ? 'S' : sc >= GRADE.A ? 'A' : sc >= GRADE.B ? 'B' : 'C';
+  H.grade = { g, sc: Math.round(sc), k: { S: 1.3, A: 1.2, B: 1.1, C: 1 }[g], best: m.best, execs: m.execs, sweeps: m.sweeps, reactions: m.reactions, waves: W.ok };
+  // The results screen (C) lists these.
+  const LABEL = { quick: '빠르기', best: '기세', execs: '처형', sweeps: '일망타진', waves: '몰이 파도', taken: '무피해', goal: '목표', risk: '위험 선택', main: '몰이기' };
+  H.grade.parts = Object.entries(part).filter(([k, v]) => v > 0 || k === 'quick' || k === 'waves').map(([k, v]) => [LABEL[k], Math.round(v)]);
+  if (G.pace) G.pace.grade ={ g, sc: Math.round(sc), part: Object.fromEntries(Object.entries(part).map(([k, v]) => [k, Math.round(v)])) };
   G.style = { grade: g };
   // 숙련 ★ (정복 or 숙련 도전): ★1 the conquest, ★2 the objective without a slip, ★3 an S.
   if (H.mode !== 'rush' && G.cleared) {
@@ -1312,14 +1689,22 @@ function hazardTick() {
 
 // ---------------- 정예 속성 (champion affixes)
 
-function affixOf(G) {
-  const list = ground(G).elite;
+/** An affix of the ground's (a second one: another, of the ground's or the common ones). */
+function affixOf(G, not = null) {
+  let list = ground(G).elite;
+  if (not) list = list.concat(['swift', 'vampiric', 'warding', 'burning']).filter(a => a !== not);
   return list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 
+/** The champion has this affix (its first or its second). */
+function has(e, a) {
+  return e.affix === a || e.affix2 === a;
+}
+
 function affix(e, a) {
-  if (!a) return;
-  e.affix = a;
+  if (!a || has(e, a)) return;
+  if (e.affix) e.affix2 = a;
+  else e.affix = a;
   e.name = `${AFFIX[a]} ${e.name || '챔피언'}`;
   if (a === 'swift') e.stepTime *= 0.67;
 }
@@ -1330,8 +1715,8 @@ function affixTick() {
   G.hunt.affT = t;
   for (const e of G.enemies) {
     if (!e.affix || e.hp <= 0) continue;
-    if (e.affix === 'burning' && t - (e.burnT || 0) > 2) { e.burnT = t; hazardMark([[e.tx, e.ty], [e.tx + 1, e.ty], [e.tx - 1, e.ty]], 0.9); }
-    if (e.affix === 'warding') for (const o of G.enemies) if (o !== e && o.pack === e.pack) o.ward = t + 0.7;
+    if (has(e, 'burning') && t - (e.burnT || 0) > 2) { e.burnT = t; hazardMark([[e.tx, e.ty], [e.tx + 1, e.ty], [e.tx - 1, e.ty]], 0.9); }
+    if (has(e, 'warding')) for (const o of G.enemies) if (o !== e && o.pack === e.pack) o.ward = t + 0.7;
   }
 }
 
@@ -1339,26 +1724,26 @@ function affixTick() {
 function hurtBy(from) {
   const G = A.G();
   if (!G.hunt || !from || !from.affix) return;
-  if (from.affix === 'frozen') A.heroStatus('slow');
-  if (from.affix === 'vampiric') from.hp = Math.min(from.maxHp, from.hp + from.maxHp * 0.06);
+  if (has(from, 'frozen')) A.heroStatus('slow');
+  if (has(from, 'vampiric')) from.hp = Math.min(from.maxHp, from.hp + from.maxHp * 0.06);
 }
 
 /** A champion fell: its affix. */
 function affixDeath(e) {
   const G = A.G();
-  if (e.affix === 'splitting' && !e.split) {
+  if (has(e, 'splitting') && !e.split) {
     for (let i = 0; i < 2; i++) {
       const s = A.addEnemy(e.m, null, null, 0, [e.tx + (i ? 1 : -1), e.ty]);
       if (s) { s.split = true; s.scale = 0.8; }
     }
   }
-  if (e.affix === 'cursed') {
+  if (has(e, 'cursed')) {
     const T = [];
     for (let a = 0; a < 12; a++) T.push([e.tx + Math.round(Math.cos(a / 12 * Math.PI * 2) * 2), e.ty + Math.round(Math.sin(a / 12 * Math.PI * 2) * 2)]);
     hazardMark(T, 1);
   }
   // 주술사: the first of its pack to fall gets up again, once.
-  const sh = G.enemies.find(o => o.affix === 'shaman' && o.pack === e.pack && o !== e && o.hp > 0 && !o.raised);
+  const sh = G.enemies.find(o => has(o, 'shaman') && o.pack === e.pack && o !== e && o.hp > 0 && !o.raised);
   if (sh && e.kind === 'champ') {
     sh.raised = true;
     A.later(1.2, () => {
@@ -1455,6 +1840,39 @@ function drawGoal(ctx) {
   for (const e of G.enemies) if (e.goal === 'nest' && e.hunt) pic(e.hunt.prop, e.x, e.y + 4);
 }
 
+/** 몰이 파도 on the screen: arrows on the edge it comes from, and how much of it is left. */
+function drawWave(ctx, cv) {
+  const G = A.G(), H = G.hunt, W = H && H.wv;
+  if (!W || (W.state !== 'warn' && W.state !== 'run') || G.bossT !== undefined) return;
+  const s = cv.width / 860, [dx, dy] = W.side, t = G.t;
+  const warn = W.state === 'warn', pulse = 0.55 + 0.45 * Math.sin(t * (warn ? 12 : 6));
+  const cx = cv.width / 2 + dx * (cv.width / 2 - 22 * s), cy = cv.height / 2 + dy * (cv.height / 2 - 22 * s);
+  const a = Math.atan2(-dy, -dx); // pointing inward: the way they come
+  ctx.save();
+  ctx.globalAlpha = warn ? pulse : 0.5;
+  ctx.fillStyle = warn ? '#ff5a3a' : '#ffb040';
+  ctx.strokeStyle = '#200800';
+  ctx.lineWidth = 2 * s;
+  for (let i = -1; i <= 1; i++) {
+    const ox = dy ? i * 70 * s : 0, oy = dx ? i * 60 * s : 0;
+    ctx.save();
+    ctx.translate(cx + ox, cy + oy);
+    ctx.rotate(a);
+    for (let j = 0; j < 2; j++) {
+      ctx.beginPath();
+      const x = j * 9 * s;
+      ctx.moveTo(x + 9 * s, 0); ctx.lineTo(x - 5 * s, -9 * s); ctx.lineTo(x - 1 * s, 0); ctx.lineTo(x - 5 * s, 9 * s); ctx.closePath();
+      ctx.stroke(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.font = `${Math.round(10 * s)}px G9`;
+  ctx.textAlign = 'center';
+  const txt = warn ? `몰이 파도 ${Math.max(0, Math.ceil(W.until - t))}초 전` : `몰이 파도 · 남은 ${W.left || 0}/${W.total || 0}`;
+  A.outline(txt, cv.width / 2, hudTop(cv) + 40 * s, warn ? '#ff9a6a' : '#ffd84a');
+}
+
 /** The objective's line under the 토벌도, and an arrow to it when off screen. */
 function drawGoalHud(ctx, cv) {
   const G = A.G(), H = G.hunt, g = H && H.goal, s = cv.width / 860;
@@ -1511,7 +1929,7 @@ function breakTick() {
     if (G.broken.has(k) || Math.hypot(b.x - p.x, b.y - p.y) > 30) continue;
     G.broken.add(k);
     const r = Math.random();
-    const more = H.path === 'treasure' ? 2 : 1;
+    const more = H.paths.treasure ? 2 : 1;
     for (let i = 0; i < more; i++) G.drops.push({ x: b.x + i * 12, y: b.y, kind: r < 0.25 ? 'heal' : 'coin' });
     if (A.M().fx.h_kill) A.addFx('h_kill', b.x, b.y - 12, { scale: 0.5 });
     note('break');
@@ -1847,7 +2265,8 @@ function modeStart(G) {
     A.applyBuild(start);
     H.prog = 0.7;
     H.act = 2;
-    H.intro = H.crossed = true;
+    H.intro = true;
+    H.asked = 2;
     H.floor0 = -64;
     H.maxBoss = 75;
     H.rushGoal = 3;
@@ -1878,10 +2297,10 @@ export function initHunt(api) {
   A = api;
   const H = {
     start, note, on, clock, tough, xpK, spawn, kill, hurt, takeK, cleared, stops, cardBonus, stepK, clockText,
-    hud(ctx, cv) { drawStorm(ctx, cv); hud(ctx, cv); hud2(ctx, cv); drawGoalHud(ctx, cv); },
+    hud(ctx, cv) { drawStorm(ctx, cv); hud(ctx, cv); hud2(ctx, cv); drawGoalHud(ctx, cv); drawWave(ctx, cv); },
     ground: drawGoal, move, hurtBy, GROUNDS, GROUPS, groundOf: ground,
     open, cam, drawMap, flowDirs, reach, spawnTile, ambient, sweep, sweepKill, MODES, starTotal,
-    world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade,
+    world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade, trainTried, firstPicks,
     tick(dt) { tick(dt); },
     PACE, PATHS,
   };
@@ -1889,6 +2308,7 @@ export function initHunt(api) {
   window.__hunt = () => { const G = A.G(); return G && G.hunt; };
   window.__dash = () => dash();
   window.__huntGoal = () => goalSpot();
+  window.__huntPick = k => choicePick(k, true);
   window.__hazard = k => hazard(k);
   window.__arena = () => { const G = A.G(); return G && G.arena && { id: G.arena.id, stuck: G.arena.stuck || 0, cols: G.arena.map.cols, rows: G.arena.map.rows }; };
   window.__momentum = () => { const G = A.G(); return G && G.momentum; };
