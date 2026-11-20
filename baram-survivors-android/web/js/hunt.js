@@ -947,7 +947,7 @@ function hud(ctx, cv) {
 const MOMENTUM_AT = [10, 40, 100, 200];
 const MOMENTUM_NAME = ['', '기세 1단', '기세 2단', '기세 3단', '폭주'];
 const EXEC_AT = 0.15;
-const DASH = { tiles: 3, inv: 0.25, cd: 3, quick: 1.2, cancel: 0.3, dmg: 0.6 };
+const DASH = { tiles: 3, inv: 0.25, cd: 2.2, quick: 0.9, cancel: 0.3, dmg: 0.6 }; // (B: 질주 손맛 — cd 3 → 2.2, after a kill 1.2 → 0.9)
 
 function mo() {
   const G = A.G();

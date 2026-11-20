@@ -796,6 +796,19 @@
   body.yeon #banner { background: none; border: 0; top: 22%; font-size: 15px; color: #ff4a3a;
       text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000; }
   /* The 필살기's way (사냥 / 보스), switched with a tap beside the button. */
+  /* 몰이기 (기획 P1-1): the class's gather-and-burst, by hand; its wait darkens it from the top. */
+  #keys #main-btn { position: relative; width: 92px; height: 40px; background-color: #000; background-repeat: no-repeat; background-position: 4px center; background-size: 32px 32px; color: #fff;
+      padding-left: 36px !important; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; --wait: 0%; border-color: rgb(196,120,40); }
+  #keys #main-btn::after { content: ''; position: absolute; left: 0; top: 0; right: 0; height: var(--wait); background: rgba(0,0,0,0.6); pointer-events: none; }
+  #keys #main-btn span, #keys #main-btn small { position: relative; z-index: 1; display: block; }
+  #keys #main-btn small { font: 8px G7, monospace; font-weight: normal; }
+  #keys #main-btn.ready { border-color: #ffd040; }
+  #keys #main-btn.glow { box-shadow: 0 0 8px 3px #ff9a30; }
+  body.yeon #keys > button#main-btn:not(#ult) { position: absolute; right: 114px; bottom: 0; width: 52px !important; height: 52px; padding: 0 !important;
+      background: #000 var(--icon) no-repeat center 3px / 34px 34px !important; border: 3px solid rgb(196,120,40) !important; outline: 1px solid #000;
+      display: flex; flex-direction: column; justify-content: flex-end; line-height: 10px; font-size: 9px !important; color: #fff !important; white-space: nowrap; overflow: hidden; }
+  body.yeon #keys > button#main-btn:not(#ult).ready { border-color: #ffd040 !important; }
+  body.yeon #keys > button#main-btn:not(#ult)[hidden] { display: none; }
   #keys #dash-btn { width: 92px; height: 28px; }
   body.yeon #keys > button#dash-btn { position: absolute; right: 0; bottom: 146px; width: 88px !important; height: 30px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
   #keys #dash-btn.ready { border-color: #ffd040 !important; }
@@ -969,6 +982,7 @@
       <button id="opt-party" class="btn"></button>
       <button id="opt-party-pick" class="btn">동료 설정</button>
       <button id="opt-dash" class="btn"></button>
+      <button id="opt-main" class="btn" title="몰이기: 3초 동안 조작이 없고 주변에 적이 12마리 이상이면 자동으로 씁니다"></button>
       <button id="opt-auto" class="btn"></button>
       <button id="opt-info" class="btn"></button>
       <button id="opt-calm" class="btn"></button>
@@ -983,7 +997,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="dash-btn" title="질주 (Shift)" hidden>질주</button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="main-btn" title="몰이기 (E)" hidden><span></span><small></small></button><button id="dash-btn" title="질주 (Shift)" hidden>질주</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>
