@@ -519,7 +519,7 @@ function showScreen(name) {
   if (name !== null) $('#train').hidden = true; // 수련장's panel goes with the hunt view
   if (name === 'select' || name === 'stages') audio.bgm(audio.pickBgm('select') ? 'select' : 'title');
   if (name === 'select') buildSelect();
-  if (name === 'stages') buildStages();
+  if (name === 'stages') { buildStages(); syncPartyLine(); }
 }
 
 function buildSelect() {
@@ -2328,6 +2328,7 @@ function pickGear(g) {
     // An abyss weapon: one of a kind, in gold, with the 승급 fanfare.
     const sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id), R = RARITY.unique;
     bag(G.cls).push('sp:' + g.sp);
+    autoWearDrop(sp.kind, specialBase(sp, G.cls.id), g.sp);
     audio.play('promote');
     (G.gained = G.gained || []).push(`[${R.name}] ${name}`);
     saveJson('bs_progress', progress);
@@ -2346,6 +2347,7 @@ function pickGear(g) {
       return;
     }
     b.push(id);
+    autoWearDrop(sp.kind, specialBase(sp, G.cls.id), g.sp);
     (G.gained = G.gained || []).push('★' + name);
     saveJson('bs_progress', progress);
     say(`스페셜 아이템 ${josa(name, '을', '를')} 얻었습니다! (${sp.opt.text})`, 'sys');
@@ -2363,6 +2365,7 @@ function pickGear(g) {
     return;
   }
   b.push(id);
+  autoWearDrop(g.kind, g.tier, null);
   (G.gained = G.gained || []).push(name);
   saveJson('bs_progress', progress);
   say(`${josa(name, '을', '를')} 주웠습니다. (메뉴 → 장비)`, 'sys');
@@ -2415,7 +2418,7 @@ function bootsRow(box) {
     em.textContent = st.worn === id ? (b ? '착용 중' : '비어 있음') : d > 0 ? `▲이동 ${d}%` : d < 0 ? `▼이동 ${-d}%` : '같음';
     btn.append(em);
     if (id && id === top && st.worn !== id) btn.classList.add('best');
-    btn.onclick = () => wearBoots(id);
+    btn.onclick = () => (window.__equipInstant ? wearBoots(id) : openBootsPop(id));
     row.append(btn);
   }
   box.append(row);
@@ -2570,6 +2573,7 @@ function wearBest(cls) {
 /** A piece's button gets its 전투력 change against what is worn, and 추천 on the row's best. */
 function markCompare(btn, cls, kind, tier, sp, now, top) {
   const d = powerWith(cls, kind, tier, sp) - now;
+  btn.dataset.d = d;
   const em = document.createElement('em');
   em.className = 'cmp ' + (btn.classList.contains('on') ? 'worn' : d > 0 ? 'up' : d < 0 ? 'down' : 'same');
   em.textContent = btn.classList.contains('on') ? (tier < 0 && !sp ? '비어 있음' : '착용 중') : d > 0 ? `▲${d.toLocaleString()}` : d < 0 ? `▼${(-d).toLocaleString()}` : '같음';
@@ -2582,13 +2586,15 @@ function buildEquip() {
   const box = $('#equip-rows');
   box.innerHTML = '';
   const now = combatPower(cls);
+  box.append(eqBar(cls));
   // One tap to the strongest set, where something stronger lies in the bag.
   const better = ['weapon', 'armor', 'shield', 'helmet', 'cape'].some(k => bagPieces(cls, k).some(q => powerWith(cls, k, q[0], q[1]) > now));
   if (better) {
     const bb = document.createElement('button');
     bb.className = 'btn wear-best';
     bb.textContent = '가장 강한 장비로 갈아입기';
-    bb.onclick = () => { wearBest(cls); buildEquip(); };
+    bb.id = 'equip-best';
+    bb.onclick = () => (window.__equipInstant ? (wearBest(cls), buildEquip()) : openBestPop());
     box.append(bb);
   }
   // A hero drawn in 연's own figure changes hair and face in the 코디 window (연's own 헤어·얼굴).
@@ -2636,6 +2642,7 @@ function buildEquip() {
     for (const t of tiers) {
       const btn = document.createElement('button');
       btn.className = 'equip' + (g[kind] === t && !g[kind + 'Sp'] ? ' on' : '');
+      btn.dataset.k = kind; btn.dataset.t = t; btn.dataset.sp = '';
       const icon = pieceIcon(cls, kind, t);
       const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '벗기' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
@@ -2652,11 +2659,7 @@ function buildEquip() {
       if (kind === 'weapon' && t >= 0) btn.title = familyTitle(weaponFamilyOf(cls, t, null));
       markCompare(btn, cls, kind, t, null, now, rowTop[0] === t && rowTop[1] === null);
       btn.onpointerenter = () => showPieceTip(cls, kind, t, null);
-      btn.onclick = () => {
-        equipTip = [kind, t, null];
-        wear(kind, t);
-        buildEquip();
-      };
+      btn.onclick = () => pieceClick(kind, t, null);
       row.append(btn);
     }
     // The specials found of this kind: gold-framed, with their option.
@@ -2665,6 +2668,7 @@ function buildEquip() {
       if (!sp || sp.kind !== kind) continue;
       const t = specialBase(sp, cls.id), btn = document.createElement('button');
       btn.className = 'equip special' + (g[kind + 'Sp'] === id ? ' on' : '');
+      btn.dataset.k = kind; btn.dataset.t = t; btn.dataset.sp = id;
       const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span${sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${sp.rarity ? `[${RARITY.unique.name}] ` : sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.gyeok && GYEOK[sp.gyeok] ? `${GYEOK[sp.gyeok].name}` : sp.ward ? `${STATUS[sp.ward].name} 막기` : sp.opt.text}</small>`;
       const fam = kind === 'weapon' || sp.craft && sp.craft.sinsu ? familyOf(sp) : null;
@@ -2679,13 +2683,10 @@ function buildEquip() {
       if (sp.proc) btn.title += `\n${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}`;
       markCompare(btn, cls, kind, t, id, now, rowTop[1] === id);
       btn.onpointerenter = () => showPieceTip(cls, kind, t, id);
-      btn.onclick = () => {
-        equipTip = [kind, t, id];
-        wear(kind, t, id);
-        buildEquip();
-      };
+      btn.onclick = () => pieceClick(kind, t, id);
       row.append(btn);
     }
+    arrangeRow(row, cls);
     box.append(row);
   }
   bootsRow(box);
@@ -2709,6 +2710,404 @@ function buildEquip() {
   }
   gl.innerHTML = gys.lines.length ? gys.lines.map(t => `<div>${t}</div>`).join('') : '<div class="none">격 없음 — 보스의 스페셜 무기·갑옷, 용무기, 전설 조합 장비에 격이 붙습니다.</div>';
 }
+
+// ---------------------------------------------------------------- 장착 팝업 · 장비 편의
+//
+// A tap on a card in the equipment window opens this popup (not an instant change): the piece
+// in full, set against what is worn, with 장착 / 해제 / 취소. 가장 강한 장비 asks the same way.
+// Around it: NEW marks, 찜, sorting and filters kept in settings.eq, a toast with 되돌리기,
+// 자동 착용 of better drops, and 「바로 착용」 on the results screen.
+
+const EQ_KINDS = ['weapon', 'armor', 'shield', 'helmet', 'cape'];
+const EQ_LABEL = { weapon: '무기', armor: '갑옷', shield: '방패', helmet: '투구', cape: '망토' };
+/** The window's remembered choices: sort (rank | power), filter (all | up | new | fav), 자동 착용. */
+function eqPrefs() {
+  if (!settings.eq) settings.eq = { sort: 'rank', filter: 'all', auto: false };
+  return settings.eq;
+}
+function pieceKey(kind, t, sp) { return sp ? 'sp:' + sp : `${kind}:${t}`; }
+function pieceListOf(cls, name) {
+  progress[name] = progress[name] || {};
+  return progress[name][cls.id] = progress[name][cls.id] || [];
+}
+/** Everything already in a bag when this feature first runs counts as seen: only later finds are NEW. */
+function ensureSeen() {
+  if (progress.seen) return;
+  progress.seen = {};
+  for (const [c, b] of Object.entries(progress.inv || {})) progress.seen[c] = b.slice();
+  saveJson('bs_progress', progress);
+}
+function isNewPiece(cls, key) {
+  return key !== 'armor:0' && key !== 'weapon:0' && !pieceListOf(cls, 'seen').includes(key);
+}
+function markSeen(cls, key) {
+  const s = pieceListOf(cls, 'seen');
+  if (!s.includes(key)) { s.push(key); saveJson('bs_progress', progress); }
+}
+function isFav(cls, key) { return pieceListOf(cls, 'fav').includes(key); }
+function toggleFav(cls, key) {
+  const f = pieceListOf(cls, 'fav'), i = f.indexOf(key);
+  if (i >= 0) f.splice(i, 1); else f.push(key);
+  saveJson('bs_progress', progress);
+}
+/** The pieces in the bag not yet looked at, as [kind, tier, special id]. */
+function newPieces(cls) {
+  const out = [];
+  for (const kind of EQ_KINDS) for (const [t, id] of bagPieces(cls, kind)) if ((t >= 0 || id) && isNewPiece(cls, pieceKey(kind, t, id))) out.push([kind, t, id]);
+  return out;
+}
+
+/** What a set of gear amounts to: 전투력, 공격력, 체력, 방어, 이동속도 and its option and 격 lines. */
+function gearStats(cls, g) {
+  progress.gear = progress.gear || {};
+  const keep = progress.gear[cls.id];
+  progress.gear[cls.id] = g;
+  try {
+    const pw = k => pieceRank(cls, g, k), ex = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pw(k)) : 0);
+    return {
+      power: combatPower(cls),
+      atk: Math.round((weaponMult(cls, g) - 1) * 100),
+      hp: Math.round(pw('armor') * 20 + ex('helmet') * 12),
+      def: (hasShield(cls.id) ? Math.max(0, pw('shield') + 1) : Math.max(0, Math.floor(pw('armor') / 2) + 1)) + Math.round(ex('cape') / 3),
+      spd: moveInfo(cls).pct,
+      lines: wornGyeok(cls, g).lines,
+      opts: EQ_KINDS.map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']]).filter(Boolean).flatMap(sp => sp.optLines || [sp.opt.text]),
+    };
+  } finally { progress.gear[cls.id] = keep; }
+}
+const withPiece = (cls, kind, t, sp) => Object.assign({}, savedGear(cls), { [kind]: t, [kind + 'Sp']: sp || null });
+
+function pieceLabel(cls, kind, t, spId) {
+  const sp = spId && SPECIAL[spId];
+  if (sp) return specialName(sp, cls.id);
+  return t < 0 || t === undefined ? `${EQ_LABEL[kind]} 없음` : pieceName(cls, kind, t);
+}
+function epDelta(a, b, unit = '') {
+  const d = b - a;
+  return `${a.toLocaleString()}${unit} → <b>${b.toLocaleString()}${unit}</b> <em class="${d > 0 ? 'up' : d < 0 ? 'down' : 'same'}">${d > 0 ? '▲' + d.toLocaleString() : d < 0 ? '▼' + (-d).toLocaleString() : '같음'}${d ? unit : ''}</em>`;
+}
+/** Where a piece comes from, as the 도감 words it. */
+function pieceFrom(cls, kind, t, spId) {
+  const name = pieceLabel(cls, kind, t, spId);
+  const it = codexItems(cls).find(x => x.kind === kind && (x.name === name || (x.name.includes(' ~ ') && !spId && t === dragonTier(cls))));
+  if (!it) return '';
+  return Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
+}
+/** Which classes can wear it. */
+function pieceClasses(cls, kind, spId) {
+  const sp = spId && SPECIAL[spId];
+  if (sp && sp.craft && sp.craft.only) return `${sp.craft.only.map(c => (CLASSES.find(x => x.id === c) || { name: c }).name).join('·')} 전용`;
+  if (sp && sp.cls) return `${(CLASSES.find(x => x.id === sp.cls) || { name: sp.cls }).name} 전용`;
+  return `${cls.name} 장비${kind === 'shield' ? ' (방패를 드는 직업)' : ''} · 직업마다 따로 줍니다`;
+}
+
+let epState = null; // what the popup shows, for tests: {type, kind, t, sp}
+function epopShow(cap, html, buttons, state) {
+  epState = state;
+  $('#epop-cap').textContent = cap;
+  $('#epop-body').innerHTML = html;
+  const row = $('#epop-btns');
+  row.innerHTML = '';
+  for (const [label, cls, fn, id] of buttons) {
+    const b = document.createElement('button');
+    b.className = 'btn ' + (cls || '');
+    if (id) b.id = id;
+    b.textContent = label;
+    b.onclick = fn;
+    row.append(b);
+  }
+  $('#epop').hidden = false;
+  $('#epop-body').scrollTop = 0;
+}
+function closePiecePop() { $('#epop').hidden = true; epState = null; }
+
+/** The popup for a piece of the bag (tier -1: taking the slot's piece off). */
+function openPiecePop(kind, t, spId = null) {
+  const cls = G ? G.cls : chosenClass, g0 = savedGear(cls), sp = spId && SPECIAL[spId];
+  const key = pieceKey(kind, t, spId), none = t < 0 && !sp;
+  const worn = sp ? g0[kind + 'Sp'] === spId : g0[kind] === t && !g0[kind + 'Sp'];
+  const one = { [kind]: t, [kind + 'Sp']: sp ? spId : null }, rank = pieceRank(cls, one, kind);
+  const st = none ? 1 : starOf(cls, sp ? 'sp:' + spId : key), stMax = none ? 1 : starMaxOf(cls, sp ? 'sp:' + spId : key);
+  const dragon = !sp && kind === 'weapon' && t === dragonTier(cls);
+  const name = pieceLabel(cls, kind, t, spId), icon = none ? null : pieceIcon(cls, kind, t, spId);
+  const tag = sp ? (sp.craft ? '조합' : sp.rarity ? '고유' : sp.raid ? '레이드 스페셜' : '스페셜') : dragon ? '용무기' : (!none && t > 0 && raidOf(cls.id, kind, t) ? '레이드' : '일반');
+  const after = withPiece(cls, kind, t, spId);
+  const A = gearStats(cls, g0), B = gearStats(cls, after);
+  // -- the piece
+  const L = [];
+  if (!none) {
+    L.push(`<div class="ep-tier"><b>${Math.round(rank * 10) / 10}등급</b> · ${EQ_LABEL[kind]} · ${tag}`
+      + `${kind === 'weapon' ? ` · 공격력 ×${weaponMult(cls, one).toFixed(2)}` : ''}</div>`);
+    L.push(`<div class="ep-star">${dragon ? `${dragonName(cls.id, st)} (제${st}/${stMax}단)` : '★'.repeat(st) + '<i>' + '★'.repeat(Math.max(0, stMax - st)) + '</i>'} <small>강화는 대장장이에서</small></div>`);
+    if (sp) {
+      const [o1, ...more] = sp.optLines || [sp.opt.text];
+      L.push(`<div class="o1">옵션: ${o1}</div>`);
+      for (const o of more) L.push(`<div class="o2">보조 옵션: ${o}</div>`);
+      if (sp.proc) L.push(`<div class="pr">특수 · ${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}</div>`);
+      if (sp.ward) L.push(`<div class="gy">방어 · ${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다</div>`);
+    } else L.push('<div class="none">옵션 없음 (일반 장비는 등급과 ★로 강해집니다)</div>');
+    const fam = kind === 'weapon' ? weaponFamilyOf(cls, t, spId) : sp && sp.craft && sp.craft.sinsu ? familyOf(sp) : null;
+    if (fam && WEAPON_FAMILY[fam]) L.push(`<div class="fam">${familyLine(fam)}<br>${WEAPON_FAMILY[fam].text}</div>`);
+    // 격: the rule and what it does
+    const gys = [];
+    if (sp && sp.gyeok && GYEOK[sp.gyeok]) gys.push(gyeokText(sp.gyeok));
+    if (dragon) { const dg = dragonGyeok(cls.id, st); gys.push(`${dg.name}: 타격 시 ${Math.round(dg.chance * 100)}% · 고정 피해${dg.st ? ' · 저주' : ''}${dg.cdCut ? ` · 핵심 기술 재사용 -${dg.cdCut * 100}%` : ''}`); }
+    if (gys.length) L.push(`<div class="gy"><b>격</b> · ${gys.join('<br>')}</div>`);
+    else L.push('<div class="none">격 없음</div>');
+    const ms = sp && sp.craft && sp.craft.set && MUSIN_SET[sp.craft.set];
+    if (ms) {
+      const on = !!musinSetOf(after);
+      L.push(`<div class="pr"><b>세트 · ${ms.name}</b> ${on ? '(이 장비로 완성)' : '(같은 신수의 갑옷 + 기운을 함께)'}: ${ms.text}</div>`);
+    }
+    const from = pieceFrom(cls, kind, t, spId);
+    if (from) L.push(`<div class="from">얻는 곳: ${from}</div>`);
+  } else L.push(`<div class="none">${EQ_LABEL[kind]}을(를) 벗고 아무것도 끼지 않습니다.</div>`);
+  L.push(`<div class="from">착용 직업: ${pieceClasses(cls, kind, spId)}</div>`);
+  // -- the comparison with what is worn now
+  const curSp = g0[kind + 'Sp'] && SPECIAL[g0[kind + 'Sp']], curT = g0[kind];
+  const cur = pieceLabel(cls, kind, curT, curSp ? curSp.id : null), curRank = pieceRank(cls, g0, kind);
+  const R = [];
+  if (worn) R.push('<div class="ep-now">지금 착용 중인 장비입니다.</div>');
+  else {
+    R.push(`<div class="ep-cur">지금 ${EQ_LABEL[kind]}: <b>${cur}</b>${curRank >= 0 ? ` (${Math.round(curRank * 10) / 10}등급)` : ''}</div>`);
+    R.push('<table class="ep-cmp">'
+      + `<tr><th>전투력</th><td>${epDelta(A.power, B.power)}</td></tr>`
+      + `<tr><th>공격력</th><td>${epDelta(A.atk, B.atk, '%')}</td></tr>`
+      + `<tr><th>체력</th><td>${epDelta(A.hp, B.hp)}</td></tr>`
+      + `<tr><th>방어</th><td>${epDelta(A.def, B.def)}</td></tr>`
+      + `<tr><th>이동속도</th><td>${epDelta(A.spd, B.spd, '%')}</td></tr></table>`);
+    const famSet = new Set(Object.keys(WEAPON_FAMILY).flatMap(f => [`<b>${familyLine(f)}</b>`, WEAPON_FAMILY[f].text]));
+    const diff = (a, b) => b.filter(x => !a.includes(x) && !famSet.has(x));
+    const fa = weaponFamilyOf(cls, g0.weapon, g0.weaponSp), fb = weaponFamilyOf(cls, after.weapon, after.weaponSp);
+    const dl = [...(fa !== fb ? [`<div class="${fb && WEAPON_FAMILY[fb] ? 'up' : 'down'}">계열: ${fa && WEAPON_FAMILY[fa] ? WEAPON_FAMILY[fa].name : '없음'} → ${fb && WEAPON_FAMILY[fb] ? WEAPON_FAMILY[fb].name : '없음'}</div>`] : []), ...diff(A.opts, B.opts).map(x => `<div class="up">+ 옵션 ${x}</div>`), ...diff(B.opts, A.opts).map(x => `<div class="down">− 옵션 ${x}</div>`),
+      ...diff(A.lines, B.lines).map(x => `<div class="up">+ ${x}</div>`), ...diff(B.lines, A.lines).map(x => `<div class="down">− ${x}</div>`)];
+    R.push(dl.length ? `<div class="ep-diff">${dl.join('')}</div>` : '<div class="none">옵션·격은 달라지지 않습니다.</div>');
+  }
+  const head = `<div class="ep-head">${icon ? `<img src="${icon}" alt="">` : '<span class="ep-noimg"></span>'}<div><b class="ep-name${sp && sp.rarity ? ' uniq' : ''}">${name}</b>`
+    + `${isNewPiece(cls, key) && !none ? ' <i class="newtag">NEW</i>' : ''}${worn ? ' <i class="wornflag">착용 중</i>' : ''}</div></div>`;
+  const btns = [];
+  const canOff = none || (worn && ['shield', 'helmet', 'cape'].includes(kind));
+  if (!worn) btns.push([none ? '벗기' : '장착', 'primary', () => equipFromPop(kind, t, spId), 'ep-wear']);
+  else if (canOff && !none) btns.push(['해제', 'primary', () => equipFromPop(kind, -1, null), 'ep-wear']);
+  else btns.push(['착용 중', 'primary', null, 'ep-wear']);
+  if (!none) btns.push([isFav(cls, key) ? '찜 해제' : '찜', '', () => { toggleFav(cls, key); openPiecePop(kind, t, spId); buildEquip(); }, 'ep-fav']);
+  // where to get / make it
+  if (!none && !G) {
+    if (sp && sp.craft) btns.push(['조합하러', '', () => { closePiecePop(); openForge(); }, 'ep-go']);
+    else if (sp && !sp.rarity) {
+      const stg = STAGES.find(s => s.id === sp.src) || RAIDS.find(r => r.id === sp.src);
+      if (stg) btns.push(['사냥터 보기', '', () => { closePiecePop(); $('#equip').hidden = true; pickedStage = stg; mapTab = stg.raid ? 'raid' : 'list'; showScreen('stages'); }, 'ep-go']);
+    }
+  }
+  btns.push(['취소', '', closePiecePop, 'ep-cancel']);
+  if (btns[0][2] === null) btns[0][2] = closePiecePop;
+  if (!none) markSeen(cls, key);
+  epopShow(none ? `${EQ_LABEL[kind]} 벗기` : '장착 확인', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`, btns, { type: 'piece', kind, t, sp: spId });
+  buildEquip();
+}
+function equipFromPop(kind, t, spId) {
+  const cls = G ? G.cls : chosenClass, g0 = savedGear(cls), prev = [kind, g0[kind], g0[kind + 'Sp'] || null];
+  const name = pieceLabel(cls, kind, t, spId);
+  wear(kind, t, spId);
+  if (t >= 0 || spId) markSeen(cls, pieceKey(kind, t, spId));
+  closePiecePop();
+  equipTip = [kind, t, spId];
+  buildEquip();
+  eqToast(t < 0 && !spId ? `${EQ_LABEL[kind]}을(를) 벗었습니다` : `${name} 착용`, () => { wear(...prev); buildEquip(); });
+}
+/** A line under the window's rows, with 되돌리기 where there is something to undo. */
+let eqToastTimer = 0;
+function eqToast(text, undo) {
+  const el = $('#equip-toast');
+  if (!el) return;
+  el.innerHTML = '';
+  const s = document.createElement('span');
+  s.textContent = text;
+  el.append(s);
+  if (undo) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.id = 'eq-undo';
+    b.textContent = '되돌리기';
+    b.onclick = () => { undo(); el.hidden = true; };
+    el.append(b);
+  }
+  el.hidden = false;
+  clearTimeout(eqToastTimer);
+  eqToastTimer = setTimeout(() => { el.hidden = true; }, 7000);
+}
+
+/** 가장 강한 장비로 갈아입기: what would change, and 적용 / 취소. */
+function bestSwaps(cls) {
+  const g = savedGear(cls), out = [];
+  const after = Object.assign({}, g);
+  for (const kind of EQ_KINDS) {
+    const ps = bagPieces(cls, kind);
+    if (!ps.length) continue;
+    const top = ps.reduce((a, q) => (powerWith(cls, kind, q[0], q[1]) > powerWith(cls, kind, a[0], a[1]) ? q : a), ps[0]);
+    if (top[0] === g[kind] && (top[1] || null) === (g[kind + 'Sp'] || null)) continue;
+    out.push({ kind, from: pieceLabel(cls, kind, g[kind], g[kind + 'Sp']), to: pieceLabel(cls, kind, top[0], top[1]), q: top });
+    Object.assign(after, { [kind]: top[0], [kind + 'Sp']: top[1] || null });
+  }
+  return { out, after };
+}
+function openBestPop() {
+  const cls = G ? G.cls : chosenClass, { out, after } = bestSwaps(cls);
+  if (!out.length) { eqToast('이미 가장 강한 장비입니다'); return; }
+  const A = gearStats(cls, savedGear(cls)), B = gearStats(cls, after);
+  const rows = out.map(s => `<tr><th>${EQ_LABEL[s.kind]}</th><td>${s.from} <span class="arrow">→</span> <b>${s.to}</b></td></tr>`).join('');
+  epopShow('가장 강한 장비로 갈아입기', `<div class="ep-cur">아래처럼 바뀝니다.</div><table class="ep-cmp ep-swaps">${rows}</table>`
+    + `<table class="ep-cmp"><tr><th>전투력</th><td>${epDelta(A.power, B.power)}</td></tr><tr><th>공격력</th><td>${epDelta(A.atk, B.atk, '%')}</td></tr>`
+    + `<tr><th>체력</th><td>${epDelta(A.hp, B.hp)}</td></tr><tr><th>방어</th><td>${epDelta(A.def, B.def)}</td></tr></table>`,
+  [['적용', 'primary', () => {
+    const snap = savedGear(cls), prev = out.map(s => [s.kind, snap[s.kind], snap[s.kind + 'Sp'] || null]);
+    for (const s of out) { wear(s.kind, s.q[0], s.q[1]); if (s.q[0] >= 0 || s.q[1]) markSeen(cls, pieceKey(s.kind, s.q[0], s.q[1])); }
+    closePiecePop();
+    buildEquip();
+    eqToast(`${out.length}곳을 갈아입었습니다`, () => { for (const p of prev) wear(...p); buildEquip(); });
+  }, 'ep-apply'], ['취소', '', closePiecePop, 'ep-cancel']], { type: 'best' });
+}
+
+/** The popup for a pair of boots (shared by every class). */
+function openBootsPop(id) {
+  const cls = G ? G.cls : chosenClass, st = bootsState(progress), b = id && BOOT[id], cur = st.worn && BOOT[st.worn];
+  const now = moveInfo(cls), nxt = moveInfo(cls, id), worn = st.worn === id, icon = b && picture(b.name);
+  const lv = nxt.lvl ? KYEONGGONG[nxt.lvl - 1] : null;
+  const L = [`<div class="ep-tier"><b>신발</b> · 이동속도 ${b ? `+${b.pct}%` : '기본'}</div>`,
+    lv ? `<div class="gy"><b>경공</b> · ${lv.name}: ${lv.text}</div>` : '<div class="none">경공 없음</div>',
+    `<div class="from">모든 직업이 함께 씁니다 · 사냥터 보스, 대장장이 조합, 레이드 상점에서 얻습니다</div>`];
+  const R = worn ? ['<div class="ep-now">지금 신고 있는 신발입니다.</div>']
+    : [`<div class="ep-cur">지금 신발: <b>${cur ? cur.name : '없음'}</b></div>`, `<table class="ep-cmp"><tr><th>이동속도</th><td>${epDelta(now.pct, nxt.pct, '%')}</td></tr></table>`,
+      `<div class="${nxt.lvl > now.lvl ? 'up' : nxt.lvl < now.lvl ? 'down' : 'none'}">${nxt.lvl !== now.lvl ? `경공: ${now.lvl ? KYEONGGONG[now.lvl - 1].name : '없음'} → ${nxt.lvl ? KYEONGGONG[nxt.lvl - 1].name : '없음'}` : '경공은 달라지지 않습니다.'}</div>`];
+  const head = `<div class="ep-head">${icon ? `<img src="${icon}" alt="">` : '<span class="ep-noimg"></span>'}<div><b class="ep-name">${b ? b.name : '신발 벗기'}</b>${worn ? ' <i class="wornflag">착용 중</i>' : ''}</div></div>`;
+  const go = () => { const prev = st.worn; wearBoots(id); closePiecePop(); buildEquip(); eqToast(b ? `${b.name} 착용` : '신발을 벗었습니다', () => { wearBoots(prev); }); };
+  epopShow(b ? '신발 장착 확인' : '신발 벗기', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`,
+    [[worn ? '착용 중' : b ? '장착' : '벗기', 'primary', worn ? closePiecePop : go, 'ep-wear'], ['취소', '', closePiecePop, 'ep-cancel']], { type: 'boots', id });
+}
+
+/** A card was tapped: the popup (or, for tests with window.__equipInstant, the old instant change). */
+function pieceClick(kind, t, spId) {
+  equipTip = [kind, t, spId];
+  if (window.__equipInstant) { wear(kind, t, spId); buildEquip(); return; }
+  openPiecePop(kind, t, spId);
+}
+
+/** Sort and filter a row's cards by the remembered choices, favourites first; also each card's attributes. */
+function arrangeRow(row, cls) {
+  const P = eqPrefs(), cards = [...row.children];
+  for (const c of cards) {
+    const key = pieceKey(c.dataset.k, +c.dataset.t, c.dataset.sp || null), none = +c.dataset.t < 0 && !c.dataset.sp;
+    c.dataset.fav = !none && isFav(cls, key) ? '1' : '';
+    const nw = !none && isNewPiece(cls, key);
+    if (nw) {
+      c.classList.add('isnew');
+      const n = document.createElement('i');
+      n.className = 'newtag';
+      n.textContent = 'NEW';
+      c.append(n);
+    }
+    if (c.dataset.fav) {
+      const f = document.createElement('u');
+      f.className = 'favmark';
+      f.textContent = '♥';
+      c.append(f);
+    }
+    const on = c.classList.contains('on'), d = +c.dataset.d || 0;
+    c.hidden = !on && !none && ((P.filter === 'up' && d <= 0) || (P.filter === 'new' && !nw) || (P.filter === 'fav' && !c.dataset.fav));
+    if (none && P.filter !== 'all') c.hidden = false;
+  }
+  const rankOf = c => (+c.dataset.t < 0 && !c.dataset.sp ? -1e9 : 0);
+  const order = cards.map((c, i) => [c, i]).sort((a, b) => (b[0].dataset.fav ? 1 : 0) - (a[0].dataset.fav ? 1 : 0)
+    || (P.sort === 'power' ? (rankOf(a[0]) - rankOf(b[0])) || ((+b[0].dataset.d || 0) - (+a[0].dataset.d || 0)) : 0) || a[1] - b[1]);
+  for (const [c] of order) row.append(c);
+}
+
+/** The bar at the top of the equipment window: 신규 확인, sort, filter, 자동 착용. */
+function eqBar(cls) {
+  const P = eqPrefs(), bar = document.createElement('div');
+  bar.className = 'eq-bar';
+  const add = (label, on, fn, id, title) => {
+    const b = document.createElement('button');
+    b.className = 'eqb' + (on ? ' on' : '');
+    if (id) b.id = id;
+    if (title) b.title = title;
+    b.textContent = label;
+    b.onclick = fn;
+    bar.append(b);
+  };
+  const news = newPieces(cls);
+  if (news.length) add(`신규 장비 확인 (${news.length})`, true, () => openPiecePop(...news[0]), 'eq-new', '새로 얻은 장비를 차례로 봅니다');
+  add(P.sort === 'power' ? '정렬: 전투력순' : '정렬: 기본', false, () => { P.sort = P.sort === 'power' ? 'rank' : 'power'; saveJson('bs_settings', settings); buildEquip(); }, 'eq-sort');
+  for (const [f, label] of [['all', '전체'], ['up', '▲ 강한 것'], ['new', 'NEW'], ['fav', '♥ 찜']]) {
+    add(label, P.filter === f, () => { P.filter = f; saveJson('bs_settings', settings); buildEquip(); }, 'eq-f-' + f);
+  }
+  add(`자동 착용 ${P.auto ? '켬' : '끔'}`, P.auto, () => { P.auto = !P.auto; saveJson('bs_settings', settings); buildEquip(); eqToast(P.auto ? '사냥 중 더 강한 장비를 주우면 바로 입습니다' : '자동 착용을 껐습니다'); }, 'eq-auto', '사냥에서 전투력이 오르는 장비를 주우면 바로 입습니다');
+  return bar;
+}
+
+/** Wearing a drop at once when it is stronger (자동 착용), from pickGear. */
+function autoWearDrop(kind, tier, spId) {
+  if (!G || !eqPrefs().auto || G.training) return;
+  const cls = G.cls;
+  if (powerWith(cls, kind, tier, spId) > combatPower(cls)) {
+    const name = pieceLabel(cls, kind, tier, spId);
+    wear(kind, tier, spId);
+    markSeen(cls, pieceKey(kind, tier, spId));
+    say(`자동 착용: ${name}`, 'sys');
+  }
+}
+
+/** The results screen: new pieces that would raise 전투력, each with 바로 착용. */
+function overWearUI() {
+  let box = $('#over-wear');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!G) return;
+  const cls = G.cls, now = combatPower(cls), ups = [];
+  for (const [kind, t, id] of newPieces(cls)) {
+    const d = powerWith(cls, kind, t, id) - now;
+    if (d > 0) ups.push([kind, t, id, d]);
+  }
+  ups.sort((a, b) => b[3] - a[3]);
+  for (const [kind, t, id, d] of ups.slice(0, 4)) {
+    const b = document.createElement('button');
+    b.className = 'btn ow';
+    b.dataset.k = kind;
+    b.innerHTML = `바로 착용 · ${pieceLabel(cls, kind, t, id)} <em>▲${d.toLocaleString()}</em>`;
+    b.onclick = () => { wear(kind, t, id); markSeen(cls, pieceKey(kind, t, id)); b.disabled = true; b.textContent = `${pieceLabel(cls, kind, t, id)} 착용 완료`; };
+    box.append(b);
+  }
+}
+
+/** The window opened: where it was, or on the first NEW piece. */
+let eqScroll = 0;
+function openEquipWindow() {
+  equipTip = null;
+  buildEquip();
+  $('#equip').hidden = false;
+  const box = $('#equip-rows'), nw = box.querySelector('.equip.isnew:not([hidden])');
+  if (nw) nw.scrollIntoView({ block: 'center', inline: 'nearest' });
+  else box.scrollTop = eqScroll;
+}
+function closeEquipWindow() {
+  eqScroll = $('#equip-rows').scrollTop;
+  $('#equip').hidden = true;
+}
+
+/** Android back / Esc: the top-most layer closes first. true when one did. */
+const BACK_LAYERS = [['#epop', closePiecePop], ['#coordi', () => $('#coordi-close').click()], ['#party-pick', () => $('#pp-close').click()],
+  ['#forge', () => $('#forge-close').click()], ['#trade', () => $('#close-trade').click()], ['#codex', () => $('#close-codex').click()],
+  ['#backup', () => $('#backup-close').click()], ['#tree', () => $('#close-tree').click()], ['#equip', closeEquipWindow], ['#sounds', () => $('#close-sounds').click()]];
+function closeTopLayer() {
+  for (const [sel, close] of BACK_LAYERS) {
+    const el = $(sel);
+    if (el && !el.hidden) { close(); return true; }
+  }
+  return false;
+}
+window.__closeTopLayer = closeTopLayer;
+window.__equipPop = (kind, t, sp) => (kind === 'best' ? openBestPop() : openPiecePop(kind, t, sp || null));
+window.__epopState = () => epState;
 
 // ---------------------------------------------------------------- 도감
 //
@@ -3320,12 +3719,8 @@ function gyeokLine(g) {
 $('#forge-close').onclick = () => { forgeEnd(); forgeOptAsk = false; $('#forge').hidden = true; if (!$('#equip').hidden) buildEquip(); };
 $('#equip-cards').onclick = () => openCards();
 
-$('#open-equip').onclick = () => {
-  equipTip = null;
-  buildEquip();
-  $('#equip').hidden = false;
-};
-$('#close-equip').onclick = () => { $('#equip').hidden = true; };
+$('#open-equip').onclick = () => openEquipWindow();
+$('#close-equip').onclick = () => closeEquipWindow();
 
 // ---------------------------------------------------------------- spell tree
 //
@@ -7457,6 +7852,7 @@ function enterTown(cls) {
     portalSprite(DOOR_TINT, 58, true);
   }
   showScreen('town');
+  syncLastHunt();
   audio.bgm('town');
   walletShown = '';
   townWallet();
@@ -7721,6 +8117,15 @@ window.__townWalk = (x, y) => !townBlocked(x, y);
 
 /** The town's shortcut buttons: an errand by the NPC's id, or the raid list. */
 function townErrand(id) {
+  if (id === 'last') {
+    const st = lastHuntStage();
+    if (!st) return;
+    pickedStage = st;
+    pickedMode = (settings.lastHunt && settings.lastHunt.mode) || 'conquer';
+    if (!progress.cleared[st.id] || settings.legacyPace) pickedMode = 'conquer';
+    return goHunt();
+  }
+  if (id === 'party') return openPartyPick();
   if (id === 'war') return War.openBoard();
   if (id === 'training') return startTraining(T ? T.cls : chosenClass);
   if (id === 'coordi') return openCoordi();
@@ -7747,11 +8152,8 @@ function talk() {
     showScreen('stages');
   }
   else if (n.id === 'clerk') openQuests();
-  else if (n.id === 'smith') {
-    equipTip = null;
-    buildEquip();
-    $('#equip').hidden = false;
-  } else openTrade(n.id);
+  else if (n.id === 'smith') openEquipWindow();
+  else openTrade(n.id);
 }
 
 // ---------------------------------------------------------------- 수련장
@@ -9910,6 +10312,7 @@ function showResults(title) {
   // A conquered ground can be hunted on, harder and harder, for its specials.
   $('#keep').hidden = !(G.cleared && !G.dead && !G.stage.raid);
   showScreen('over');
+  overWearUI();
 }
 
 function leaveHunt() {
@@ -12213,10 +12616,30 @@ $('#start-btn').onclick = () => {
 };
 $('#back-title').onclick = () => showScreen('title');
 $('#back-select').onclick = () => enterTown(chosenClass);
-$('#go').onclick = () => {
+$('#go').onclick = () => goHunt();
+/** Into the picked ground (remembered, for 「이전 사냥터」 in the town). */
+function goHunt() {
+  settings.lastHunt = { id: pickedStage.id, mode: pickedMode };
+  saveJson('bs_settings', settings);
   startRun(chosenClass, pickedStage);
   if (G && G.hunt && G.hunt.mode === 'conquer' && pickedMode === 'sweep' && progress.cleared[G.stage.id]) Hunt.sweep(G); // 사냥 기믹: 소탕
-};
+}
+/** The ground of the last hunt, if it is still open to this hero. */
+function lastHuntStage() {
+  const l = settings.lastHunt;
+  if (!l) return null;
+  const si = STAGES.findIndex(s => s.id === l.id);
+  if (si >= 0) return unlocked(si) ? STAGES[si] : null;
+  const r = RAIDS.find(x => x.id === l.id);
+  return r && raidOpen(r) ? r : null;
+}
+/** The town's 「이전 사냥터」 key: named for the ground, hidden until there is one. */
+function syncLastHunt() {
+  const b = $('#town-last'), st = lastHuntStage();
+  if (!b) return;
+  b.hidden = !st;
+  if (st) { b.textContent = `다시: ${st.name.replace(' 레이드', '')}`; b.title = `${st.name}에 바로 들어갑니다`; }
+}
 $('#pause-btn').onclick = () => togglePause();
 $('#resume').onclick = () => togglePause(false);
 $('#quit').onclick = () => {
@@ -12285,14 +12708,25 @@ function openPartyPick() {
     box.append(b);
     lookPicture(c).then(url => { if (url) b.querySelector('.hero').src = url; });
   }
+  $('#pp-mode').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
+  $('#pp-mode').classList.toggle('on', !!settings.party);
   $('#party-pick').hidden = false;
+  syncPartyLine();
 }
-$('#pp-close').onclick = () => { $('#party-pick').hidden = true; };
+/** The 사냥터 panel's line: 동료 모드 and how many companions are picked, with a shortcut. */
+function syncPartyLine() {
+  const el = $('#party-line span');
+  if (el) el.textContent = `동료 모드: ${settings.party ? '켬' : '끔'}` + (settings.party ? ` · 동료 ${(settings.partyPick || []).length}명${(settings.partyPick || []).length ? '' : ' (무작위)'}` : '');
+}
+$('#pp-mode').onclick = () => { settings.party = !settings.party; saveJson('bs_settings', settings); syncSettings(); openPartyPick(); };
+$('#party-line-btn').onclick = () => openPartyPick();
+$('#pp-close').onclick = () => { $('#party-pick').hidden = true; syncPartyLine(); };
 $('#pp-clear').onclick = () => { settings.partyPick = []; saveJson('bs_settings', settings); openPartyPick(); };
 $('#opt-party').onclick = () => {
   settings.party = !settings.party;
   saveJson('bs_settings', settings);
   syncSettings();
+  syncPartyLine();
 };
 $('#opt-tiles').onclick = () => {
   settings.tiles = !settings.tiles;
@@ -12698,6 +13132,7 @@ window.__appPause = on => {
 // Back: opens or closes the pause menu, or steps back through the menus; false when there is
 // nothing left to go back to (the app then exits on a second press).
 window.__appBack = () => {
+  if (closeTopLayer()) return true; // the top-most window or popup first
   if (!$('#codex').hidden) {
     $('#codex').hidden = true;
     return true;
@@ -12905,4 +13340,5 @@ initCostume({
 bindCoordi();
 $('#equip-coordi').onclick = () => openCoordi();
 
+ensureSeen();
 boot();

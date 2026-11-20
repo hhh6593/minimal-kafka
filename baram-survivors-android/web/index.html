@@ -485,6 +485,51 @@
   #equip-box { width: min(96vw, 640px); max-height: 94vh; overflow-y: auto; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
       background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
       box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; }
+  /* 장착 팝업 (the window's pieces open it): the piece at the left, against what is worn at the right. */
+  #epop { position: fixed; inset: 0; z-index: 27; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .62); }
+  #epop-box { width: min(96vw, 560px); max-height: 94vh; display: flex; flex-direction: column; padding: 0 8px 8px; color: #2a1606;
+      background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
+      box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; }
+  #epop-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font: 10px/14px G9, monospace; }
+  #epop-btns { margin-top: 6px; gap: 6px; }
+  #epop-btns .btn { min-width: 0; flex: 1 1 0; min-height: 40px; padding: 4px 6px; }
+  #epop-btns .btn.primary { background: #e8b84a; border-color: #ffe9a0 #7a4a08 #7a4a08 #ffe9a0; flex: 1.4 1 0; }
+  .ep-head { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; border-bottom: 1px solid #a0602a; margin-bottom: 4px; }
+  .ep-head img, .ep-noimg { flex: none; width: 56px; height: 56px; object-fit: contain; background: #f4e2b8; border: 2px solid #7a4a1e; padding: 2px; box-sizing: border-box; }
+  .ep-name { font: 700 14px/18px G11, monospace; color: #7a1800; } .ep-name.uniq { color: #8a2a9a; }
+  .newtag { font: normal 8px/10px G9, monospace; color: #fff; background: #d02a10; padding: 0 3px; vertical-align: middle; }
+  .wornflag { font: normal 9px/11px G9, monospace; color: #fff; background: #6a3a18; padding: 0 3px; vertical-align: middle; }
+  .ep-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .ep-cols > div > div { margin-bottom: 3px; overflow-wrap: anywhere; }
+  .ep-tier b { font-size: 12px; color: #2a1606; } .ep-star { color: #c88a00; font-size: 13px; letter-spacing: 1px; } .ep-star i { font-style: normal; color: #b9a070; }
+  .ep-star small { font: 9px G9, monospace; color: #6a5030; letter-spacing: 0; margin-left: 4px; }
+  #epop .o1 { color: #2a5a10; } #epop .o2 { color: #1a4a9a; } #epop .pr { color: #8a3a08; } #epop .gy { color: #7a1800; } #epop .fam { color: #5a3010; }
+  #epop .none, #epop .from { color: #6a5030; } #epop .up { color: #1a7a10; } #epop .down { color: #b02010; }
+  .ep-cmp { width: 100%; border-collapse: collapse; margin: 2px 0 4px; }
+  .ep-cmp th { width: 54px; text-align: left; font-weight: 700; color: #6a3e16; padding: 2px 0; vertical-align: top; }
+  .ep-cmp td { padding: 2px 0; } .ep-cmp td b { color: #2a1606; }
+  .ep-cmp em { font-style: normal; font-weight: 700; } .ep-cmp em.up { color: #1a7a10; } .ep-cmp em.down { color: #b02010; } .ep-cmp em.same { color: #6a5030; }
+  .ep-swaps th { width: 40px; } .ep-swaps .arrow { color: #7a1800; }
+  .ep-now { padding: 6px; background: #fff0c0; border: 1px solid #a0602a; text-align: center; }
+  @media (max-width: 520px) { .ep-cols { grid-template-columns: 1fr; } }
+  /* The equipment window's bar (신규 확인, 정렬, 보기, 자동 착용), NEW and 찜 on the cards, and the undo toast. */
+  .eq-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+  .eqb { padding: 3px 8px; min-height: 28px; font: 10px G9, monospace; color: #2a1606; background: #c89858; border: 2px solid; border-color: #e8c48c #5a3212 #5a3212 #e8c48c; }
+  .eqb.on { background: #fff0c0; border-color: #7a1800; color: #7a1800; font-weight: 700; }
+  #eq-new { background: #f0a090; border-color: #ffd0c0 #8a2010 #8a2010 #ffd0c0; color: #4a0800; }
+  .equip .newtag { position: absolute; top: -1px; right: -1px; }
+  .equip.best.isnew::before { top: 11px; }
+  .equip .favmark { position: absolute; left: 2px; bottom: 1px; font: normal 10px/10px G9, monospace; color: #d02a60; text-decoration: none; }
+  #equip-toast { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 0; padding: 3px 8px; font: 11px G9, monospace; color: #1a4a10; background: #e4f0c0; border: 1px solid #5a8a30; }
+  #equip-toast .btn { min-width: 0; padding: 2px 10px; min-height: 28px; }
+  #over-wear { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+  #over-wear:empty { display: none; }
+  #over-wear .ow { min-width: 0; min-height: 34px; background: #e8b84a; text-align: left; } #over-wear .ow em { font-style: normal; color: #1a7a10; margin-left: 4px; }
+  #party-line { display: flex; align-items: center; gap: 6px; justify-content: space-between; font: 11px G9, monospace; color: #f4e2b0; text-shadow: 1px 1px 0 #000; }
+  #party-line .btn { min-width: 0; padding: 3px 8px; font-size: 11px; min-height: 30px; }
+  #pp-mode.on { background: #e8b84a; }
+  #town-last { max-width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #e8b84a; }
+  @media (pointer: coarse) { .eqb { min-height: 34px; } #equip-box .row .btn { min-height: 38px; } }
   #equip-box .caption small { font: 10px G9, monospace; color: #e8d0a0; margin-left: 6px; }
   /* One line per kind: its name at the left, the pieces found side by side (scrolling when many). */
   #equip-rows { flex: 1 1 auto; min-height: min(250px, 46vh); overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 34px 1fr; gap: 4px 6px;
@@ -769,6 +814,7 @@
     </div>
     <div class="info-col">
       <div id="stage-info"></div>
+      <div id="party-line"><span></span><button id="party-line-btn" class="btn">동료 설정</button></div>
       <div class="row"><button id="back-select" class="btn">마을로</button><button id="go" class="btn"></button></div>
     </div>
   </div>
@@ -780,9 +826,11 @@
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
   <button id="talk" class="btn" hidden></button>
   <div id="town-quick">
+    <button class="btn" id="town-last" data-go="last" hidden></button>
     <button class="btn" data-go="guide">사냥터</button>
     <button class="btn" data-go="training">수련장</button>
     <button class="btn" data-go="raid">레이드</button>
+    <button class="btn" data-go="party">동료</button>
     <button class="btn" data-go="war">대항전</button>
     <button class="btn" data-go="smith">장비</button>
     <button class="btn" data-go="coordi">코디</button>
@@ -814,7 +862,7 @@
   <h2>동료 설정</h2>
   <p id="pp-note"></p>
   <div id="pp-cards"></div>
-  <div class="row"><button id="pp-clear" class="btn">모두 빼기</button><button id="pp-close" class="btn">닫기</button></div>
+  <div class="row"><button id="pp-mode" class="btn"></button><button id="pp-clear" class="btn">모두 빼기</button><button id="pp-close" class="btn">닫기</button></div>
 </div>
 <div id="trade" hidden>
   <div id="trade-box">
@@ -828,6 +876,7 @@
   <div id="over-box">
     <div class="caption" id="over-title"></div>
     <div id="over-stats"></div>
+    <div id="over-wear"></div>
     <div class="row"><button id="again" class="btn">다시 사냥</button><button id="keep" class="btn" hidden>계속 사냥</button><button id="to-select" class="btn">마을로</button></div>
   </div>
 </div>
@@ -959,11 +1008,19 @@
 
 <div id="equip" hidden>
   <div id="equip-box">
-    <div class="caption">장비 <small>주운 장비 중에서 고르면 바로 입습니다.</small></div>
+    <div class="caption">장비 <small>주운 장비를 누르면 자세히 보고 입을 수 있습니다.</small></div>
     <div id="equip-rows"></div>
     <div id="equip-tip" hidden></div>
+    <div id="equip-toast" hidden></div>
     <div id="equip-stats"></div>
     <div class="row"><button id="equip-craft" class="btn">강화·조합</button><button id="equip-codex" class="btn">도감</button><button id="equip-cards" class="btn">괴력난신</button><button id="equip-coordi" class="btn">코디</button><button id="close-equip" class="btn">닫기</button></div>
+  </div>
+</div>
+<div id="epop" hidden>
+  <div id="epop-box">
+    <div class="caption" id="epop-cap"></div>
+    <div id="epop-body"></div>
+    <div class="row" id="epop-btns"></div>
   </div>
 </div>
 <div id="banner" hidden></div>
