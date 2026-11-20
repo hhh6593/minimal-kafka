@@ -8283,6 +8283,62 @@ const PARTY = {
 function ownCompanions() {
   return CLASSES.map(c => c.id).filter(id => id !== G.cls.id && PARTY[id] && (best[id] || promoOf(id) > 0));
 }
+/** 동료 성장: an own companion's level is its record's (best[id].lvl, with best[id].xp the exp into the
+ *  next level), the same record the hero's hunts write, so the class cards, raids and quests read it too.
+ *  Joining a hunt it starts at 60% of the record (and at least 1 + 2 per 승급), never more than two levels
+ *  past the hero at that moment; then it shares 60% of the hero's exp, never passing 80% of the hero's level (compCap).
+ *  The effect (HP, spell power) still reads m.lv, which stays 1..6 (1 + level/6, as before). */
+const COMP_START = 0.6, COMP_SHARE = 0.6;
+const compCap = lv => Math.max(3, Math.floor(lv * 0.8));
+function companionStart(id, heroLv) {
+  const rec = best[id];
+  return Math.max(1, Math.min(heroLv + 2, Math.max(Math.floor((rec ? rec.lvl : 1) * COMP_START), 1 + 2 * promoOf(id))));
+}
+/** "Lv 12 · 2차 승급": a class's level as a companion and its 승급 (the 동료 설정 cards, the party panel). */
+function companionLabel(id) {
+  const rec = best[id], pr = promoOf(id);
+  return `${rec ? `Lv ${rec.lvl}` : '기록 없음'}${pr ? ` · ${pr}차 승급` : ''}`;
+}
+/** The hero gained exp: each own companion takes its share and levels up (a bubble and a line). */
+function shareCompanionXp(v) {
+  const p = G.player;
+  for (const m of G.party || []) {
+    if (!m.own) continue;
+    m.xp = (m.xp || 0) + v * COMP_SHARE;
+    while (m.cl < compCap(p.lvl) && m.xp >= xpFor(m.cl)) {
+      m.xp -= xpFor(m.cl);
+      m.cl++;
+      m.bubble = { text: `Lv ${m.cl}!`, t: G.t };
+      say(`${m.name} Lv ${m.cl}!`, 'party');
+    }
+    if (m.cl >= compCap(p.lvl)) m.xp = Math.min(m.xp, xpFor(m.cl) - 1);
+  }
+}
+/** The hunt's end (clear or fail): each own companion's level goes into its class's record, once; the
+ *  results screen lists what grew. Idempotent (record() runs on every way a hunt ends). */
+function recordCompanions() {
+  if (G.war || G.training) return;
+  const grew = G.compGrowth = G.compGrowth || {};
+  for (const m of G.party || []) {
+    if (!m.own || !m.cl) continue;
+    const id = m.cls.id, r = best[id];
+    const g = grew[id] = grew[id] || { name: m.name, from: r ? r.lvl : 0, was: m.promo || 0 };
+    if (!r || m.cl > r.lvl) best[id] = { lvl: m.cl, kills: r ? r.kills : Math.round(G.kills * 0.5), xp: Math.round(m.xp) };
+    else if (m.cl === r.lvl) r.xp = Math.max(r.xp || 0, Math.round(m.xp));
+    g.to = best[id].lvl;
+  }
+  saveJson('bs_best', best);
+}
+/** The results line: '동료 성장: 내 전사 Lv 9→12, 내 궁사 Lv 4→7 · 2차 승급'. */
+function companionSummary() {
+  const rows = Object.entries(G.compGrowth || {}).map(([id, g]) => {
+    const pr = promoOf(id);
+    const t = [g.to > g.from ? `${g.name} Lv ${g.from || 1}→${g.to}` : `${g.name} Lv ${g.to}`];
+    if (pr > g.was) t.push(`${pr}차 승급`);
+    return t.join(' · ');
+  });
+  return rows.length ? `<br><b class="promo">동료 성장: ${rows.join(', ')}</b>` : '';
+}
 /** Who joins this hunt, in order: the 동료 설정's picks, then classes at random (once a hunt). */
 function partyOrder() {
   if (G.partyOrder) return G.partyOrder;
@@ -8301,7 +8357,7 @@ function joinParty(cls) {
   const gear = savedGear(cls);
   const slot = G.party.length;
   const m = {
-    cls, name, lv: 1, gear, own, promo, baseLv: own ? Math.min(6, 1 + Math.floor(promo / 2)) : 0, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
+    cls, name, lv: 1, cl: 1, xp: 0, gear, own, promo, baseLv: own ? Math.min(6, 1 + Math.floor(promo / 2)) : 0, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
     // Walks in from the edge of the view, as another player would.
     x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
     cd: { a: 1, b: 3, c: 6, d: 9, r: 0, e: 5, g: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,
@@ -8313,10 +8369,16 @@ function joinParty(cls) {
   m.x = m.tx * TILE + TILE / 2;
   m.y = m.ty * TILE + TILE - 6;
   m.lv = Math.max(1, m.baseLv);
+  if (own) {
+    m.cl = companionStart(cls.id, p.lvl);
+    const rec = best[cls.id];
+    if (rec && rec.xp && m.cl === rec.lvl) m.xp = Math.min(rec.xp, xpFor(m.cl) - 1);
+    m.lv = Math.max(m.baseLv, Math.min(6, 1 + Math.floor(m.cl / 6)));
+  }
   m.maxHp = memberMaxHp(m);
   m.hp = m.maxHp;
   G.party.push(m);
-  say(own ? `${name}${promo ? `(${promo}차 승급)` : ''}이(가) 함께합니다. 이 사냥터를 깨면 ${cls.name}의 기록에도 남습니다.`
+  say(own ? `${name}(Lv ${m.cl})${promo ? `(${promo}차 승급)` : ''}이(가) 함께합니다. 이 사냥터를 깨면 ${cls.name}의 기록에도 남습니다.`
     : `${josa(name, '이', '가')} 파티에 들어왔습니다. (${cls.name})`, 'party');
 }
 
@@ -8449,7 +8511,7 @@ function updateParty(dt) {
   const p = G.player;
   for (const m of G.party) {
     // Party members grow with the hero, as D2 Survivors' mercenaries share its level.
-    const lv = Math.max(m.baseLv || 0, Math.min(6, 1 + Math.floor(p.lvl / 6)));
+    const lv = Math.max(m.baseLv || 0, Math.min(6, 1 + Math.floor((m.own ? m.cl : p.lvl) / 6)));
     if (lv !== m.lv) {
       const k = m.hp / m.maxHp;
       m.lv = lv;
@@ -8862,9 +8924,120 @@ function partyTalk(m, lines) {
 
 const KIWON = ['누리의기원', '대지의기원', '바다의기원', '동해의기원', '하늘의기원', '천공의기원', '구름의기원', '태양의기원'];
 
+
+// ---------------------------------------------------------------- 동료의 승급 기술
+// An own companion casts the class's skills of every 승급 tier it has (promoOf), not only the old four:
+// its kit is the highest tiers' attacks (up to five, a spread of kinds, tier first), one 강화 buff, one
+// shield and one heal. A skill is open once the companion's level reaches half its `req` (a 9차 skill
+// at Lv 17); its 단 is 1 + level/5 (at most 8) and its blow is the hero's own formula (dmg x 1.15^(단-1),
+// evolved = 8단) at 55%, so it never out-damages the hero's cast of the same skill (the hero also has
+// gear, passives and 용무기). One cast at a time, 1.4 s apart (1.0 in a raid); each skill's wait is
+// 1.5x the hero's, so the highest tier goes first and the lower tiers fill the gaps.
+const TIER_ATK = new Set(['spell', 'strike', 'spell4', 'nova', 'cleave', 'line', 'screen', 'slash', 'blink']);
+const TIER_K = 0.55;
+function tierKit(id, tier) {
+  const defs = Object.entries(SKILLS).filter(([, d]) => d.cls === id && d.promo && d.promo <= tier && !d.hpCost && d.kind !== 'ult');
+  const best = f => defs.filter(([, d]) => f(d)).sort((a, b) => b[1].promo - a[1].promo || (b[1].dmg || 0) - (a[1].dmg || 0));
+  const atk = best(d => TIER_ATK.has(d.kind)), kit = [], seen = new Set();
+  for (const e of atk) if (!seen.has(e[1].kind) && kit.length < 5) { seen.add(e[1].kind); kit.push(e); }
+  for (const e of atk) if (!kit.includes(e) && kit.length < 5) kit.push(e);
+  kit.sort((a, b) => b[1].promo - a[1].promo || (b[1].dmg || 0) - (a[1].dmg || 0));
+  const out = kit.map(e => e[0]);
+  for (const f of [d => d.kind === 'buff' && d.buff === 'power', d => d.kind === 'buff' && d.buff === 'shield', d => d.kind === 'heal']) {
+    const e = best(f)[0];
+    if (e) out.push(e[0]);
+  }
+  return out;
+}
+/** The names of a class's highest-tier skills at a 승급 (the 동료 설정 card): '6차: ○○'. */
+function tierSkillLine(id, tier) {
+  if (!tier) return '';
+  const kit = tierKit(id, tier).map(k => SKILLS[k]).filter(d => TIER_ATK.has(d.kind));
+  const top = kit.length ? kit[0].promo : 0;
+  return top ? `${top}차: ${kit.filter(d => d.promo === top).map(d => d.name).slice(0, 2).join('·')}` : '';
+}
+function memberSkillLv(m) { return Math.max(1, Math.min(8, 1 + Math.floor(m.cl / 5))); }
+function memberFx(id, sl) {
+  const d = SKILLS[id];
+  const base = d.yeon ? d.fx : d.modern && M.fx[d.modern] ? d.modern : d.promo === 4 && M.fx['new_' + id] ? 'new_' + id
+    : d.fxs ? d.fxs[Math.min(sl, d.fxs.length) - 1] : M.fx['s_' + id] ? 's_' + id : d.fx;
+  return grownFx(base, sl);
+}
+/** One tier skill of an own companion, if one is ready: returns true when it cast (the old routine rests). */
+function memberTierCast(m, near, face, pose) {
+  if (!m.own) return false;
+  const tier = Math.max(m.promo || 0, promoOf(m.cls.id));
+  if (!tier) return false;
+  if (m.kitTier !== tier) { m.kitTier = tier; m.kit = tierKit(m.cls.id, tier); m.sk = m.sk || {}; }
+  const haste = (m.hasteUntil || 0) > G.t ? 0.6 : 1;
+  if (G.t < (m.tierGap || 0)) return false;
+  const sl = memberSkillLv(m), p = G.player;
+  for (const id of m.kit) {
+    const d = SKILLS[id];
+    if (m.cl < Math.floor((d.req || 1) * 0.5) || G.t < (m.sk[id] || 0)) continue;
+    const cd = d.cd * Math.pow(0.93, sl - 1) * 1.5;
+    const k = (d.evolved ? Math.pow(1.15, 4) : Math.pow(1.15, sl - 1)) * TIER_K * (m.power || 1) * auraK(m)
+      * ((m.buffUntil || 0) > G.t ? 1 + (m.buffK || 0.4) : 1);
+    const dmg = (d.dmg || 0) * k, fxid = memberFx(id, sl);
+    const t = near(3)[0];
+    let done = false;
+    if (d.kind === 'buff') {
+      if (d.buff === 'shield' ? m.hp >= m.maxHp * 0.7 : !t) continue;
+      if (d.buff === 'power') { m.buffUntil = G.t + (d.duration || 4) * 1.2; m.buffK = (d.power || 0.4) * 0.5; }
+      else if (d.buff === 'shield') m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.15);
+      addFx(fxid, m.x, m.y - 26, { anchor: 'center' });
+      done = true;
+    } else if (d.kind === 'heal') {
+      const low = partyBodies().filter(b => b.hp < b.maxHp * 0.6).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (!low) continue;
+      const n = low.maxHp * Math.min(0.3, 0.1 + 0.02 * sl);
+      if (low === p) heal(n, true); else low.hp = Math.min(low.maxHp, low.hp + n);
+      addFx(fxid, low.x, low.y - 26, { anchor: 'center' });
+      done = true;
+    } else if (t) {
+      const reach = d.kind === 'cleave' || d.kind === 'line' || d.kind === 'slash' || d.kind === 'nova' ? 2.2 : 7;
+      if (tdist(t, m) > reach) continue;
+      face(t);
+      const hit = (e, f = 1) => hurtEnemy(e, dmg * f);
+      const status = e => { if (d.stun) e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? Math.min(d.stun, 0.6) : d.stun); if (d.slow) e.slow = d.slow; if (d.curse) e.curse = d.curse; };
+      if (d.kind === 'screen') {
+        const all = onScreen().slice(0, 40);
+        screenFx(fxid, id, 0.7);
+        later(0.35, () => { for (const e of all) { if (e.hp <= 0) continue; status(e); hit(e, d.falloff ? Math.max(0.2, 1 - d.falloff * tdist(e, p)) : 1); } });
+      } else if (d.kind === 'nova' || d.kind === 'cleave' || d.kind === 'line') {
+        const r = d.kind === 'nova' ? (d.radius || 1) + 0.5 : Math.min(d.depth || 2, 3) + 0.5;
+        addFx(fxid, m.x, m.y - 26, { anchor: 'center' });
+        later(0.12, () => { for (const e of around(m.tx, m.ty, Math.min(3, Math.round(r))).slice(0, d.max || 9)) { status(e); hit(e); } });
+      } else if (d.kind === 'slash') {
+        fxOn(fxid, t);
+        for (let i = 0; i < 3; i++) later(i * 0.12, () => { if (t.hp > 0) hit(t, 0.4); });
+      } else {
+        // spell / strike / spell4 / blink: on the nearest few, and round each as the spell's radius says
+        near(Math.min(3, d.count || 1)).forEach((e, i) => later(i * 0.1, () => {
+          if (e.hp <= 0) return;
+          const life = fxOn(fxid, e);
+          later(life * (d.hitAt || 0.3), () => {
+            const set = d.radius ? around(e.tx, e.ty, Math.min(2, d.radius)).slice(0, 6) : [e];
+            for (const o of set.length ? set : [e]) { status(o); hit(o); }
+          });
+        }));
+      }
+      done = true;
+    }
+    if (!done) continue;
+    m.sk[id] = G.t + cd * haste;
+    m.tierGap = G.t + (G.stage.raid ? 1.0 : 1.4) * haste;
+    if (d.buff === 'haste') m.hasteUntil = G.t + (d.duration || 4);
+    if (d.promo >= 4) partySay(m, d.name); else m.bubble = { text: d.name, t: G.t };
+    pose('magic');
+    return true;
+  }
+  return false;
+}
+
 function partyAct(m) {
   // Companions help; the hero carries the hunt, so each hits about as hard as a starting spell.
-  const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + p.lvl * 0.04) * (m.power || 1) * auraK(m);
+  const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + (m.own ? m.cl : p.lvl) * 0.04) * (m.power || 1) * auraK(m);
   const pose = kind => { m.pose = kind; m.poseT = 0.3; };
   const near = n => nearestEnemies(n, 7, { tx: m.tx, ty: m.ty });
   const face = t => {
@@ -8872,6 +9045,7 @@ function partyAct(m) {
     m.fdy = m.fdx ? 0 : Math.sign(t.y - m.y);
   };
   const boss = G.enemies.find(e => e.kind === 'boss' && tdist(e, m) < 9);
+  if (memberTierCast(m, near, face, pose)) return;
   switch (m.cls.id) {
     case 'poet': {
       const [low, k] = neediest();
@@ -9440,6 +9614,7 @@ function gainXp(v) {
   v *= 1 + GEAR_OPT.exp * opt('exp'); // 경험치 (an armour's line)
   if (G.hunt) v *= Hunt.xpK(); // 사냥 기믹: experience by act
   p.xp += v * pactReward();
+  if (G.party && G.party.length) shareCompanionXp(v * pactReward());
   p.total = (p.total || 0) + v;
   const got = v * pactReward(), of = p.next;
   battleInfo('xp', got, k => `경험치가 ${shownNum(Math.round(k))}(${(k / of * 100).toFixed(2)}%) 올랐습니다.`);
@@ -9905,6 +10080,7 @@ function showResults(title) {
     + G.skills.map(s => `${skillName(s.id, s.lv)}`).join(' · ')
     + (G.gained && G.gained.length ? `<br><b class="promo">얻은 것: ${gainedSummary(G.gained)}</b>` : '')
     + (G.promoted ? `<br><b class="promo">${G.promoted.join('<br>')}</b>` : '')
+    + companionSummary()
     + (style ? `<br><b class="grade g${style.g}">스타일 ${style.g}</b> 최고 기세 ${style.best}단 · 처형 ${style.execs} · 일망타진 ${style.sweeps} · 반응 ${style.reactions} · 돈 ×${style.k}`
       + (style.stars ? ` · 숙련 ${'★'.repeat(style.stars)}${style.newStar ? ' (새 ★)' : ''}` : '') : '');
   // A conquered ground can be hunted on, harder and harder, for its specials.
@@ -9945,6 +10121,7 @@ function record() {
     best[G.cls.id] = { lvl, kills: G.kills };
     saveJson('bs_best', best);
   }
+  recordCompanions();
 }
 
 /** How many 승급 a class has: each tier needs its ground conquered by that class, in order. */
@@ -12275,7 +12452,7 @@ function openPartyPick() {
     b.className = 'card' + (at >= 0 ? ' on' : '') + (chosenClass && chosenClass.id === c.id ? ' me' : '');
     b.innerHTML = `${at >= 0 ? `<i>${at + 1}</i>` : ''}<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><em>${PARTY[c.id] ? PARTY[c.id].role : ''}</em>
-      <small>${rec ? `최고 Lv ${rec.lvl}` : '기록 없음'}${pr ? ` · ${pr}차 승급` : ''}</small>`;
+      <small>${companionLabel(c.id)}${rec ? ` · 합류 Lv ${companionStart(c.id, 99)}~` : ''}${tierSkillLine(c.id, pr) ? `<br>${tierSkillLine(c.id, pr)}` : ''}</small>`;
     b.disabled = at < 0 && picks.length >= 3;
     b.onclick = () => {
       settings.partyPick = at >= 0 ? picks.filter(x => x !== c.id) : picks.concat(c.id);
@@ -12850,6 +13027,7 @@ window.__silentSkills = () => {
 window.__game = () => G;
 window.__images = () => images; // test: the loaded pictures
 window.__clear = () => clearStage();
+window.__tierKit = (id, tier) => tierKit(id, tier).map(k => SKILLS[k].promo + "차 " + SKILLS[k].name);
 window.__start = (c, s, m) => { pickedMode = m || 'conquer'; startRun(CLASSES[c], STAGES[s]); if (m === 'sweep' && G.hunt) Hunt.sweep(G); };
 window.__enterTown = c => enterTown(CLASSES[c]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
