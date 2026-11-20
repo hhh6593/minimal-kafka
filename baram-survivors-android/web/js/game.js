@@ -1093,15 +1093,15 @@ function startRun(cls, stage, training = false) {
 
 /** The 속도 key: x2 anywhere, x3 on a ground (or raid) conquered before. */
 function speedMax() { return !G || (G.war && !G.war.raid) ? 1 : G.wasCleared ? 3 : 2; } // 대항전: as it is
-function huntSpeed() { return G ? Math.min(settings.speed || 1, speedMax()) : 1; }
+// The pick holds for this run only: every hunt, raid, 대항전 and 쟁 starts at ×1 (G is new each run).
+function huntSpeed() { return G ? Math.min(G.speedPick || 1, speedMax()) : 1; }
 function syncSpeed() {
   const b = $('#speed-btn');
   b.hidden = !G || !!G.training || speedMax() < 2;
   b.textContent = `속도 ×${huntSpeed()}`;
 }
 $('#speed-btn').onclick = () => {
-  settings.speed = huntSpeed() % speedMax() + 1;
-  saveJson('bs_settings', settings);
+  G.speedPick = huntSpeed() % speedMax() + 1;
   syncSpeed();
 };
 
