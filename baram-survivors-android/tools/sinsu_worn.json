@@ -4,7 +4,8 @@
   "mode": "weapon",
   "classes": [
    "warrior"
-  ]
+  ],
+  "trail": true
  },
  "hyeonmu": {
   "item": "현무불괴갑",

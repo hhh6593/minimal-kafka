@@ -9,7 +9,8 @@ CONFIG_JSON (default tools/sinsu_worn.json): {key: {"item": name, "mode": "weapo
 glove on the fist, no 연 fist over it), "size" (from the hand to the tip against the hero's height,
 default SIZE), "scale": "figure" (a glove with no blade: the original's size against its figure),
 "src": [cd, mt, frame] (the render its picture is cut from, where the standing front hides part of
-it), "grip" / "tip": [x, y] (in that render's pixels, where found wrong), "mirror": true}, and
+it), "grip" / "tip": [x, y] (in that render's pixels, where found wrong), "mirror": true, "trail": true (the
+original's swing kept under the blade: 청룡신검's water)}, and
 "_pose": {cls: corrections of 연's hand and weapon line, class_poses}}. --quick fetches only standing
 and striking (front, back, left): enough for candidate sheets; build then shows the stand where a
 walk or a cast is missing.
@@ -783,6 +784,35 @@ def held(pp, g, t, ang, length, mirror):
     return touch_up(sc, 'weapon'), (cx - x0 + 1, cy - y0 + 1)
 
 
+def trail(item, render, cd, f, kfig):
+    """The original's swing in its strike frame f facing cd: the piece's glowing pixels (bright and
+    saturated: 청룡신검's water) off its blade (the solid pixels, grown a little), big pieces only,
+    scaled to 연's figure: (picture, x and y of its corner from the feet) or None."""
+    from scipy.ndimage import binary_dilation, label
+    its, bas = render(item, cd, 3), render(None, cd, 3)
+    j = min(len(its) - 1, f)
+    it, ba = its[j], bas[min(j, len(bas) - 1)]
+    pp, _ = piece_pixels(it, ba)
+    m = (pp[..., 3] > 0) & ~(in_palette(it, skin_palette(ba)) & (it[..., 3] > 0))
+    rgb = it[..., :3].astype(int)
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    glow = m & (mx > 150) & ((mx - mn) > 0.55 * mx)
+    glow &= ~binary_dilation(m & ~glow, iterations=2)
+    lab, n = label(glow)
+    if not n:
+        return None
+    sizes = np.bincount(lab.ravel())
+    glow = np.isin(lab, [i for i in range(1, n + 1) if sizes[i] >= 30])
+    bb = bbox(glow)
+    if not bb:
+        return None
+    x0, y0, x1, y1 = bb
+    cut = it[y0:y1 + 1, x0:x1 + 1].copy()
+    cut[..., 3] = np.where(glow[y0:y1 + 1, x0:x1 + 1], 255, 0)
+    sc = scaled(cut, kfig)
+    return sc, round((x0 - FEET[0]) * kfig), round((y0 - FEET[1]) * kfig)
+
+
 def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, height, kfig):
     """The weapon held in 연's hand frame by frame (class_poses): its sheet, and the part 연 draws
     behind the body (wback) where the class's own weapons have one. 연's fist (the body's skin and
@@ -822,6 +852,16 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
             gcx, gcy = gp
             # on the class's canvas: the grip on 연's hand
             lay = np.zeros((PH, PW, 4), np.uint8)
+            if conf.get('trail') and name.startswith('atk_'):
+                # the original's own swing (청룡신검's blue water: its glowing pixels away from the
+                # blade) round 연's body as round the original's, under the blade
+                tr = trail(conf['item'], render, DIRS[name.split('_')[1]], f, kfig)
+                if tr is not None:
+                    t_, tx0, ty0 = tr
+                    ys, xs = np.nonzero(t_[..., 3] > 0)
+                    X, Y = xs + tx0 + POX, ys + ty0 + POY
+                    ok = (X >= 0) & (X < PW) & (Y >= 0) & (Y < PH)
+                    lay[Y[ok], X[ok]] = t_[ys[ok], xs[ok]]
             px, py = int(round(POX + p['gx'] - gcx)), int(round(POY + p['gy'] - gcy))
             h, w = sc.shape[:2]
             ya, xa = max(0, -py), max(0, -px)
