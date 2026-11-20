@@ -52,6 +52,20 @@ MAP = {
                   'SFX_VOX_UI_KillLog_5', 'SFX_VOX_UI_KillLog_6', 'SFX_VOX_UI_KillLog_7', 'SFX_VOX_UI_KillLog_8_1'],
     },
     'skills': {
+        # 차수별 고유 기술 (data.js TIER_SKILLS): the record's own clip where the build has it, else its line's.
+        'w_lure': 'fx_skill_110401', 'w_will': 'fx_skill_330201', 'w_gale': 'fx_skill_110201', 'w_tarok': 'SFX_Warrior_3rd_01',
+        'w_gwangya': 'SFX_Warrior_5th_1', 'w_hogi': 'SFX_Warrior_5th_2_1', 'r_chamgan': 'fx_skill_210302', 'r_hyeoldok': 'SFX_Thief_5th_3_1',
+        'r_tudo': 'SFX_Thief_6th_1', 'm_chain': 'SFX_Magician_4th_02_2_1', 'm_instant': 'SFX_Magician_3rd_02_1', 'm_seonsim': 'fx_skill_42811',
+        'p_honma': 'fx_skill_420101', 'p_saint': 'fx_skill_heal_05', 'p_seongi': 'SFX_Shaman_5th_3', 'a_cheong': 'SFX_Archer_WindArrow_Base',
+        'a_cloud': 'SFX_Archer_WeeBo', 'a_rapid': 'SFX_Archer_Attack_Bow_1_1', 'a_rod': 'SFX_Archer_ThunderCharge', 'a_tuhyeol4': 'SFX_Archer_BloodStrikeR5_Hit',
+        'a_unhwa': 'SFX_Archer_RainArrow', 'l_hoecheon': 'SFX_Lancer_1st_01', 'l_noegi': 'SFX_Lancer_T_04', 'l_noegichim': 'SFX_Lancer_T_05_2',
+        'l_revenge': 'SFX_Lancer_S_01_1', 'l_weebo': 'SFX_Archer_WeeBo', 'l_ungi': 'fx_skill_230201', 'mk_whitepalm': 'fx_skill_deathfist',
+        'mk_whirl': 'SFX_Dokkaebi_2nd_WhirlWind', 'mk_air': 'SFX_Fight_BodyCheck', 'mk_muhan': 'SFX_Fighter_5th_1', 'mk_stack': 'fx_skill_quake',
+        'mk_yuk': 'SFX_Fighter_6th_1', 'md_fice': 'SFX_Warlock_OrbIce', 'md_flight': 'SFX_Warlock_OrbLight', 'md_ffire': 'SFX_Warlock_OrbFire',
+        'cl_gray': 'SFX_Celestial_3rd_MindControl', 'cl_wedge': 'SFX_Celestial_AgoArmor_Alt', 'cl_shatter': 'SFX_Celestial_3rd_GroundSlam', 'dk_walk': 'SFX_Dokkaebi_DokkaebiHat',
+        'dk_wisp1': 'SFX_Dokkaebi_WispFire', 'dk_mook': 'SFX_Dokkaebi_WispGet_2', 'dk_wisp2': 'SFX_Dokkaebi_5th_Jwibulnori_Cast', 'dk_maryu': 'SFX_Dokkaebi_Strength',
+        'dk_wisp3': 'SFX_Dokkaebi_2nd_WispExplosion', 'rp_convert': 'SFX_Reaper_SoulShot', 'rp_nether': 'SFX_Reaper_Redemption', 'rp_resonate': 'SFX_Reaper_Resonate',
+        'rp_guard': 'SFX_Reaper_Barrier', 'rp_bomb': 'SFX_Reaper_3rd_InfernoBlaze', 'rp_wraith': 'SFX_Reaper_3rd_SoulBuff',
         # The 기원 line: 누리·대지·바다·…·천공·구름·태양.
         'c_heal': ['fx_skill_heal_02', 'fx_skill_heal_02', 'fx_skill_heal_03', 'fx_skill_heal_03',
                    'fx_skill_heal_04', 'fx_skill_heal_06', 'fx_skill_heal_07', 'fx_skill_heal_08'],

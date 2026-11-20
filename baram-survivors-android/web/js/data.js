@@ -874,6 +874,140 @@ export const SKILLS = {
   rp_ult: { cls: 'reaper', name: '차사강림', kind: 'ult', fx: '144', hpCost: 0.2,
     desc: '체력 20%와 마력을 모두 써서, 저승차사의 힘으로 화면의 몬스터를 벤다' },
 };
+
+// 차수별 고유 기술 (TIER_SKILLS): each a mechanic of its own (game.js TIER_KINDS), so a class has more
+// than "a bigger blow" to pick at every 승급. Names are the class's own 연 records (Skills_Player and
+// its older numbering: 유인, 사슬벼락, 연사, 회천, 뇌기지체 ...), 연's shared techniques where the class
+// has no more of its own (청명파살, 운화, 백열장, 약육강식, 분골쇄신, 호신강기, 폭화분격) and, for the 차사's
+// 9차, the name of 연's 원혼소환 (a monster technique in 연; the 차사 has no tenth record). Icons and
+// effects: tools/yeon_tier_skills.json (k_<id> where 연 has the effect; else fx names one already in
+// the build). ck: the plain kind a companion casts it as (tierKit, memberTierCast); none = left out.
+// fx2: a second picture (the blow, the burst, the orb). Damage and waits sit on each tier's curve.
+const TIER_SKILLS = {
+  // 전사
+  w_lure: { cls: 'warrior', req: 4, name: '유인', kind: 'taunt', fx: 'k_w_roar', hit: 8, cd: 10, range: 4, duration: 3,
+    desc: '네 칸 안의 몬스터를 곁으로 끌어모아 치고, 잠시 받는 피해가 절반이 된다' },
+  w_will: { cls: 'warrior', req: 9, name: '의지의외침', kind: 'cleanse', fx: 'k_w_bless', hit: 10, cd: 12, duration: 3, stun: 0.8, radius: 1,
+    desc: '외침으로 몸에 걸린 해로운 상태를 모두 떨치고, 곁의 몬스터를 기절시키며 잠시 모든 기술이 빨리 돈다' },
+  w_gale: { promo: 1, cls: 'warrior', req: 6, name: '영풍진격', kind: 'charge', fx: 'k_w_rush', fx2: 'k_w_tiger', dmg: 22, cd: 3, range: 5, radius: 1, stun: 0.8, ck: 'nova',
+    desc: '무적이 되어 몬스터가 가장 많이 모인 곳으로 돌진해 내리찍고 둘레를 기절시킨다' },
+  w_tarok: { promo: 6, cls: 'warrior', req: 24, name: '타력광풍', kind: 'spin', fx: 'k_w_chohon', dmg: 30, cd: 5, radius: 1, ticks: 8, tick: 0.3, ck: 'nova',
+    desc: '광풍처럼 몸을 돌려 2.4초 동안 둘레의 몬스터를 거듭 베며, 도는 사이에도 움직일 수 있다' },
+  w_gwangya: { promo: 7, cls: 'warrior', req: 27, name: '광야건곤', kind: 'execute', fx: 'k_w_flash', dmg: 36, cd: 3.5, depth: 3, below: 0.3, ck: 'cleave', max: 9,
+    desc: '앞쪽 역삼각형을 가른다. 체력이 30% 아래인 몬스터는 단숨에 쓰러지고, 상처가 깊을수록 더 아프다' },
+  w_hogi: { promo: 9, cls: 'warrior', req: 33, name: '호기방출', kind: 'gust', fx: 'k_w_blackdragon', hit: 34, cd: 14, duration: 5, radius: 1, tick: 0.4, power: 0.2,
+    desc: '호기의 바람을 5초 동안 두른다. 바람이 둘레의 몬스터를 거듭 치고 밀어내며, 그동안 피해가 20% 는다' },
+  // 도적
+  r_chamgan: { promo: 7, cls: 'rogue', req: 27, name: '참간맹습', kind: 'hop', fx: 'k_r_dance', dmg: 30, cd: 3, range: 5, count: 4, stun: 0.5, ck: 'blink',
+    desc: '몬스터에서 몬스터로 번개처럼 옮겨 다니며 넷을 차례로 베고 잠시 멈춘다' },
+  r_hyeoldok: { promo: 8, cls: 'rogue', req: 30, name: '혈독주입', kind: 'zone', fx: 'g_poison_purple', fx2: 'y_hyeoldok', dmg: 26, cd: 6, radius: 2, duration: 4, tick: 0.5, k: 0.3, at: 'self', dot: 'venom', ck: 'strike',
+    desc: '발밑에 피의 독을 퍼뜨린다. 4초 동안 독에 닿은 몬스터는 거듭 피해를 입고 맹독에 걸린다' },
+  r_tudo: { promo: 9, cls: 'rogue', req: 33, name: '투도멸진', kind: 'mark', fx: 'g_curse_zod', fx2: 'k_r_amsal', dmg: 42, cd: 4.5, range: 5, count: 6, radius: 1, delay: 2, weak: 0.25, ck: 'strike',
+    desc: '몬스터 여섯의 약점을 드러내 2초 동안 받는 피해를 25% 늘린 뒤, 약점이 한꺼번에 터진다' },
+  // 주술사
+  m_chain: { promo: 6, cls: 'mage', req: 24, name: '사슬벼락', kind: 'chain', fx: 'k_p_noejeon', dmg: 26, cd: 2.4, range: 7, count: 5, jump: 3, decay: 0.82, stun: 0.4, ck: 'spell',
+    desc: '벼락이 몬스터에서 몬스터로 사슬처럼 튀어 다섯을 친다. 한 번 튈 때마다 조금씩 약해진다' },
+  m_instant: { promo: 7, cls: 'mage', req: 27, name: '즉발시전', kind: 'reset', fx: 'k_m_magi', cd: 16, duration: 2,
+    desc: '다른 모든 마법의 재사용 대기를 거의 끝내고, 잠시 모든 마법이 빨리 돈다' },
+  m_seonsim: { promo: 9, cls: 'mage', req: 33, name: '선심단멸', kind: 'detonate', fx: 'k_m_manpa', fx2: 'k_m_curse', dmg: 34, cd: 3, range: 7, radius: 2, curse: 4, per: 0.35, ck: 'strike',
+    desc: '대상 둘레에 저주를 내리고 터뜨린다. 저주·둔화·마비·중독처럼 걸린 상태가 많을수록 더 크게 터진다' },
+  // 도사
+  p_honma: { promo: 6, cls: 'poet', req: 24, name: '혼마기', kind: 'stack', fx: 'k_p_daeseon', fx2: 'k_p_jiroe', dmg: 20, cd: 1.8, range: 7, count: 3, stacks: 4, per: 0.25, ck: 'spell',
+    desc: '혼을 어지럽혀 몬스터 셋에 혼마를 쌓는다. 쌓일수록 아프고, 넷이 쌓이면 혼이 터져 둘레까지 친다' },
+  p_saint: { promo: 8, cls: 'poet', req: 30, name: '신성제마술', kind: 'cleanse', fx: 'k_p_judge', heal: 26, cd: 15, duration: 2, party: true, ck: 'heal',
+    desc: '자신과 동료에게 걸린 해로운 상태를 모두 걷어 내고 체력을 채우며, 잠시 어떤 공격도 받지 않는다' },
+  p_seongi: { promo: 9, cls: 'poet', req: 33, name: '선기전도', kind: 'wave', fx: 'k_p_wave', dmg: 40, cd: 6, radius: 5, push: 2, shieldT: 3, ck: 'nova',
+    desc: '선기가 둥글게 퍼져 다섯 칸까지 차례로 몬스터를 치고 밀어내며, 자신은 잠시 보호막을 두른다' },
+  // 궁사
+  a_cheong: { cls: 'archer', req: 3, name: '청명파살', kind: 'lance', fx: 'k_a_spiral', fx2: 'k_a_cheong', dmg: 16, cd: 2.2, depth: 9, grow: 0.12, ck: 'line',
+    desc: '푸른 빛의 화살이 아홉 칸을 꿰뚫는다. 꿰뚫을 때마다 12%씩 강해진다' },
+  a_cloud: { cls: 'archer', req: 8, name: '운상미보', kind: 'evade', fx: 'k_a_weebo', fx2: 'k_a_shot', hit: 14, cd: 7, count: 3, guard: 0.6, range: 6,
+    desc: '구름 위를 걷듯 가까운 몬스터에게서 세 칸 물러나며 잠시 무적이 되고, 물러나며 셋에게 화살을 쏜다' },
+  a_rapid: { promo: 1, cls: 'archer', req: 6, name: '연사', kind: 'flurry', fx: 'k_a_shot', dmg: 14, cd: 2.4, range: 6, hits: 6, k: 0.4, ck: 'spell',
+    desc: '한 몬스터에게 화살 여섯 발을 쉴 새 없이 쏜다. 4·7단에 한 발씩 는다' },
+  a_rod: { promo: 6, cls: 'archer', req: 24, name: '낙뢰충전', kind: 'totem', fx: 'k_a_thunder', fx2: 'k_dk_shock', hit: 26, cd: 8, range: 5, duration: 5, every: 0.6, k: 0.45, ck: 'strike', radius: 0,
+    desc: '벼락을 모은 화살을 땅에 꽂는다. 5초 동안 둘레 다섯 칸의 몬스터에게 벼락이 잇달아 떨어진다' },
+  a_tuhyeol4: { promo: 7, cls: 'archer', req: 27, name: '투혈사식', kind: 'mark', fx: 'g_nura_bleed', fx2: 'k_a_tuhyeol4', dmg: 40, cd: 4, range: 7, count: 3, radius: 1, delay: 1.5, hpCost: 0.04, strongest: true, ck: 'strike',
+    desc: '피를 태워(체력 4%) 가장 강한 몬스터 셋에 피의 화살을 박는다. 1.5초 뒤 화살이 터져 둘레까지 친다' },
+  a_unhwa: { promo: 9, cls: 'archer', req: 33, name: '운화', kind: 'rain', fx: 'y_baram', fx2: 'k_a_storm', dmg: 36, cd: 5, range: 7, radius: 3, drops: 10, dur: 2.5, k: 0.55, ck: 'strike',
+    desc: '몬스터가 가장 많은 곳 위에 구름 문을 열어 2.5초 동안 화살 열 줄기를 쏟는다' },
+  // 무사
+  l_hoecheon: { cls: 'lancer', req: 3, name: '회천', kind: 'boomerang', fx: 'k_l_hoecheon', dmg: 14, cd: 2.2, depth: 5, ck: 'line',
+    desc: '창을 회전시켜 던진다. 다섯 칸을 날아갔다 돌아오며 오가는 길의 몬스터를 두 번 친다' },
+  l_noegi: { cls: 'lancer', req: 9, name: '뇌기지체', kind: 'orbit', fx: 'g_astra', fx2: 'h_hit_light', hit: 12, cd: 12, duration: 6, n: 3, k: 0.4, ck: 'nova', radius: 1,
+    desc: '뇌기의 구슬 셋이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 친다' },
+  l_noegichim: { promo: 1, cls: 'lancer', req: 6, name: '뇌기침투', kind: 'knock', fx: 'k_l_moon', dmg: 22, cd: 2.6, depth: 4, push: 2, stun: 0.5, ck: 'line',
+    desc: '뇌기를 실은 창끝으로 앞 네 칸을 꿰찔러 몬스터를 두 칸 밀어내고 잠시 멈춘다' },
+  l_revenge: { promo: 6, cls: 'lancer', req: 24, name: '복수', kind: 'thorns', fx: 'k_l_reflect', fx2: 'h_ml_burst', hit: 30, cd: 14, duration: 6, radius: 1, tick: 0.5, k: 0.35, curse: 2,
+    desc: '6초 동안 곁에서 덤비는 몬스터에게 복수의 분노로 거듭 되갚아 치고 약화시킨다' },
+  l_weebo: { promo: 7, cls: 'lancer', req: 27, name: '위위비보', kind: 'evade', fx: 'k_a_weebo', fx2: 'k_l_spirit', hit: 34, cd: 8, guard: 1, radius: 1, after: true,
+    desc: '깃털처럼 세 칸 물러나며 1초 동안 무적이 되고, 서 있던 자리에 남긴 잔상이 터져 둘레를 친다' },
+  l_ungi: { promo: 9, cls: 'lancer', req: 33, name: '운기', kind: 'regen', fx: 'k_l_innate', hot: 3, cd: 18, duration: 6, mana: 0.2, ck: 'heal',
+    desc: '기운을 모아 6초 동안 매 0.5초 최대 체력의 3%씩 회복하고 마력을 채운다' },
+  // 격투가
+  mk_whitepalm: { cls: 'monk', req: 3, name: '백열장', kind: 'knock', fx: 'k_mk_whitepalm', dmg: 18, cd: 2, depth: 3, push: 2, ck: 'line',
+    desc: '하얀 장풍으로 앞 세 칸의 몬스터를 두 칸 밀쳐 낸다. 밀리다 막힌 몬스터는 잠시 멈춘다' },
+  mk_whirl: { cls: 'monk', req: 9, name: '회오리', kind: 'vortex', fx: 'k_dk_whirl', dmg: 16, cd: 4, depth: 5, dur: 1.2, k: 0.35, ck: 'line',
+    desc: '회오리를 앞으로 보내 다섯 칸을 휩쓴다. 곁의 몬스터를 길 위로 빨아들이며 거듭 친다' },
+  mk_air: { promo: 1, cls: 'monk', req: 6, name: '허공답보', kind: 'charge', fx: 'k_mk_air', fx2: 'k_mk_quake', dmg: 24, cd: 3, range: 5, radius: 1, stun: 0.6, ck: 'nova',
+    desc: '허공을 밟고 뛰어올라 몬스터가 가장 많은 곳에 내려앉으며 둘레를 친다' },
+  mk_muhan: { promo: 6, cls: 'monk', req: 24, name: '무한류', kind: 'flurry', fx: 'h_ml_punch', fx2: 'k_mk_bung', dmg: 34, cd: 3, range: 2, hits: 10, k: 0.3, stun: 0.8, melee: true, ck: 'slash',
+    desc: '앞의 한 몬스터에게 주먹 열 번을 끝없이 퍼붓고, 마지막 일격으로 띄워 잠시 멈춘다' },
+  mk_stack: { promo: 8, cls: 'monk', req: 30, name: '권기중첩', kind: 'stack', fx: 'k_mk_pointblue', fx2: 'k_mk_pointburst', dmg: 30, cd: 1.8, range: 4, count: 3, stacks: 4, per: 0.25, ck: 'spell',
+    desc: '권기를 몬스터 셋에 겹겹이 쌓는다. 쌓일수록 아프고, 넷이 쌓이면 권기가 터져 둘레까지 친다' },
+  mk_yuk: { promo: 9, cls: 'monk', req: 33, name: '약육강식', kind: 'execute', fx: 'k_mk_kyokushin', dmg: 42, cd: 3, depth: 2, below: 0.35, ck: 'cleave', max: 6,
+    desc: '약한 자는 강한 자의 먹이. 앞쪽을 쳐서 체력이 35% 아래인 몬스터는 단숨에 쓰러뜨린다' },
+  // 마도사
+  md_fice: { promo: 6, cls: 'magus', req: 24, name: '광폭구슬\'수', kind: 'zone', fx: 'y_seori', fx2: 'k_md_orbice', dmg: 26, cd: 5, range: 7, radius: 2, duration: 4, tick: 0.5, k: 0.3, slow: 2, ck: 'strike',
+    desc: '물의 광폭구슬을 던져 대상 둘레를 4초 동안 얼음 땅으로 만든다. 그 위의 몬스터는 거듭 피해를 입고 느려진다' },
+  md_flight: { promo: 7, cls: 'magus', req: 27, name: '광폭구슬\'뇌', kind: 'chain', fx: 'k_md_orblight', dmg: 30, cd: 2.4, range: 7, count: 5, jump: 3, decay: 0.85, stun: 0.4, ck: 'spell',
+    desc: '전기의 광폭구슬이 맞은 몬스터에서 곁의 몬스터로 다섯 번 전파된다' },
+  md_ffire: { promo: 9, cls: 'magus', req: 33, name: '광폭구슬\'화', kind: 'mark', fx: 'k_md_orbfire', fx2: 'k_md_bust', dmg: 46, cd: 3.5, range: 7, count: 2, radius: 2, delay: 1.2, ck: 'strike',
+    desc: '불의 광폭구슬을 몬스터 둘에 붙인다. 1.2초 뒤 구슬이 터져 둘레 두 칸을 크게 태운다' },
+  // 천인
+  cl_gray: { promo: 6, cls: 'celestial', req: 24, name: '회색지대', kind: 'vortex', fx: 'g_grab_ghost', dmg: 30, cd: 4, depth: 6, dur: 1.4, k: 0.35, slow: 3, ck: 'line',
+    desc: '거대한 회색 그림자가 앞으로 여섯 칸을 지나가며 닿는 몬스터를 끌어들여 치고 느리게 한다' },
+  cl_wedge: { promo: 8, cls: 'celestial', req: 30, name: '그림자쐐기', kind: 'trap', fx: 'g_curse_zod', fx2: 'k_cl_armor', dmg: 34, cd: 6, range: 4, count: 5, radius: 1, duration: 8, stun: 1, ck: 'strike',
+    desc: '몬스터 곁의 그림자 다섯 곳에 쐐기를 박는다. 8초 안에 몬스터가 다가오면 쐐기가 솟아 치고 묶는다' },
+  cl_shatter: { promo: 9, cls: 'celestial', req: 33, name: '분골쇄신', kind: 'sacrifice', fx: 'k_cl_shatter', fx2: 'k_cl_slam', dmg: 40, cd: 6, radius: 2, hpCost: 0.12, k: 1.5, ck: 'nova',
+    desc: '몸을 부수듯 체력 12%를 바쳐 둘레 두 칸을 내리친다. 바친 체력이 클수록 피해가 커진다' },
+  // 도깨비
+  dk_walk: { cls: 'dokkaebi', req: 4, name: '도깨비걸음', kind: 'charge', fx: 'k_dk_hat', fx2: 'k_dk_paddle', dmg: 18, cd: 3, range: 4, radius: 1, slow: 2, ck: 'nova',
+    desc: '누구도 따라올 수 없는 걸음으로 몬스터 무리 한가운데 뛰어들어 둘레를 치고 느리게 한다' },
+  dk_wisp1: { cls: 'dokkaebi', req: 9, name: '도깨비불 1성', kind: 'orbit', fx: 'g_flame', fx2: 'h_hit_fire', hit: 12, cd: 11, duration: 6, n: 2, k: 0.45, dot: 'burn', ck: 'nova', radius: 1,
+    desc: '도깨비불 둘이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 태운다(화상)' },
+  dk_mook: { promo: 1, cls: 'dokkaebi', req: 6, name: '메밀묵섭취', kind: 'regen', fx: 'k_dk_body', hot: 2.5, cd: 16, duration: 5, shieldT: 3, ck: 'heal',
+    desc: '아껴 둔 메밀묵을 먹어 5초 동안 체력을 조금씩 채우고, 잠시 받는 피해가 절반이 된다' },
+  dk_wisp2: { promo: 6, cls: 'dokkaebi', req: 24, name: '도깨비불 2성', kind: 'totem', fx: 'k_dk_wisp', fx2: 'h_hit_fire', hit: 28, cd: 8, range: 5, duration: 6, every: 0.5, k: 0.35, dot: 'burn', ck: 'strike', radius: 0,
+    desc: '도깨비불 화로를 세운다. 6초 동안 둘레 다섯 칸의 몬스터에게 불덩이를 잇달아 날린다' },
+  dk_maryu: { promo: 8, cls: 'dokkaebi', req: 30, name: '마류귀체', kind: 'thorns', fx: 'k_dk_strength', fx2: 'h_hit_fire', hit: 32, cd: 14, duration: 6, radius: 1, tick: 0.5, k: 0.35, drain: 0.01,
+    desc: '6초 동안 곁에서 덤비는 몬스터를 거듭 되받아치며, 칠 때마다 체력을 조금씩 되찾는다' },
+  dk_wisp3: { promo: 9, cls: 'dokkaebi', req: 33, name: '도깨비불 3성', kind: 'barrage', fx: 'g_sinsu_jujak_fire', fx2: 'k_dk_wispexp', dmg: 38, cd: 3.5, depth: 6, n: 7, k: 0.6, radius: 1, ck: 'spell', count: 3, range: 6,
+    desc: '도깨비불 일곱을 부채꼴로 날린다. 몬스터에 닿은 불은 터져 둘레까지 태운다' },
+  // 차사
+  rp_convert: { cls: 'reaper', req: 4, name: '영기변환', kind: 'stack', fx: 'k_rp_shot', fx2: 'k_rp_burst', dmg: 14, cd: 1.8, range: 5, count: 2, stacks: 4, per: 0.25, ck: 'spell',
+    desc: '베어 낸 영기를 몬스터 둘에 쌓는다. 쌓일수록 아프고, 넷이 쌓이면 영기가 터져 둘레까지 친다' },
+  rp_nether: { promo: 1, cls: 'reaper', req: 6, name: '저승의기원', kind: 'regen', fx: 'k_rp_resurrect', hot: 2.5, cd: 15, duration: 4, shieldT: 2, ck: 'heal',
+    desc: '저승의 기운으로 4초 동안 체력을 조금씩 채우고, 잠시 보호막을 두른다' },
+  rp_resonate: { promo: 2, cls: 'reaper', req: 10, name: '영혼공명', kind: 'orbit', fx: 'g_jinhon', fx2: 'k_rp_shot', hit: 14, cd: 12, duration: 6, n: 3, k: 0.45, slow: 1, ck: 'nova', radius: 1,
+    desc: '공명하는 영혼 셋이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 치고 느리게 한다' },
+  rp_guard: { promo: 4, cls: 'reaper', req: 18, name: '호신강기', kind: 'shieldburst', fx: 'k_cl_wall', fx2: 'k_rp_madness', hit: 30, cd: 12, duration: 4, radius: 2, stun: 0.6,
+    desc: '강기를 둘러 4초 동안 받는 피해가 절반이 되고, 강기가 풀릴 때 터져 둘레 두 칸을 치고 멈춘다' },
+  rp_bomb: { promo: 6, cls: 'reaper', req: 24, name: '폭화분격', kind: 'mark', fx: 'g_god_of_fire', fx2: 'k_rp_bomb', dmg: 42, cd: 4, range: 6, count: 3, radius: 1, delay: 1.4, dot: 'burn', ck: 'strike',
+    desc: '몬스터 셋에 업화의 불씨를 심는다. 1.4초 뒤 불씨가 터져 둘레까지 태운다(화상)' },
+  rp_wraith: { promo: 9, cls: 'reaper', req: 33, name: '원혼소환', kind: 'totem', fx: 'k_rp_soulbuff', fx2: 'k_rp_shot', hit: 36, cd: 8, range: 6, duration: 6, every: 0.45, k: 0.35, shots: 2, ck: 'strike', radius: 0,
+    desc: '원혼을 불러 세운다. 6초 동안 원혼이 둘레 여섯 칸의 몬스터 둘씩에게 혼의 화살을 잇달아 쏜다' },
+};
+Object.assign(SKILLS, TIER_SKILLS);
+// The late ones come by 계승 in the place of a spell of their line (PRE below).
+const TIER_PRE = {
+  w_tarok: 'w_chohon', w_gwangya: 'w_roar3', w_hogi: 'w_tarok', r_chamgan: 'r_dance', r_hyeoldok: 'r_drain', r_tudo: 'r_jiok',
+  m_chain: 'm_cheonggi', m_instant: 'm_magi', m_seonsim: 'm_curse', p_honma: 'p_weaken', p_saint: 'p_baekho2', p_seongi: 'p_daeseon',
+  a_rod: 'a_freeze', a_tuhyeol4: 'a_breakair', a_unhwa: 'a_storm', l_revenge: 'l_innate', l_weebo: 'l_wind', l_ungi: 'l_revenge',
+  mk_muhan: 'mk_uppercut', mk_stack: 'mk_pointburst', mk_yuk: 'mk_kyokushin', md_fice: 'md_orbice', md_flight: 'md_orblight',
+  md_ffire: 'md_orbfire', cl_gray: 'cl_storm', cl_wedge: 'cl_bind', cl_shatter: 'cl_slam', dk_wisp2: 'dk_wisp1', dk_maryu: 'dk_body',
+  dk_wisp3: 'dk_wisp2', rp_bomb: 'rp_inferno', rp_wraith: 'rp_bomb',
+};
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴, 5차 요괴굴, 6차 왕궁, 7차 무신의 탑, 8차 기린산, 9차 타계 마령굴.
 // 승급: each class's own conquests, in order. 1차 쥐굴, 2차 사슴굴, 3차 흉가, 4차 도깨비굴.
 // The spell tree: three 계열 a class, each running from the first spells to the 9차; a spell of
@@ -936,6 +1070,22 @@ export const BRANCHES = {
     { name: '저승', note: '기운을 빨고 몸을 지킨다', ids: ['rp_walk', 'rp_drain', 'rp_soulbuff', 'rp_resurrect', 'rp_barrier', 'rp_eye'] },
   ],
 };
+// The 차수별 기술 in their 계열 (index of the class's branch above).
+const TIER_BRANCH = {
+  w_gale: 0, w_gwangya: 0, w_tarok: 1, w_hogi: 1, w_lure: 2, w_will: 2,
+  r_chamgan: 0, r_tudo: 1, r_hyeoldok: 1,
+  m_seonsim: 2, m_chain: 1, m_instant: 2,
+  p_saint: 0, p_honma: 1, p_seongi: 2,
+  a_cheong: 0, a_rapid: 0, a_unhwa: 1, a_rod: 1, a_tuhyeol4: 1, a_cloud: 2,
+  l_hoecheon: 0, l_noegichim: 0, l_weebo: 1, l_noegi: 2, l_revenge: 2, l_ungi: 2,
+  mk_whitepalm: 0, mk_muhan: 0, mk_yuk: 0, mk_whirl: 1, mk_stack: 1, mk_air: 2,
+  md_fice: 0, md_flight: 0, md_ffire: 1,
+  cl_shatter: 0, cl_gray: 1, cl_wedge: 2,
+  dk_walk: 1, dk_wisp1: 2, dk_wisp2: 2, dk_wisp3: 2, dk_mook: 2, dk_maryu: 2,
+  rp_convert: 0, rp_bomb: 1, rp_wraith: 1, rp_resonate: 1, rp_nether: 2, rp_guard: 2,
+};
+for (const [id, i] of Object.entries(TIER_BRANCH)) BRANCHES[SKILLS[id].cls][i].ids.push(id);
+
 const PRE = {
   w_rush: 'w_sword', w_flash: 'w_rush', w_advance: 'w_flash', w_swords: 'w_flash',
   w_dragon: 'w_howl', w_thunder: 'w_dragon', w_blackdragon: 'w_thunder',
@@ -967,6 +1117,7 @@ const PRE = {
 };
 const AWAKEN = { w_thunder: 'w_myriad', r_bloom: 'r_gale', m_inferno: 'm_kalpa', p_bagua: 'p_taiji', a_chain: 'a_blood5', l_dragon: 'l_moonfull', mk_point: 'mk_aventhit', md_storm: 'md_wavefrenzy', cl_gumiho: 'cl_reindeer', dk_nemesis: 'dk_rage', rp_chain: 'rp_gate' };
 for (const [id, from] of Object.entries(PRE)) SKILLS[id].pre = [from, 3];
+for (const [id, from] of Object.entries(TIER_PRE)) SKILLS[id].pre = [from, 3];
 for (const [from, into] of Object.entries(AWAKEN)) {
   SKILLS[from].up = into;
   SKILLS[into].evolved = true;
