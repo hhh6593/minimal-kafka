@@ -231,6 +231,18 @@
   /* Shortcuts: every errand of the town without the walk. */
   #town-quick { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 34px; display: flex; flex-direction: column; gap: 4px; }
   #town-quick .btn { min-width: 0; padding: 4px 10px; font-size: 11px; }
+  /* 다음 목표: one line under the purse, the nearest step to grow (a tap goes there). */
+  #town-goal { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); max-width: min(62vw, 560px); min-width: 0;
+      padding: 2px 10px; font: 700 11px/16px G11, monospace; color: #fff2d0; background: rgba(30, 16, 8, .85);
+      border: 1px solid #a0602a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 0 #000; }
+  #town-goal small { font: 10px G9, monospace; color: #ffc860; margin-right: 4px; }
+  #town-goal.hot { border-color: #ffd040; box-shadow: 0 0 6px 1px rgba(255, 208, 64, .6); animation: goal-glow 1.2s ease-in-out infinite alternate; }
+  @keyframes goal-glow { from { box-shadow: 0 0 3px 0 rgba(255, 208, 64, .4); } to { box-shadow: 0 0 9px 2px rgba(255, 208, 64, .8); } }
+  /* 의뢰: a bar for the count, a ready one lit, the week's chest in gold. */
+  .qbar { display: inline-block; width: 46px; height: 5px; margin-right: 4px; vertical-align: middle; background: #6a4a2a; border: 1px solid #3a2010; }
+  .qbar i { display: block; height: 100%; background: #e8b030; }
+  .trade-row.ready { box-shadow: inset 0 0 0 2px #e0a010; }
+  .trade-row.chest b { color: #a05a00; }
   #town-sound { position: absolute; right: max(8px, env(safe-area-inset-right)); bottom: 8px; display: flex; gap: 4px; }
   #town-sound .btn { min-width: 0; padding: 3px 8px; font-size: 11px; }
   #title-sound { display: flex; gap: 6px; }
@@ -790,6 +802,43 @@
   #keys #dash-btn.glow { box-shadow: 0 0 8px 3px #ffd040; }
   #over-stats .grade { font-size: 15px; }
   #over-stats .gS { color: #ff8a20; } #over-stats .gA { color: #e8c040; } #over-stats .gB { color: #a0c8ff; }
+  /* 결과: the grade large, the rare finds in gold, the gains as chips with icons, 의뢰 moved, the next goal. */
+  #over-stats { line-height: 1.5; }
+  #over-stats .r-head { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #over-stats .r-grade { font: 700 34px/36px G11, monospace; min-width: 40px; padding: 0 4px; color: #6a6a6a; background: #2a1606;
+      border: 2px solid #a0602a; text-shadow: 2px 2px 0 #000; }
+  #over-stats .r-grade.gS { color: #ff8a20; box-shadow: 0 0 10px 2px #ffb040; } #over-stats .r-grade.gA { color: #ffd040; } #over-stats .r-grade.gB { color: #a0c8ff; } #over-stats .r-grade.gC { color: #c8c8c8; }
+  #over-stats .r-who { text-align: left; font-size: 11px; }
+  #over-stats .r-style { font-size: 10px; color: #5a3010; }
+  #over-stats .r-star { color: #e09000; letter-spacing: 1px; }
+  #over-stats em { font-style: normal; color: #c03000; font-weight: 700; }
+  #over-stats .r-special { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 3px 0; }
+  #over-stats .r-special span { padding: 1px 8px; font-weight: 700; color: #fff2a0; background: linear-gradient(#7a4a00, #4a2800); border: 1px solid #ffd040;
+      box-shadow: 0 0 6px 1px rgba(255, 200, 60, .7); text-shadow: 1px 1px 0 #000; }
+  #over-stats .r-gains { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 4px; margin: 3px 0; }
+  .rchip { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px 0 2px; font: 700 11px/18px G11, monospace; color: #2a1606;
+      background: #f0d9a8; border: 1px solid #8a5a2a; white-space: nowrap; }
+  .rchip img { width: 16px; height: 16px; object-fit: contain; image-rendering: pixelated; }
+  .rchip small { font: 10px G9, monospace; color: #6a4a2a; }
+  .rchip.gold { color: #7a4a00; } .rchip.coin { color: #0a4a7a; } .rchip.cos { color: #8a1a9a; } .rchip.gear { white-space: normal; }
+  #over-stats .r-promo { font-weight: 700; color: #7a1800; }
+  #over-stats .r-comp { font-size: 10px; color: #1a5a10; }
+  #over-stats .r-quest { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #3a2a10; }
+  #over-stats .r-quest .done { color: #0a6a10; font-weight: 700; }
+  #over-stats .r-next { font-size: 10px; color: #4a2a08; }
+  #over-stats .r-next small { color: #a05a00; font-weight: 700; margin-right: 3px; }
+  #over-stats .r-skills { font-size: 9px; color: #6a4a2a; }
+  /* 승급 의식 (over the results), and the gold line of a special found. */
+  #promo-fx { position: fixed; z-index: 60; cursor: pointer; }
+  #promo-fx .pc-card { width: min(320px, 88vw); }
+  #promo-fx .pc-n { font: 700 18px G11, monospace; color: #a01800; text-shadow: 0 0 6px #ffd860; }
+  #promo-fx .pc-sks { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+  #promo-fx .pc-sk { display: flex; flex-direction: column; align-items: center; width: 64px; font-size: 9px; }
+  #promo-fx .pc-sk img { width: 32px; height: 32px; }
+  #promo-fx .pc-tap { opacity: .7; font-size: 9px; }
+  #chat p.loot { color: #a06a00; font-weight: 700; }
+  body.yeon #chat p.loot { color: #ffd040; }
+  #town-quick .btn.hot { border-color: #ffe080 #8a5a00 #8a5a00 #ffe080; background: #e8b860; }
   #ult-mode { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #2a1606; border: 2px solid rgb(148,48,219); }
 </style>
 </head>
@@ -831,6 +880,7 @@
 
 <div id="town" class="screen" hidden>
   <div class="town-top"><span id="town-name"></span><span id="town-gold"></span></div>
+  <button id="town-goal" class="btn" hidden></button>
   <button id="town-back" class="btn">직업 선택</button>
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
   <button id="talk" class="btn" hidden></button>
