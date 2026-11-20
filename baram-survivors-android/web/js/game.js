@@ -4284,7 +4284,7 @@ function update(dt) {
   updateStyle(dt);
   if (!G.dead) updatePickups(dt);
   for (const f of G.fxs) f.t += dt;
-  G.fxs = G.fxs.filter(f => f.t < f.life);
+  G.fxs = G.fxs.filter(f => f.t < f.life && !(f.on && fxDone(f)));
   for (const d of G.dying) d.t += dt;
   if (G.shocks) {
     for (const s of G.shocks) s.t += dt;
@@ -7061,17 +7061,25 @@ function cast(skill, st) {
       if (p.hp >= p.maxHp && (!low || low === p)) return retry(1);
       heal(st.heal, false);
       if (low && low !== p) healMember(low, st.heal, fxid);
-      if (G.war) War.heroHeal(st.heal, fxid); // 대항전: the 기원 reaches the allies near
+      // 대항전·쟁·공대: the 기원 reaches the allies near (a 도사's as a healer's), its picture on each.
+      if (G.war) War.heroHeal(st.heal, fxReach, G.cls.id === 'poet', low);
       // A 도사 hero in a raid is the party's healer: its 기원 reach everyone standing.
       if (G.stage.raid && !G.war && G.cls.id === 'poet') for (const m of G.party) if (m !== low && !m.down) healMember(m, m.maxHp * st.heal / p.maxHp * 0.6);
       if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
       if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
       if (def.guard) G.buffs.guard = Math.max(G.buffs.guard, G.t + def.guard);
-      // The 기원's own picture for its grade (누리, 대지, 바다 …), over the hero.
-      if (fxid) addFx(fxid, 0, -26, { follow: true });
+      // The 기원's own picture for its grade (누리, 대지, 바다 …), over the hero: at a caster's size
+      // everywhere (in a war or a raid, and for the shared 누리의 기원, it was the small one, a ring
+      // lost under the hero among the field's blows).
+      const hfx = casterBig(fxReach, 'heal', skill.lv) || fxid;
+      if (hfx) addFx(hfx, 0, -26, { follow: true });
       audio.play('skill_' + skill.id, def.kind, skill.lv);
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
+      // Not counted as a blow (used stays false), but the 기원 is still a spell said aloud: the
+      // casting pose (it had none, the hero stood idle while it went off).
+      strikePose('magic');
+      p.castUntil = G.t + 0.3;
       break;
     }
     case 'buff': {
@@ -7103,7 +7111,8 @@ function cast(skill, st) {
   if (used) {
     if (def.darken) G.darkUntil = G.t + def.darken;
     audio.play('skill_' + skill.id, def.kind, skill.lv);
-    const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior')
+    // (A blink is a dash and a strike, but a caster's own (주술사's 이형환위) is a spell: the cast.)
+    const melee = def.kind === 'slash' || (def.kind === 'blink' && !['mage', 'poet', 'magus'].includes(G.cls.id)) || (def.kind === 'spell' && G.cls.id === 'warrior')
       || (WEAPON_POSE.has(G.cls.id) && !['buff', 'heal'].includes(def.kind));
     strikePose(melee ? 'attack' : 'magic');
     G.player.castUntil = G.t + 0.3; // 기본 공격: not in the middle of a cast
@@ -8093,7 +8102,8 @@ function castUlt() {
   if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
   const shownName = ultShown(G.cls.id).name;
   G.bubble = { text: `${shownName}!`, t: G.t };
-  strikePose(MELEE.has(G.cls.id) || WEAPON_POSE.has(G.cls.id) ? 'attack' : 'magic');
+  // A blade's or a bow's strike for the fighters; the 천인 (in MELEE for its leap) casts its 필살기.
+  strikePose(MELEE_LOOK[G.cls.id] || WEAPON_POSE.has(G.cls.id) ? 'attack' : 'magic');
   say(`${shownName}!`);
   audio.play('skill_' + def.id, 'ult');
   if (def.darken) G.darkUntil = G.t + def.darken;
@@ -9694,7 +9704,7 @@ function healMember(m, n, fx = null) {
   m.hp += n;
   if (G.war) War.healed(m, n);
   healText(m, n, 58);
-  if (fx) addFx(fx, m.x, m.y - 26, { scale: 0.8 });
+  if (fx) fxOnBody(fx, m, -26, { scale: 0.8 });
 }
 
 /**
@@ -10244,14 +10254,14 @@ function memberTierCast(m, near, face, pose) {
       if (d.buff === 'shield' ? m.hp >= m.maxHp * 0.7 : !t) continue;
       if (d.buff === 'power') { m.buffUntil = G.t + (d.duration || 4) * 1.2; m.buffK = (d.power || 0.4) * 0.5; }
       else if (d.buff === 'shield') m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.15);
-      addFx(fxid, m.x, m.y - 26, { anchor: 'center' });
+      fxOnBody(fxid, m, -26, { anchor: 'center' });
       done = true;
     } else if (d.kind === 'heal') {
       const low = partyBodies().filter(b => b.hp < b.maxHp * 0.6).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
       if (!low) continue;
       const n = low.maxHp * Math.min(0.3, 0.1 + 0.02 * sl);
       if (low === p) heal(n, true); else low.hp = Math.min(low.maxHp, low.hp + n);
-      addFx(fxid, low.x, low.y - 26, { anchor: 'center' });
+      fxOnBody(fxid, low, -26, { anchor: 'center' });
       done = true;
     } else if (t) {
       const reach = d.kind === 'cleave' || d.kind === 'line' || d.kind === 'slash' || d.kind === 'nova' ? 2.2 : 7;
@@ -10288,7 +10298,8 @@ function memberTierCast(m, near, face, pose) {
     m.tierGap = G.t + (G.stage.raid ? 1.0 : 1.4) * haste;
     if (d.buff === 'haste') m.hasteUntil = G.t + (d.duration || 4);
     if (d.promo >= 4) partySay(m, d.name); else m.bubble = { text: d.name, t: G.t };
-    pose('magic');
+    // A fighter's blow is its weapon's swing; spells, 기원 and buffs the cast (the hero's own rule).
+    pose((MELEE_LOOK[m.cls.id] || WEAPON_POSE.has(m.cls.id)) && !['buff', 'heal'].includes(d.kind) ? 'attack' : 'magic');
     return true;
   }
   return false;
@@ -10297,7 +10308,8 @@ function memberTierCast(m, near, face, pose) {
 function partyAct(m) {
   // Companions help; the hero carries the hunt, so each hits about as hard as a starting spell.
   const p = G.player, pw = (1 + 0.15 * (m.lv - 1)) * (1 + (m.own ? m.cl : p.lvl) * 0.04) * (m.power || 1) * auraK(m);
-  const pose = kind => { m.pose = kind; m.poseT = 0.3; };
+  // (the clip's own length: 0.3 on a swing started its frames below the first, a blank frame)
+  const pose = kind => { m.pose = kind; m.poseT = kind === 'attack' ? 0.22 : 0.3; };
   const near = n => nearestEnemies(n, 7, { tx: m.tx, ty: m.ty });
   const face = t => {
     m.fdx = Math.abs(t.x - m.x) > Math.abs(t.y - m.y) ? Math.sign(t.x - m.x) : 0;
@@ -10361,7 +10373,7 @@ function partyAct(m) {
         m.cd.b = 14;
         G.buffs.shield = Math.max(G.buffs.shield, G.t + 4 + m.lv);
         for (const b of partyBodies()) addShot(m, b, { color: '#5aa8ff', glow: '#c0e0ff', size: 3, speed: 420, onHit: () =>
-          addFx(FX.shield, b === p ? 0 : b.x, -26 + (b === p ? 0 : b.y), { follow: b === p, scale: 0.6 }) });
+          fxOnBody(FX.shield, b, -26, { scale: 0.6 }) });
         audio.play('party_guard');
         partySay(m, G.stage.raid ? '보무' : '보호');
         if (G.stage.raid) partyTalk(m, ['보무 갑니다~', '보호 무장 걸어요!']);
@@ -11524,8 +11536,24 @@ function addFx(id, x, y, o = {}) {
   // faded in instead (a white pop the size of the beast, seen at every 현무·청룡·주작 격).
   const skip = FX_LEAD[id] || 0;
   G.fxs.push({ id, x, y, t: skip - (o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
-    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint, skip, fadeIn: skip ? 0.2 : 0 });
+    follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint, skip, fadeIn: skip ? 0.2 : 0,
+    alpha: o.alpha, on: o.on }); // (o.alpha: an AI fighter's picture, see-through: war.js aiAlpha)
   return life;
+}
+
+/**
+ * A 기원, a shield or a buff on a body (a companion, a war's or raid's fighter): it stays on that
+ * body for its whole life, moving with it (x, y offsets from its feet), and ends when it falls.
+ * (They were left where they began: a healed fighter walked out of its 기원.) On the hero: follow.
+ */
+function fxOnBody(id, b, dy = -26, o = {}) {
+  if (!b) return 0;
+  if (b === G.player || b.hero) return addFx(id, 0, dy, { ...o, follow: true });
+  return addFx(id, 0, dy, { ...o, on: b });
+}
+function fxDone(f) {
+  const b = f.on;
+  return b && (b.dead || b.down || b.hp <= 0 || (b.war && G.war && !G.war.bodies.includes(b)));
 }
 
 function fxFrame(d, t, loop) {
@@ -11950,7 +11978,9 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
-  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle', dead: 'dead' }[pose] || 'idle';
+  // 'magic' (strikePose: a spell, a 기원, the casters' plain blow) is 연's cast clip; it fell to
+  // idle here, so a 마도사's or 주술사's spells went off with the hero standing still.
+  const name = { walk: 'walk', attack: 'atk', cast: 'cast', magic: 'cast', idle: 'idle', dead: 'dead' }[pose] || 'idle';
   // A fallen hero is 연's own ghost: the dead frame, the same from every side.
   const a = name === 'dead' && H.anims.dead ? H.anims.dead
     : H.anims[`${name}_${dir}`] || H.anims[`idle_${dir}`] || H.anims.walk_down;
@@ -12298,7 +12328,7 @@ function drawYhero(clsId, armor, b, x, y, pose, alpha) {
   if (!yh) return false;
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
-  const name = { walk: 'walk', attack: 'atk', cast: 'cast', idle: 'idle' }[pose] || 'idle';
+  const name = { walk: 'walk', attack: 'atk', cast: 'cast', magic: 'cast', idle: 'idle' }[pose] || 'idle';
   const a = yh.u.anims[`${name}_${dir}`] || yh.u.anims[`idle_${dir}`] || yh.u.anims.walk_down;
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
@@ -12892,7 +12922,7 @@ function render(now) {
   const trail = !G.war && p.trail, puffs = [];
   for (const f of G.fxs) {
     if (f.t < 0) continue;
-    let x = f.follow ? p.x + f.x : f.x, y = f.follow ? p.y + f.y : f.y;
+    let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
     if (f.mv) {
       // Travelling (a row's arrow or beam): out to its end over mv[2] seconds, slowing at the last.
       const k = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - k) * (1 - k);
@@ -13613,6 +13643,7 @@ function syncSettings() {
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
+  $('#opt-aifx').textContent = `AI 이펙트 투명도: ${Math.round((1 - aiFxAlpha()) * 100)}%`;
   $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
   $('#lv-auto').textContent = settings.autoPick ? '자동 선택 켬' : '자동 선택';
 }
@@ -13830,6 +13861,19 @@ $('#opt-info').onclick = () => {
 // softer white on the struck, the added-light 격 pictures dimmer.
 $('#opt-calm').onclick = () => {
   settings.calmFx = !settings.calmFx;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// AI 이펙트 투명도: how see-through the war's, raid's and 쟁's other fighters' pictures are drawn
+// (war.js aiAlpha; the hero's own spells and the 기원 on it stay solid). From the next picture on.
+const AI_FX_STEPS = [1, 0.8, 0.65, 0.5, 0.35];
+function aiFxAlpha() {
+  const v = settings.aiFxAlpha;
+  return typeof v === 'number' && v > 0 && v <= 1 ? v : 0.65;
+}
+$('#opt-aifx').onclick = () => {
+  const i = AI_FX_STEPS.findIndex(v => Math.abs(v - aiFxAlpha()) < 0.01);
+  settings.aiFxAlpha = AI_FX_STEPS[(i + 1) % AI_FX_STEPS.length];
   saveJson('bs_settings', settings);
   syncSettings();
 };
