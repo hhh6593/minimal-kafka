@@ -328,6 +328,14 @@
   .coordi-poses, .coordi-actions { display: flex; gap: 3px; flex-wrap: wrap; }
   .coordi-actions { margin-top: auto; justify-content: flex-end; }
   .coordi-presets { display: flex; gap: 2px; align-items: center; flex-wrap: nowrap; }
+  .coordi-dye { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; }
+  .coordi-dye small { font-size: 10px; color: #6a4a20; }
+  .coordi-dye .btn { min-width: 0; padding: 2px 6px; font-size: 11px; }
+  .coordi-dye .btn.on { background: #7a2a08; color: #ffe8b0; }
+  .coordi-dye .dyesw { width: 15px; height: 15px; padding: 0; border: 1px solid #5a3a10; border-radius: 50%; opacity: .55; cursor: pointer; }
+  .coordi-dye .dyesw.own { opacity: 1; }
+  .coordi-dye .dyesw.on { outline: 2px solid #7a2a08; outline-offset: 1px; opacity: 1; }
+  .coordi-dye .dyenote { flex-basis: 100%; }
   .coordi-presets small { font-size: 10px; color: #6a4a20; white-space: nowrap; }
   .coordi-presets .btn { min-width: 0; padding: 2px 6px; font-size: 11px; flex: none; opacity: .55; }
   .coordi-presets .btn.full, .coordi-presets .btn.pick, .coordi-presets .btn:last-child { opacity: 1; }
