@@ -8158,7 +8158,8 @@ function ultPic(id, x, y, o = {}) {
   return addFx(want, x, y, o);
 }
 function ultHitPic(t, e, delay) {
-  if (!t.hit || !M.fx[t.hit]) return;
+  // (eighteen at most a cast: a full screen of eighty struck each wearing it slowed a phone)
+  if (!t.hit || !M.fx[t.hit] || (G.ultHits = (G.ultHits || 0) + 1) > 18) return;
   fxOn(t.hit, e, { delay, scale: t.hitScale || 1.1 });
 }
 function ultAfter(t, x, y, delay = 0) {
@@ -8299,7 +8300,8 @@ const ULT_MECH = {
     const onLine = e => ways.some(([dx, dy]) => { const a = (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, s = Math.abs((e.tx - p.tx) * dy - (e.ty - p.ty) * dx); return a > 0 && s <= 1; });
     ways.forEach(([dx, dy], w) => {
       for (let k = 1; k <= (t.len || 5); k++) {
-        later(0.1 + k * 0.07 + w * 0.02, () => ultPic(t.main, p.x + dx * k * TILE * 1.4, p.y - 6 + dy * k * TILE * 1.4, { want: t.mainSize || 110, anchor: 'bottom' }));
+        // (a size a ring: each ring its own picture, so the four-of-one-picture limit of addFx holds per ring)
+        later(0.1 + k * 0.07 + w * 0.02, () => ultPic(t.main, p.x + dx * k * TILE * 1.4, p.y - 6 + dy * k * TILE * 1.4, { want: (t.mainSize || 110) + k * 6, anchor: 'bottom' }));
       }
     });
     if (t.cast) ultPic(t.cast, 0, -26, { follow: true, want: t.castSize || 200 });
@@ -8319,7 +8321,7 @@ const ULT_MECH = {
       later(0.1 + s * (t.gap || 0.13), () => {
         for (let k = -1; k <= 1; k++) {
           const side = k * (dx ? v.h : v.w) * 0.55;
-          ultPic(t.main, p.x + (dx * a + dy * side) * TILE, p.y - 6 + (dy * a + dx * side) * TILE, { want: t.mainSize || 150, anchor: 'bottom', flip: dx < 0 });
+          ultPic(t.main, p.x + (dx * a + dy * side) * TILE, p.y - 6 + (dy * a + dx * side) * TILE, { want: (t.mainSize || 150) + (k + 1) * 6, anchor: 'bottom', flip: dx < 0 });
         }
         G.shake = Math.max(G.shake, 0.14);
       });
@@ -8598,6 +8600,7 @@ function castUlt() {
     }
   } else {
     const strike = (e, k) => { if (e.hp > 0) hurtEnemy(e, base * k); };
+    G.ultHits = 0;
     const run = ULT_MECH[def.mech] || ULT_MECH.rain;
     if (seen.length || def.mech === 'sanctuary') run(def, seen, strike);
   }
@@ -15505,6 +15508,14 @@ window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
 window.__ult = () => castUlt();
+window.__gather = (r = 4) => { // test: the field's foes set round the hero (for frames of a skill going off)
+  const p = G.player, spots = [];
+  for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if ((x || y) && Math.hypot(x, y) <= r + 0.5) spots.push([p.tx + x, p.ty + y]);
+  spots.sort(() => Math.random() - 0.5);
+  let n = 0;
+  for (const e of G.enemies) { const s = spots.find(([x, y]) => free(x, y)); if (s && tkShove(e, s[0], s[1])) { e.mt = e.dur; e.moving = false; n++; } }
+  return n;
+};
 window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
 window.__main = () => castMain(); // 몰이기 (test: a player pressing it into a heap)
 window.__mainCount = () => (G && mainOn() ? mainCount() : 0);

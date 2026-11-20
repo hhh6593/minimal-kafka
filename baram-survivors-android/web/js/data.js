@@ -1460,7 +1460,7 @@ export const ULT_TIERS = {
   ],
   mage: [
     ult('mage', 'm_ult', '헬파이어', { mech: 'meteor', main: 'k_m_ult', mainSize: 220, hit: 'k_x_m_ult_hit', after: 'k_m_quake', n: 5, shield: 5, boss: 'm_seongryeo', k: 1 }),
-    ult('mage', 'm_hell2', "헬파이어'첨", { mech: 'cross', cast: 'k_m_magi', castSize: 140, main: 'k_m_hell2', mainSize: 120, hit: 'k_x_m_ult_hit', after: 'k_m_sammae', len: 6, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
+    ult('mage', 'm_hell2', "헬파이어'첨", { mech: 'cross', cast: 'k_m_magi', castSize: 140, main: 'k_m_hell2', mainSize: 120, hit: 'k_m_sammae', after: 'k_m_quake', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
       desc: '헬파이어의 극의. 여덟 갈래로 뻗는 불기둥이 화면을 가르고, 남은 몬스터에게 불길이 번진다' }),
     ult('mage', 'm_fire3', '폭류유성', { mech: 'rain', main: 'k_m_fire3', frac: 0.95, drop: 'k_m_seongryeo', dropSize: 150, hit: 'k_x_m_ult_hit', span: 1.6, shield: 5, boss: 'm_jiokchak', k: 1.3 }),
     ult('mage', 'm_kalpa', '겁화', { mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'k_m_hyeongsang', hitScale: 0.6, after: 'k_m_quake', afterScale: 2, shield: 6, boss: 'm_cross', k: 1.5 }),
@@ -1478,7 +1478,7 @@ export const ULT_TIERS = {
     ult('archer', 'a_blood5', '투혈오식', { mech: 'mark', cast: 'k_u_a_r5cast', frac: 0.5, main: 'k_a_cheong', markScale: 0.6, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
   ],
   lancer: [
-    ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'k_l_phantom', len: 5, boss: 'l_meteor', k: 1 }),
+    ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'k_l_phantom', len: 4, diag: true, boss: 'l_meteor', k: 1 }),
     ult('lancer', 'l_genesis', '천지개벽', { mech: 'rain', main: 'k_l_genesis', frac: 0.9, drop: 'k_u_l_pillar', dropSize: 170, hit: 'k_u_l_bolt', boss: 'l_rush', k: 1.15 }),
     ult('lancer', 'l_dragon', '맹룡승천', { mech: 'meteor', main: 'k_l_dragon', mainSize: 230, hit: 'k_u_l_dragonhead', hitScale: 0.6, after: 'k_l_extinct', afterScale: 0.5, n: 5, gap: 0.25, boss: 'l_annihil', k: 1.3 }),
     ult('lancer', 'l_moonfull', '월하멸섬', { mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'k_u_l_moonbeam', hitScale: 0.5, steps: 7, boss: 'l_javelin', k: 1.5 }),
