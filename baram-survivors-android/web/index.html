@@ -25,7 +25,7 @@
 
   /* Windows share the side panel's materials: a carved wooden frame around parchment, dark ink,
      raised tan keys. Text that sits straight on the game view stays light with a dark edge. */
-  #pause-box, #lv-box, #cr-box, #over-box, #sounds-box, #stage-info {
+  #pause-box, #lv-box, #over-box, #sounds-box, #stage-info {
     color: #2a1606; background: #d8b070; border: 4px solid; border-color: #a0602a #2a1004 #2a1004 #a0602a;
     box-shadow: inset 0 0 0 2px #6a3a18, inset 0 0 0 3px #f0d49c, 0 0 0 1px #000; border-radius: 0; }
   .card, .choice {
@@ -38,7 +38,7 @@
   .caption { margin: -2px -2px 6px; padding: 2px 8px; font-weight: 700; color: #f6e6c0; background: #6a3a18;
       border-bottom: 2px solid #2a1004; text-shadow: 1px 1px 0 #2a1004; }
 
-  .screen, #levelup, #crossroad, #pause, #loading { position: fixed; inset: 0; display: flex; flex-direction: column;
+  .screen, #levelup, #pause, #loading { position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 8px; padding: max(8px, env(safe-area-inset-top))
       max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
   .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -180,11 +180,11 @@
   #stage-info .state { font: 10px G9, monospace; color: #6a4a2a; }
   #stage-info .state.done { color: #1a6a10; }
 
-  #levelup, #crossroad, #pause { background: rgba(0, 0, 0, .5); z-index: 10; }
+  #levelup, #pause { background: rgba(0, 0, 0, .5); z-index: 10; }
   /* In a hunt, windows open over the play view, not over the side panel. */
-  body.hunting #levelup, body.hunting #crossroad, body.hunting #pause { right: var(--side); }
-  #lv-box, #cr-box, #pause-box, #over-box { padding: 0 8px 8px; width: min(100%, 480px); }
-  #choices, #cr-choices { display: flex; flex-direction: column; gap: 4px; }
+  body.hunting #levelup, body.hunting #pause { right: var(--side); }
+  #lv-box, #pause-box, #over-box { padding: 0 8px 8px; width: min(100%, 480px); }
+  #choices { display: flex; flex-direction: column; gap: 4px; }
   .lv-keys { margin-top: 6px; }
   .lv-keys .btn { min-width: 0; flex: 1; padding: 3px 6px; font-size: 11px; }
   .choice { display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; }
@@ -205,8 +205,11 @@
   /* The town: the map is drawn on the canvas; only the labels and keys sit over it. */
   #town { pointer-events: none; justify-content: flex-start; align-items: stretch; }
   #town button { pointer-events: auto; }
-  .town-top { display: flex; justify-content: space-between; padding: 2px 8px; font-weight: 700; color: #f6e6c0;
-      background: rgba(30, 16, 8, .85); border: 1px solid #a0602a; align-self: center; gap: 24px; }
+  /* The purse and the 다음 목표 under it: one block, the same width and the same left edge (the
+     goal was a box of its own, centred on its own width, a few pixels off the purse). */
+  .town-head { align-self: center; display: flex; flex-direction: column; align-items: stretch; max-width: min(94vw, 640px); }
+  .town-top { display: flex; justify-content: space-between; align-items: center; padding: 2px 8px; font-weight: 700; color: #f6e6c0;
+      background: rgba(30, 16, 8, .85); border: 1px solid #a0602a; gap: 24px; }
   /* The purse: two chips, a coin picture before each number, light on dark (it was a faint line). */
   .wallet { display: inline-flex; gap: 6px; align-items: center; vertical-align: middle; }
   .wchip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px 1px 3px; border-radius: 9px;
@@ -232,8 +235,8 @@
   #town-quick { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 34px; display: flex; flex-direction: column; gap: 4px; }
   #town-quick .btn { min-width: 0; padding: 4px 10px; font-size: 11px; }
   /* 다음 목표: one line under the purse, the nearest step to grow (a tap goes there). */
-  #town-goal { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); max-width: min(62vw, 560px); min-width: 0;
-      padding: 2px 10px; font: 700 11px/16px G11, monospace; color: #fff2d0; background: rgba(30, 16, 8, .85);
+  #town-goal { position: static; margin: -1px 0 0; min-width: 0; max-width: none; border-radius: 0; text-align: left;
+      padding: 2px 8px; font: 700 11px/16px G11, monospace; color: #fff2d0; background: rgba(30, 16, 8, .85);
       border: 1px solid #a0602a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 0 #000; }
   #town-goal small { font: 10px G9, monospace; color: #ffc860; margin-right: 4px; }
   #town-goal.hot { border-color: #ffd040; box-shadow: 0 0 6px 1px rgba(255, 208, 64, .6); animation: goal-glow 1.2s ease-in-out infinite alternate; }
@@ -770,23 +773,29 @@
   /* The small keys (현황·모여 / 메뉴·사냥) stand two by two over the 필살기 button, each big
      enough for a thumb and apart from it (in a row beside it they were small and a press often
      went to the wrong one), all inside the 100px the skill bar leaves at the right. */
-  body.yeon #keys { right: 8px; bottom: 8px; display: grid; grid-template-columns: 42px 42px; gap: 5px;
+  /* 2차 피드백 (the bar hid too much): the keys a size smaller — 40×26 keys, a 50px 필살기, a 40px
+     보조 기술 — and 「기술 창: 작게」 smaller again (body.hud-small). Over the 대항전's bottom bar
+     (진영대장) the keys and the chat stand above it (body.war-bar). */
+  body.yeon #keys { right: 8px; bottom: 8px; display: grid; grid-template-columns: 40px 40px; gap: 4px;
       justify-items: stretch; align-items: end; }
+  body.yeon.war-bar #keys, body.yeon.war-bar #chat { bottom: 24px; }
   body.yeon #keys > button { touch-action: manipulation; }
-  body.yeon #keys > button:not(#ult):not(#util-btn) { height: 32px; width: auto !important; min-width: 0; padding: 0 2px;
-      font-size: 12px !important; line-height: 28px; white-space: nowrap;
+  body.yeon #keys > button:not(#ult):not(#util-btn) { height: 26px; width: auto !important; min-width: 0; padding: 0 2px;
+      font-size: 11px !important; line-height: 22px; white-space: nowrap;
       background: rgba(0,0,0,0.78) !important; color: #fff !important; border: 2px solid rgb(148,48,219) !important; }
   body.yeon #keys > #war-call-btn { border-color: rgb(88,168,60) !important; color: #c8f0b0 !important; }
   body.yeon #keys > #speed-btn { grid-column: 1 / -1; }
   body.yeon #keys > #ult { grid-column: 1 / -1; justify-self: end; margin-top: 2px; }
-  body.yeon #ult { width: 58px; height: 58px; background: #000 no-repeat center 4px / 40px 40px; border: 3px solid rgb(148,48,219);
+  body.yeon #ult { width: 50px; height: 50px; background: #000 no-repeat center 3px / 34px 34px; border: 3px solid rgb(148,48,219);
       outline: 1px solid #000; color: #fff; font-size: 9px; display: flex; flex-direction: column; justify-content: flex-end;
       padding-bottom: 1px; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
   body.yeon #ult small { font-size: 8px; }
+  /* (one line inside the smaller button: a long name such as 건곤대나이 no longer breaks in two) */
+  body.yeon #ult span, body.yeon #util-btn span { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; font-size: 8px; letter-spacing: -0.5px; }
   body.yeon #ult.ready { border-color: #ffd040; }
   /* 보조 기술 left of the 필살기, a little smaller, at its foot. */
-  body.yeon #keys > button#util-btn:not(#ult) { position: absolute; right: 64px; bottom: 0; width: 46px !important; height: 46px; padding: 0 !important;
-      background-color: #000 !important; background-position: center 3px; background-size: 32px 32px; border: 3px solid rgb(88,140,219) !important; outline: 1px solid #000;
+  body.yeon #keys > button#util-btn:not(#ult) { position: absolute; right: 56px; bottom: 0; width: 40px !important; height: 40px; padding: 0 !important;
+      background-color: #000 !important; background-position: center 2px; background-size: 27px 27px; border: 3px solid rgb(88,140,219) !important; outline: 1px solid #000;
       display: flex; flex-direction: column; justify-content: flex-end; line-height: 10px; font-size: 9px !important; }
   body.yeon #keys > button#util-btn:not(#ult).ready { border-color: #9ad8ff !important; }
   body.yeon #keys > button#util-btn:not(#ult)[hidden] { display: none; }
@@ -796,21 +805,13 @@
   body.yeon #banner { background: none; border: 0; top: 22%; font-size: 15px; color: #ff4a3a;
       text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000; }
   /* The 필살기's way (사냥 / 보스), switched with a tap beside the button. */
-  /* 몰이기 (기획 P1-1): the class's gather-and-burst, by hand; its wait darkens it from the top. */
-  #keys #main-btn { position: relative; width: 92px; height: 40px; background-color: #000; background-repeat: no-repeat; background-position: 4px center; background-size: 32px 32px; color: #fff;
-      padding-left: 36px !important; text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; --wait: 0%; border-color: rgb(196,120,40); }
-  #keys #main-btn::after { content: ''; position: absolute; left: 0; top: 0; right: 0; height: var(--wait); background: rgba(0,0,0,0.6); pointer-events: none; }
-  #keys #main-btn span, #keys #main-btn small { position: relative; z-index: 1; display: block; }
-  #keys #main-btn small { font: 8px G7, monospace; font-weight: normal; }
-  #keys #main-btn.ready { border-color: #ffd040; }
-  #keys #main-btn.glow { box-shadow: 0 0 8px 3px #ff9a30; }
-  body.yeon #keys > button#main-btn:not(#ult) { position: absolute; right: 114px; bottom: 0; width: 52px !important; height: 52px; padding: 0 !important;
-      background: #000 var(--icon) no-repeat center 3px / 34px 34px !important; border: 3px solid rgb(196,120,40) !important; outline: 1px solid #000;
-      display: flex; flex-direction: column; justify-content: flex-end; line-height: 10px; font-size: 9px !important; color: #fff !important; white-space: nowrap; overflow: hidden; }
-  body.yeon #keys > button#main-btn:not(#ult).ready { border-color: #ffd040 !important; }
-  body.yeon #keys > button#main-btn:not(#ult)[hidden] { display: none; }
   #keys #dash-btn { width: 92px; height: 28px; }
-  body.yeon #keys > button#dash-btn { position: absolute; right: 0; bottom: 146px; width: 88px !important; height: 30px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
+  body.yeon #keys > button#dash-btn { position: absolute; right: 0; bottom: calc(100% + 6px); width: 84px !important; height: 28px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
+  body.yeon.hud-small #keys { grid-template-columns: 36px 36px; gap: 3px; }
+  body.yeon.hud-small #keys > button:not(#ult):not(#util-btn) { height: 22px; font-size: 10px !important; line-height: 18px; }
+  body.yeon.hud-small #ult { width: 44px; height: 44px; background-size: 28px 28px; font-size: 8px; }
+  body.yeon.hud-small #keys > button#util-btn:not(#ult) { right: 50px; width: 34px !important; height: 34px; background-size: 22px 22px; font-size: 8px !important; }
+  body.yeon.hud-small #keys > button#dash-btn { width: 76px !important; height: 24px; font-size: 10px; }
   #keys #dash-btn.ready { border-color: #ffd040 !important; }
   #keys #dash-btn.glow { box-shadow: 0 0 8px 3px #ffd040; }
   #over-stats .grade { font-size: 15px; }
@@ -853,6 +854,9 @@
   body.yeon #chat p.loot { color: #ffd040; }
   #town-quick .btn.hot { border-color: #ffe080 #8a5a00 #8a5a00 #ffe080; background: #e8b860; }
   #ult-mode { font: 700 11px G11, monospace; padding: 2px 6px; color: #f4e2c0; background: #2a1606; border: 2px solid rgb(148,48,219); }
+  /* The carved-panel layout: the small keys one column as wide as the 보조 기술 / 필살기 under them
+     (they were 52, 64 and a word wide, each flush right at its own width). */
+  body:not(.yeon) #keys > button:not(#ult):not(#util-btn):not(#dash-btn) { width: 92px; height: 24px; }
 </style>
 </head>
 <body>
@@ -892,8 +896,10 @@
 </div>
 
 <div id="town" class="screen" hidden>
-  <div class="town-top"><span id="town-name"></span><span id="town-gold"></span></div>
-  <button id="town-goal" class="btn" hidden></button>
+  <div class="town-head">
+    <div class="town-top"><span id="town-name"></span><span id="town-gold"></span></div>
+    <button id="town-goal" class="btn" hidden></button>
+  </div>
   <button id="town-back" class="btn">직업 선택</button>
   <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
   <button id="talk" class="btn" hidden></button>
@@ -961,13 +967,6 @@
   </div>
 </div>
 
-<div id="crossroad" hidden>
-  <div id="cr-box">
-    <div class="caption">갈림길 · 어느 길로 갈까</div>
-    <div id="cr-choices"></div>
-  </div>
-</div>
-
 <div id="pause" hidden>
   <div id="pause-box">
     <div class="caption">메뉴</div>
@@ -982,10 +981,11 @@
       <button id="opt-party" class="btn"></button>
       <button id="opt-party-pick" class="btn">동료 설정</button>
       <button id="opt-dash" class="btn"></button>
-      <button id="opt-main" class="btn" title="몰이기: 3초 동안 조작이 없고 주변에 적이 12마리 이상이면 자동으로 씁니다"></button>
       <button id="opt-auto" class="btn"></button>
       <button id="opt-info" class="btn"></button>
       <button id="opt-calm" class="btn"></button>
+      <button id="opt-cam" class="btn" title="걸을 때 화면이 가는 방향으로 한 칸 앞을 보여 줍니다 (멀미가 나면 끄세요)"></button>
+      <button id="opt-bar" class="btn" title="사냥 화면 오른쪽 아래 기술 창과 단추의 크기"></button>
       <button id="opt-aifx" class="btn" title="대항전·레이드·쟁의 다른 길드원·적 이펙트 투명도 (내 캐릭터 이펙트는 그대로)"></button>
       <button id="opt-overlap" class="btn" title="대항전·레이드·쟁에서 겹쳐 선 캐릭터(내 캐릭터 위에 선 캐릭터, 한 칸을 함께 쓰는 아군)의 투명도 (내 캐릭터는 그대로)"></button>
       <button id="opt-big" class="btn" title="대항전·레이드·쟁의 인원 (다음 전투부터)"></button>
@@ -997,7 +997,7 @@
 <div id="play-frame" hidden>
   <div id="map-tab"><span id="map-name"></span><small id="boss-clock"></small></div>
   <div id="mini" hidden></div>
-  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="main-btn" title="몰이기 (E)" hidden><span></span><small></small></button><button id="dash-btn" title="질주 (Shift)" hidden>질주</button><button id="ult"><span></span><small></small></button></div>
+  <div id="keys"><button id="speed-btn" hidden>속도 ×1</button><button id="pause-btn">메뉴</button><button id="ult-mode" title="필살기 방식 바꾸기">사냥</button><button id="util-btn" title="보조 기술 (Q)" hidden><span></span><small></small></button><button id="dash-btn" title="질주 (Shift)" hidden>질주</button><button id="ult"><span></span><small></small></button></div>
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>

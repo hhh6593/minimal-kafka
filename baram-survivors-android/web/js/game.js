@@ -4284,7 +4284,6 @@ function update(dt) {
     if (chain.length && !G.chainRun && !G.ambush && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
     idleLook(dt);
-    mainTick(); // 몰이기 자동
   }
   runTimers();
   G.allyHitting = true;
@@ -5937,7 +5936,7 @@ function meleeImpact(power) {
 const HITSTOP = { gap: 0.5, share: 0.015, grace: 0.2 };
 /** This run's feel record (also read by the measuring tools). */
 function feel() {
-  return G.feel || (G.feel = { hs: 0, hsN: 0, why: {}, lvFull: 0, lvQuiet: 0, pulls: 0, mainN: 0, mainHits: 0, mainSweeps: 0, mainAuto: 0, sums: 0 });
+  return G.feel || (G.feel = { hs: 0, hsN: 0, why: {}, lvFull: 0, lvQuiet: 0, pulls: 0, sums: 0 });
 }
 function hitStop(sec, why) {
   if (!G || G.stage.raid || G.war || G.training) return false;
@@ -6287,7 +6286,7 @@ function killEnemy(e) {
   // A kill gives a little mana, but not the kills of a 필살기 itself (a screen of them refilled it
   // at once, and it could be thrown again and again).
   // 마력 리듬 (기획 P2-2, light): a kill in a heap (five or more within 3 tiles) gives twice the
-  // mana, a lone one a little less — the bigger the 몰이, the sooner the 몰이기 and 필살기.
+  // mana, a lone one a little less — the bigger the 몰이, the sooner the 필살기.
   if (G.t - (G.ultAt === undefined ? -99 : G.ultAt) > 3) p.mp = Math.min(p.maxMp, p.mp + (G.hunt ? (heapNear() >= 5 ? 1.2 : 0.45) : 0.6));
   // Experience comes at the kill, as in the game: nothing to pick up.
   gainXp(e.xp);
@@ -6679,7 +6678,7 @@ function drawChain() {
   const cr = boxOf(canvas), d = canvas.width / cr.width;
   const sz = 26 * d, gap = 4 * d, n = c.ids.length;
   const w = n * sz + (n - 1) * gap + 12 * d, h = sz + 24 * d;
-  const x = 8 * d, y = 64 * d;
+  const x = 8 * d, y = Math.max(64 * d, (G.binfoBottom || 0) + 4 * d);
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(x, y, w, h);
@@ -8282,48 +8281,6 @@ function castUlt() {
   }
 }
 
-// ---------------------------------------------------------------- 몰이기 (기획 P1-1)
-// 원조's 몰이사냥 and 연's hand-timed skill: each class's own "gather, then burst" — the near ones
-// drawn in onto the hero (유인), then the class's great area spell over them all. It takes 40% of
-// the mana and comes again in 6 s; the more it strikes the harder (4% a foe, up to ×2.2) and the
-// more mana comes back (1% a foe, up to 30%); twenty or more are a 일망타진. A button of its own
-// (E); 몰이기 자동 (default on) throws it for a player who has left the hero standing 3 s with
-// twelve or more around. Its look is the class's own spell of that kind, rising with the 승급
-// (the official effect and sound of that spell; nothing drawn new). Hunting grounds only.
-const MAIN = { cost: 0.4, cd: 6, perHit: 0.04, maxK: 2.2, refund: 0.01, refundMax: 0.3, sweep: 20, idle: 3, autoN: 12 };
-const MAIN_LADDER = {
-  warrior: [[0, 'w_lion'], [3, 'w_howl'], [4, 'w_blood'], [7, 'w_thunder']],
-  rogue: [[0, 'r_jiok'], [4, 'r_bunhon'], [7, 'r_bloom']],
-  mage: [[0, 'm_nodo'], [4, 'm_fire3'], [7, 'm_inferno'], [9, 'm_kalpa']],
-  poet: [[0, 'p_wave'], [4, 'p_break'], [7, 'p_daejijin']],
-  archer: [[0, 'a_flame'], [4, 'a_allwhirl'], [9, 'a_blood5']],
-  lancer: [[0, 'l_release'], [4, 'l_genesis'], [9, 'l_moonfull']],
-  monk: [[0, 'mk_quake'], [3, 'mk_rupture'], [4, 'mk_buddha']],
-  magus: [[0, 'md_frenzyexp'], [4, 'md_exfrenzy'], [9, 'md_wavefrenzy']],
-  celestial: [[0, 'cl_brilliant'], [4, 'cl_thunder'], [9, 'cl_reindeer']],
-  dokkaebi: [[0, 'dk_whirl'], [3, 'dk_flatten'], [9, 'dk_rage']],
-  reaper: [[0, 'rp_spiral'], [4, 'rp_madness'], [9, 'rp_gate']],
-};
-/** The class's 몰이기 now (the highest step its 승급 has reached). */
-function mainSkill(cls) {
-  let id = null;
-  for (const [pr, s] of MAIN_LADDER[cls] || []) if (promoOf(cls) >= pr && SKILLS[s]) id = s;
-  return id;
-}
-/** How far (tiles round the hero) it strikes: 3, a little more with each 승급, at most 4.5. */
-function mainReach() {
-  return Math.min(4.5, 3 + 0.2 * promoOf(G.cls.id));
-}
-function mainOn() {
-  return !!(G && G.hunt && !G.war && !G.stage.raid && !G.training && mainSkill(G.cls.id));
-}
-function mainWait() {
-  return Math.max(0, (G.mainReady || 0) - G.t);
-}
-function mainCan() {
-  const p = G.player;
-  return mainOn() && !G.dead && !G.over && !G.paused && !G.choosing && mainWait() <= 0 && p.mp >= p.maxMp * MAIN.cost;
-}
 /** Foes within 3 tiles of the hero (counted at most four times a second: the kills ask often). */
 function heapNear() {
   if (G.t < (G.heapAt ?? -9)) return G.heapN;
@@ -8333,113 +8290,6 @@ function heapNear() {
   for (const e of G.enemies) if (e.hp > 0 && !e.ally && Math.abs(e.tx - p.tx) <= 3 && Math.abs(e.ty - p.ty) <= 3 && ++n >= 5) break;
   return (G.heapN = n);
 }
-/** Foes within its reach now. */
-function mainCount() {
-  const p = G.player, R = mainReach();
-  let n = 0;
-  for (const e of G.enemies) if (e.hp > 0 && !e.ally && Math.abs(e.tx - p.tx) <= R && Math.abs(e.ty - p.ty) <= R) n++;
-  return n;
-}
-/** The spell's picture as its cast draws it at this 단 (cast: fxBase). */
-function mainFx(id, def, lv) {
-  const base = def.yeon ? def.fx : def.modern && M.fx[def.modern] ? def.modern : def.promo === 4 && M.fx['new_' + id] ? 'new_' + id
-    : def.fxs ? def.fxs[Math.min(lv, def.fxs.length) - 1] : M.fx['s_' + id] ? 's_' + id : def.fx;
-  return grownFx(base, lv);
-}
-
-function castMain(auto = false) {
-  if (!G || !mainCan()) return false;
-  const p = G.player, id = mainSkill(G.cls.id), def = SKILLS[id], R = mainReach();
-  // Not thrown at empty ground: something must be within reach of the 유인.
-  if (!G.enemies.some(e => e.hp > 0 && !e.ally && tdist(e, p) <= R + 2)) return false;
-  p.mp -= p.maxMp * MAIN.cost;
-  G.mainReady = G.t + MAIN.cd;
-  G.mainAt = G.t;
-  const f = feel();
-  f.mainN++;
-  if (auto) f.mainAuto++;
-  const lead = lure(); // 몰이: the near ones drawn in onto the hero
-  strikePose(MELEE_LOOK[G.cls.id] || WEAPON_POSE.has(G.cls.id) ? 'attack' : 'magic');
-  G.bubble = { text: `${def.name}!`, t: G.t };
-  audio.play('skill_' + id, def.kind);
-  battleInfo('cast', null, () => `[몰이기] ${def.name}`);
-  later(lead + 0.05, () => blastMain(id, def, R));
-  return true;
-}
-
-function blastMain(id, def, R) {
-  if (G.dead || G.over) return;
-  const p = G.player, f = feel();
-  const lv = Math.max(1, Math.min(MAX_SKILL_LEVEL, 1 + Math.floor(p.lvl / 5)));
-  const fx = mainFx(id, def, lv);
-  if (fx && M.fx[fx]) {
-    const [sf, flip] = dirFx(fx, id, p.fdx, p.fdy);
-    screenFx(sf, id, Math.min(0.95, 0.45 + R * 0.1), flip);
-  }
-  shock(p.x, p.y - 4, R + 0.5, '255,214,74');
-  G.shake = Math.max(G.shake, 0.3);
-  const hit = around(p.tx, p.ty, R).filter(e => !(e.guardT > G.t));
-  const n = hit.length;
-  let k = Math.min(MAIN.maxK, 1 + MAIN.perHit * n);
-  if (n >= MAIN.sweep) {
-    // 일망타진: counted as the hunt counts one (style, its banner, experience ×1.5 for a moment).
-    const c = G.hunt ? Hunt.chainPower(1) : 1;
-    if (c === 1) banner('일망타진!');
-    k *= c > 1 ? c : 1.6;
-    f.mainSweeps++;
-    hitStop(0.08, 'sweep');
-    pullLoot(1.8);
-  }
-  // As strong as the hero's strongest spell twice over (its build), never below a floor by level.
-  let top = 0;
-  for (const s of G.skills) if (!SKILLS[s.id].heal) top = Math.max(top, stats(s).dmg || 0);
-  const blow = Math.max(top * 2, 20 + p.lvl * 5) * k;
-  const look = MELEE_LOOK[G.cls.id], spark = look ? look.hit : sparkOf(id, def);
-  G.castCd = MAIN.cd; // a heavy blow (hunt.js): the boss's 그로기 fills twice, a weak leader is 처형
-  G.castElem = G.hunt ? Hunt.elemOf(def) : null;
-  hit.forEach((e, i) => {
-    if (e.hp <= 0) return;
-    if (i < 10 && spark && M.fx[spark]) fxOn(spark, e, { delay: i * 0.02, scale: look ? look.hs * 1.2 : SPARK_SCALE[spark] || 0.6 });
-    hurtEnemy(e, blow);
-    fling(e, p.tx, p.ty);
-  });
-  G.castCd = 0;
-  G.castElem = null;
-  // The mana back: the bigger the heap, the sooner the next.
-  p.mp = Math.min(p.maxMp, p.mp + Math.min(MAIN.refundMax, MAIN.refund * n) * p.maxMp);
-  if (n) floatText(p.x, p.y - 78, `몰이 ${n}`, n >= MAIN.sweep ? '#ff7a3a' : '#ffe070', true);
-  f.mainHits += n;
-}
-
-/** 몰이기 자동: the hero left standing 3 s, twelve or more around, the mana there — it goes. */
-function mainTick() {
-  if (settings.mainAuto === false || !mainOn() || G.t < (G.mainCheck || 0)) return;
-  G.mainCheck = G.t + 0.25;
-  if (!mainCan() || G.t - (G.steerAt ?? -9) < MAIN.idle || G.t - (G.mainAt ?? -9) < MAIN.idle) return;
-  if (mainCount() >= MAIN.autoN) castMain(true);
-}
-
-/** The 몰이기 button: the spell's icon, its wait (darkening from the top), how many are in reach. */
-function syncMain() {
-  const b = $('#main-btn');
-  if (!b) return;
-  const on = mainOn();
-  if (b.hidden === on) b.hidden = !on;
-  if (!on) return;
-  const id = mainSkill(G.cls.id), p = G.player, w = mainWait(), poor = p.mp < p.maxMp * MAIN.cost;
-  const n = G.t >= (G.mainShowAt || 0) ? (G.mainShowAt = G.t + 0.2, G.mainShown = mainCount()) : G.mainShown || 0;
-  put('#main-btn span', SKILLS[id].name);
-  put('#main-btn small', w > 0 ? `${Math.ceil(w)}초` : poor ? `마력 ${Math.floor(100 * p.mp / p.maxMp)}%` : `몰이 ${n}`);
-  const def = SKILLS[id], fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
-  const ic = `url(assets/${M.skillicon && M.skillicon.includes(id) ? `skillicon/${id}` : `icon/${fx}`}.png)`;
-  if (shown.mainIcon !== ic) { shown.mainIcon = ic; b.style.backgroundImage = ic; b.style.setProperty('--icon', ic); }
-  const ready = w <= 0 && !poor;
-  b.classList.toggle('ready', ready);
-  b.classList.toggle('glow', ready && n >= MAIN.sweep);
-  const k = w > 0 ? w / MAIN.cd : poor ? 1 - p.mp / (p.maxMp * MAIN.cost) : 0, sh = `${(k * 100).toFixed(0)}%`;
-  if (shown.mainShade !== sh) { shown.mainShade = sh; b.style.setProperty('--wait', sh); }
-}
-
 const timers = [];
 function later(delay, fn) {
   if (delay <= 0) fn();
@@ -10446,56 +10296,78 @@ function skillIconImage(id) {
   if (!fx && def.kind === 'slash') return G ? (iconCache[id] = gearImage({ kind: 'weapon', tier: 1 }) || null) : null;
   return (iconCache[id] = fx ? images[`icon/${fx}.png`] || null : null);
 }
+/**
+ * The spells' bar (2차 피드백: three rows of big slots hid too much of the field). 연: two rows of
+ * six small slots at the bottom right, ending left of the 보조 기술 / 필살기 and level with their
+ * foot; a thin frame on a see-through ground, the slots that are ready a little faded (the bar
+ * stands out only while it counts down). 설정 「기술 창: 보통 / 작게」 (30 / 24 points a slot, a
+ * little larger on a tall screen). The carved-panel layout: one row at the bottom left.
+ */
 function drawSkillBar() {
-  if (!G.skills.length || G.dead) return;
-  const W = canvas.width, u = W / 860;
-  const cr = boxOf(canvas), dl = $('#chat') && boxOf($('#chat'));
-  const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * (canvas.height / cr.height)) : canvas.height;
-  const yeon = document.body.classList.contains('yeon'), dpr = canvas.width / cr.width;
-  const sz = Math.round((yeon ? 38 : 30) * u), gap = Math.round(5 * u);
-  // 연: two rows of four at the bottom right, left of the 필살기 button; else a row at the bottom left.
-  // 연: ends left of the keys (현황·모여 / 메뉴·사냥 over the 필살기), wherever their grid stands.
-  const kr = yeon && $('#keys') ? boxOf($('#keys')) : null;
-  // The 보조 기술 button stands left of the 필살기, outside the keys' grid: the bar ends left of it too.
-  const ub = yeon && $('#util-btn') && !$('#util-btn').hidden ? boxOf($('#util-btn')) : null;
-  const mb = yeon && $('#main-btn') && !$('#main-btn').hidden ? boxOf($('#main-btn')) : null; // 몰이기
-  const keyLeft = Math.min(kr && kr.width ? kr.left : Infinity, ub && ub.width ? ub.left : Infinity, mb && mb.width ? mb.left : Infinity);
-  const right = keyLeft < Infinity ? Math.min(W - 100 * dpr, (keyLeft - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
-  const x0 = yeon ? right - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
-  // Slots 1-8 stand as they always did (two rows of four); the 9th-12th make a third row above them.
-  G.skills.slice(0, MAX_SKILLS).forEach((s, i) => {
-    const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap),
-      y = y0 + (yeon ? (i >= 8 ? -(sz + gap) : i >= 4 ? sz + gap : 0) : 0);
-    // 연's slot: a purple frame in a black line.
+  if (!G.skills.length || G.dead || !$('#over').hidden) return;
+  const W = canvas.width, cr = boxOf(canvas), d = canvas.width / cr.width;
+  const yeon = document.body.classList.contains('yeon');
+  const small = settings.barSize === 'small';
+  const tall = Math.max(1, Math.min(1.15, cr.height / 412));
+  const sz = Math.round((small ? 24 : 30) * tall * d), gap = Math.round(3 * d), cols = yeon ? 6 : MAX_SKILLS;
+  const list = G.skills.slice(0, MAX_SKILLS), rows = Math.ceil(list.length / cols);
+  let x0, yBot;
+  if (yeon) {
+    // Left of the keys' grid and the 보조 기술 (it stands outside the grid, at the 필살기's left).
+    const kr = $('#keys') ? boxOf($('#keys')) : null;
+    const ub = $('#util-btn') && !$('#util-btn').hidden ? boxOf($('#util-btn')) : null;
+    const ult = $('#ult') ? boxOf($('#ult')) : null;
+    const keyLeft = Math.min(kr && kr.width ? kr.left : Infinity, ub && ub.width ? ub.left : Infinity, ult && ult.width ? ult.left : Infinity);
+    const right = keyLeft < Infinity ? (keyLeft - cr.left - 8) * d : W - 130 * d;
+    x0 = Math.round(right - cols * sz - (cols - 1) * gap);
+    // level with the foot of the 필살기 (lifted with it over the 대항전's bottom bar)
+    yBot = ult && ult.height ? Math.round((ult.bottom - cr.top) * d) : canvas.height - 8 * d;
+  } else {
+    const dl = $('#chat') && boxOf($('#chat'));
+    const H = dl && dl.top > cr.top ? Math.min(canvas.height, (dl.top - cr.top) * d) : canvas.height;
+    x0 = Math.round(10 * d);
+    yBot = Math.round(H - 6 * d);
+  }
+  const y0 = yBot - rows * sz - (rows - 1) * gap;
+  ctx.save();
+  // a see-through ground under the whole bar
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(x0 - 2 * d, y0 - 2 * d, Math.min(cols, list.length) * (sz + gap) - gap + 4 * d, rows * (sz + gap) - gap + 4 * d);
+  const fs = Math.max(8, Math.round((small ? 8 : 9) * tall * d));
+  list.forEach((s, i) => {
+    const def = SKILLS[s.id], x = x0 + (i % cols) * (sz + gap), y = y0 + Math.floor(i / cols) * (sz + gap);
+    const left = s.cdMax && !s.waiting ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0, cooling = left > 0.02;
+    ctx.globalAlpha = cooling ? 0.95 : 0.72;
     ctx.fillStyle = '#000';
-    ctx.fillRect(x - 4, y - 4, sz + 8, sz + 8);
-    ctx.fillStyle = 'rgb(148,48,219)';
-    ctx.fillRect(x - 3, y - 3, sz + 6, sz + 6);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x - 1, y - 1, sz + 2, sz + 2);
+    ctx.fillRect(x - d, y - d, sz + 2 * d, sz + 2 * d);
     const im = skillIconImage(s.id);
     if (im && im.width) {
-      ctx.save();
       const ic = def.tint && !(M.skillicon && M.skillicon.includes(s.id)) ? tinted(im, def.tint) : im;
       const k = Math.min(sz / im.width, sz / im.height);
       ctx.drawImage(ic, x + (sz - im.width * k) / 2, y + (sz - im.height * k) / 2, im.width * k, im.height * k);
-      ctx.restore();
     }
-    // The wait, as 연 shows it: the icon darkened, the seconds over it.
-    const left = s.cdMax && !s.waiting ? Math.max(0, Math.min(1, s.timer / s.cdMax)) : 0;
-    if (left > 0.02) {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(x, y, sz, sz);
+    // 연's purple slot edge, thin: the frame no longer weighs on the field
+    const lw = Math.max(1, Math.round(d));
+    ctx.strokeStyle = 'rgba(148,48,219,0.85)';
+    ctx.lineWidth = lw;
+    ctx.strokeRect(x - lw / 2, y - lw / 2, sz + lw, sz + lw);
+    // The wait: the part still to come darkened from the top, the whole seconds over it.
+    if (cooling) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x, y, sz, Math.round(sz * left));
       if (s.timer >= 1) {
-        ctx.font = `bold ${Math.round(10 * u)}px G9`;
+        ctx.globalAlpha = 1;
+        ctx.font = `bold ${fs + Math.round(2 * d)}px G9`;
         ctx.textAlign = 'center';
-        outline(`${Math.ceil(s.timer)}초`, x + sz / 2, y + sz / 2 + 4 * u, '#ffffff');
+        outline(String(Math.ceil(s.timer)), x + sz / 2, y + sz / 2 + fs * 0.45, '#ffffff');
       }
     }
-    ctx.font = `bold ${Math.round(9 * u)}px G9`;
+    ctx.globalAlpha = cooling ? 0.95 : 0.8;
+    ctx.font = `bold ${fs}px G9`;
     ctx.textAlign = 'right';
-    outline(String(s.lv), x + sz - 1, y + sz - 2, '#fff');
+    outline(String(s.lv), x + sz - d, y + sz - d, '#fff');
   });
+  ctx.restore();
   ctx.textAlign = 'left';
 }
 
@@ -10650,9 +10522,11 @@ function battleInfo(key, n, text) {
   if (L.length > 3) L.shift();
 }
 function drawBattleInfo() {
+  G.binfoBottom = 0;
   if (!document.body.classList.contains('yeon') || G.war || settings.battleInfo === false) return;
   const p = G.player, cr = boxOf(canvas), d = canvas.width / cr.width;
-  const x = 6 * d, y = 50 * d, w = 124 * d, th = 14 * d, lh = 10.5 * d, MAXROWS = 4;
+  // (left edge with the status above it, 8 points in)
+  const x = 8 * d, y = 50 * d, w = 124 * d, th = 14 * d, lh = 10.5 * d, MAXROWS = 4;
   ctx.save();
   ctx.font = `${Math.round(8.5 * d)}px G9`;
   // The last lines, wrapped at word breaks as 연 wraps them, the newest kept when they are many.
@@ -10669,6 +10543,7 @@ function drawBattleInfo() {
     rows.unshift(...out.map(text => ({ text, a: Math.min(1, (9 - (G.t - l.t)) * 0.8) })));
   }
   const h = th + 23 * d + rows.length * lh + 3 * d;
+  G.binfoBottom = y + h; // the 기술 연계 window goes under it, not over it
   ctx.fillStyle = 'rgba(14,10,8,0.5)';
   ctx.fillRect(x, y, w, h);
   // The title: 연's dark brown plate with a gilt edge.
@@ -11582,15 +11457,6 @@ function nextChoice() {
     }
     return;
   }
-  // 판 중 선택 (hunt.js, A: a two-way strip that does not stop the hunt): a card that could stop
-  // waits until it is picked (5 s at most), so two choices never stand over each other.
-  if (G.hunt && G.hunt.choice && !settings.autoPick && !G.firstCard) {
-    if (!G.choiceDeferred) {
-      G.choiceDeferred = true;
-      later(0.3, () => { G.choiceDeferred = false; if (G && !G.choosing) nextChoice(); });
-    }
-    return;
-  }
   G.pendingLevels--;
   const first = G.firstCard, tune = G.tuneCard;
   G.tuneCard = false;
@@ -12307,7 +12173,6 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   if (e.code === 'Space') castUlt();
   if (e.code === 'KeyQ') castUtil();
-  if (e.code === 'KeyE') castMain(); // 몰이기
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') Hunt.dash(); // 사냥 기믹: 질주
 });
 addEventListener('keyup', e => keys.delete(e.code));
@@ -13406,10 +13271,12 @@ function drawGroundCached(key, camX, camY, paint) {
 }
 
 /**
- * 카메라 앞보기 (기획 P0-5): walking, the view runs ahead of the hero in the way it goes (1.5
- * tiles; 0.75 in a 대항전·레이드·쟁), eased in over about a quarter second and back to the hero
- * over about 0.6 s once it stops — the field ahead comes into sight sooner, and the walk reads
- * as speed. Real time (so a pause or the cards hold it); not in the 수련장.
+ * The camera (2차 피드백: the lead made walking sway and sick). By default it is held on the hero
+ * exactly — the hero's own glide from tile to tile, rounded to whole pixels, nothing eased on top
+ * — so it never runs ahead, overshoots or swings back. Only a jump of more than a tile and a half
+ * in one frame (a blink, a 순간이동) is eased over about a tenth of a second instead of cut.
+ * 「카메라 앞보기」 (설정, off by default) adds a short lead of one tile the way the player steers
+ * (their keys, not the way a spell turned the hero), eased in and out slowly and without overshoot.
  */
 function camLead(now) {
   const L = G.camLead || (G.camLead = { x: 0, y: 0, at: now });
@@ -13417,19 +13284,37 @@ function camLead(now) {
   L.at = now;
   const p = G.player;
   let tx = 0, ty = 0;
-  if (!G.training && !G.dead && !G.paused && !G.choosing && p.moving && (p.fdx || p.fdy)) {
-    const far = TILE * (G.war || G.stage.raid ? 0.75 : 1.5);
-    tx = (p.fdx || 0) * far;
-    ty = (p.fdy || 0) * far;
+  if (settings.camLead && !G.training && !G.dead && !G.paused && !G.choosing && p.moving) {
+    const dx = settings.tiles || G.war ? p.inDx || 0 : p.fdx || 0, dy = settings.tiles || G.war ? p.inDy || 0 : p.fdy || 0;
+    const far = TILE * (G.war || G.stage.raid ? 0.5 : 1);
+    tx = dx * far;
+    ty = dy * far;
   }
-  const moving = tx || ty, k = 1 - Math.exp(-dt / (moving ? 0.25 : 0.6) * 2.3);
+  const moving = tx || ty, k = 1 - Math.exp(-dt / (moving ? 0.5 : 0.8) * 2.3);
   // (the hero standing still a blink between tiles keeps the lead: only a real stop eases back)
-  if (!moving && G.t - (G.steerAt ?? -9) < 0.15) return L;
+  if (!moving && G.t - (G.steerAt ?? -9) < 0.2) return L;
   L.x += (tx - L.x) * k;
   L.y += (ty - L.y) * k;
-  if (Math.abs(L.x) < 0.3) L.x = 0;
-  if (Math.abs(L.y) < 0.3) L.y = 0;
+  if (Math.abs(L.x - tx) < 0.3) L.x = tx;
+  if (Math.abs(L.y - ty) < 0.3) L.y = ty;
   return L;
+}
+
+/** Where the camera looks (world pixels): the hero, or eased toward it after a jump. */
+function camFollow(now, lead) {
+  const p = G.player, C = G.camAt || (G.camAt = { x: p.x, y: p.y, at: now });
+  const dt = Math.min(0.1, Math.max(0, now - C.at));
+  C.at = now;
+  const far = Math.hypot(p.x - C.x, p.y - C.y);
+  if (far > TILE * 1.5 && far < TILE * 30 && !C.easing) C.easing = true;
+  if (C.easing) {
+    const k = 1 - Math.exp(-dt / 0.1 * 2.3);
+    C.x += (p.x - C.x) * k;
+    C.y += (p.y - C.y) * k;
+    if (Math.hypot(p.x - C.x, p.y - C.y) < 2) C.easing = false;
+  }
+  if (!C.easing) { C.x = p.x; C.y = p.y; }
+  return [Math.round(C.x + lead.x - VW / 2), Math.round(C.y + lead.y - 30 - VH / 2)];
 }
 
 function render(now) {
@@ -13444,18 +13329,20 @@ function render(now) {
     return;
   }
   const p = G.player;
-  const lead = camLead(now);
-  let camX = Math.round(p.x + lead.x - VW / 2), camY = Math.round(p.y + lead.y - 30 - VH / 2);
+  let [camX, camY] = camFollow(now, camLead(now));
   // 대항전 (war.js): the camera stays on the battlefield's map.
   if (G.war) [camX, camY] = War.cam(camX, camY);
   if (G.arena) [camX, camY] = Hunt.cam(camX, camY); // 사냥 기믹: held inside the map
   // 수련장: the hero and the dummy in the middle of what the panel leaves free.
   if (G.training) camX -= trainShift();
-  if (G.shake > 0) {
-    // Harder blows shake harder.
-    const a = Math.min(5, 1 + G.shake * 12);
-    camX += Math.round(rand(-a, a));
-    camY += Math.round(rand(-a, a));
+  G.camView = [camX, camY]; // (where it looks before any shake: tests trace it)
+  // The screen shakes only for the big moments (a boss's slam, a 일망타진, the hero's 필살기): the
+  // small knocks of every blow and 치명타 no longer jitter it (they ran together into a constant
+  // tremble). Small, a smooth sway rather than a jump each frame, fading out; none with 번쩍임 줄이기.
+  if (G.shake >= 0.3 && !settings.calmFx) {
+    const a = Math.min(2, (G.shake - 0.2) * 5), w = G.t * 38;
+    camX += Math.round(a * Math.sin(w));
+    camY += Math.round(a * 0.7 * Math.cos(w * 1.3));
   }
   ctx.setTransform(Z, 0, 0, Z, -camX * Z, -camY * Z);
   if (G.war && !G.war.raid) {
@@ -13834,6 +13721,9 @@ function render(now) {
     }
     ctx.restore();
   }
+  // 대항전: the keys and the chat stand over its bottom bar (진영대장), not on it.
+  const warBar = !!(G.war && !G.war.raid && !G.stage.jaeng);
+  if (shown.warBar !== warBar) { shown.warBar = warBar; document.body.classList.toggle('war-bar', warBar); boxes.clear(); }
   drawSkillBar();
   drawYeonStatus();
   drawChain();
@@ -14230,7 +14120,6 @@ function syncUlt() {
   if (!G) return;
   const p = G.player;
   syncUtil();
-  syncMain(); // 몰이기
   put('#ult-mode', ultMode(G.cls.id) === 'hunt' ? '사냥' : '보스');
   put('#map-name', G.stage.name + (G.cleared ? ' (정복)' : ''));
   const hc = G.hunt && Hunt.clockText(); // 사냥 기믹: 토벌도 in place of the clock
@@ -14339,11 +14228,6 @@ $('#util-btn').addEventListener('pointerdown', e => {
   e.stopPropagation();
   castUtil();
 });
-$('#main-btn').addEventListener('pointerdown', e => {
-  e.preventDefault();
-  e.stopPropagation();
-  castMain();
-});
 
 function togglePause(force) {
   if (!G || G.over || G.choosing || (G.dead && !(G.war && G.war.heroOut))) return false; // (out of revives in a raid: the menu, to go home)
@@ -14370,11 +14254,16 @@ function syncSettings() {
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
   $('#opt-party').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
   $('#opt-dash').textContent = '돌진 기술: ' + (settings.dashMode === 'stay' ? '제자리' : '자동');
-  $('#opt-main').textContent = '몰이기 자동: ' + (settings.mainAuto === false ? '끔' : '켬 (3초 방치)');
   $('#opt-auto').textContent = '레벨업 자동 선택: ' + (settings.autoPick ? '켬' : '끔');
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
+  $('#opt-cam').textContent = '카메라 앞보기: ' + (settings.camLead ? '켬' : '끔');
+  $('#opt-bar').textContent = '기술 창: ' + (settings.barSize === 'small' ? '작게' : '보통');
+  if (document.body.classList.contains('hud-small') !== (settings.barSize === 'small')) {
+    document.body.classList.toggle('hud-small', settings.barSize === 'small');
+    boxes.clear();
+  }
   $('#opt-aifx').textContent = `AI 이펙트 투명도: ${Math.round((1 - aiFxAlpha()) * 100)}%`;
   $('#opt-overlap').textContent = `겹친 캐릭터 투명도: ${overlapAlpha() >= 1 ? '끔' : Math.round((1 - overlapAlpha()) * 100) + '%'}`;
   $('#opt-big').textContent = '대규모 전투: ' + (settings.bigBattle === false ? '끔' : settings.bigBattle === 'all' ? '쟁까지' : '대항전·레이드');
@@ -14580,11 +14469,6 @@ $('#opt-tiles').onclick = () => {
 };
 // 돌진 기술: 자동 (dashes, blinks and the 필살기's leap carry the hero to the foe, as always) or
 // 제자리 (they strike from where the hero stands). Raids keep the hero off the red either way.
-$('#opt-main').onclick = () => {
-  settings.mainAuto = settings.mainAuto === false;
-  saveJson('bs_settings', settings);
-  syncSettings();
-};
 $('#opt-dash').onclick = () => {
   settings.dashMode = settings.dashMode === 'stay' ? 'auto' : 'stay';
   saveJson('bs_settings', settings);
@@ -14599,6 +14483,18 @@ $('#opt-info').onclick = () => {
 // softer white on the struck, the added-light 격 pictures dimmer.
 $('#opt-calm').onclick = () => {
   settings.calmFx = !settings.calmFx;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 카메라 앞보기 (off by default): the view a tile ahead of the way the player steers (camLead).
+$('#opt-cam').onclick = () => {
+  settings.camLead = !settings.camLead;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 기술 창: 보통 / 작게 — the spells' slots and the keys beside them (drawSkillBar, body.hud-small).
+$('#opt-bar').onclick = () => {
+  settings.barSize = settings.barSize === 'small' ? 'normal' : 'small';
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -15177,8 +15073,6 @@ window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
 window.__ult = () => castUlt();
-window.__main = () => castMain(); // 몰이기 (test: a player pressing it into a heap)
-window.__mainCount = () => (G && mainOn() ? mainCount() : 0);
 
 // ---------------------------------------------------------------- 사신수 길드대항전 (war.js)
 // The war lives in war.js; these are the hunt's own pieces it builds on (the hero, its spells,

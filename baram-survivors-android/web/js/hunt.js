@@ -38,16 +38,15 @@ export const PACE = {
   // The drive's size: about 7 s of the hero's own kills of late (no fewer than 16, no more than the
   // field's floor), in rows a beat apart on a band of the side 11 tiles wide, so they come in a heap.
   wave: { first: 38, every: 45, warn: 5, len: 15, rest: 5, k: 1, secs: 6, min: 16, max: 140, hp: 0.2, step: 0.6, done: 0.75, restK: 0.6, warnK: 0.6, span: 5, rowEvery: 0.4, rows: 8 },
-  // 판 중 선택 (개편 A, P1-3): a two-way pick on a strip that does not stop the hunt; after 5 s
-  // the one picked last time (or the first) is taken.
-  choice: { first: 55, second: 35, wait: 5 },
+  // 판 중 사건 (개편 A, P1-3; no longer asked — 2차 피드백): when the first and the second happen.
+  choice: { first: 55, second: 35 },
   stopMax: 6,
   // 필드 보스 (개편 A, P2-4, 연): on a ground conquered before, three runs in ten a roaming one of the
   // ground's boss comes past 60% of the gauge, with its blows; 레이드주화, a special's chance.
   field: { chance: 0.3, at: 0.6, life: 0.35, every: 5 },                // cards that stop the hunt (자동 선택 off), the 정비 among them
 };
 
-// 판 중 선택: two of these at a time, as 연's 의뢰 (위험 감수 only on a ground conquered before).
+// 판 중 사건: what each of the run's events gives (위험 감수·광폭 도전 are no longer taken).
 export const PATHS = {
   elite: { name: '정예 토벌', desc: '챔피언 무리 ×2 · 재료 ×1.5' },
   treasure: { name: '보물 사냥', desc: '보물 도깨비 3회 · 돈 ×1.6' },
@@ -58,9 +57,10 @@ export const PATHS = {
   rage: { name: '광폭 도전', desc: '보스 광폭화 상태로 · 보상 ×1.3' },
 };
 const CHOICES = [
-  { id: 'c1', title: '어느 쪽을 노릴까?', opts: () => ['elite', 'treasure'] },
-  { id: 'c2', title: '속도를 낼까, 숨을 고를까?', opts: G => ['swift', G.wasCleared ? 'pact' : 'jar'] },
-  { id: 'c3', title: '보스를 어떻게 맞을까?', opts: () => ['tune', 'rage'] },
+  // (no longer asked: each is taken for the player — see ask())
+  { id: 'c1', auto: () => (Math.random() < 0.5 ? 'elite' : 'treasure') },
+  { id: 'c2', auto: G => (G.player.hp < G.player.maxHp * 0.6 ? 'jar' : 'swift') },
+  { id: 'c3', auto: () => 'tune' },
 ];
 
 // The boss's own blows on a hunting ground (the raid patterns' names), by ground; by its group
@@ -92,13 +92,12 @@ function start(G) {
   G.pace = { s: [], ev: [], cards: 0, manual: 0, last: -1 };
   // G.war is set after this (War.setup runs later): the 대항전·쟁 known by their stage too.
   if (A.settings().legacyPace || G.stage.raid || G.stage.war || G.war || G.training) return;
-  choiceHide();
   G.hunt = {
     prog: 0, act: 1, lastNew: 0, killSec: -1, killGot: 0, intro: false, path: null, paths: {},
     champsAt: PACE.champsAt.slice(), minisAt: PACE.minisAt.slice(), treasures: 0, warnAt: null,
     bigDmg: 0, bigTime: 0, bonusLv: 0, beat: 0, k: 1, str: 0,
     wv: { n: 0, state: 'idle', next: PACE.wave.first, ok: 0, clean: 0 },
-    asked: 0, choice: null,
+    asked: 0,
   };
   G.phase = 0;
   arenaStart(G);
@@ -288,9 +287,8 @@ function beats(dt) {
   affixTick();
   breakTick();
   waveTick();
-  choiceTick();
-  if (H.warnAt === null && !H.choice) {
-    // 판 중 선택: the first in the second act, the second half a minute on with the gauge past half.
+  if (H.warnAt === null) {
+    // 판 중 사건: the first in the second act, the second half a minute on with the gauge past half.
     if (H.asked === 0 && t >= PACE.choice.first && H.act >= 2) ask(CHOICES[0]);
     else if (H.asked === 1 && t >= H.askedAt + PACE.choice.second && H.prog >= 0.45 && H.wv.state !== 'run') ask(CHOICES[1]);
   }
@@ -318,10 +316,8 @@ function beats(dt) {
     note('act3');
     if (H.wv.state === 'run') harvest(); // the drive's spoils in before the fight
     H.wv.state = 'done';
-    // 정비 or 광폭 도전: the last pick, while the boss's air gathers.
-    if (H.choice) choicePick(H.choice.def);
+    // 정비: a card of three while the boss's air gathers.
     ask(CHOICES[2]);
-    H.warn = Math.max(H.warn, PACE.choice.wait + 0.3);
   }
   if (H.warnAt !== null && t >= H.warnAt + H.warn) callBoss();
 }
@@ -524,72 +520,20 @@ function goblinHurt(e) {
   }
 }
 
-// ------------------------------------------------------------------ 판 중 선택 (개편 A, P1-3)
+// ------------------------------------------------------------------ 판 중 사건 (개편 A, P1-3 → 2차 피드백)
+// The in-run two-way picks (a strip over the chat) read as noise: they are no longer asked. Each
+// one now simply happens, chosen for the player — 정예 토벌 or 보물 사냥 by turns, 회복 항아리 when
+// the hero is hurt (else 속공), and the 정비 card before the boss — announced as an event.
 
-let bar = null;
-
-function choiceHide() {
-  if (bar) bar.hidden = true;
-}
-
-/** A pick on the strip over the chat: two buttons, the hunt going on. */
+/** An event of the run in place of the old pick: its option taken at once, nothing on screen to answer. */
 function ask(c) {
-  const G = A.G(), H = G.hunt, S = A.settings();
-  const opts = c.opts(G), pref = (S.huntPicks || {})[c.id];
-  const def = opts.includes(pref) ? pref : opts[0];
+  const G = A.G(), H = G.hunt;
   H.asked++;
   H.askedAt = G.t;
-  H.choice = { id: c.id, opts, def, until: G.t + PACE.choice.wait };
   note('cross:ask');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'hunt-pick';
-    bar.style.cssText = 'position:fixed;z-index:9;bottom:66px;left:calc((100% - var(--side, 0px)) / 2);transform:translateX(-50%);'
-      + 'display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px 5px;background:rgba(0,0,0,.72);'
-      + 'border:2px solid #c8a050;border-radius:3px;font:11px G9,monospace;color:#f0e0c0;pointer-events:auto;user-select:none;';
-    document.body.append(bar);
-  }
-  bar.innerHTML = '';
-  const head = document.createElement('div');
-  head.textContent = c.title;
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:6px;';
-  for (const k of opts) {
-    const b = document.createElement('button');
-    b.dataset.pick = k;
-    b.style.cssText = 'min-height:34px;min-width:120px;padding:2px 8px;font:11px G9,monospace;color:#fff;background:#1a1208;'
-      + `border:1px solid ${k === def ? '#ffd84a' : '#806040'};border-radius:2px;line-height:13px;`;
-    b.innerHTML = `<b style="color:#ffd84a">${PATHS[k].name}</b><br><small>${PATHS[k].desc}</small>`;
-    b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); choicePick(k, true); });
-    row.append(b);
-  }
-  const time = document.createElement('div');
-  time.style.cssText = 'height:3px;width:100%;background:#ffd84a;transform-origin:left;';
-  bar.append(head, row, time);
-  bar._time = time;
-  bar.hidden = false;
+  takePath(c.auto(G), true);
 }
-
-function choiceTick() {
-  const G = A.G(), H = G.hunt, c = H.choice;
-  if (!c) return;
-  if (G.t >= c.until) { choicePick(c.def); return; }
-  if (bar && bar._time) bar._time.style.transform = `scaleX(${Math.max(0, (c.until - G.t) / PACE.choice.wait).toFixed(2)})`;
-}
-
-function choicePick(k, byHand = false) {
-  const G = A.G(), H = G && G.hunt, c = H && H.choice;
-  if (!c || !c.opts.includes(k)) return;
-  H.choice = null;
-  choiceHide();
-  if (byHand) {
-    const S = A.settings();
-    S.huntPicks = { ...(S.huntPicks || {}), [c.id]: k };
-    A.saveSettings();
-  }
-  takePath(k);
-  A.lootFeed(`${byHand ? '선택' : '기본 선택'} · ${PATHS[k].name}`);
-}
+window.__huntPick = () => {}; // (the strip is gone; old test scripts may still call it)
 
 /** A pick of three before a big moment (the 갈림길, the boss): it stops even with few cards. */
 function tune() {
@@ -745,7 +689,6 @@ function tick(dt) {
   sample();
   const G = A.G(), H = G.hunt;
   if (H) { momentumTick(); release(); unstick(); }
-  if (bar && !bar.hidden && (!H || !H.choice || G.over || G.dead)) choiceHide();
   if (!H || H.act >= 3 || !dt) return;
   const p = G.player;
   let n = 0;
@@ -785,7 +728,6 @@ function cleared() {
   if (!H) return;
   G.slowmo = Math.max(G.slowmo || 0, 0.8);
   G.marks = [];
-  choiceHide();
   if (H.paths.treasure) G.gold = Math.round(G.gold * 1.6);
   if (H.paths.rage) G.gold = Math.round(G.gold * 1.3);
   if (H.paths.elite) { const b = { x: G.player.x, y: G.player.y + 20, kind: 'boss' }; A.dropGear(b, 30); }
@@ -846,13 +788,15 @@ function firstPicks(cls, ok, rest) {
 
 // ------------------------------------------------------------------ the picks' effects
 
-function takePath(k) {
+function takePath(k, event = false) {
   const G = A.G(), H = G.hunt;
   H.path = k;
   H.paths[k] = true;
   note('cross:' + k);
-  A.say(`선택: ${PATHS[k].name} — ${PATHS[k].desc}`, 'sys');
-  if (k !== 'tune') A.banner(PATHS[k].name);
+  if (k !== 'tune') {
+    A.say(`${event ? '' : '선택: '}${PATHS[k].name} — ${PATHS[k].desc}`, 'sys');
+    A.banner(PATHS[k].name);
+  }
   if (k === 'elite') champs(1);
   if (k === 'treasure') H.treasureAt = G.t + 1;
   if (k === 'jar') {
@@ -1171,8 +1115,7 @@ function hurtTaken(dmg) {
 }
 
 /** 스타일 등급: S 10~20%, A 35%, B 35%, C 15% of runs (개편 A, P1-5). */
-// (set from 48 bot runs, 4 classes × 4 grounds × 3: S 19% · A 35% · B 27% · C 19%; the 몰이기's
-// part, about 4 with B's auto-cast, on top)
+// (set from 48 bot runs, 4 classes × 4 grounds × 3: S 19% · A 35% · B 27% · C 19%)
 const GRADE = { S: 67, A: 58, B: 48 };
 
 /** 스타일 등급: time, the best 기세, 처형, 일망타진, the drives, health lost, the objective, the risks. */
@@ -1182,8 +1125,7 @@ function grade() {
   if (H.grade) return H.grade;
   const run = G.clearT || G.t, W = H.wv || { ok: 0, clean: 0 };
   // 개편 A (P1-5): the time weighs half what it did; the hunt's own moments the rest — the
-  // drives taken whole, 처형, 일망타진, the 몰이기's crowd (B's G.feel: casts and foes struck).
-  const ms = G.feel, mainAvg = ms && ms.mainN ? ms.mainHits / ms.mainN : 0;
+  // drives taken whole, 처형, 일망타진.
   const part = {
     quick: Math.max(0, Math.min(15, (260 - run) / 8)),               // quick: up to 15
     best: [0, 4, 8, 12, 16][m.best],                                 // 기세: up to 16
@@ -1193,13 +1135,12 @@ function grade() {
     taken: Math.max(0, 12 - (H.taken || 0) * 3),                     // 받은 피해
     goal: H.goalBonus ? 10 : H.goalDone ? 5 : 0,                     // 목표
     risk: (H.paths.rage ? 5 : 0) + (H.paths.swift ? 3 : 0) + (H.paths.pact ? 3 : 0), // 위험 선택
-    main: Math.min(4, mainAvg / 4),                                  // 몰이기 평균 맞은 수
   };
   const sc = Object.values(part).reduce((a, b) => a + b, 0);
   const g = sc >= GRADE.S ? 'S' : sc >= GRADE.A ? 'A' : sc >= GRADE.B ? 'B' : 'C';
   H.grade = { g, sc: Math.round(sc), k: { S: 1.3, A: 1.2, B: 1.1, C: 1 }[g], best: m.best, execs: m.execs, sweeps: m.sweeps, reactions: m.reactions, waves: W.ok };
   // The results screen (C) lists these.
-  const LABEL = { quick: '빠르기', best: '기세', execs: '처형', sweeps: '일망타진', waves: '몰이 파도', taken: '무피해', goal: '목표', risk: '위험 선택', main: '몰이기' };
+  const LABEL = { quick: '빠르기', best: '기세', execs: '처형', sweeps: '일망타진', waves: '몰이 파도', taken: '무피해', goal: '목표', risk: '위험 선택' };
   H.grade.parts = Object.entries(part).filter(([k, v]) => v > 0 || k === 'quick' || k === 'waves').map(([k, v]) => [LABEL[k], Math.round(v)]);
   if (G.pace) G.pace.grade ={ g, sc: Math.round(sc), part: Object.fromEntries(Object.entries(part).map(([k, v]) => [k, Math.round(v)])) };
   G.style = { grade: g };
@@ -2308,7 +2249,6 @@ export function initHunt(api) {
   window.__hunt = () => { const G = A.G(); return G && G.hunt; };
   window.__dash = () => dash();
   window.__huntGoal = () => goalSpot();
-  window.__huntPick = k => choicePick(k, true);
   window.__hazard = k => hazard(k);
   window.__arena = () => { const G = A.G(); return G && G.arena && { id: G.arena.id, stuck: G.arena.stuck || 0, cols: G.arena.map.cols, rows: G.arena.map.rows }; };
   window.__momentum = () => { const G = A.G(); return G && G.momentum; };
