@@ -773,6 +773,8 @@ export const TAECHO_BASE = {
 // (id 7100524) is the alternative: set ABYSS_BASE.lancer to it and drop 'lancer' from ABYSS_LAID.
 const ABYSS_LAID = ['mage', 'poet', 'archer', 'lancer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'];
 export const ABYSS_WORN = Object.fromEntries(ABYSS_LAID.map(c => [c, 's_ab_' + c]));
+// Laid too, to swap in by this one line: 인어삼지창 's_ab_lancer_trident', 진명삼지창 's_ab_lancer_jinmyeong'.
+// ABYSS_WORN.lancer = 's_ab_lancer_trident';
 // 태초 and the abyss uniques are the top of the weapons: their 격 drawn this much larger again
 // (the picture only; GYEOK_TIER's reach by rank is unchanged).
 export const TOP_GYEOK_FX = { taecho: 1.6, abyss: 1.4 };
