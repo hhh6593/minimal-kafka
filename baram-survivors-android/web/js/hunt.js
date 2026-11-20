@@ -799,7 +799,9 @@ function stops(picks) {
   if (!G.hunt) return true;
   // (a new spell only while the build is still being chosen: the first three; and no more than
   // six stops a run, one kept for the 정비 — 개편 A, P1-4)
-  if (G.pace && G.pace.manual >= PACE.stopMax - (G.hunt.paths.tune || G.hunt.warnAt !== null ? 0 : 1)) return false;
+  // (the 정비 is held a place until it is dealt or the boss is up: it stops without asking here)
+  const H = G.hunt, keep = H.paths.tune || H.act >= 3 ? 0 : 1;
+  if (G.pace && G.pace.manual >= PACE.stopMax - keep) return false;
   return picks.some(o => o.type === 'skill' && (o.from || o.mastered || (o.lv === 1 && G.skills.length < 3)));
 }
 
