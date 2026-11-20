@@ -10213,6 +10213,11 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     && heavenOn(cls.id) && starOf(cls, `weapon:${gear.weapon}`) >= DRAGON_MAX) dz = HEAVEN_DRESS;
   // The original's own piece worn (an "s_" layer) is not recoloured as its stand-in would be.
   if (dz && dz.standIn && want.weapon && want.weapon.startsWith('s_')) dz = null;
+  // The 창술사's long spear (laid or 연's own): fewer, smaller fire tongues, so its line still reads.
+  if (dz && cls.id === 'lancer') {
+    if (!spearDress.has(dz)) spearDress.set(dz, { ...dz, flames: Math.min(dz.flames, 2), fsc: dz.fsc * 0.6, glow: dz.glow * 0.7 });
+    dz = spearDress.get(dz);
+  }
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
     if (!(path in images)) loadImage(path);
@@ -10470,6 +10475,8 @@ function dressedSheet(im, path, t, pal, swing) {
   return c;
 }
 const bladePts = new Map();
+// (the dress of the 창술사's long spear, by its family's: drawYhero2)
+const spearDress = new Map();
 function dressFrame(c, H, sheets, a, f, box, dz, key) {
   // The weapon alone in this cell: its glow under the hero, and the spots its fire stands on.
   const w = document.createElement('canvas');
