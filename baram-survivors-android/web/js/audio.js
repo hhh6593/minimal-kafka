@@ -105,8 +105,9 @@ export class Audio {
     }
   }
 
-  /** kind: the skill's kind, for fallbacks; level picks among several sounds (기원 tiers). */
-  play(key, kind, level = 1) {
+  /** kind: the skill's kind, for fallbacks; level picks among several sounds (기원 tiers);
+   *  rate: played that many times as fast (the kill sound climbing with a streak). */
+  play(key, kind, level = 1, rate = 1) {
     if (!this.sfxOn || !this.ctx || this.halted) return;
     const now = this.ctx.currentTime;
     if (now - (this.last[key] || -1) < (MIN_GAP[key] ?? MIN_GAP[kind] ?? 0.03)) return;
@@ -120,13 +121,13 @@ export class Audio {
       const [num, r] = n ? String(n).split('@') : [];
       const b = (num && this.buffers[num]) || this.buffers[k];
       if (b) {
-        this.start(b, GAIN[key] ?? 1, +r || 1);
+        this.start(b, GAIN[key] ?? 1, (+r || 1) * rate);
         return;
       }
     }
     // Spells stay silent without their own files: a made-up sound misrepresents them.
     if (key.startsWith('skill_')) return;
-    if (SYNTH[key]) this.synth(SYNTH[key]);
+    if (SYNTH[key]) this.synth(rate === 1 ? SYNTH[key] : { ...SYNTH[key], f: SYNTH[key].f && SYNTH[key].f.map(f => f * rate) });
   }
 
   synth(s) {
