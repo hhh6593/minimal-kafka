@@ -12477,13 +12477,16 @@ function yunit(m) {
   return im && im.complete && im.width ? { u, im } : null;
 }
 
+// Units whose 연 attack row reads badly here and strike from their standing pose instead
+// (반고, the 삼두룡: it sinks and rises, which flickers at this size).
+const STILL_ATK = new Set(['y606011']);
 /** Which row: the way it last moved (or faces), and what it is doing. */
 function yunitAnim(u, b) {
   const dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
   const dir = dx ? 'side' : dy < 0 ? 'up' : 'down';
   const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
   const atk = pick(`atk_${dir}`, 'atk_side', 'atk_down');
-  if (atk && b.atkAt !== undefined && (G.t - b.atkAt) * 1000 < atk.n * atk.ms) {
+  if (atk && b.atkAt !== undefined && !STILL_ATK.has((b.m && b.m.id) || b.unit) && (G.t - b.atkAt) * 1000 < atk.n * atk.ms) {
     return { a: atk, f: Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms)), dir, dx };
   }
   const walk = pick(`walk_${dir}`, 'walk_side', 'walk_down');
