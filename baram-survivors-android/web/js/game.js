@@ -12478,8 +12478,9 @@ function yunit(m) {
 }
 
 // Units whose 연 attack row reads badly here and strike from their standing pose instead
-// (반고, the 삼두룡: it sinks and rises, which flickers at this size).
-const STILL_ATK = new Set(['y606011']);
+// (their attack sinks into the ground or fades out and back, which flickers at this size):
+// 반고 (삼두룡), 용마 (청기린), 폭염왕 (화령), 고균도 저주의 추장, 숭숭이 (제천대성).
+const STILL_ATK = new Set(['y606011', 'y304624', 'y511013', 'y611001', 'y617201']);
 /** Which row: the way it last moved (or faces), and what it is doing. */
 function yunitAnim(u, b) {
   const dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
