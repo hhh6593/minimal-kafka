@@ -257,6 +257,16 @@ def scaled2(rgba, kx, ky):
 # The original figure's head, from the top of the plain figure's hair (its first drawn row): the
 # top of its eyes (their black rims), its chin, and its face's width (skin, ears included).
 O_EYE, O_CHIN, O_FACE_W = 18, 29, 24
+# Fitting the original's hair to 연's own (its long hairs, e.g. 은익섬광·고대 무사·땋은 머리): 연's hairs
+# hug the head (a crown a few pixels over the skull, the sides just past the face), hang to the hips
+# or knees at most, about as wide as the body, drawn with dark shading and a dark outline.
+#   HAIR_HEAD_K: the head part's scale against the face's (smaller than the face's own: the
+#     original's hair is far bigger round its head than 연's);
+#   HAIR_END: where what hangs ends, as a part of 연's chin-to-feet (1: the feet);
+#   HAIR_HALF: how far it reaches either side of the head's centre, in 연's head widths;
+#   HAIR_WISP: loose locks smaller than this part of the hair's biggest piece are dropped;
+#   HAIR_TONE: the colours darkened (gamma, then a multiple) towards 연's shading.
+HAIR_HEAD_K, HAIR_END, HAIR_HALF, HAIR_WISP, HAIR_TONE = 0.84, 0.72, 1.05, 0.12, (1.3, 0.92)
 
 
 def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
@@ -268,7 +278,8 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
         narrowed a little less (연's body is broad);
       - 연's face (its skin, eyes and mouth, from the eyes down) left clear of the hair, facing
         down or aside, so the hero keeps its face as with 연's own hairs.
-    Two layers, as 연's own hairs: "hair" (over the head: all of it from behind; from the front and
+    Two layers, as 연's own hairs (and the hair layer again, "c<piece>_h", cut at the top of
+    연's skull, worn under a hat or helmet): "hair" (over the head: all of it from behind; from the front and
     the side what the original draws over the figure and the top of the head) and "back" (the
     rest, behind the body, where the class's clips draw 연's long hairs). Each is touched up for 연
     (a dark outline round the whole hair, then split). icon: the item's official render
@@ -301,7 +312,8 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
     h0 = yhead(i0['row'], 0)
     if not h0:
         return None
-    k_head = h0[3] / O_FACE_W
+    k_head = h0[3] / O_FACE_W * HAIR_HEAD_K
+    half = HAIR_HALF * h0[3]
     # 연's eye line: two fifths down its head (its brows and eyes; the original's are under the fringe)
     eye_of = lambda yh: yh[1] + 0.4 * (yh[2] - yh[1])
 
@@ -376,8 +388,8 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
             # 연's knots: the eye line, and where the original's chin falls at the head's scale
             yeye = eye_of(yh)
             ychin = yeye + (ochin - oeye) * k_head
-            k_low = max(0.3, min(k_head, -ychin / max(1, ofeet - ochin)))
-            k_lx = (k_head + k_low) / 2
+            k_low = max(0.2, min(k_head, -ychin * HAIR_END / max(1, ofeet - ochin)))
+            k_lx = (k_head + 2 * k_low) / 3
             bands = []
             if y0 < ochin:
                 bands.append((y0, min(y1 + 1, ochin), k_head, k_head, yeye + (y0 - oeye) * k_head))
@@ -405,6 +417,20 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
                 m = p[..., 3] > 0
                 can[sl] = np.where(m[..., None], p, can[sl])
                 fcan[sl] |= fp & m
+            # 연's measure: no wider than its hairs (either side of the head's centre), no loose locks,
+            # its darker shading
+            from scipy.ndimage import label
+            xs_ = np.arange(can.shape[1]) + gx0
+            can[:, np.abs(xs_ + 0.5) > half] = 0
+            lab, n = label(can[..., 3] > 0)
+            if n > 1:
+                sizes = np.bincount(lab.ravel())[1:]
+                small = [i + 1 for i in range(n) if sizes[i] < HAIR_WISP * sizes.max()]
+                can[np.isin(lab, small)] = 0
+            g_, m_ = HAIR_TONE
+            rgb = can[..., :3].astype(float) / 255
+            can[..., :3] = np.clip(255 * m_ * rgb ** g_, 0, 255).astype(np.uint8)
+            fcan &= can[..., 3] > 0
             tu = touch_up(can, 'hair')
             solid = np.pad(can[..., 3] > 0, 1)
             fpad = np.pad(fcan, 1)
@@ -431,6 +457,14 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
                 lay = tu.copy()
                 lay[~m] = 0
                 pieces.setdefault(kind, {})[(a['row'], f)] = (lay, ox, oy)
+                if kind == 'hair':
+                    # under a hat or helmet ("hat"): nothing over the top of 연's skull (the
+                    # original's crown, its 신수 ornament), the hat sitting on the hair as on 연's
+                    # own; the rest as it is
+                    hat = lay.copy()
+                    hat[:max(0, min(hat.shape[0], round(yh[1]) - oy))] = 0
+                    if hat[..., 3].any():
+                        pieces.setdefault('hat', {})[(a['row'], f)] = (hat, ox, oy)
     if 'hair' not in pieces:
         return None
     rows = max(a['row'] for a in H['anims'].values()) + 1
@@ -447,11 +481,13 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
             y_, x_ = r * ch + oy - by0, f * cw + ox - bx0
             sl = sheet[y_:y_ + l.shape[0], x_:x_ + l.shape[1]]
             sheet[y_:y_ + l.shape[0], x_:x_ + l.shape[1]] = np.where(l[..., 3:4] > 0, l, sl)
-        key = piece if kind == 'hair' else piece + '_b'
+        key = piece + {'hair': '', 'back': '_b', 'hat': '_h'}[kind]
         fname = f'{key}_{cls}.png'
         Image.fromarray(sheet).save(os.path.join(root, fname), optimize=True)
-        # variant "c<piece>": the 코디 hair's own layers (costume.js headParts: hair and back "c<id>")
-        got[key] = {'kind': kind, 'variant': 'c' + piece, 'file': 'sinsu/' + fname, 'cols': cols,
+        # variant "c<piece>": the 코디 hair's own layers (costume.js headParts: hair and back "c<id>");
+        # under a hat its hair layer is "c<piece>_h"
+        got[key] = {'kind': 'hair' if kind == 'hat' else kind, 'variant': 'c' + piece + ('_h' if kind == 'hat' else ''),
+                    'file': 'sinsu/' + fname, 'cols': cols,
                     'cell': [cw, ch], 'foot': [-bx0, -by0], 'side': [], 'k': round(k_head, 3)}
     # the 코디 list's picture: the official item render, as fetched (its own pixels, cropped)
     ic = os.path.join(root, f'{piece}_icon.png')

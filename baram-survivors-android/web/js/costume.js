@@ -267,6 +267,9 @@ function headParts(H, cos, out, wholeHat) {
   else if (hair && L.hair && L.hair['c' + hair]) {
     out.head = fv;
     out.hair = 'c' + hair;
+    // 사신수 무신의 헤어 under a hat or helmet (one drawn, not 투명): its cut at the top of the
+    // skull, the original's crown and ornament not poking through the hat.
+    if (out.helmet && L.hair['c' + hair + '_h']) out.hair = 'c' + hair + '_h';
     if (L.back && L.back['c' + hair]) out.back = 'c' + hair;
   } else if (fv !== 'nohair' && L.hair && L.hair.own) {
     out.head = fv;
