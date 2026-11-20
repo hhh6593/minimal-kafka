@@ -213,7 +213,7 @@ function injectUi() {
   #war-board .wb-card b { display: block; font-size: 14px; color: #ffd27a; }
   #war-board .wb-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 8px 0 4px; }
   #war-board .wb-role { min-width: 110px; }
-  #war-board .wb-actions { position: sticky; bottom: -10px; margin: 6px -12px -10px; padding: 6px 0 8px; background: rgba(8,6,4,0.96); border-top: 1px solid #5a4630; } /* 출전 always on screen */
+  #war-board .wb-actions { align-self: stretch; z-index: 2; position: sticky; bottom: -10px; margin: 6px -12px -10px; padding: 6px 0 8px; background: rgba(8,6,4,0.96); border-top: 1px solid #5a4630; } /* 출전 always on screen */
   #war-board .wb-role.on, #war-board .wb-side.on { border-color: #ffd040; color: #ffd040; }
   #war-board .wb-info { max-width: 820px; margin: 0 auto; color: #e8dcc0; font: 12px G11, sans-serif; line-height: 1.5; }
   #war-board .wb-load { max-width: 820px; margin: 6px auto; border: 1px solid #5a4630; padding: 6px 8px; color: #e8dcc0; font: 12px G11, sans-serif; }
