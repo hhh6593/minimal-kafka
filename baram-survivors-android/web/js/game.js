@@ -9173,6 +9173,7 @@ function trainPick(id, lv) {
   if (!d) return;
   tr.id = id;
   if (lv) tr.lv = lv;
+  Hunt.trainTried(G.cls.id, id); // 사냥 기믹 (P1-10): the preset for the next hunt's first card
   const level = d.evolved ? 1 : Math.max(1, Math.min(MAX_SKILL_LEVEL, tr.lv));
   G.skills = [{ id, lv: level, timer: 0 }];
   G.buffs.power = G.buffs.stealth = G.buffs.guard = G.buffs.shield = G.buffs.haste = 0;
@@ -11252,7 +11253,10 @@ function drawCards() {
       .map(([id]) => ({ type: 'skill', id, lv: 1 }));
     const known = mastered(G.cls.id).filter(id => SKILLS[id].req > 1 && SKILLS[id].kind !== 'heal')
       .sort(() => Math.random() - 0.5).slice(0, 1).map(id => ({ type: 'skill', id, lv: 1, mastered: true }));
-    return known.concat(first).slice(0, 3);
+    const deal = known.concat(first).slice(0, 3);
+    // 사냥 기믹 (P1-10): on a ground conquered before, the 수련장's preset first.
+    const fit = id => SKILLS[id] && mine(id) && !SKILLS[id].evolved && SKILLS[id].kind !== 'ult' && SKILLS[id].kind !== 'heal' && (SKILLS[id].req === 1 || mastered(G.cls.id).includes(id));
+    return Hunt.firstPicks(G.cls.id, fit, deal) || deal;
   }
   const opts = [];
   // Spells and passives that lead to an evolution the hero is working toward weigh more.
@@ -14879,6 +14883,7 @@ const Hunt = initHunt({
   walled: (tx, ty) => !!(G.arena && !Hunt.open(tx, ty)),
   heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
   VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, drawGroundCached, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
+  saveProgress: () => saveJson('bs_progress', progress),
 });
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.

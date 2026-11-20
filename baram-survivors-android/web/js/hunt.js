@@ -35,7 +35,9 @@ export const PACE = {
   // 몰이 파도 (개편 A, P1-2): every 45 s from 0:35 — a warning (5 s) from one side, a big crowd
   // from there in three rows, quick (13 s at most), then 수확 (the drops pulled in, a chest for a
   // clean drive) and 5 s of breath (the field ×0.6).
-  wave: { first: 28, every: 45, warn: 5, len: 15, rest: 5, k: 1, min: 36, max: 140, hp: 0.35, step: 0.7, done: 0.75, restK: 0.6, warnK: 0.6 },
+  // The drive's size: about 7 s of the hero's own kills of late (no fewer than 16, no more than the
+  // field's floor), in rows a beat apart on a band of the side 11 tiles wide, so they come in a heap.
+  wave: { first: 38, every: 45, warn: 5, len: 15, rest: 5, k: 1, secs: 6, min: 16, max: 140, hp: 0.2, step: 0.6, done: 0.75, restK: 0.6, warnK: 0.6, span: 5, rowEvery: 0.4, rows: 8 },
   // 판 중 선택 (개편 A, P1-3): a two-way pick on a strip that does not stop the hunt; after 5 s
   // the one picked last time (or the first) is taken.
   choice: { first: 55, second: 35, wait: 5 },
@@ -333,10 +335,10 @@ function halfView() {
   return [Math.ceil(A.VW() / A.TILE / 2), Math.ceil(A.VH() / A.TILE / 2)];
 }
 
-/** Open tiles on a row k tiles past the screen's edge on side d, across the whole side. */
-function edgeRow(d, k) {
+/** Open tiles on a row k tiles past the screen's edge on side d, across the side (or a band of it). */
+function edgeRow(d, k, band = 99) {
   const G = A.G(), p = G.player, [w, h] = halfView(), out = [];
-  const span = d[0] ? h + 1 : w + 1;
+  const span = Math.min(band, d[0] ? h + 1 : w + 1);
   for (let j = -span; j <= span; j++) {
     const tx = d[0] ? p.tx + d[0] * (w + k) : p.tx + j, ty = d[0] ? p.ty + j : p.ty + d[1] * (h + k);
     if (A.free(tx, ty) && (!G.arena || reach(tx, ty))) out.push([tx, ty]);
@@ -363,6 +365,9 @@ function waveTick() {
     W.side = waveSide();
     W.until = t + P.warn;
     W.elite = W.n % 3 === 0;
+    // the hero's kills a second over the last ten (before the field thins for the warning)
+    const s = G.pace.s, back = s[Math.max(0, s.length - 11)];
+    W.rate = back && s.length > 1 ? (s[s.length - 1][1] - back[1]) / Math.max(1, s[s.length - 1][0] - back[0]) : 3;
     const side = SIDE[W.side.join(',')];
     A.banner(`${side}쪽에서 ${W.elite ? '정예가 이끄는 ' : ''}무리가 몰려온다!`);
     A.say(`몰이 파도: ${side}쪽에서 몬스터 무리가 몰려옵니다! 모아서 쓸어 버리세요.`, 'warn');
@@ -378,9 +383,12 @@ function waveTick() {
     W.left = 0;
     W.total = 0;
     W.taken = H.taken || 0;
-    const want = Math.round(Math.max(P.min, Math.min(P.max, A.floorCount(clock()) * P.k)));
-    // Three rows, a beat apart, from just past the screen's edge.
-    for (let r = 0; r < 3; r++) A.later(r * 0.7, () => { if (A.G() === G && W.state === 'run') waveRow(W, r, Math.ceil(want / 3)); });
+    const want = Math.round(Math.max(P.min, Math.min(P.max, A.floorCount(clock()) * P.k, W.rate * P.secs)));
+    // Rows a beat apart, from just past the screen's edge, on a band of that side: they come as one heap.
+    const R = Math.max(2, Math.min(P.rows, Math.ceil(want / Math.max(4, edgeRow(W.side, 1, P.span).length))));
+    for (let r = 0; r < R; r++) A.later(r * P.rowEvery, () => { if (A.G() === G && W.state === 'run') waveRow(W, r, Math.ceil(want / R)); });
+    W.want = want;
+    W.spawnEnd = t + R * P.rowEvery + 0.3;
     if (W.elite) champs(1);
     G.shake = Math.max(G.shake || 0, 0.25);
     note('event:wave');
@@ -390,7 +398,7 @@ function waveTick() {
       W.left = 0;
       for (const e of G.enemies) if (e.wave === W.id && e.hp > 0) W.left++;
     }
-    const spawned = t >= W.at + 1.6;
+    const spawned = t >= W.spawnEnd;
     if ((spawned && W.total && W.left <= W.total * (1 - P.done)) || t >= W.until) harvest();
   } else if (W.state === 'rest' && t >= W.until) {
     W.state = 'idle';
@@ -400,10 +408,13 @@ function waveTick() {
 
 function waveRow(W, r, n) {
   const G = A.G(), m = A.pickMonster();
-  // Not enough room on that side (a wall): the rest come in from wherever the field may.
-  const spots = edgeRow(W.side, 1 + r).sort(() => Math.random() - 0.5);
+  // On the band, a row in and the next behind it; not enough room there (a wall): a row further
+  // out, then the whole side; what finds no room there (a walled map) comes in from wherever the field may.
+  const P = PACE.wave, sh = a => a.sort(() => Math.random() - 0.5);
+  const spots = [...sh(edgeRow(W.side, 1 + (r & 1), P.span)), ...sh(edgeRow(W.side, 3, P.span)), ...sh(edgeRow(W.side, 2 - (r & 1)))];
   for (let i = 0; i < n && G.enemies.length < 420; i++) {
-    const e = A.addEnemy(i % 5 === 4 ? A.pickMonster() : m, null, null, 0, spots[i] || null);
+    const at = spots[i] && A.free(spots[i][0], spots[i][1]) ? spots[i] : null;
+    const e = A.addEnemy(i % 5 === 4 ? A.pickMonster() : m, null, null, 0, at);
     if (!e) continue;
     e.wave = W.id;
     e.stepTime *= PACE.wave.step;
@@ -416,6 +427,7 @@ function waveRow(W, r, n) {
 function harvest() {
   const G = A.G(), H = G.hunt, W = H.wv, t = G.t;
   const ok = W.total > 0 && W.killed >= W.total * PACE.wave.done;
+  if (G.pace) (G.pace.waves = G.pace.waves || []).push([Math.round(W.at), Math.round(t - W.at), W.want, W.total, W.killed, Math.round(W.rate || 0)]);
   W.state = 'rest';
   W.until = t + PACE.wave.rest;
   G.vacuumAt = t;
@@ -807,6 +819,29 @@ function cardBonus(o) {
   return 0;
 }
 
+// ------------------------------------------------------------------ 수련장 → 첫 카드 (개편 A, P1-10)
+
+/** A spell tried in the 수련장: the class's last three tried are its preset (kept with the progress). */
+function trainTried(cls, id) {
+  const pr = A.progress();
+  pr.trainPreset = pr.trainPreset || {};
+  pr.trainPreset[cls] = [id, ...(pr.trainPreset[cls] || []).filter(x => x !== id)].slice(0, 3);
+  if (A.saveProgress) A.saveProgress();
+}
+
+/** The first card of a 정복/소탕 on a ground conquered before: the preset's spells this first card may
+ *  hold (ok: a first-tier attack or a 숙련 one), the rest of the deal after; null when none fit. */
+function firstPicks(cls, ok, rest) {
+  const G = A.G(), H = G && G.hunt;
+  if (!H || H.mode === 'rush' || !G.wasCleared) return null;
+  const pre = ((A.progress().trainPreset || {})[cls] || []).filter(ok);
+  if (!pre.length) return null;
+  note('cross:preset');
+  const cards = pre.map(id => ({ type: 'skill', id, lv: 1, preset: true }));
+  for (const o of rest) if (cards.length < 3 && !cards.some(c => c.id === o.id)) cards.push(o);
+  return cards;
+}
+
 // ------------------------------------------------------------------ the picks' effects
 
 function takePath(k) {
@@ -1134,7 +1169,7 @@ function hurtTaken(dmg) {
 }
 
 /** 스타일 등급: S 10~20%, A 35%, B 35%, C 15% of runs (개편 A, P1-5). */
-const GRADE = { S: 64, A: 59, B: 50 };
+const GRADE = { S: 63, A: 54, B: 44 }; // (set from 32 bot runs: S 12% · A 31% · B 41% · C 16%)
 
 /** 스타일 등급: time, the best 기세, 처형, 일망타진, the drives, health lost, the objective, the risks. */
 function grade() {
@@ -2261,7 +2296,7 @@ export function initHunt(api) {
     hud(ctx, cv) { drawStorm(ctx, cv); hud(ctx, cv); hud2(ctx, cv); drawGoalHud(ctx, cv); drawWave(ctx, cv); },
     ground: drawGoal, move, hurtBy, GROUNDS, GROUPS, groundOf: ground,
     open, cam, drawMap, flowDirs, reach, spawnTile, ambient, sweep, sweepKill, MODES, starTotal,
-    world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade,
+    world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade, trainTried, firstPicks,
     tick(dt) { tick(dt); },
     PACE, PATHS,
   };
