@@ -1171,7 +1171,9 @@ function hurtTaken(dmg) {
 }
 
 /** 스타일 등급: S 10~20%, A 35%, B 35%, C 15% of runs (개편 A, P1-5). */
-const GRADE = { S: 63, A: 54, B: 44 }; // (set from 32 bot runs: S 12% · A 31% · B 41% · C 16%)
+// (set from 48 bot runs, 4 classes × 4 grounds × 3: S 19% · A 35% · B 27% · C 19%; the 몰이기's
+// part, about 4 with B's auto-cast, on top)
+const GRADE = { S: 67, A: 58, B: 48 };
 
 /** 스타일 등급: time, the best 기세, 처형, 일망타진, the drives, health lost, the objective, the risks. */
 function grade() {
@@ -1180,8 +1182,8 @@ function grade() {
   if (H.grade) return H.grade;
   const run = G.clearT || G.t, W = H.wv || { ok: 0, clean: 0 };
   // 개편 A (P1-5): the time weighs half what it did; the hunt's own moments the rest — the
-  // drives taken whole, 처형, 일망타진, the 몰이기's crowd (B's G.mainStats, when there).
-  const ms = G.mainStats, mainAvg = ms && ms.casts ? ms.hits / ms.casts : 0;
+  // drives taken whole, 처형, 일망타진, the 몰이기's crowd (B's G.feel: casts and foes struck).
+  const ms = G.feel, mainAvg = ms && ms.mainN ? ms.mainHits / ms.mainN : 0;
   const part = {
     quick: Math.max(0, Math.min(15, (260 - run) / 8)),               // quick: up to 15
     best: [0, 4, 8, 12, 16][m.best],                                 // 기세: up to 16
@@ -1191,7 +1193,7 @@ function grade() {
     taken: Math.max(0, 12 - (H.taken || 0) * 3),                     // 받은 피해
     goal: H.goalBonus ? 10 : H.goalDone ? 5 : 0,                     // 목표
     risk: (H.paths.rage ? 5 : 0) + (H.paths.swift ? 3 : 0) + (H.paths.pact ? 3 : 0), // 위험 선택
-    main: Math.min(8, mainAvg / 2.5),                                // 몰이기 평균 맞은 수
+    main: Math.min(4, mainAvg / 4),                                  // 몰이기 평균 맞은 수
   };
   const sc = Object.values(part).reduce((a, b) => a + b, 0);
   const g = sc >= GRADE.S ? 'S' : sc >= GRADE.A ? 'A' : sc >= GRADE.B ? 'B' : 'C';
