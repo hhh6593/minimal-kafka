@@ -234,6 +234,15 @@
   #town-sound .btn { min-width: 0; padding: 3px 8px; font-size: 11px; }
   #title-sound { display: flex; gap: 6px; }
   #title-sound .btn { min-width: 0; padding: 4px 10px; font-size: 12px; }
+  /* 소리 크기: [배경음 켬] − 70% + , wrapped as one unit so the pair never splits across lines */
+  .vgroup { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  #title-sound { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 10px; }
+  #town-sound { flex-direction: column; align-items: flex-end; gap: 2px; }
+  .vstep { display: inline-flex; align-items: center; gap: 2px; }
+  body .vstep .btn, body #title #title-sound .vstep .btn { min-width: 0; width: 22px; padding: 2px 0; font-size: 12px; line-height: 14px; }
+  .vstep b { min-width: 34px; text-align: center; font: bold 11px G9, monospace; color: #f4dca8; }
+  #pause-box .vstep b { color: #2a1606; }
+  .vstep.off b { opacity: .45; }
   /* 수련장: the spell list, the chosen spell's card and the damage meter, at the field's left. */
   #train { position: fixed; left: max(8px, env(safe-area-inset-left)); top: 8px; bottom: 84px; width: min(250px, 32vw); z-index: 5;
       display: flex; flex-direction: column; gap: 4px; padding: 0 6px 6px; color: #2a1606; background: rgba(216, 176, 112, .94);

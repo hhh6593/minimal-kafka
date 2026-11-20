@@ -223,6 +223,26 @@ export class Audio {
     this.sfxOn = on;
   }
 
+  /** Music volume 0..1 (the on/off switch keeps it); applied at once, in the app too. */
+  setBgmVolume(v) {
+    this.bgmVolume = Math.max(0, Math.min(1, v));
+    if (this.music) this.music.volume = this.bgmVolume;
+  }
+
+  /** Effects volume 0..1: the master gain every effect goes through. */
+  setSfxVolume(v) {
+    this.sfxVolume = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.value = this.sfxVolume;
+  }
+
+  /** A short sample effect, so the new effects volume can be heard. */
+  sample() {
+    this.unlock();
+    if (!this.sfxOn || !this.ctx) return;
+    delete this.last.click;
+    this.play('click');
+  }
+
   /** The app went to the background (or came back). */
   halt(on) {
     this.halted = on;
