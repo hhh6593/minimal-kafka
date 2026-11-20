@@ -245,7 +245,8 @@ function injectUi() {
   body:not(.war) #war-call-btn { display: none; }
   .jaeng-cmd { font: 700 11px G11, monospace; padding: 2px 5px; color: #f4e2c0; background: #2a1030; border: 2px solid rgb(176,90,255); }
   .jaeng-cmd.cool { opacity: 0.45; }
-  body:not(.jaeng) .jaeng-cmd { display: none; }
+  #jaeng-cmds { position: fixed; right: calc(env(safe-area-inset-right) + 4px); top: 34%; z-index: 30; display: flex; flex-direction: column; gap: 3px; }
+  body:not(.jaeng) #jaeng-cmds { display: none; }
   `;
   document.head.append(st);
   const board = document.createElement('div');
@@ -278,8 +279,11 @@ function injectUi() {
     c.title = '주변 아군을 불러 따라오게 한다';
     c.onclick = () => heroCall();
     b.after(c);
-    // 「쟁」: the hero's command to its squad and the first (20 s, every 10 s).
-    let last = c;
+    // 「쟁」: the hero's command to its squad and the first (20 s, every 10 s), a small column of
+    // its own at the right edge (in the keys' grid it fell under the 질주 key).
+    const col = document.createElement('div');
+    col.id = 'jaeng-cmds';
+    document.body.append(col);
     for (const [kind, label, tip] of [['boss', '보스', '보스 집중: 내 분대와 1분대가 20초 동안 보스를 친다'], ['pk', '견제', '견제: 보스를 가장 많이 치는 다른 길드의 딜러·힐러를 끊는다'], ['seal', '봉인', '봉인: 우리 것이 아닌 가장 가까운 봉인석을 차지한다']]) {
       const k = document.createElement('button');
       k.className = 'jaeng-cmd';
@@ -287,8 +291,7 @@ function injectUi() {
       k.textContent = label;
       k.title = tip;
       k.onclick = () => heroCommand(kind);
-      last.after(k);
-      last = k;
+      col.append(k);
     }
   }
 }
@@ -303,8 +306,8 @@ export function openBoard() {
   if (!cls) return;
   const box = document.getElementById('war-board');
   const roles = rolesFor(cls);
-  const w = WARS[pickWar] || jaengCard(cls, pr);
   const pr = A.progress();
+  const w = WARS[pickWar] || jaengCard(cls, pr);
   const mats = pr.mats || {};
   const cards = Object.values(WARS).map(x => {
     const pic = img(x.art) ? `assets/hud/${x.art}.png` : '';
@@ -4277,6 +4280,10 @@ function jaengSetup() {
     looks: pendingWar.looks || {},
   };
   G.bossDue = false;
+  // (hunt.js's 토벌도 is set up before the war is: not a hunt's here.)
+  G.hunt = null;
+  const dash = document.getElementById('dash-btn');
+  if (dash) dash.hidden = true;
   G.phase = 0;
   G.raidT = 4;
   W.countdown = 4;
@@ -5084,7 +5091,7 @@ function jaengCard(cls, pr) {
   const gate = (A.SINSU_GATE[wk.sinsu] || [])[0], open = !gate || (pr.raids || {})[gate];
   return {
     jaeng: true, id: 'jaeng', name: '쟁', title: `월드 보스 · ${boss}`, locked, practice: !left, wk,
-    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(12명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 1000점)·막타(+150)·봉인석·PK(처치 8, 도움 3)·광역기 끊기(+30)로 순위를 가린다. 9분이면 보스가 달아난다.`,
+    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(12명씩)가 다툰다. 2분 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. 9분이면 보스가 달아난다.`,
     more: `이번 주 보상 ${left}/${JAENG_PAID}회 남음 (월요일 초기화) · 보상: 레이드주화 · ${open ? A.MATS[wk.sinsu].name : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[wk.sinsu].name})`} · 전 · 1위 보스 상자(${boss} 세트 한 부위 50%, 코디 30%) · 막타 상자`
       + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 길드대항전에서 한 번 이기면 열린다</b>' : ''),
   };
@@ -5178,6 +5185,7 @@ function jaengRewards(W, place, tier) {
 
 function showJaengResult(W) {
   const G = A.G(), r = W.result, box = document.getElementById('war-result');
+  document.body.classList.remove('jaeng'); // (the command keys go with the fight)
   const won = r.place === 0;
   const hud = n => (img(n) ? `assets/hud/${n}.png` : '');
   const medal = (label, value, icon) => `<div class="wr-medal">${hud('ui_icon_medal01') ? `<img class="wr-mbg" src="${hud('ui_icon_medal01')}" alt="">` : ''}

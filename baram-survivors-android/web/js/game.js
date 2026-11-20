@@ -7336,6 +7336,9 @@ const QUESTS = [
   { id: 'q_endless', title: '불굴', text: '정복 뒤 계속 사냥에서 10분 버티기', gold: 1500, need: 10, have: s => Math.floor(s.endless / 60) },
   { id: 'q_allclass', title: '팔방미인', text: '네 직업 모두 Lv 20 기록', gold: 2000, need: 4, have: () => CLASSES.filter(c => (best[c.id] || {}).lvl >= 20).length },
   { id: 'q_codex', title: '장비 수집가', text: '도감 장비 절반 모으기', gold: 2000, need: 50, have: () => Math.floor(codexShare() * 100) },
+  // 「쟁」 (war.js): first of the three guilds ten times, the boss's last blow ten times.
+  { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 길드 1위 10번', gold: 5000, need: 10, have: () => (progress.bosspk || {}).won || 0 },
+  { id: 'q_jaeng_last', title: '막타 장인', text: '쟁에서 보스 막타 10번', gold: 5000, need: 10, have: () => (progress.bosspk || {}).last || 0 },
 ];
 
 /** Today's three 의뢰: drawn from the grounds already open, the same all day. */
