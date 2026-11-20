@@ -14,7 +14,7 @@ shoulder and arm flares off the body, in the 신수's colour. Here:
     layer aback, the same variant as the outfit, so the outfit brings them (game.js yGearVariants);
   - 무신의기운 (the 망토 slot): the original's aura (its two 신수 heads beside the figure), 'wings' too,
     as a cape layer (behind the body from the front and the side, over the back from behind: 연's
-    cape order), drawn AURA_K of the hero's scale so it does not swallow the field.
+    cape order), AURA_W times the hero across, its dark mass lifted toward the 신수's colour (fit_aura).
 Out: GEAR_DIR/musin_worn/<piece>_<class>.png and index.json in sinsu_worn's form
 ({cls: {piece: {kind, file, cols, cell, foot, side, variant?}}}); prepare_assets.py adds them to the
 heroes' layers as "s_<piece>" (or their variant). Uses sinsu_worn.py's fetch and cutting; the
@@ -38,7 +38,12 @@ import sinsu_worn  # noqa: E402
 
 SETS = {'cheong': '청룡', 'baekho': '백호', 'jujak': '주작', 'hyeonmu': '현무'}
 OUTFIT = 309367
-AURA_K = 0.8
+# 무신의기운: AURA_W times the hero across at its widest (the original's spans four figures and hid
+# 연's small heroes in a hunt), scaled about the chest (AURA_CHEST of the hero's height above the
+# feet), drawn AURA_ALPHA of solid, its dark mass lifted toward the 신수's colour (AURA_TINT: h, s, v).
+# (AURA_W is of the bare body and head, about 21 px; dressed, a hero is some 26: 2.3 is about 1.9 of it.)
+AURA_W, AURA_CHEST, AURA_ALPHA = 2.3, 0.6, 215
+AURA_TINT = {'cheong': (0.62, 0.65, 0.62), 'baekho': (0.62, 0.08, 0.8), 'jujak': (0.985, 0.8, 0.7), 'hyeonmu': (0.5, 0.7, 0.55)}
 # 연's heroes stand about 46 px feet to crown; the flares are kept from 40% of that up (the hips).
 HERO_H, CUT_LOW = 46, 0.4
 
@@ -93,22 +98,66 @@ def recolour(a, s):
     return out
 
 
-def shrink(path, meta, k):
-    """An aura layer drawn k times smaller about the feet (cell and foot kept)."""
+def hero_width(gear, H):
+    """연's hero across, standing facing down: its body and head layers together."""
+    a = H['anims']['idle_down']
+    x0 = x1 = None
+    for kind in ('body', 'head'):
+        meta = H['layers'].get(kind, {}).get('base')
+        if not meta:
+            continue
+        im = Image.open(os.path.join(gear, 'yhero2', meta['file'])).convert('RGBA')
+        cw, ch = meta.get('cell', H['cell'])
+        fx = meta.get('foot', H['foot'])[0]
+        bb = im.crop((0, a['row'] * ch, cw, (a['row'] + 1) * ch)).getbbox()
+        if bb:
+            x0 = bb[0] - fx if x0 is None else min(x0, bb[0] - fx)
+            x1 = bb[2] - fx if x1 is None else max(x1, bb[2] - fx)
+    return (x1 - x0) if x0 is not None else 26
+
+
+def aura_pixel(s, r, g, b):
+    """The aura's dark mass lifted toward its 신수's colour (a 기운, not a black blot)."""
+    h, sa, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+    th, ts, tv = AURA_TINT[s]
+    if s == 'baekho':  # silver mist: the original's black and grey lifted to pale grey
+        return colorsys.hsv_to_rgb(th, min(sa, 0.12) + 0.06, 0.38 + 0.6 * v)
+    lift = max(0.0, 1 - v / 0.55)  # the darker, the more of the 신수's colour
+    nh = th if sa < 0.25 else h
+    return colorsys.hsv_to_rgb(nh, max(sa, ts * lift + sa * (1 - lift)), max(v, tv * lift + v * (1 - lift)))
+
+
+def fit_aura(path, meta, s, hero_w):
+    """The aura drawn AURA_W times the hero across, about its chest (behind the shoulders, not
+    round the feet), lifted toward the 신수's colour and a little see-through. Returns its scale."""
     im = Image.open(path).convert('RGBA')
     cw, ch = meta['cell']
     fx, fy = meta['foot']
+    cy = fy - AURA_CHEST * HERO_H
+    widths = []
+    for y0 in range(0, im.height, ch):
+        bb = im.crop((0, y0, cw, y0 + ch)).getbbox()
+        if bb:
+            widths.append(bb[2] - bb[0])
+    k = min(1.0, AURA_W * hero_w / max(widths)) if widths else 1.0
     out = Image.new('RGBA', im.size)
     for y0 in range(0, im.height, ch):
         for x0 in range(0, im.width, cw):
             c = np.asarray(im.crop((x0, y0, x0 + cw, y0 + ch)))
             if not (c[..., 3] > 0).any():
                 continue
-            sc = sinsu_worn.scaled(c, k)
-            # scaled about the feet
-            ox, oy = round(fx - fx * k), round(fy - fy * k)
+            sc = np.asarray(sinsu_worn.touch_up(sinsu_worn.scaled(c, k), 'wings')).copy()
+            m = sc[..., 3] > 0
+            outline = m & (sc[..., :3].astype(int).sum(-1) <= 22 + 18 + 26)
+            ys, xs = np.nonzero(m & ~outline)
+            for y, x in zip(ys, xs):
+                sc[y, x, :3] = [round(255 * v) for v in aura_pixel(s, *(int(q) for q in sc[y, x, :3]))]
+            sc[..., 3] = np.where(m, AURA_ALPHA, 0)
+            # scaled about the chest (touch_up added a one-pixel margin)
+            ox, oy = round(fx - fx * k) - 1, round(cy - cy * k) - 1
             out.alpha_composite(Image.fromarray(sc), (x0 + ox, y0 + oy))
     out.save(path, optimize=True)
+    return k
 
 
 def cut_low(path, meta):
@@ -133,6 +182,13 @@ def build(gear):
     index = json.load(open(ip, encoding='utf-8'))
     ci = json.load(open(os.path.join(gear, 'ycostume', 'index.json'), encoding='utf-8'))
     done = {}
+    H2 = json.load(open(os.path.join(gear, 'yhero2', 'index.json'), encoding='utf-8'))
+    widths = {}
+
+    def hero_w(cls):
+        if cls not in widths:
+            widths[cls] = hero_width(gear, H2[cls])
+        return widths[cls]
     for cls, ps in index.items():
         for s in SETS:
             fl = ps.get(f'musin_flare_{s}')
@@ -144,7 +200,7 @@ def build(gear):
             if au:
                 au['kind'] = 'cape'
                 au['side'] = []  # 연's own cape order (the class's z)
-                shrink(os.path.join(root, os.path.basename(au['file'])), au, AURA_K)
+                au['k'] = round(fit_aura(os.path.join(root, os.path.basename(au['file'])), au, s, hero_w(cls)), 3)
             om = ci['layers'].get(cls, {}).get('armor', {}).get(f'c{OUTFIT}')
             if not om:
                 continue

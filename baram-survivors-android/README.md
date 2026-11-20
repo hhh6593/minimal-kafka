@@ -1249,7 +1249,7 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
 가시 장식)입니다. 몸은 연의 판갑 천상남자무갑(치장용, 코디 309367: 모든 직업 틀에 연이 그린 것)의 푸른 판만 원작 렌더에서 잰
 신수 색으로 바꾸고(청룡 남색과 옅은 파랑, 백호 은백, 주작 진홍, 현무 흑남색과 청록; 살·윤곽·금빛은 그대로), 원작의 어깨·팔 가시는
 원작 렌더의 몸 밖 픽셀(`sinsu_worn.py` 'wings')을 연의 어깨에 얹습니다(`aback`, 갑옷과 같은 변형이라 함께 입혀짐; 걸을 때 발치로
-늘어지지 않게 허리 위만, `CUT_LOW`). 기운은 원작의 신수 두 머리 기운(몸 밖 픽셀)을 연 영웅 비율의 0.8배로 망토 층에(앞·옆은 몸 뒤,
+늘어지지 않게 허리 위만, `CUT_LOW`). 기운은 원작의 신수 두 머리 기운(몸 밖 픽셀)을 영웅 폭의 약 1.9배(`AURA_W`, 원작 그대로는 4배라 사냥에서 영웅을 가렸음)로 가슴 높이를 중심으로 줄이고, 검은 덩어리는 신수 색으로 띄우고(청룡 남청, 백호 은빛 안개, 주작 진홍, 현무 청록; `AURA_TINT`) 조금 비치게(`AURA_ALPHA`) 해서 망토 층에(앞·옆은 몸 뒤,
 뒤에서는 등 위: 연 망토 순서). 아이콘은 원작 그림(`Item/Render`, `fetch_icons.py`로 연 아이콘 틀에). 빌드 입력:
 `python3 tools/musin_worn.py fetch GEAR_DIR` 다음 `build GEAR_DIR`(→ `GEAR_DIR/musin_worn/`, `prepare_assets.py`가 `yhero2/sinsu/`에
 `s_musin_*` 층으로; 렌더는 `sinsu_worn/raw`를 함께 씀). 무신의 안대(얼굴 장식)는 장비 칸이 없어 넣지 않았습니다.
