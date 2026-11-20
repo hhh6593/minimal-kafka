@@ -161,6 +161,8 @@ async function boot() {
   applySounds();
   audio.setBgm(settings.bgm);
   audio.setSfx(settings.sfx);
+  audio.setBgmVolume(volOf('bgm'));
+  audio.setSfxVolume(volOf('sfx'));
   const paths = [
     ...Object.keys(M.fx).map(id => `fx/${id}.png`),
     // Hit sparks and the level-up burst are never in a spell slot: no icon of their own.
@@ -9016,8 +9018,10 @@ function drawSkillBar() {
   const keyLeft = Math.min(kr && kr.width ? kr.left : Infinity, ub && ub.width ? ub.left : Infinity);
   const right = keyLeft < Infinity ? Math.min(W - 100 * dpr, (keyLeft - cr.left) * dpr - 6 * dpr) : W - 100 * dpr;
   const x0 = yeon ? right - 4 * (sz + gap) : Math.round(12 * u), y0 = yeon ? canvas.height - 12 * dpr - 2 * sz - gap : Math.round(H - sz - 10 * u);
-  G.skills.slice(0, 8).forEach((s, i) => {
-    const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap), y = y0 + (yeon && i >= 4 ? sz + gap : 0);
+  // Slots 1-8 stand as they always did (two rows of four); the 9th-12th make a third row above them.
+  G.skills.slice(0, MAX_SKILLS).forEach((s, i) => {
+    const def = SKILLS[s.id], x = x0 + (yeon ? i % 4 : i) * (sz + gap),
+      y = y0 + (yeon ? (i >= 8 ? -(sz + gap) : i >= 4 ? sz + gap : 0) : 0);
     // 연's slot: a purple frame in a black line.
     ctx.fillStyle = '#000';
     ctx.fillRect(x - 4, y - 4, sz + 8, sz + 8);
@@ -12562,6 +12566,13 @@ function syncSettings() {
   $('#opt-sfx').textContent = '효과음: ' + (settings.sfx ? '켬' : '끔');
   // The same two switches on the title and in town (소리 끄기 without starting a hunt).
   for (const b of document.querySelectorAll('.snd')) b.textContent = (b.dataset.sound === 'bgm' ? '배경음 ' : '효과음 ') + (settings[b.dataset.sound] ? '켬' : '끔');
+  for (const v of document.querySelectorAll('.vstep')) {
+    const k = v.dataset.vol, p = Math.round(volOf(k) * 100);
+    v.querySelector('b').textContent = p + '%';
+    v.classList.toggle('off', !settings[k]);
+    v.querySelector('.vm').disabled = p <= 0;
+    v.querySelector('.vp').disabled = p >= 100;
+  }
   $('#opt-num').textContent = '피해 숫자: ' + (settings.numbers ? '켬' : '끔');
   $('#opt-bubble').textContent = '말풍선: ' + (settings.bubbles ? '켬' : '끔');
   $('#opt-tiles').textContent = '이동: ' + (settings.tiles ? '한 칸씩' : '자유');
@@ -12676,6 +12687,39 @@ $('#opt-bgm').onclick = () => {
   saveJson('bs_settings', settings);
   syncSettings();
 };
+// 배경음/효과음 volume (0-100%, 10% steps): − value + beside each on/off switch (pause menu, title, town).
+const VOL_DEFAULT = { bgm: 0.5, sfx: 0.6 };
+function volOf(k) {
+  const v = settings[k + 'Vol'];
+  return typeof v === 'number' && v >= 0 && v <= 1 ? v : VOL_DEFAULT[k];
+}
+function setVol(k, v) {
+  v = Math.max(0, Math.min(1, Math.round(v * 20) / 20));
+  settings[k + 'Vol'] = v;
+  if (k === 'bgm') audio && audio.setBgmVolume(v);
+  else audio && audio.setSfxVolume(v);
+  saveJson('bs_settings', settings);
+  syncSettings();
+  if (k === 'sfx' && audio) audio.sample();
+}
+function initVolume() {
+  const anchors = [...document.querySelectorAll('.snd'), $('#opt-bgm'), $('#opt-sfx')];
+  for (const a of anchors) {
+    const k = a.dataset.sound || (a.id === 'opt-bgm' ? 'bgm' : 'sfx');
+    const v = document.createElement('span');
+    v.className = 'vstep';
+    v.dataset.vol = k;
+    v.title = (k === 'bgm' ? '배경음' : '효과음') + ' 크기';
+    v.innerHTML = '<button class="btn vm" aria-label="작게">−</button><b></b><button class="btn vp" aria-label="크게">+</button>';
+    v.querySelector('.vm').onclick = e => { e.stopPropagation(); setVol(k, volOf(k) - 0.1); };
+    v.querySelector('.vp').onclick = e => { e.stopPropagation(); setVol(k, volOf(k) + 0.1); };
+    const g = document.createElement('span');
+    g.className = 'vgroup';
+    a.before(g);
+    g.append(a, v);
+  }
+}
+initVolume();
 document.querySelectorAll('.snd').forEach(b => { b.onclick = () => $(b.dataset.sound === 'bgm' ? '#opt-bgm' : '#opt-sfx').click(); });
 syncSettings();
 $('#opt-sfx').onclick = () => {
