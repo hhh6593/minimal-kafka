@@ -6182,11 +6182,10 @@ function rollSpecial(e) {
     && (!s.craft.only || s.craft.only.includes(G.cls.id)))) && (s.kind !== 'shield' || hasShield(G.cls.id)));
   if (!mine.length) return;
   const sp = mine[Math.floor(Math.random() * mine.length)];
-  // 스페셜 드롭의 한 방 (기획 P1-9): a column of gold over it, the world slowed for a breath,
-  // its own line in the chat and a call across the field (it looked like any plain drop).
+  // 스페셜 드롭의 한 방 (기획 P1-9): a column of gold over it and a call across the field (it
+  // looked like any plain drop). The slowed breath comes when it is picked up (specialMoment).
   G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id }, beam: '#ffe070' });
   say('어디선가 빛나는 물건이 떨어졌습니다!', 'warn');
-  if (!G.stage.raid && !G.war) G.slowmo = Math.max(G.slowmo || 0, 0.4);
   banner('빛나는 물건!');
   emote(Math.random() < 0.5 ? 'really' : 'hehe', G.player);
 }
@@ -6287,7 +6286,9 @@ function killEnemy(e) {
   const p = G.player;
   // A kill gives a little mana, but not the kills of a 필살기 itself (a screen of them refilled it
   // at once, and it could be thrown again and again).
-  if (G.t - (G.ultAt === undefined ? -99 : G.ultAt) > 3) p.mp = Math.min(p.maxMp, p.mp + 0.6);
+  // 마력 리듬 (기획 P2-2, light): a kill in a heap (five or more within 3 tiles) gives twice the
+  // mana, a lone one a little less — the bigger the 몰이, the sooner the 몰이기 and 필살기.
+  if (G.t - (G.ultAt === undefined ? -99 : G.ultAt) > 3) p.mp = Math.min(p.maxMp, p.mp + (G.hunt ? (heapNear() >= 5 ? 1.2 : 0.45) : 0.6));
   // Experience comes at the kill, as in the game: nothing to pick up.
   gainXp(e.xp);
   const roll = Math.random();
@@ -8322,6 +8323,15 @@ function mainWait() {
 function mainCan() {
   const p = G.player;
   return mainOn() && !G.dead && !G.over && !G.paused && !G.choosing && mainWait() <= 0 && p.mp >= p.maxMp * MAIN.cost;
+}
+/** Foes within 3 tiles of the hero (counted at most four times a second: the kills ask often). */
+function heapNear() {
+  if (G.t < (G.heapAt ?? -9)) return G.heapN;
+  G.heapAt = G.t + 0.25;
+  const p = G.player;
+  let n = 0;
+  for (const e of G.enemies) if (e.hp > 0 && !e.ally && Math.abs(e.tx - p.tx) <= 3 && Math.abs(e.ty - p.ty) <= 3 && ++n >= 5) break;
+  return (G.heapN = n);
 }
 /** Foes within its reach now. */
 function mainCount() {
@@ -11568,6 +11578,15 @@ function nextChoice() {
     }
     return;
   }
+  // 판 중 선택 (hunt.js, A: a two-way strip that does not stop the hunt): a card that could stop
+  // waits until it is picked (5 s at most), so two choices never stand over each other.
+  if (G.hunt && G.hunt.choice && !settings.autoPick && !G.firstCard) {
+    if (!G.choiceDeferred) {
+      G.choiceDeferred = true;
+      later(0.3, () => { G.choiceDeferred = false; if (G && !G.choosing) nextChoice(); });
+    }
+    return;
+  }
   G.pendingLevels--;
   const first = G.firstCard, tune = G.tuneCard;
   G.tuneCard = false;
@@ -13787,7 +13806,9 @@ function render(now) {
   const c = G.combo;
   if (c.n >= 10 && G.t - c.t < 3) {
     const pop = Math.max(0, 1 - (G.t - c.pop) / 0.15), mark = Math.max(0, 1 - (G.t - (c.mark || -9)) / 0.6);
-    const sc = (1 + 0.25 * pop + 0.6 * mark * mark) * (canvas.width / 860);
+    // (it grows a step with each 기세 step, 10/40/100/200, as the kill sound climbs: killRate)
+    const tier = c.n >= 200 ? 0.24 : c.n >= 100 ? 0.16 : c.n >= 40 ? 0.08 : 0;
+    const sc = (1 + tier + 0.25 * pop + 0.6 * mark * mark) * (canvas.width / 860);
     ctx.save();
     ctx.translate(canvas.width - 70 * (canvas.width / 860), 64 * (canvas.width / 860));
     ctx.scale(sc, sc);
