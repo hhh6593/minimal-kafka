@@ -2822,19 +2822,22 @@ function openCraft(sink = null) {
   const mats = progress.mats || {};
   $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)} · `
     + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
-  let icon = null;
+  let icon = null, fxs = null;
   const row = (name, desc, label, can, act) => {
     if (sink) {
-      sink.push({ sec, name, desc, label, can, icon, meta, act: () => {
+      const ent = { sec, name, desc, label, can, icon, meta, star: fxs, act: null };
+      // The making plays out in the window (forgeRun): suspense, then the result.
+      ent.act = () => forgeRun(ent, () => {
         act();
         saveJson('bs_progress', progress);
         if ($('#town-gold')) $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
         if (G) applyGear();
         refreshAvatars();
-        openForge();
-      } });
+      });
+      sink.push(ent);
       icon = null;
       meta = null;
+      fxs = null;
       return;
     }
     const r = document.createElement('div');
@@ -2999,7 +3002,7 @@ function openCraft(sink = null) {
   head('강화 · 사본(조합 장비는 재료)으로 별을 올린다');
   // 확률 강화 (today's way, optional): half the materials, but it can fail — 손상 (spent for
   // nothing) or 부식 (a star back) — at 90% … 10% from 제일 to 제구.
-  row(`확률 강화 ${settings.chanceUp ? '켜짐' : '꺼짐'}`, settings.chanceUp ? '재료 절반 · 성공 90%→10% · 실패 시 손상(재료만 잃음) 또는 부식(별 -1)'
+  if (!sink) row(`확률 강화 ${settings.chanceUp ? '켜짐' : '꺼짐'}`, settings.chanceUp ? '재료 절반 · 성공 90%→10% · 실패 시 손상(재료만 잃음) 또는 부식(별 -1)'
     : '켜면 조합 장비·용무기 별을 절반 재료로, 대신 확률로 올린다', settings.chanceUp ? '끄기' : '켜기', true, () => {
     settings.chanceUp = !settings.chanceUp;
     saveJson('bs_settings', settings);
@@ -3023,6 +3026,7 @@ function openCraft(sink = null) {
       icon = pieceIcon(cls, csp ? csp.kind : kind, csp ? specialBase(csp, cls.id) : +t, csp && csp.id);
       const next = dragon ? dragonName(cls.id, star + 1) : `★${star + 1}`;
       meta = star < top ? { mats: sc.mats, gold: sc.gold, gyeok: dragon ? dragonGyeok(cls.id, star + 1) : null } : null;
+      fxs = { n: star, dragon };
       row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${won(sc.gold)}`
         + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
         star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
@@ -3035,11 +3039,13 @@ function openCraft(sink = null) {
             // 손상 or 부식, as today's 강화 fails.
             const rust = Math.random() < 0.3 && star > 1;
             if (rust) st[key] = star - 1;
+            forgeOut = { t: rust ? 'rust' : 'dmg', from: star, to: rust ? star - 1 : star, name, dragon };
             say(rust ? `강화 실패 — 부식! ${name} 별이 하나 내려갔습니다.` : `강화 실패 — 손상. 재료만 사라졌습니다.`, 'warn');
             banner(rust ? '강화 실패 · 부식' : '강화 실패 · 손상');
             return;
           }
           st[key] = star + 1;
+          forgeOut = { t: 'ok', from: star, to: star + 1, name: dragon ? dragonName(cls.id, star + 1) : name, dragon };
           say(dragon ? `${dragonName(cls.id, star + 1)} 승급!` : `${name} ★${star + 1} 강화!`, 'sys');
           if (dragon || (csp && csp.craft.legend)) banner(dragon ? `승급 성공 · ${dragonName(cls.id, star + 1)}` : `강화 성공 · ${name} ★${star + 1}`);
         });
@@ -3049,6 +3055,7 @@ function openCraft(sink = null) {
     if (!copies && star === 1) continue;
     any = true;
     const can = star < STAR_MAX && copies >= cost.copies && (progress.gold || 0) >= cost.gold;
+    fxs = { n: star };
     row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: 사본 ${copies}/${cost.copies} + ${won(cost.gold)} · 별마다 반 등급`,
       star >= STAR_MAX ? '최고' : '강화', can, () => {
         progress.gold -= cost.gold;
@@ -3056,6 +3063,7 @@ function openCraft(sink = null) {
         progress.stars = progress.stars || {};
         const st = progress.stars[cls.id] = progress.stars[cls.id] || {};
         st[key] = star + 1;
+        forgeOut = { t: 'ok', from: star, to: star + 1, name };
         say(`${name} ★${star + 1} 강화!`, 'sys');
       });
   }
@@ -3069,7 +3077,9 @@ $('#equip-craft').onclick = () => openForge();
 // Every recipe of the smith in one place: a tab per kind of making, the list of that tab,
 // and the chosen recipe in full — its picture, what it gives (격 included), each material
 // with what is held and where it drops, and the button.
-let forgeTab = null, forgePick = null;
+let forgeTab = null, forgePick = null, forgeFresh = true, forgeBusy = false, forgeOut = null, forgeLast = null;
+const lbScroll = { tab: null };
+const forgeKey = e => e.name.replace(/ ★\d+$/, '').replace(/ \(.*\)$/, '');
 const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['무신 방어구', /사신수 무신/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
   ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
@@ -3091,24 +3101,26 @@ function openForge() {
     const bt = document.createElement('button');
     bt.className = 'btn' + (t === forgeTab ? ' on' : '');
     bt.innerHTML = t + (n ? ` <i>${n}</i>` : '');
-    bt.onclick = () => { forgeTab = t; forgePick = null; openForge(); };
+    bt.onclick = () => { if (forgeBusy) return; forgeTab = t; forgePick = null; forgeFresh = true; forgeLast = null; openForge(); };
     tb.append(bt);
   }
   const mine = list.filter(e => forgeTabOf(e.sec) === forgeTab);
-  const pick = mine.find(e => e.name === forgePick) || mine.find(e => e.can) || mine[0];
-  forgePick = pick && pick.name;
+  const pick = mine.find(e => forgeKey(e) === forgePick) || mine.find(e => e.can) || mine[0];
+  forgePick = pick && forgeKey(pick);
+  const keep = !forgeFresh && lbScroll.tab === forgeTab;
+  forgeFresh = false;
   const done = e => e.label === '가짐' || e.label === '새김' || e.label === '최고';
-  const lb = $('#forge-list');
+  const lb = $('#forge-list'), d = $('#forge-detail');
+  const sL = lb.scrollTop, sD = d.scrollTop;
   lb.innerHTML = '';
   for (const e of mine) {
     const it = document.createElement('button');
     it.className = 'forge-item' + (e === pick ? ' on' : '') + (e.can ? ' ready' : '') + (done(e) ? ' done' : '');
     it.innerHTML = (e.icon ? `<img src="${e.icon}" alt="">` : '<span class="noimg"></span>')
       + `<b>${e.name.replace(/ \(.*\)$/, '')}</b><small>${e.can ? '할 수 있음' : e.label === '가짐' || e.label === '새김' ? '보유' : e.label === '최고' ? '최고 단계' : '재료 부족'}</small>`;
-    it.onclick = () => { forgePick = e.name; openForge(); };
+    it.onclick = () => { if (forgeBusy) return; forgePick = forgeKey(e); openForge(); };
     lb.append(it);
   }
-  const d = $('#forge-detail');
   d.innerHTML = '';
   if (pick) {
     const m = pick.meta || {};
@@ -3130,15 +3142,182 @@ function openForge() {
     bt.onclick = () => pick.act();
     d.append(bt);
   }
+  forgeOptBar();
+  forgeLastLine();
   $('#forge').hidden = false;
+  if (keep) { lb.scrollTop = sL; d.scrollTop = sD; }
+  lbScroll.tab = forgeTab;
 }
+// ---------------------------------------------------------------- 강화·조합 연출
+// A making (강화, 승급, 조합 ...) plays in the window: a short suspense (the card glows, 연's
+// sparkle, the roulette's ticks), then its result — 성공 (flash, the ★ counting up, 연's level-up
+// pillar), 손상 (the card cracks, dark smoke, 재료만 사라짐) or 부식 (a star back) — and the
+// result stays as a line in the window until the next action. The window is locked meanwhile.
+let forgeOptAsk = false, forgeTimers = [], forgeSprites = [], forgeRaf = 0;
+const FORGE_OPT_TEXT = '확률 강화: 재료 절반 · 성공 90%→10% · 실패 시 손상/부식';
+
+/** The 확률 강화 switch, apart from the list: the footer of the 강화 tab. */
+function forgeOptBar() {
+  let bar = $('#forge-opt');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'forge-opt';
+    $('#forge-body').after(bar);
+  }
+  bar.hidden = forgeTab !== '강화';
+  if (bar.hidden) { forgeOptAsk = false; return; }
+  const on = !!settings.chanceUp;
+  bar.title = FORGE_OPT_TEXT;
+  bar.className = on ? 'on' : '';
+  if (forgeOptAsk && !on) {
+    bar.innerHTML = '<span class="fopt-warn">⚠ 실패하면 재료가 사라지고 별이 내려갈 수 있습니다. 켤까요?</span><button class="fopt-yes">켜기</button><button class="fopt-no">취소</button>';
+    bar.querySelector('.fopt-yes').onclick = () => { forgeOptAsk = false; settings.chanceUp = true; saveJson('bs_settings', settings); openForge(); };
+    bar.querySelector('.fopt-no').onclick = () => { forgeOptAsk = false; forgeOptBar(); };
+    return;
+  }
+  bar.innerHTML = `<label class="fopt"><input type="checkbox" ${on ? 'checked' : ''}><span class="sw"></span><b>확률 강화</b></label><small>${FORGE_OPT_TEXT.replace('확률 강화: ', '')}</small>`;
+  bar.querySelector('input').onchange = ev => {
+    if (forgeBusy) { ev.target.checked = on; return; }
+    if (ev.target.checked) { ev.target.checked = false; forgeOptAsk = true; forgeOptBar(); return; }
+    settings.chanceUp = false;
+    saveJson('bs_settings', settings);
+    openForge();
+  };
+}
+
+/** The last result as a line at the top of the card, kept until the next action. */
+function forgeLastLine() {
+  if (!forgeLast) return;
+  const d = $('#forge-detail'), el = document.createElement('div');
+  el.className = 'fd-res ' + forgeLast.t;
+  el.textContent = forgeLast.text;
+  d.prepend(el);
+}
+
+function forgeSound(k) { try { if (audio) audio.play(k); } catch (e) { /* silent */ } }
+function forgeLater(ms, fn) { forgeTimers.push(setTimeout(fn, ms)); }
+
+/** One of 연's/the game's effect sheets on the window's canvas, centred on the card's picture. */
+function forgeSprite(id, o = {}) {
+  const f = M.fx && M.fx[id];
+  const im = f && images[`fx/${f.src || id}.png`];
+  if (!im || !$('#forge-fx .ffx-cv')) return;
+  forgeSprites.push({ id, f, im, t0: performance.now() + (o.delay || 0), scale: o.scale || 1, dy: o.dy || 0 });
+  if (!forgeRaf) forgeRaf = requestAnimationFrame(forgeDraw);
+}
+function forgeDraw(now) {
+  forgeRaf = 0;
+  const cvs = [...document.querySelectorAll('#forge-fx .ffx-cv')];
+  if (!cvs.length) { forgeSprites = []; return; }
+  // Two layers: the additive sheets (black ground) on one that blends by 'screen', the rest on a plain one.
+  const cv = cvs[0], cA = cvs[1].getContext('2d'), cN = cv.getContext('2d');
+  cA.clearRect(0, 0, cv.width, cv.height);
+  cN.clearRect(0, 0, cv.width, cv.height);
+  forgeSprites = forgeSprites.filter(s => {
+    const d = durs(s.id), life = d.reduce((a, b) => a + b, 0), t = (now - s.t0) / 1000;
+    if (t >= life) return false;
+    if (t < 0) return true;
+    const f = s.f, cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9, i = fxFrame(d, t, false) + (f.f0 || 0);
+    const k = s.scale * (f.k || 1), w = f.w * k, h = f.h * k;
+    const c = f.add ? cA : cN;
+    c.globalCompositeOperation = f.add ? 'lighter' : 'source-over';
+    c.imageSmoothingEnabled = k > 1.5;
+    const cx = cv.width / 2, cy = cv.height / 2 + s.dy;
+    c.drawImage(s.im, (i % cols) * f.w, Math.floor(i / cols) * f.h, f.w, f.h, cx - w / 2, f.ax !== undefined ? cy - f.ay * k + h * 0.15 : cy - h / 2, w, h);
+    return true;
+  });
+  if (forgeSprites.length) forgeRaf = requestAnimationFrame(forgeDraw);
+}
+
+function forgeEnd() {
+  forgeTimers.forEach(clearTimeout);
+  forgeTimers = [];
+  forgeSprites = [];
+  const fx = $('#forge-fx');
+  if (fx) fx.remove();
+  forgeBusy = false;
+}
+
+/** Runs a making: suspense, the real action (raw), then the result. */
+function forgeRun(ent, raw) {
+  if (forgeBusy) return;
+  const kind = /레이드 상점/.test(ent.sec) ? null : /강화/.test(ent.sec) ? (ent.star && ent.star.dragon ? 'promo' : 'enh') : 'craft';
+  if (!kind) { raw(); openForge(); return; }
+  forgeBusy = true;
+  forgeLast = null;
+  forgeOut = null;
+  const calm = !!settings.calmFx, label = ent.name.replace(/ \(.*\)$/, '');
+  const fx = document.createElement('div');
+  fx.id = 'forge-fx';
+  fx.className = 'ffx wait' + (calm ? ' calm' : '');
+  fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card"><div class="ffx-ico">${ent.icon ? `<img src="${ent.icon}" alt="">` : ''}</div>`
+    + `<b class="ffx-name">${label}</b><div class="ffx-star">${ent.star && ent.star.n ? '★' + ent.star.n : '…'}</div><div class="ffx-msg">${kind === 'craft' ? '만드는 중…' : kind === 'promo' ? '승급 중…' : '강화 중…'}</div></div>`;
+  $('#forge-box').append(fx);
+  // The effect layers sit on the window (not inside the card: a card in motion would cut the
+  // 'screen' blend short), centred on the card's picture.
+  const ico = fx.querySelector('.ffx-ico').getBoundingClientRect(), fr = fx.getBoundingClientRect();
+  for (const cls of ['', ' add']) {
+    const cv = document.createElement('canvas');
+    cv.className = 'ffx-cv' + cls;
+    cv.width = 300; cv.height = 240;
+    cv.style.left = Math.round(ico.left - fr.left + ico.width / 2 - 150) + 'px';
+    cv.style.top = Math.round(ico.top - fr.top + ico.height / 2 - 120) + 'px';
+    fx.append(cv);
+  }
+  fx.onclick = () => { if (fx.classList.contains('done')) forgeEnd(); };
+  forgeSound('click');
+  forgeSprite('129', { scale: 1.6 });
+  forgeSprite('131', { scale: 1.5, delay: 300 });
+  forgeLater(260, () => forgeSound('click'));
+  forgeLater(520, () => { forgeSound('click'); forgeSprite('77', { scale: 1.3 }); });
+  forgeLater(780, () => {
+    try { raw(); } catch (e) { console.error(e); forgeEnd(); return; }
+    const out = forgeOut || { t: 'ok', name: label, craft: true };
+    const was = $('#forge-list').scrollTop;
+    openForge();
+    $('#forge-list').scrollTop = was;
+    const star = fx.querySelector('.ffx-star'), msg = fx.querySelector('.ffx-msg'), name = fx.querySelector('.ffx-name');
+    fx.classList.remove('wait');
+    fx.classList.add(out.t, 'res');
+    if (out.t === 'ok') {
+      const big = kind === 'promo' || kind === 'craft';
+      if (kind === 'craft') { msg.textContent = `조합 성공 — ${label}`; forgeLast = { t: 'ok', text: `조합 성공 · ${label}` }; star.textContent = '✔'; }
+      else {
+        name.textContent = out.name;
+        star.textContent = '★' + out.from;
+        forgeLater(260, () => { star.textContent = '★' + out.to; star.classList.add('pop'); });
+        msg.textContent = kind === 'promo' ? `승급 성공 — ${out.name}` : `강화 성공 — ★${out.from} → ★${out.to}`;
+        forgeLast = { t: 'ok', text: kind === 'promo' ? `승급 성공 · ${out.name}` : `강화 성공 · ${out.name} ★${out.from} → ★${out.to}` };
+      }
+      forgeSound(big ? 'promote' : 'chest');
+      if (kind === 'promo') forgeLater(120, () => forgeSound('levelup'));
+      forgeSprite('h_levelup', { scale: big ? 1.6 : 1.2, dy: -10 });
+      forgeSprite('131', { scale: 2.2 });
+      if (kind === 'promo') forgeSprite('g_zodiac_dragon', { scale: 1, delay: 150, dy: 20 });
+      forgeLater(big ? 2000 : 1500, () => fx.classList.add('done'));
+    } else {
+      const rust = out.t === 'rust';
+      star.textContent = '★' + out.from;
+      msg.textContent = rust ? `부식 — ★${out.from} → ★${out.to}` : '손상 — 재료만 사라졌습니다';
+      forgeLast = { t: out.t, text: msg.textContent + ` · ${out.name}` };
+      if (rust) forgeLater(300, () => { star.textContent = '★' + out.to; star.classList.add('drop'); });
+      forgeSound('lose');
+      forgeSprite(rust ? 'g_poison_purple' : 'k_ab_darkburst', { scale: rust ? 1.3 : 1, dy: rust ? 0 : 30 });
+      if (!rust) forgeSprite('k_ab_smoke', { scale: 0.9, delay: 250, dy: 20 });
+      forgeLater(1700, () => fx.classList.add('done'));
+    }
+    forgeLater(out.t === 'ok' ? 2200 : 2000, () => { if ($('#forge-fx') === fx) forgeEnd(); });
+    forgeLastLine();
+  });
+}
+
 /** A 격 (a gyeok.js entry or a 용무기's) as a line. */
 function gyeokLine(g) {
   const id = Object.keys(GYEOK).find(k => GYEOK[k] === g);
   if (id) return gyeokText(id);
   return `${g.name}: 타격 시 ${Math.round(g.chance * 100)}% · 고정 피해${g.st ? ' · 저주' : ''}${g.cdCut ? ` · 핵심 기술 재사용 -${g.cdCut * 100}%` : ''}`;
 }
-$('#forge-close').onclick = () => { $('#forge').hidden = true; if (!$('#equip').hidden) buildEquip(); };
+$('#forge-close').onclick = () => { forgeEnd(); forgeOptAsk = false; $('#forge').hidden = true; if (!$('#equip').hidden) buildEquip(); };
 $('#equip-cards').onclick = () => openCards();
 
 $('#open-equip').onclick = () => {
