@@ -18,7 +18,7 @@
 //   - 레이드 (공대): a raid is fought on the same fighters — the hero and twenty-four raiders against
 //     the raid's boss and servants, which stay game.js's monsters (see the 레이드 section).
 
-import { frameBox, drawLayers, dropCostume, aiCostume, loadCostumes } from './costume.js';
+import { frameBox, drawLayers, dyeImage, dropCostume, aiCostume, loadCostumes } from './costume.js';
 import { gwoeWeek } from './data.js';
 
 let A = null; // game.js internals (initWar)
@@ -5750,7 +5750,7 @@ function composeFrame(H, b, a, f, mirror, force, src) {
       im = A.images[path];
       if (!im || !im.complete || !im.width) return src ? null : false;
     }
-    sheets[kind] = { im, meta };
+    sheets[kind] = { im: dyeImage(im, meta), meta };
   }
   // The class's cell, grown where a 코디 reaches past it (costume.js).
   const box = frameBox(H, Object.values(sheets).map(s => s.meta)), { cw, ch, fx, fy } = box;

@@ -9,7 +9,7 @@ import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sou
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -562,7 +562,7 @@ async function drawLook(cls, H, want) {
     let im = images[path];
     if (!im) im = await loadImage(path);
     else if (!im.complete) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
-    if (im && im.width) sheets[kind] = { im: sinsuDressed(savedGear(cls) || {}, kind, im, path), meta };
+    if (im && im.width) sheets[kind] = { im: dyeImage(sinsuDressed(savedGear(cls) || {}, kind, im, path), meta), meta };
   }
   if (!sheets.body) return null;
   const a = H.anims.idle_down || H.anims.walk_down;
@@ -10509,7 +10509,7 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     const cl = dz && kind === 'weapon' && classicOf(cls, gear);
     const src = cl ? classicSheet(im, path, cl, H, meta) : null;
     if (cl && !src) continue;
-    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal, dz.water && waterRows(H, meta)) : armorDressed(gear, kind, im, path), meta };
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal, dz.water && waterRows(H, meta)) : dyeImage(armorDressed(gear, kind, im, path), meta), meta };
   }
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';

@@ -58,6 +58,100 @@ for (const [s, name, raids, gate] of [['cheong', '청룡', ['raid_varuna'], '바
 }
 const MUSIN_ORDER = Object.fromEntries(MUSIN_HAIR.map((h, i) => [h.id, i]));
 
+// 염색약 (hair dye): the original's 염색약 colours. Each is bought once (전, the rarest with
+// 레이드주화) and then owned for good (progress.costume.dyes, shared by every class): the hero's hair
+// is dyed to it, or back to its own colour, at any time. What is chosen is kept per class
+// (wear.dye, with the 헤어) and goes into the 아바타 프리셋. Only the hair is recoloured, as below.
+export const DYES = [
+  { id: 'black', name: '검정', hex: '#2c2c36', gold: 1500 },
+  { id: 'brown', name: '갈색', hex: '#7c4a24', gold: 1500 },
+  { id: 'blond', name: '금발', hex: '#e6c24c', gold: 3000 },
+  { id: 'silver', name: '은발', hex: '#b4b9c6', gold: 3000 },
+  { id: 'white', name: '백발', hex: '#efeff4', gold: 3000 },
+  { id: 'red', name: '적발', hex: '#b8281c', gold: 3000 },
+  { id: 'orange', name: '주황', hex: '#e8801c', gold: 3000 },
+  { id: 'pink', name: '분홍', hex: '#f07aa8', gold: 3000 },
+  { id: 'lime', name: '연두', hex: '#7cc83c', gold: 5000 },
+  { id: 'teal', name: '청록', hex: '#1cb0a0', gold: 5000 },
+  { id: 'sky', name: '하늘', hex: '#4aa8e8', gold: 5000 },
+  { id: 'navy', name: '남색', hex: '#26368e', gold: 5000 },
+  { id: 'purple', name: '보라', hex: '#8a3cc8', gold: 5000 },
+  { id: 'magenta', name: '자홍', hex: '#d0208c', coins: 30 },
+  { id: 'azure', name: '청옥', hex: '#2a72f0', coins: 30 },
+  { id: 'gold', name: '황금', hex: '#f2b800', coins: 30 },
+];
+const DYE_BY = Object.fromEntries(DYES.map(d => [d.id, d]));
+export function ownsDye(id) { return !!DYE_BY[id] && !!(state().dyes && state().dyes[id]); }
+function giveDye(id) {
+  const s = state();
+  s.dyes = s.dyes && typeof s.dyes === 'object' ? s.dyes : {};
+  if (!DYE_BY[id] || s.dyes[id]) return false;
+  s.dyes[id] = 1;
+  version++;
+  A.save();
+  return true;
+}
+const dyeCost = d => (d.gold ? A.won(d.gold) : `주화 ${d.coins}`);
+
+function hexHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let h = 0, s = 0;
+  if (d) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  }
+  return [h / 6, s, l];
+}
+const hue2 = (p, q, t) => {
+  t = ((t % 1) + 1) % 1;
+  return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p;
+};
+
+// A dyed hair sheet: the hair's own shading kept (each pixel's brightness against the sheet's mean
+// hair brightness), laid around the dye's colour: its hue and saturation, its lightness plus that
+// difference. The darkest pixels (the outline) stay dark. Alpha untouched. Made once a sheet and dye
+// (hair sheets are small), the last few kept.
+const dyed = new Map();
+export function dyeImage(im, meta) {
+  const dye = meta && meta.dye && DYE_BY[meta.dye];
+  if (!dye || !im || !im.width) return im;
+  const key = meta.file + '|' + dye.id;
+  let c = dyed.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = im.width;
+  c.height = im.height;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(im, 0, 0);
+  try {
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data, n = p.length;
+    let sum = 0, cnt = 0;
+    for (let i = 0; i < n; i += 4) {
+      if (p[i + 3] < 128) continue;
+      const y = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255;
+      if (y > 0.2) { sum += y; cnt++; }
+    }
+    const ym = cnt ? sum / cnt : 0.5, [h, s, lt] = hexHsl(dye.hex), gain = Math.max(0.6, Math.min(1, 0.55 + lt));
+    for (let i = 0; i < n; i += 4) {
+      if (!p[i + 3]) continue;
+      const y = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255;
+      let l = lt + (y - ym) * gain;
+      // The outline and the deepest shade: kept as dark as they were.
+      const k = Math.max(0, Math.min(1, (y - 0.1) / 0.2));
+      l = Math.max(0, Math.min(1, y * 0.85 * (1 - k) + l * k));
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s, pp = 2 * l - q;
+      p[i] = Math.round(hue2(pp, q, h + 1 / 3) * 255);
+      p[i + 1] = Math.round(hue2(pp, q, h) * 255);
+      p[i + 2] = Math.round(hue2(pp, q, h - 1 / 3) * 255);
+    }
+    g.putImageData(d, 0, 0);
+  } catch (e) { return im; }
+  if (dyed.size >= 48) dyed.delete(dyed.keys().next().value);
+  dyed.set(key, c);
+  return c;
+}
+
 /** Gives the 사신수 무신의 헤어 whose raids are all won (progress.raids); their names. */
 export function unlockMusinHair(from) {
   if (!A || !D) return [];
@@ -151,6 +245,10 @@ export function wornCostume(clsId) {
   if (!A || !D) return null;
   const w = state().wear[clsId] || {}, items = costumeItems(), out = {};
   for (const [kind, id] of Object.entries(w)) {
+    if (kind === 'dye') {
+      if (ownsDye(id)) out.dye = id;
+      continue;
+    }
     if (id === HIDE) {
       if (HIDE_NAME[kind]) out[kind] = id;
       continue;
@@ -163,6 +261,7 @@ export function wornCostume(clsId) {
 
 /** Whether a class can wear id in that slot (an owned look its figure has, or 투명). */
 function wearable(clsId, kind, id) {
+  if (kind === 'dye') return ownsDye(id);
   if (id === HIDE) return !!HIDE_NAME[kind];
   const it = costumeItems()[id];
   return !!it && it.kind === kind && ownsCostume(id) && it.classes.includes(clsId);
@@ -278,7 +377,23 @@ export function costumeVariants(H, cos, out) {
       wholeHat = true;
     }
   }
-  return headParts(H, cos, out, wholeHat);
+  return dyeParts(H, cos, headParts(H, cos, out, wholeHat));
+}
+
+/** 염색: the hair worn (and what hangs behind it) as a dyed variant "<v>~<dye>": the same layer with
+ *  the dye in its meta, so the looks' keys differ and the sheet is recoloured where it is drawn
+ *  (dyeImage). Without a hair layer of its own (the class's own hair is in its head) nothing. */
+function dyeParts(H, cos, out) {
+  // (A dye not owned is only tried on: what is worn is held to the owned by wornCostume.)
+  if (!cos.dye || !DYE_BY[cos.dye]) return out;
+  for (const kind of ['hair', 'back']) {
+    const v = out[kind], L = H.layers[kind];
+    if (!v || !L || !L[v]) continue;
+    const dv = v + '~' + cos.dye;
+    if (!L[dv]) L[dv] = Object.assign({}, L[v], { dye: cos.dye });
+    out[kind] = dv;
+  }
+  return out;
 }
 
 /** 헤어·얼굴: the head in parts (a face, a hair over it, what hangs behind), the hat that holds the
@@ -510,8 +625,7 @@ export function openCoordi(at) {
   if (at && KINDS.some(([k]) => k === at)) { tab = at; vscroll.top = 0; }
   $('#coordi').hidden = false;
   const go = () => {
-    trial = Object.assign({}, state().wear[cls.id] || {});
-    for (const [k, id] of Object.entries(trial)) if (!ownsCostume(id)) delete trial[k];
+    trial = ownedTrial(cls);
     pick = null;
     buildCoordi();
     clearInterval(previewTimer);
@@ -534,6 +648,13 @@ function closeCoordi() {
   A.save();
 }
 const seen = new Set();
+
+/** What the class wears now, as the trial look starts from. */
+function ownedTrial(cls) {
+  const t = Object.assign({}, state().wear[cls.id] || {});
+  for (const [k, id] of Object.entries(t)) if (k === 'dye' ? !ownsDye(id) : !ownsCostume(id)) delete t[k];
+  return t;
+}
 
 function canWear(cls, it) { return it.classes.includes(cls.id); }
 
@@ -772,6 +893,7 @@ function buildDetail(detail, cls) {
       const v = trial[kind];
       setCostume(cls.id, kind, v && ownsCostume(v) ? v : null);
     }
+    setCostume(cls.id, 'dye', trial.dye && ownsDye(trial.dye) ? trial.dye : null);
     A.changed();
     A.say('코디를 바꿨습니다.', 'sys');
     buildCoordi();
@@ -786,8 +908,7 @@ function buildDetail(detail, cls) {
   undo.textContent = '되돌리기';
   undo.title = '미리 입어 본 것을 취소하고 지금 입은 모습으로';
   undo.onclick = () => {
-    trial = Object.assign({}, state().wear[cls.id] || {});
-    for (const [k, id] of Object.entries(trial)) if (!ownsCostume(id)) delete trial[k];
+    trial = ownedTrial(cls);
     pick = null;
     buildCoordi();
   };
@@ -799,6 +920,7 @@ function buildDetail(detail, cls) {
   orig.title = '코디를 모두 벗고 직업 본래의 모습으로 바로 저장합니다. 가진 코디는 그대로 남습니다.';
   orig.onclick = () => {
     for (const [kind] of KINDS) setCostume(cls.id, kind, null);
+    setCostume(cls.id, 'dye', null);
     trial = {};
     pick = null;
     A.changed();
@@ -806,8 +928,55 @@ function buildDetail(detail, cls) {
     buildCoordi();
   };
   row.append(undo, strip, orig, save);
-  detail.append(presetRow(cls), row);
+  detail.append(...(tab === 'hair' ? [dyeRow(cls, detail)] : []), presetRow(cls), row);
   drawPreview();
+}
+
+/** 염색 (헤어 tab): a swatch for each dye (owned ones marked), 염색 해제 (the hair's own colour);
+ *  a dye not owned yet is tried on and bought here. */
+function dyeRow(cls, detail) {
+  const row = document.createElement('div');
+  row.className = 'coordi-dye';
+  const lab = document.createElement('small');
+  lab.textContent = '염색';
+  lab.title = '염색약을 사면 그 색으로 언제든 염색합니다(모든 직업 공용). 원래 색으로 되돌릴 수도 있습니다.';
+  row.append(lab);
+  const off = document.createElement('button');
+  off.className = 'btn' + (!trial.dye ? ' on' : '');
+  off.textContent = '원래 색';
+  off.title = '염색 해제: 머리카락 본래의 색';
+  off.onclick = () => { delete trial.dye; buildDetail(detail, cls); };
+  row.append(off);
+  for (const d of DYES) {
+    const b = document.createElement('button');
+    const o = ownsDye(d.id);
+    b.className = 'dyesw' + (trial.dye === d.id ? ' on' : '') + (o ? ' own' : '');
+    b.style.background = d.hex;
+    b.title = `${d.name} 염색약${o ? ' · 보유' : ' · ' + dyeCost(d)}`;
+    b.onclick = () => { trial.dye = d.id; buildDetail(detail, cls); };
+    row.append(b);
+  }
+  const d = DYE_BY[trial.dye], note = document.createElement('small');
+  note.className = 'dyenote';
+  if (d && !ownsDye(d.id)) {
+    const p = A.progress();
+    note.textContent = `${d.name} 염색약 ${dyeCost(d)} `;
+    const buy = document.createElement('button');
+    buy.className = 'btn';
+    buy.textContent = '사기';
+    buy.disabled = d.gold ? (p.gold || 0) < d.gold : (p.coins || 0) < d.coins;
+    buy.onclick = () => {
+      if (d.gold) p.gold -= d.gold;
+      else p.coins -= d.coins;
+      giveDye(d.id);
+      A.say(`염색약 [${d.name}]을(를) 샀습니다. 이제 언제든 그 색으로 염색합니다.`, 'sys');
+      buildCoordi();
+    };
+    note.append(buy);
+  } else if (d) note.textContent = '';
+  if (d && (!trial.hair || (costumeItems()[trial.hair] || {}).whole)) note.textContent += ' (헤어를 고르면 적용됩니다)';
+  if (note.textContent) row.append(note);
+  return row;
 }
 
 // ---------------------------------------------------------------- 아바타 프리셋
@@ -824,7 +993,7 @@ function presets(clsId) {
 /** The preset's look as this class can wear it now (what it no longer owns or fits left off). */
 function presetWear(clsId, pr) {
   const out = {};
-  for (const [kind, id] of Object.entries((pr && pr.wear) || {})) if (KINDS.some(([k]) => k === kind) && wearable(clsId, kind, id)) out[kind] = id;
+  for (const [kind, id] of Object.entries((pr && pr.wear) || {})) if ((kind === 'dye' || KINDS.some(([k]) => k === kind)) && wearable(clsId, kind, id)) out[kind] = id;
   return out;
 }
 
@@ -843,6 +1012,7 @@ export function applyPreset(clsId, i) {
   if (!pr) return false;
   const wear = presetWear(clsId, pr);
   for (const [kind] of KINDS) setCostume(clsId, kind, wear[kind] || null);
+  setCostume(clsId, 'dye', wear.dye || null);
   if (A.changed) A.changed();
   return wear;
 }
@@ -1034,7 +1204,7 @@ function drawPreview() {
   for (const [kind, v] of Object.entries(want)) {
     const meta = H.layers[kind] && H.layers[kind][v];
     const im = meta && sheet(meta.file);
-    if (im) sheets[kind] = { im, meta };
+    if (im) sheets[kind] = { im: dyeImage(im, meta), meta };
   }
   const box = frameBox(H, Object.values(sheets).map(s => s.meta));
   const t = performance.now();
@@ -1089,7 +1259,7 @@ function testSheet(cos, cls = A.cls()) {
     if (!meta) continue;
     const im = sheet(meta.file);
     if (!im) return null;
-    sheets[kind] = { im, meta };
+    sheets[kind] = { im: dyeImage(im, meta), meta };
   }
   const box = frameBox(H, Object.values(sheets).map(s => s.meta));
   const rows = [];
