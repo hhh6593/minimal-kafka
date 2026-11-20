@@ -1319,16 +1319,22 @@ function fireGyeok(g, t) {
       const f = G.fxs[G.fxs.length - 1];
       if (g.selfAlpha && f && f.id === self) f.alpha = g.selfAlpha;
     }
-    fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null });
-    gyLight(fxId);
-    // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water).
+    // 청린수폭: its 청룡 drawn in parts (crBurst), the rest as one picture.
+    if (g.draw === 'cr' && fxId === g.fx && M.fx.g_cr_brush) crBurst('storm', t, fxK, g);
+    else {
+      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null });
+      gyLight(fxId);
+    }
+    // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water; with its 청룡,
+    // as the lightning reaches the ground: gridAt).
     if (g.fxGrid && M.fx[g.fxGrid]) {
+      const at = fxId === g.fx ? g.gridAt || 0 : 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (dx || dy) addFx(g.fxGrid, t.x + dx * TILE * 0.85, t.y + dy * TILE * 0.7 + 6, { scale: g.gridK || 1, anchor: 'bottom', delay: 0.06 * (Math.abs(dx) + Math.abs(dy)), flip: dx > 0 });
+        if (dx || dy || (at && g.gridMid)) addFx(g.fxGrid, t.x + dx * TILE * 0.85, t.y + dy * TILE * 0.7 + 6, { scale: g.gridK || 1, anchor: 'bottom', delay: at + 0.06 * (Math.abs(dx) + Math.abs(dy)), flip: dx > 0 });
       }
     }
     // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
-    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) { fxOn(g.fx2, e, { scale: gyScale(g.fx2, 0.8 * (g.fx2K || g.fxK || 1)), tint: g.tint || null }); gyLight(g.fx2); }
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) { fxOn(g.fx2, e, { scale: gyScale(g.fx2, 0.8 * (g.fx2K || g.fxK || 1)), tint: g.tint || null, delay: fxId === g.fx ? g.fx2At || 0 : 0 }); gyLight(g.fx2); }
   }
   // The top weapons' 격 (신화, items.js GYEOK_TIER): a soft light round the struck in the family's
   // colour (it was the whole screen; drawn in render), and the blow's way one step further (lv).
@@ -1616,6 +1622,7 @@ function gyLand(o) {
       if (g.st2) applyStatus(b, ...g.st2);
     }
     const id = g.fxGrid && M.fx[g.fxGrid] ? g.fxGrid : g.fx2 && M.fx[g.fx2] ? g.fx2 : M.fx[g.fx] ? g.fx : null;
+    if (g.draw === 'cr' && M.fx.g_cr_bolt) crBurst('bolt', e, (g.fxK || 1) * 0.9, g, o.i);
     if (id && fxBudget('gyway', 4)) {
       if (id === g.fxGrid) addFx(id, e.x, e.y + 6, { scale: (g.gridK || 1) * 1.1, anchor: 'bottom', flip: o.i % 2 === 1 });
       else fxOn(id, e, { scale: (id === g.fx ? 0.75 * (g.fxK || 1) : 0.8 * (g.fx2K || 1)), tint: g.tint || null, flip: o.i % 2 === 1 });
@@ -1635,8 +1642,115 @@ function gyLine(x1, y1, x2, y2, rgb) {
   l.x1 = x1; l.y1 = y1; l.x2 = x2; l.y2 = y2; l.t0 = G.t; l.rgb = rgb; l.seed = Math.random() * 100;
 }
 
+// ---------------------------------------------------------------- 청린수폭's 청룡 (gyeok.js cheongrin)
+//
+// Out of 연's own 청룡 pictures only (tools/yeon_cheongrin.py): its 청룡 변신's storm cloud with the
+// blue-lightning dragon coiling down out of it onto the struck (g_cr_storm, the clip's 8 cells at its
+// pace and its small sideways shake), the lightning body alone striking again on each strike after
+// (g_cr_bolt), and, the water of it, 진청룡마령참's brush-stroke dragons (Yong-gung_BlueDragon_Line,
+// in the 청룡's blues: g_cr_brush) swimming round the struck 3x3, one more with each strike, each
+// growing through the clip's shapes as it goes, behind the storm on the far side and before it on
+// the near, a pale wake behind. Under them a ground of water. All alpha-blended (no added light),
+// one pooled list, a few pictures each frame.
+const CR_MAX = 6, CR_RGB = '60,160,255';
+// Skill_Effect_Transform_Chungryong's Position/Effect x per cell (its units: the sprite at ×1.1)
+const CR_SHAKE = [0, 4.5, -6, 5, 5.5, 5.5, 5.5, 5];
+// its cells in turn, the coiled dragon's crackling three (4-6) once more while the strikes land
+const CR_SEQ = [0, 1, 2, 3, 4, 5, 6, 4, 5, 6, 7], CR_CELL = 0.11;
+const CR_BRUSH = { n: 3, gap: 0.25, life: 1.15, turn: 1.25 * Math.PI };
+function crBurst(kind, e, k, g, i = 0) {
+  const bs = G.gcr || (G.gcr = []);
+  let b = bs.find(o => G.t - o.t0 > o.life);
+  if (!b) {
+    if (bs.length >= CR_MAX) return;
+    bs.push(b = {});
+  }
+  // on the struck, going with it as 연's weapon 격 do (FOLLOW_EFFECT_TARGET), where it fell if it falls
+  b.kind = kind; b.e = e; b.x = e.x; b.y = e.y; b.t0 = G.t; b.i = i;
+  b.k = k / 1.3; // 1 at the 격's own size, more as the weapon's rank grows it
+  b.r = (g.area || 1) + 0.25;
+  b.tint = g.tint || null;
+  b.dir = Math.random() < 0.5 ? 1 : -1;
+  b.life = kind === 'storm' ? Math.max(CR_BRUSH.gap * (CR_BRUSH.n - 1) + CR_BRUSH.life + 0.05, CR_SEQ.length * CR_CELL + 0.2) : 0.4;
+}
+/** One brush dragon of a storm at its age: where it is, its look; null when not out. */
+function crBrush(b, j, age, out) {
+  const u = (age - 0.04 - CR_BRUSH.gap * j) / CR_BRUSH.life;
+  if (u <= 0 || u >= 1) return null;
+  const a = Math.PI * (0.55 + 0.667 * j) + b.dir * u * CR_BRUSH.turn;
+  const rx = b.r * TILE * 1.05, ry = b.r * TILE * 0.55;
+  out.u = u;
+  out.x = b.x + Math.cos(a) * rx;
+  out.y = b.y - 6 + Math.sin(a) * ry - 14 * u;
+  out.front = Math.sin(a) > 0;
+  out.vx = -Math.sin(a) * b.dir; // its way round, seen from the side
+  return out;
+}
+const crTmp = {};
+/** A brush dragon (j) of a storm, on its side of the storm (front: nearer the viewer). */
+function crDrawBrush(b, j, age, front) {
+  const o = crBrush(b, j, age, crTmp);
+  if (!o || o.front !== front) return;
+  const calm = settings.calmFx, u = o.u, grow = 1 - (1 - u) * (1 - u);
+  const a = Math.min(1, u / 0.12, (1 - u) / 0.18) * (calm ? 0.7 : 0.9);
+  const t = (Math.min(4, Math.floor(u * 6)) + 0.5) * 0.11, sc = b.k * (0.2 + 0.13 * grow), y = o.y - 287 * sc * 0.42;
+  ctx.globalAlpha = a;
+  drawFx('g_cr_brush', o.x, y, t, sc, o.vx * 0.3, 'mid', false, o.vx < 0, b.tint);
+  // and once more added, faint, for the water's light (never past 0.65; not with 번쩍임 줄이기)
+  if (!calm) {
+    ctx.globalAlpha = a * 0.25;
+    ctx.globalCompositeOperation = 'lighter';
+    drawFx('g_cr_brush', o.x, y, t, sc, o.vx * 0.3, 'mid', false, o.vx < 0, b.tint);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+/** Over the bodies, before the other effects: the storms and bolts, their brush dragons round them. */
+function drawCheongrin() {
+  const bs = G.gcr;
+  if (!bs || !M.fx.g_cr_brush) return;
+  for (const b of bs) {
+    const age = G.t - b.t0;
+    if (age > b.life) { b.e = null; continue; }
+    if (b.e && b.e.hp > 0) { b.x = b.e.x; b.y = b.e.y; }
+    if (b.kind === 'storm') for (let j = 0; j < CR_BRUSH.n; j++) crDrawBrush(b, j, age, false);
+  }
+  for (const b of bs) {
+    const age = G.t - b.t0;
+    if (age > b.life) continue;
+    const calm = settings.calmFx;
+    if (b.kind === 'storm') {
+      // the clip's cells at its 0.117 s (game pace 0.11), its last one fading
+      const end = CR_SEQ.length * CR_CELL;
+      ctx.globalAlpha = Math.min(1, age / 0.08, 1 - (age - end) / 0.2) * (calm ? 0.85 : 1);
+      if (ctx.globalAlpha > 0) {
+        // (grown with the weapon's rank, but never past most of the screen's height)
+        const c = CR_SEQ[Math.min(CR_SEQ.length - 1, Math.floor(age / CR_CELL))], sc = Math.min(b.k * 0.78, VH * 0.62 / 256);
+        drawFx('g_cr_storm', b.x + CR_SHAKE[c] * sc / 1.1, b.y + 4, (c + 0.5) * CR_CELL, sc, 0, 'bottom', false, false, b.tint);
+      }
+    } else {
+      // the lightning dragon's body, its two cells in turn, striking again
+      ctx.globalAlpha = Math.min(1, age / 0.05, (b.life - age) / 0.15) * (calm ? 0.8 : 0.95);
+      drawFx('g_cr_bolt', b.x, b.y + 4, age, b.k * 0.5, 0, 'bottom', true, b.i % 2 === 1, b.tint);
+    }
+  }
+  for (const b of bs) {
+    const age = G.t - b.t0;
+    if (age > b.life || b.kind !== 'storm') continue;
+    for (let j = 0; j < CR_BRUSH.n; j++) crDrawBrush(b, j, age, true);
+  }
+  ctx.globalAlpha = 1;
+}
+
 /** Under the bodies: the grounds of the 격 and the marks still to go off. */
 function drawGyeokGround() {
+  // 청린수폭's water on the struck 3x3, spreading as the lightning lands, gone with the last dragon
+  if (G.gcr) for (const b of G.gcr) {
+    const age = G.t - b.t0;
+    if (b.kind !== 'storm' || age > b.life) continue;
+    const w = (2 * b.r + 0.6) * TILE * Math.min(1, 0.5 + age / 0.4);
+    ctx.globalAlpha = Math.min(1, age / 0.2, (b.life - age) / 0.4) * 0.85;
+    ctx.drawImage(gzSprite(CR_RGB), Math.round(b.x - w / 2), Math.round(b.y - 6 - w * 0.27), Math.round(w), Math.round(w * 0.54));
+  }
   if (G.gz) for (const z of G.gz) {
     if (!z.on) continue;
     const age = G.t - z.made, left = z.until - G.t;
@@ -10944,6 +11058,7 @@ function render(now) {
   ctx.globalAlpha = 1;
 
   drawShocks();
+  drawCheongrin(); // 청린수폭's 청룡 (before the splashes and orbs on it)
   // Spell effects over everything, at their own size.
   const trail = !G.war && p.trail, puffs = [];
   for (const f of G.fxs) {
