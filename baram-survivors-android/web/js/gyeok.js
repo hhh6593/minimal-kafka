@@ -63,8 +63,8 @@ export const GYEOK = {
   akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', fxK: 1.3,
     fx2: 'k_ab_darkburst', fx2K: 0.7, tint: ABYSS_TINT },
   // 태초's own (태초광명 격): 천자의분노's wide blow in gold-white light, a stun, and the wearer's pierce.
-  taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_anger_son', fxK: 1.4,
-    tint: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)' },
+  taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_taecho_light', fxK: 1.4,
+    fx2: 'g_taecho_light', fx2K: 0.6, tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.7)' },
   // 주작선장's own (연 8080 주작비상 격): fire around and the wearer's party strengthened. Drawn as
   // 연 plays it (g_zuzak_kyeog: the whole prefab, the fire whirling up into a white flash and the
   // phoenix in its blaze; the old g_zuzak_captain was its one texture) on the struck, and 연's 주작
@@ -117,7 +117,9 @@ export const GYEOK = {
 export const ABYSS_KIN = ['saseong', 'maengdok', 'binggyeol', 'yeomryeong', 'jiok', 'nakroe', 'gijeol'];
 for (const id of ABYSS_KIN) {
   const g = GYEOK[id];
-  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT,
+  // Drawn as the top weapons they are: their own picture larger, and the abyss's dark burst on the struck.
+  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT, fxK: (g.fxK || 1) * 1.7,
+    ...(g.fx2 ? {} : { fx2: 'k_ab_darkburst', fx2K: 0.9 }),
     ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : { area: 1 }) };
 }
 

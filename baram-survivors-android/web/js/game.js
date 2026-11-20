@@ -148,6 +148,8 @@ async function boot() {
     const fx = 'k_' + id;
     if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
+  // 태초광명 격: 천자의분노's blow drawn additive (its dark strokes drop out), a gold-white light.
+  if (M.fx.g_anger_son) M.fx.g_taecho_light = { ...M.fx.g_anger_son, src: M.fx.g_anger_son.src || 'g_anger_son', add: true };
   // Each 5차+ spell's effect in its own colour and size: a second name for the same picture.
   for (const [id, def] of Object.entries(SKILLS)) {
     if (def.tint && M.fx[def.fx]) M.fx['s_' + id] = { ...M.fx[def.fx], src: def.fx, tint: def.tint, k: def.fxk };
