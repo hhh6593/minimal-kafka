@@ -2314,18 +2314,20 @@ function gearImage(g) {
   // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
   // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
   // 연's own icon for the piece where the build has it.
-  const y = G && yItemIcon(G.cls, g.kind, g.tier, g.sp);
+  const gc = G && (g.cls && g.cls !== G.cls.id ? CLASSES.find(c => c.id === g.cls) || G.cls : G.cls);
+  const y = G && yItemIcon(gc, g.kind, g.tier, g.sp);
   if (y) {
     const k = y.slice('assets/'.length);
     if (!(k in images)) loadImage(k);
     if (images[k] && images[k].complete && images[k].width) return images[k];
   }
   if (g.kind === 'armor' && M.items.armor) return images[`item/${M.items.armor.id}.png`];
-  const path = hasAvatars() && gearIcon(G.cls.id, g.kind, g.tier);
+  const path = hasAvatars() && gearIcon(gc ? gc.id : G.cls.id, g.kind, g.tier);
   return path ? images[path.slice('assets/'.length)] : images[`item/${M.items.chest.id}.png`];
 }
 
 function pickGear(g) {
+  if (g.cls && g.cls !== G.cls.id) return companionPick(g);
   if (g.sp && SPECIAL[g.sp] && SPECIAL[g.sp].rarity) {
     // An abyss weapon: one of a kind, in gold, with the 승급 fanfare.
     const sp = SPECIAL[g.sp], name = specialName(sp, G.cls.id), R = RARITY.unique;
@@ -2372,6 +2374,30 @@ function pickGear(g) {
   saveJson('bs_progress', progress);
   say(`${josa(name, '을', '를')} 주웠습니다. (메뉴 → 장비)`, 'sys');
   note(`${name} 획득`);
+}
+
+/** A piece for one of the player's own companions: into that class's bag (a second one a copy),
+ * and the companion puts on whatever is now its strongest. */
+function companionPick(g) {
+  const cls = CLASSES.find(c => c.id === g.cls);
+  if (!cls) return;
+  const b = bag(cls), id = `${g.kind}:${g.tier}`, name = gearName(cls.id, g.kind, g.tier) || '장비';
+  audio.play('pickup');
+  if (b.includes(id)) {
+    addCopy(cls, id);
+    saveJson('bs_progress', progress);
+    note(`내 ${cls.name} · ${name}: 강화 재료(사본) +1`);
+    return;
+  }
+  b.push(id);
+  (G.gained = G.gained || []).push(`${name} (내 ${cls.name})`);
+  const put = companionWearBest(cls);
+  saveJson('bs_progress', progress);
+  if (put.length) {
+    say(`내 ${cls.name}: ${josa(name, '을', '를')} 주워 더 강한 장비로 갈아입었습니다.`, 'party');
+    const m = (G.party || []).find(x => x.own && x.cls === cls);
+    if (m) m.bubble = { text: '장비 교체!', t: G.t };
+  } else say(`내 ${cls.name}: ${josa(name, '을', '를')} 주웠습니다.`, 'party');
 }
 
 /** Puts on a piece from the bag (or takes off a shield with tier -1); sp: a special's id. */
@@ -2570,6 +2596,24 @@ function wearBest(cls) {
     const top = ps.reduce((a, q) => (powerWith(cls, kind, q[0], q[1]) > powerWith(cls, kind, a[0], a[1]) ? q : a), ps[0]);
     wear(kind, top[0], top[1]);
   }
+}
+
+/** 동료 모드: one of the player's own characters puts on the strongest of its own bag (saved to its
+ * gear, as 가장 강한 장비로 갈아입기 would), and its figure in the party is dressed again. */
+function companionWearBest(cls) {
+  const { out } = bestSwaps(cls);
+  if (!out.length) return [];
+  progress.gear = progress.gear || {};
+  const g = savedGear(cls);
+  for (const s of out) Object.assign(g, { [s.kind]: s.q[0], [s.kind + 'Sp']: s.q[1] || null });
+  progress.gear[cls.id] = g;
+  saveJson('bs_progress', progress);
+  for (const m of (G && G.party) || []) {
+    if (m.cls !== cls || !m.own) continue;
+    m.gear = savedGear(cls);
+    if (hasAvatars()) m.av = dressed(cls, m.gear);
+  }
+  return out;
 }
 
 /** A piece's button gets its 전투력 change against what is worn, and 추천 on the row's best. */
@@ -6195,6 +6239,20 @@ function bootsDrop() {
 
 /** A piece of the class's gear on the ground, about as good as the ground is deep. */
 function dropGear(e, dx = 0) {
+  // 동료 모드: about a third of the pieces are for one of the player's own companions (its class's
+  // line, into its own bag; it puts on what is stronger — companionPick).
+  const mine = (G.party || []).filter(m => m.own && m.cls && GEAR[m.cls.id] && m.down <= 0);
+  if (mine.length && !G.war && !G.stage.raid && Math.random() < 0.35) {
+    const m = mine[Math.floor(Math.random() * mine.length)], cid = m.cls.id, ln = GEAR[cid];
+    const ks = ['weapon', 'armor', 'shield', 'weapon', 'armor', 'shield', 'helmet', 'cape']
+      .filter(k => (ln[k] || []).length && plainList(cid, k).length && (k !== 'shield' || hasShield(cid)));
+    if (ks.length) {
+      const k = ks[Math.floor(Math.random() * ks.length)], lst = plainList(cid, k), tp = lst.length - 1;
+      const t = lst[Math.max(0, Math.min(tp, Math.floor(G.level / 3) + (Math.random() < 0.35 ? 1 : 0) + (e.kind === 'boss' ? 1 : 0)))];
+      G.drops.push({ x: e.x + dx, y: e.y, kind: 'gear', gear: { kind: k, tier: t, cls: cid } });
+      return;
+    }
+  }
   // 투구 and 망토 drop too (a little rarer than the weapon, armour and shield), from their own lines.
   const line = GEAR[G.cls.id];
   const kinds = ['weapon', 'armor', 'shield', 'weapon', 'armor', 'shield', 'helmet', 'cape']
@@ -8855,6 +8913,7 @@ function joinParty(cls) {
   // Mine: a class picked in 동료 설정, or one played before; it shares the conquest (promote).
   const own = (settings.partyPick || []).includes(cls.id) || ownCompanions().includes(cls.id), promo = own ? promoOf(cls.id) : 0;
   const name = own ? `내 ${cls.name}` : def.names[Math.floor(Math.random() * def.names.length)];
+  if (own) companionWearBest(cls);
   const gear = savedGear(cls);
   const slot = G.party.length;
   const m = {
