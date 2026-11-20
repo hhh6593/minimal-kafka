@@ -1312,7 +1312,7 @@ function gyeokProc(on, t) {
   if (!p.gyeoks || !p.gyeoks.length || !t || !t.m) return;
   G.gyeokCd = G.gyeokCd || {};
   for (const g of p.gyeoks) {
-    if (g.on !== on || G.t < (G.gyeokCd[g.id] || 0) || Math.random() >= g.chance) continue;
+    if (g.on !== on || G.t < (G.gyeokCd[g.id] || 0) || Math.random() >= g.chance * (G.plainHit ? PLAIN_GYEOK_K : 1)) continue;
     G.gyeokCd[g.id] = G.t + (g.cd || 0) * GYEOK_CD_K;
     fireGyeok(g, t);
   }
@@ -3648,6 +3648,7 @@ function update(dt) {
     }
     if (chain.length && !G.chainRun && !G.ambush && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
     plainAttack(dt);
+    idleLook(dt);
   }
   runTimers();
   G.allyHitting = true;
@@ -6069,6 +6070,7 @@ function cast(skill, st) {
       // the hero's own facing is left alone, so walking stays the player's.
       const [ax, ay] = near.find(([dx, dy]) => dx === fx0 && dy === fy0) || near[0];
       p.lungeAt = G.t;
+      p.lungeK = 1;
       p.ldx = ax;
       p.ldy = ay;
       const dirs = [[ax, ay]];
@@ -6433,41 +6435,136 @@ function cast(skill, st) {
     const melee = def.kind === 'slash' || def.kind === 'blink' || (def.kind === 'spell' && G.cls.id === 'warrior')
       || (WEAPON_POSE.has(G.cls.id) && !['buff', 'heal'].includes(def.kind));
     strikePose(melee ? 'attack' : 'magic');
+    G.player.castUntil = G.t + 0.3; // 기본 공격: not in the middle of a cast
   }
 }
 
 /**
- * The weapon's plain attack: a swing at a monster on a tile beside the hero, only while no
- * damaging spell has gone off for 1.5 seconds (as in D2 Survivors). Weak; the weapon worn
- * makes it stronger.
+ * 기본 공격: every class always has one blow to throw, whatever its spells are doing. It has its
+ * own short wait (`cd`) and its own reach; it goes out whenever the hero is not in the middle of a
+ * cast and a foe is within reach (the spells' waits do not matter, and it no longer holds back for
+ * 1.5 s after a spell). A close-in class strikes the nearest foe up to `reach` tiles off, leaning
+ * into it (the lunge) with its own 연 slash arc on the struck tile; a far class (archer, the four
+ * casters) sends its first spell's own picture (and a small orb for the casters) at the nearest foe
+ * in reach. Its power is a share (PLAIN_K) of the class's first spell at the level of the hero's
+ * highest spell, so it never outgrows the spells; it is struck through hurtEnemy like any blow
+ * (weapon, stats, crits) and looses 격 at half the spells' chance (G.plainHit).
  */
+const PLAIN_K = 0.25;
+const PLAIN_GYEOK_K = 0.5;
+const PLAIN = {
+  warrior: { reach: 2, cd: 0.8 },
+  rogue: { reach: 2, cd: 0.7 },
+  lancer: { reach: 3, cd: 0.9 },
+  monk: { reach: 2, cd: 0.65 },
+  dokkaebi: { reach: 2, cd: 0.85 },
+  reaper: { reach: 2.5, cd: 0.8 },
+  archer: { reach: 6, cd: 0.8 },
+  mage: { reach: 5, cd: 0.95, orb: '131' },
+  poet: { reach: 5, cd: 0.95, orb: '131' },
+  magus: { reach: 5, cd: 0.95, orb: '3' },
+  celestial: { reach: 5, cd: 0.95, orb: '148' },
+};
+
+/** The plain blow's power: PLAIN_K (a quarter) of the first spell at the level of the hero's highest spell. */
+function plainDmg() {
+  const d0 = SKILLS[G.cls.start];
+  let lv = 1;
+  for (const s of G.skills) {
+    const d = SKILLS[s.id];
+    if (d && d.dmg && d.kind !== 'ult' && !d.heal) lv = Math.max(lv, s.lv);
+  }
+  return PLAIN_K * ((d0 && d0.dmg) || 12) * Math.pow(1.15, Math.min(lv, 8) - 1) * (1 + 0.1 * G.passives.power);
+}
+
+/** The nearest foe (alive, not a war's own side) within `reach` tiles of the hero, or null. */
+function plainTarget(reach) {
+  const p = G.player;
+  let best = null, bd = 1e9;
+  for (const e of G.enemies) {
+    if (e.hp <= 0 || e.ally || (e.war && e.team === 0)) continue;
+    const d = tdist(e, p);
+    if (d < bd && d <= reach) { bd = d; best = e; }
+  }
+  if (best && G.war && !G.war.raid && !War.clear(p.tx, p.ty, best.tx, best.ty)) return null; // 대항전: not through a wall
+  return best;
+}
+
 function plainAttack(dt) {
-  // 수련장: the plain swing only when its key is on (to try the weapon's 격), and then always.
+  // 수련장: the plain blow only when its key is on (to try the weapon's 격), and then always.
   if (G.training && !G.training.plain) return;
   const p = G.player;
   p.atkT = (p.atkT || 0) - dt;
-  const dashCancel = G.hunt && Hunt.cancel(); // 사냥 기믹: 질주 → the plain swing at once
-  if (!dashCancel && (p.atkT > 0 || (!G.training && G.t - (G.lastHit || -9) < 1.5))) return;
-  if (G.buffs.stealth > G.t) return; // 투명: no plain swing gives the hero away
-  const t = [[p.tx, p.ty], ...DIRS.map(([dx, dy]) => [p.tx + dx, p.ty + dy])]
-    .map(([x, y]) => occ.get(key(x, y))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
-  if (!t) return;
-  p.atkT = 0.75;
+  const dashCancel = G.hunt && Hunt.cancel(); // 사냥 기믹: 질주 → the plain blow at once
+  if (!dashCancel && p.atkT > 0) return;
+  // Not in the middle of a cast (the pose of a spell just thrown) nor a 기술 연계 running.
+  if (G.t < (p.castUntil || 0) || G.chainRun) return;
+  if (G.buffs.stealth > G.t) return; // 투명: no plain blow gives the hero away
+  const cls = G.cls.id, pr = PLAIN[cls] || PLAIN.warrior;
+  const t = plainTarget(pr.reach);
+  if (!t) { p.atkT = 0.1; return; } // no foe in reach: look again shortly
+  const start = SKILLS[G.cls.start];
+  const dmg = plainDmg();
+  p.atkT = pr.cd;
   const dx = t.tx - p.tx, dy = t.ty - p.ty;
-  // Walking a tile at a time, the facing is the player's: a swing does not turn the hero.
+  const dist = Math.hypot(t.x - p.x, t.y - p.y) || 1;
+  // Walking a tile at a time, the facing is the player's: a blow does not turn the hero.
   if ((dx || dy) && !settings.tiles) {
     p.fdx = Math.sign(dx);
     p.fdy = dx ? 0 : Math.sign(dy);
     if (p.fdx) p.face = p.fdx;
   }
-  // Everyone pressed onto that tile takes the swing.
-  for (const b of bodiesAt(t.tx, t.ty) || [t]) if (b.m && !b.ally && b.hp > 0) hurtEnemy(b, 7 * (1 + 0.1 * G.passives.power), dx || dy ? [dx, dy] : null);
-  meleeSlash(t.tx, t.ty, dx, dy, 0);
-  p.lungeAt = G.t;
-  p.ldx = Math.sign(dx);
-  p.ldy = Math.sign(dy);
-  audio.play('hit');
-  strikePose('attack');
+  const far = !MELEE_LOOK[cls]; // the archer and the casters strike from where they stand
+  strikePose(MELEE_LOOK[cls] || WEAPON_POSE.has(cls) ? 'attack' : 'magic');
+  audio.play('skill_' + G.cls.start, start && start.kind);
+  const hit = (b, push) => {
+    G.plainHit = true;
+    G.spark = far && start ? sparkOf(start.id, start) : null;
+    hurtEnemy(b, dmg, push);
+    G.spark = null;
+    G.plainHit = false;
+  };
+  if (!far) {
+    // The lunge: leaning into the foe, further the further it is (the hero itself stays put).
+    p.lungeAt = G.t;
+    p.ldx = (t.x - p.x) / dist;
+    p.ldy = (t.y - p.y) / dist;
+    p.lungeK = Math.min(2.4, 0.6 + Math.hypot(dx, dy) * 0.6);
+    const sx = Math.sign(dx), sy = Math.sign(dy);
+    later(0.07, () => {
+      if (G.dead) return;
+      // Everyone pressed onto that tile takes the blow.
+      for (const b of bodiesAt(t.tx, t.ty) || [t]) if (b.m && !b.ally && b.hp > 0) hit(b, dx || dy ? [sx, sy] : null);
+      meleeSlash(t.tx, t.ty, sx, sy, 0);
+    });
+    return;
+  }
+  // A far blow: the first spell's own picture on the foe, a small orb flying to it for a caster.
+  const fxid = start && start.fx;
+  const land = () => {
+    if (t.hp <= 0 || G.dead) return;
+    if (fxid && M.fx[fxid]) fxOn(fxid, t, { scale: 0.55 });
+    hit(t, null);
+  };
+  if (pr.orb && M.fx[pr.orb]) addShot(p, t, { fx: pr.orb, speed: 640, size: 4, onHit: land });
+  else later(0.1, land);
+}
+
+/**
+ * Not standing blankly: a hero left alone (no key, no touch for a second) with a foe within eight
+ * tiles turns to face the nearest one. It never walks by itself (the hero is the player's to
+ * move); only the facing, which the next 기본 공격 or a spell that goes ahead of the hero (돌진,
+ * 비영승보, 쇄혼비무) then follows.
+ */
+function idleLook(dt) {
+  const p = G.player;
+  p.lookT = (p.lookT || 0) - dt;
+  if (p.lookT > 0 || p.moving || p.stepping || G.t - (G.steerAt || -9) < 1) return;
+  p.lookT = 0.4;
+  const t = plainTarget(8);
+  if (!t || (t.tx === p.tx && t.ty === p.ty)) return;
+  const dx = t.tx - p.tx, dy = t.ty - p.ty;
+  if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx); p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
 }
 
 /** The class's finishing spell: costs all mana (and some health for the fighters). */
@@ -11585,8 +11682,9 @@ function drawHero(now, hidden) {
   }
   if (p.lungeAt !== undefined && G.t - p.lungeAt < 0.16) {
     const k = Math.sin((G.t - p.lungeAt) / 0.16 * Math.PI);
-    hx += (p.ldx || 0) * 9 * k;
-    hy += (p.ldy || 0) * 6 * k;
+    const lk = p.lungeK || 1;
+    hx += (p.ldx || 0) * 9 * k * lk;
+    hy += (p.ldy || 0) * 6 * k * lk;
   }
   if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
   if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
