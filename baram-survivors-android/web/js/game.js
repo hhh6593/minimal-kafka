@@ -2739,7 +2739,7 @@ function strikePose(kind) {
 function huntMusic() {
   // Each raid its own grand track, from the start to the end of the fight.
   if (G.stage.raid) return 'raid_' + G.stage.id;
-  if (G.stage.war) return 'raid_raid_goblin'; // 대항전: the raids' battle drums
+  if (G.stage.war) return G.stage.music || 'raid_raid_goblin'; // 대항전: the raids' battle drums («쟁»: its boss's)
   return 'stage_' + G.stage.id;
 }
 
@@ -3313,7 +3313,7 @@ function raidWave(b, n) {
   for (let i = 0; i < n; i++) {
     const a = i / n * Math.PI * 2, r = 3 + (i % 2);
     const tx = b.tx + Math.round(Math.cos(a) * r), ty = b.ty + Math.round(Math.sin(a) * r);
-    if (free(tx, ty)) addEnemy(pickMonster(i % 4 === 0), null, null, 0, [tx, ty]);
+    if (free(tx, ty) && (!G.stage.jaeng || War.open(tx, ty))) addEnemy(pickMonster(i % 4 === 0), null, null, 0, [tx, ty]);
   }
   addFx(G.stage.fx, b.x, b.y - 30, { scale: 1.2 });
 }
@@ -3374,6 +3374,19 @@ function raidSpawn(dt) {
     banner(`${G.boss.name} · ${G.stage.title || '레이드 보스'}`);
   }
   if (!b) return;
+  bossBrain(b, dt, { rageAt: RAID_LIMIT - 60 });
+}
+
+/**
+ * A raid boss's own fight once it stands (the raid's, and 「쟁」's through war.js): its phases at
+ * 70% and 40% with their waves and champions, its call every half minute, its rage (o.rageAt), whom
+ * it turns on, its bolts and blasts at the bodies about it (o.bodies: the raid's party; 「쟁」: all
+ * three guilds), and its red floor one pattern at a time.
+ */
+function bossBrain(b, dt, o) {
+  const t = G.t, p = G.player;
+  const RW = G.war && (G.war.raid || G.stage.jaeng);
+  const bodies = () => (o.bodies ? o.bodies() : partyBodies());
   // Phases at 70% and 40%; a frenzy below 25% (quicker strikes).
   const phase = b.hp < b.maxHp * 0.4 ? 2 : b.hp < b.maxHp * 0.7 ? 1 : 0;
   if (!G.frenzy && b.hp < b.maxHp * 0.25) {
@@ -3389,7 +3402,7 @@ function raidSpawn(dt) {
     G.raidT = Math.max(G.raidT, 2.5);
     raidWave(b, 8 + phase * 2);
     const m = pickMonster(true), pack = ++G.packs;
-    for (let i = 0; i < 1 + phase; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack);
+    for (let i = 0; i < 1 + phase; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack, G.stage.jaeng ? War.mobSpot() : null);
   }
   // Every half minute it calls its own.
   if (t >= G.waveT) {
@@ -3402,7 +3415,7 @@ function raidSpawn(dt) {
     bossSay('low');
   }
   // The last minute before the time runs out: enraged, it strikes harder and faster.
-  if (!G.enraged && t > RAID_LIMIT - 60) {
+  if (!G.enraged && t > o.rageAt) {
     G.enraged = true;
     bossSay('enrage');
     emote('rage');
@@ -3433,9 +3446,9 @@ function raidSpawn(dt) {
   G.volleyT = (G.volleyT === undefined ? 3 : G.volleyT) - dt;
   if (G.volleyT <= 0 && !G.blast) {
     G.volleyT = [2.8, 2.2, 1.7][G.phase] * (G.enraged ? 0.7 : 1);
-    const face = G.war && G.war.raid ? War.raidTarget() : G.aggro && !G.aggro.down ? G.aggro : p;
+    const face = RW ? War.raidTarget() : G.aggro && !G.aggro.down ? G.aggro : p;
     // (Not at a hero gone 투명: the bolt finds someone it can see.)
-    const pool = partyBodies().filter(x => x !== face && !(x === p && G.buffs.stealth > G.t));
+    const pool = bodies().filter(x => x !== face && !(x === p && G.buffs.stealth > G.t));
     const tgt = pool.length ? pool[Math.floor(Math.random() * pool.length)] : face;
     b.lunge = 0.2;
     addShot(b, tgt, { color: '#c02838', glow: '#ff6a5a', size: 5, speed: 300, onHit: () => {
@@ -3457,7 +3470,7 @@ function raidSpawn(dt) {
     G.blast = null;
     G.shake = Math.max(G.shake, 0.35);
     audio.play('boss');
-    for (const x of partyBodies()) {
+    for (const x of bodies()) {
       const k = 0.26 * raidK() * (G.enraged ? 1.3 : 1);
       if (!RW || (Math.abs(x.x - p.x) < VW / 2 && Math.abs(x.y - p.y) < VH / 2 && fxBudget('blast', 8))) addFx(G.stage.fx, x.x, x.y - 20, { scale: 0.6 });
       if (x === p) hurtPlayer(p.maxHp * k, b, true); else hurtMember(x, x.maxHp * k, b);
@@ -3513,7 +3526,7 @@ function pickPattern() {
 
 /** Whom the boss aims at: whom it has turned on (공대: the raid's target). */
 function raidAim() {
-  return G.war && G.war.raid ? War.raidTarget() || G.player : G.aggro && !G.aggro.down ? G.aggro : G.player;
+  return G.war && (G.war.raid || G.stage.jaeng) ? War.raidTarget() || G.player : G.aggro && !G.aggro.down ? G.aggro : G.player;
 }
 
 /** The four ways, the one leading most from a toward c. */
@@ -3758,7 +3771,7 @@ function raidSeq(b, waves, done) {
 /** One wave of red: off the arena's edge it is not laid; the warning as long as stepping off needs. */
 function raidMark(b, raw, nth, onFall) {
   const seen = new Set(), tiles = [];
-  const W = G.war && G.war.raid ? G.war : null;
+  const W = G.war && (G.war.raid || G.stage.jaeng) ? G.war : null;
   for (const [x, y] of raw) {
     const k = x + ',' + y;
     if (seen.has(k)) continue;
@@ -3787,7 +3800,7 @@ const RAID_BOSS_TALL = 170;
 /** The boss runs or springs to (x, y) (the nearest free tile there), in dur seconds. */
 function bossLeap(b, x, y, dur) {
   if (!(b.hp > 0)) return;
-  const W = G.war && G.war.raid ? G.war : null;
+  const W = G.war && (G.war.raid || G.stage.jaeng) ? G.war : null;
   if (W) { x = Math.max(1, Math.min(W.map.cols - 2, x)); y = Math.max(1, Math.min(W.map.rows - 2, y)); }
   let at = null;
   for (let r = 0; r < 4 && !at; r++)
@@ -3829,7 +3842,7 @@ function redDepth(tiles, b) {
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy, k = K(nx, ny);
       if (red.has(k) || (b && nx === b.tx && ny === b.ty)) continue;
-      if (G.war && G.war.raid && !War.open(nx, ny)) continue; // the arena's edge is no way out
+      if (G.war && (G.war.raid || G.stage.jaeng) && !War.open(nx, ny)) continue; // the arena's edge is no way out
       if (!dist.has(K(x, y))) { dist.set(K(x, y), 1); q.push([x, y]); }
     }
   }
@@ -3881,7 +3894,7 @@ function partyMarks(mk) {
     addFx(fx, x * TILE + TILE / 2, y * TILE + TILE / 2, { scale: 0.7 }));
   // The red floor is the boss's blow, but one that could be stepped off: not counted as tanking.
   const boss = G.enemies.find(e => e.kind === 'boss'), floor = { kind: 'boss', floor: true, name: boss ? boss.name : G.stage.name, m: boss && boss.m };
-  for (const m of G.party) if (!m.down && mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) {
+  for (const m of (G.stage.jaeng ? War.jaengBodies() : G.party)) if (!m.down && mk.tiles.some(([x, y]) => x === m.tx && y === m.ty)) {
     hurtMember(m, m.maxHp * mk.share, floor);
     if (G.war) G.war.stat.markHits++;
   }
@@ -3948,7 +3961,7 @@ function drawAlert(x, y, age) {
 }
 
 function spawn(dt) {
-  if (G.war && !G.war.raid) return; // 대항전 (war.js): the guilds are the field
+  if (G.war && !G.war.raid) return G.stage.jaeng ? War.bossTick(dt) : undefined; // 대항전 (war.js): the guilds are the field; 「쟁」: its boss
   if (G.dummy) return; // a test's lone boss (window.__dummyBoss)
   if (G.endless) {
     endlessSpawn(dt);
@@ -4255,7 +4268,7 @@ function moveEnemies(dt) {
     if ((e.goal || e.hunt) && G.hunt && !e.stun && Hunt.move(e)) continue; // 사냥 기믹: the objective's monsters
     // 공대: twenty-five can hold a boss for ever; a raid's boss shakes a hold off within 1.2 s and
     // cannot be held again for four more (its blast is still cut by the hold that lands).
-    if (e.kind === 'boss' && e.stun > 0 && G.war && G.war.raid) {
+    if (e.kind === 'boss' && e.stun > 0 && G.war && (G.war.raid || G.stage.jaeng)) {
       if (G.t < (e.stunFree || 0) && !e.stunned) e.stun = 0;
       else if (!e.stunned) { e.stun = Math.min(e.stun, 1.2); e.stunned = true; e.stunFree = G.t + e.stun + 4; }
       else e.stun = Math.min(e.stun, e.stunFree - 4 - G.t);
@@ -4287,6 +4300,7 @@ function moveEnemies(dt) {
       }
       continue;
     }
+    if (G.stage.jaeng) { War.mobAct(e, dt); continue; } // 「쟁」 (war.js): every guild is its prey
     if (!(G.war && G.war.raid) && (Math.abs(e.tx - p.tx) > v.w + 4 || Math.abs(e.ty - p.ty) > v.h + 4)) {
       // Left far behind: come back from the edge of the screen. Champions, leaders and the
       // boss too: they hunt the hero rather than wait somewhere off the map.
@@ -4406,7 +4420,7 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   // A raid boss's blows are measured on the hero's life and go through armor.
   const ac = pierce || (from && from.kind === 'boss' && G.stage.raid) ? 0 : Math.max(0, p.armor + 2 * G.passives.armor);
   // 공대: the boss of a raid of twenty-five strikes harder (war.js raidHurt; a little less on the hero).
-  if (G.war && G.war.raid && (pierce || (from && from.kind === 'boss'))) dmg *= War.raidHeroHurt();
+  if (G.war && (G.war.raid || G.stage.jaeng) && (pierce || (from && from.kind === 'boss'))) dmg *= War.raidHeroHurt();
   let taken = Math.max(1, dmg * Math.max(0.3, 20 / (20 + ac)));
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
   // 절망 on the attacker weakens its blow; 저주 on the hero lets more through; 현무의 철옹's ward.
@@ -4436,7 +4450,7 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (from && from.m && G.buffs.reflect > G.t) later(0.05, () => hurtEnemy(from, taken * 3));
   p.hp -= taken;
   // 공대: the hero's share of the blows, counted (not the red floor's: that could be stepped off).
-  if (G.war && G.war.raid && !(pierce && !from)) War.heroTaken(taken);
+  if (G.war && (G.war.raid || G.stage.jaeng) && !(pierce && !from)) War.heroTaken(taken);
   p.inv = 0.25;
   audio.play('hurt');
   floatText(p.x, p.y - 64, '-' + shownNum(taken), '#ff6060');
@@ -4505,7 +4519,7 @@ function hurtEnemy(e, dmg, push = null) {
     e.capUsed += dmg;
   }
   // 대항전 (war.js): 전장 보정 — the hero's blows on fighters are matched to the field's.
-  if (e.war) dmg = War.scale(dmg);
+  if (e.war || G.stage.jaeng) dmg = War.scale(dmg, e);
   // 공대: the hero's blows past about two raiders' worth a second are scaled down (war.js).
   const RW = G.war && G.war.raid;
   if (RW) dmg = War.raidScale(dmg);
@@ -4519,7 +4533,7 @@ function hurtEnemy(e, dmg, push = null) {
   if (!G.training && (e.flash > 0 || flashRoom())) e.flash = 0.12;
   e.shown = G.t;
   if (e.war) War.credit(e, dmg); // 대항전: the hero's contribution
-  if (RW) War.raidCredit(e, dmg, e.hp <= 0);
+  if (RW || (G.stage.jaeng && !e.war)) War.raidCredit(e, dmg, e.hp <= 0);
   // Numbers as 바람의나라 연 shows them: stacked over the struck, red and large for a crit,
   // orange for a heavy blow, grey for a light one.
   if (crit || settings.numbers || G.training) {
@@ -4922,6 +4936,7 @@ const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200];
 
 function killEnemy(e) {
   if (e.war) return War.down(e); // 대항전: a fighter falls and gets up at its camp
+  if (G.stage.jaeng) return War.mobDown(e); // 「쟁」: the boss's own fall
   // Each monster dies once: a second call (two blows landing in the same instant) must not
   // count it again, nor — through indexOf -1 — take the last monster in the list (often the
   // boss, the newest) off the field with it.
@@ -8081,7 +8096,7 @@ function cutBlast(e) {
   G.blast = null;
   banner('기술로 광역기를 끊었다!');
   emote('gains', G.player);
-  if (G.war && G.war.raid) War.raidCut(); // 공대: counted in the hero's contribution
+  if (G.war && (G.war.raid || G.stage.jaeng)) War.raidCut(); // 공대·「쟁」: counted in the hero's contribution
 }
 
 /** A companion's own words in the party chat (not a spell name), now and then. */
@@ -11893,6 +11908,9 @@ const War = initWar({
   // 공대 (the raid on the war's fighters)
   strike: allyStrike, auraK, bossSay, raidK: () => raidK(), RAID_LIMIT, RAID_BOSS_AT, raidPow: id => (RAID_GEAR[id] || { pow: 3 }).pow,
   altName: c => (PARTY[c.id] ? PARTY[c.id].names[0] : c.name), raidFail: title => showResults(title),
+  // 「쟁」 (the world boss fought over by three guilds)
+  RAIDS, bossBrain, raidMarks, addEnemy, pickMonster: champ => pickMonster(champ), leave, josa, emote,
+  raidSet, raidTier, pickGear, bag: c => bag(c),
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
