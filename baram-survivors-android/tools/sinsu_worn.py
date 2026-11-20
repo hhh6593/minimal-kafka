@@ -5,8 +5,14 @@
     sinsu_worn.py build GEAR_DIR [CONFIG_JSON] [OUT_DIR]
 
 CONFIG_JSON (default tools/sinsu_worn.json): {key: {"item": name, "mode": "weapon" | "wings" | "hair",
-"classes": [cls, ...] (absent: all), "gauntlet": true (a hilt worn as a glove: always on the fist)}}. --quick fetches only standing and striking (front, back,
-left): enough for candidate sheets; build then shows the stand where a walk or a cast is missing.
+"classes": [cls, ...] (absent: all), and for a weapon: "gauntlet": true (a blade out of a glove: the
+glove on the fist, no 연 fist over it), "size" (from the hand to the tip against the hero's height,
+default SIZE), "scale": "figure" (a glove with no blade: the original's size against its figure),
+"src": [cd, mt, frame] (the render its picture is cut from, where the standing front hides part of
+it), "grip" / "tip": [x, y] (in that render's pixels, where found wrong), "mirror": true}, and
+"_pose": {cls: corrections of 연's hand and weapon line, class_poses}}. --quick fetches only standing
+and striking (front, back, left): enough for candidate sheets; build then shows the stand where a
+walk or a cast is missing.
 OUT_DIR (default GEAR_DIR/sinsu_worn) takes the layers and index.json.
 
 연 has neither 사신수 piece. The official dress room renders the original worn
@@ -21,16 +27,19 @@ build: the piece's own pixels, frame by frame (where its render differs from the
 laid on 연's heroes as layers in the heroes' own sheet layout (GEAR_DIR/yhero2/index.json: each
 class's clips, cell and feet), scaled from the original figure to 연's (their heights, feet to the
 top of the head):
-  - 청룡신검 (the 전사): the blade as the original holds it in that pose (stand, walk, attack,
-    magic; front, back, side), put where 연's hand is in that frame (the hand drawn with 연's own
-    weapon layer of the class's 구곡검 look, its skin pixels), 연's fist drawn over the grip. 연's down /
-    up / side rows take the original's front / back / left. The layer is in front of the body
-    except where the original draws the blade behind it (facing away).
+  - weapons (청룡신검, 악마 심판의낫, the 태초 칠지천지환 line, the abyss uniques): the original's
+    weapon held as 연 holds the class's own (weapon_layers): its picture from one clean render
+    (canon), its grip put in 연's hand and its blade along 연's weapon line frame by frame (where the
+    class's many weapon layers meet and lie: class_poses), about as long as a weapon of 연's (SIZE),
+    in 연's own layer order (the weapon layer, and "wback" for what 연 draws of it behind the body).
+    연's fist is drawn back over a held grip; a gauntlet sits on the fist. No weapon in a frame 연
+    draws none in (a cast's hands).
   - 현무불괴갑 (every class): the wings and the flaring gold of the shoulders (the piece's pixels off
     the plain figure's body), set on 연's shoulders; behind the body from the front and the side,
     over it from behind. The body itself stays 연's outfit (items.js).
 Writes GEAR_DIR/sinsu_worn/<piece>_<class>.png and GEAR_DIR/sinsu_worn/index.json:
-    {cls: {piece: {"kind", "file", "cols", "cell", "foot", "side"}}}
+    {cls: {piece: {"kind", "file", "cols", "cell", "foot", "side"}}} (a weapon's part behind the body:
+    "<piece>_wb", kind "wback", variant "s_<piece>")
   - 사신수 무신의 헤어 (mode 'hair', every class, 남 and 여): the hair off the plain figure, on 연's
     hairless head (hair_layers): layers "hair" and "back" with the variant "c<piece>", worn as a
     코디 hair (costume.js MUSIN_HAIR); fetch also takes the item's official render (Item/Render) as
@@ -44,6 +53,7 @@ flaring shoulders) for a 연 outfit to wear with: an armour mixed of 연's body 
 """
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -57,10 +67,6 @@ COORDI = "https://avatar.baram.nexon.com/Coordi/RenderAvatar/M"
 RENDER = "https://avatar.baram.nexon.com/Item/Render/"
 FEET = (167, 231)
 HERE = os.path.dirname(os.path.abspath(__file__))
-# The 연 weapon layer whose hand (its skin pixels) a class's laid weapon is held by, frame by frame:
-# the class's plain weapon of the 태초 line (items.js TAECHO_BASE), else its first weapon layer.
-HAND = {'warrior': '70019', 'rogue': '1272', 'mage': '1372', 'poet': '1471', 'archer': '220077', 'lancer': '1324',
-        'monk': '70025', 'magus': '330064', 'celestial': '260048', 'dokkaebi': '1020', 'reaper': '310026'}
 DIRS = {'down': 2, 'up': 0, 'side': 3}
 MOTIONS = {'idle': 1, 'walk': 2, 'atk': 3, 'cast': 4}
 
@@ -78,7 +84,7 @@ def fetch(gear, *argv):
     raw = os.path.join(gear, 'sinsu_worn', 'raw')
     os.makedirs(raw, exist_ok=True)
     quick = '--quick' in argv
-    items = [None] + sorted({c['item'] for c in config(argv).values()})
+    items = [None] + sorted({c['item'] for k, c in config(argv).items() if not k.startswith('_')})
     for item in items:
         key = rawkey(item)
         for cd in ((2, 0, 3) if quick else range(4)):
@@ -99,7 +105,9 @@ def fetch(gear, *argv):
                 open(path, 'wb').write(data)
                 print(path, len(data))
     # A hair's picture for the 코디 list: the item's official render (the site's escape for ':').
-    for c in config(argv).values():
+    for k, c in config(argv).items():
+        if k.startswith('_'):
+            continue
         path = os.path.join(raw, f"icon_{rawkey(c['item'])}.png")
         if c['mode'] != 'hair' or os.path.exists(path):
             continue
@@ -167,8 +175,9 @@ def bbox(mask):
     return xs.min(), ys.min(), xs.max(), ys.max()
 
 
-def scaled(rgba, k):
-    """A cut-out piece scaled k times (nearest past 1, area under: 연's heroes are smaller)."""
+def scaled(rgba, k, keep=100):
+    """A cut-out piece scaled k times (nearest past 1, area under: 연's heroes are smaller). keep: the
+    covered part (of 255) a pixel needs to stay (lower keeps a thin shaft scaled far down)."""
     im = Image.fromarray(rgba)
     w, h = max(1, round(im.width * k)), max(1, round(im.height * k))
     if k >= 1:
@@ -180,7 +189,7 @@ def scaled(rgba, k):
     r = np.asarray(Image.fromarray(pm.astype(np.uint8)).resize((w, h), Image.BOX)).astype(float)
     al = np.asarray(im.getchannel('A').resize((w, h), Image.BOX)).astype(float)
     outp = np.zeros((h, w, 4), np.uint8)
-    m = al > 100
+    m = al > keep
     outp[..., :3] = np.where(al[..., None] > 0, np.clip(r[..., :3] * 255 / np.maximum(al[..., None], 1), 0, 255), 0).astype(np.uint8)
     outp[..., 3] = np.where(m, 255, 0)
     return outp
@@ -207,34 +216,6 @@ def touch_up(a, mode):
     ring = binary_dilation(np.pad(solid, 1), iterations=1) & ~np.pad(m, 1)
     pad[ring] = (22, 18, 26, 255)
     return pad
-
-
-def hand_layer(h2, H, cls):
-    """The class's weapon layer to take 연's hand from: HAND's if its fist (연's pink skin) shows in
-    most frames, else the weapon layer whose fist shows in the most (a spear or a bow may be drawn
-    without one)."""
-    def score(meta):
-        im = np.asarray(Image.open(os.path.join(h2, meta['file'])).convert('RGBA'))
-        cw, ch = meta.get('cell', H['cell'])
-        n = t = 0
-        for name, a in H['anims'].items():
-            if name == 'dead':
-                continue
-            for f in range(a['n']):
-                c = im[a['row'] * ch:(a['row'] + 1) * ch, f * cw:(f + 1) * cw]
-                t += 1
-                n += (skin_yeon(c) & (c[..., 3] > 100)).sum() >= 4
-        return n / max(1, t), im
-    layers = H['layers']['weapon']
-    order = ([HAND[cls]] if HAND.get(cls) in layers else []) + [k for k in layers if k != HAND.get(cls)][:12]
-    best = None
-    for k in order:
-        sc, im = score(layers[k])
-        if sc >= 0.9:
-            return im, layers[k]
-        if not best or sc > best[0]:
-            best = (sc, im, layers[k])
-    return best[1], best[2]
 
 
 def scaled2(rgba, kx, ky):
@@ -499,8 +480,396 @@ def hair_layers(gear, root, H, cls, piece, item, render, icon=None):
     return got
 
 
+# ---------------------------------------------------------------- weapons held as 연 holds its own
+#
+# A weapon is not laid as the original draws it (its huge blade from the original's own pose: held by
+# the blade's middle, floating over the head, out of the hand when 연 swings another way). 연's heroes
+# hold every weapon of a class on one rig: in each frame its many weapon layers share the hand and
+# lie along one line. That line, frame by frame (class_poses), is where the original's weapon goes:
+# its picture (one clean frame of its render, canon), turned and sized so its grip is in 연's hand and
+# its blade lies along 연's, about as long as 연's own (SIZE: from the hand to the tip, against the
+# hero's height; a sword of 연's is about 0.35 of it, a legendary one larger), in 연's
+# own layer order (weapon, and wback where 연 draws part of it behind the body).
+SIZE = 0.48
+# A thin shaft or chain scaled far down stays where it covers this much of a pixel (of 255).
+KEEP = 55
+# The canvas the per-frame line is found on, from the feet.
+PW, PH, POX, POY = 240, 240, 120, 170
+
+
+def weapon_cells(h2, H):
+    """{(row, f): {variant: [front mask, back mask]}}: every weapon layer of the class, frame by frame,
+    on the PW x PH canvas (feet at POX, POY); 'wback' is what 연 draws of it behind the body."""
+    cw, ch = H['cell']
+    fx, fy = H['foot']
+    masks = {}
+    for kind in ('weapon', 'wback'):
+        for v, m in H['layers'].get(kind, {}).items():
+            im = np.asarray(Image.open(os.path.join(h2, m['file'])).convert('RGBA'))
+            w, h = m.get('cell', [cw, ch])
+            mx, my = m.get('foot', [fx, fy])
+            cols = m.get('cols', 10 ** 9)
+            for name, a in H['anims'].items():
+                if name == 'dead':
+                    continue
+                for f in range(a['n']):
+                    r0, c0 = (a['row'] + f // cols) * h, (f % cols) * w
+                    c = im[r0:r0 + h, c0:c0 + w]
+                    if c.shape[:2] != (h, w):
+                        continue
+                    ys, xs = np.nonzero(c[..., 3] > 100)
+                    if not len(xs):
+                        continue
+                    X, Y = xs - mx + POX, ys - my + POY
+                    ok = (X >= 0) & (X < PW) & (Y >= 0) & (Y < PH)
+                    d = masks.setdefault((a['row'], f), {}).setdefault(v, [np.zeros((PH, PW), bool), np.zeros((PH, PW), bool)])
+                    d[kind == 'wback'][Y[ok], X[ok]] = True
+    return masks
+
+
+def layer_cell(h2, H, meta, row, f):
+    """A layer's cell on the PW x PH canvas (feet at POX, POY)."""
+    cw, ch = meta.get('cell', H['cell'])
+    mx, my = meta.get('foot', H['foot'])
+    im = np.asarray(Image.open(os.path.join(h2, meta['file'])).convert('RGBA'))
+    c = im[row * ch:(row + 1) * ch, f * cw:(f + 1) * cw]
+    out = np.zeros((PH, PW, 4), np.uint8)
+    y0, x0 = POY - my, POX - mx
+    h, w = c.shape[:2]
+    ya, xa = max(0, -y0), max(0, -x0)
+    yb, xb = min(h, PH - y0), min(w, PW - x0)
+    out[y0 + ya:y0 + yb, x0 + xa:x0 + xb] = c[ya:yb, xa:xb]
+    return out
+
+
+def class_poses(h2, H, height, fix=None):
+    """연's hand and weapon line in each frame of a class: {(row, f): {gx, gy (from the feet), ang
+    (radians, y down: the blade's way from the hand), front (bool mask on the canvas: where 연 draws
+    its weapons in front of the body, else behind)}} and the class's usual length (idle and walk:
+    from the hand to the tip). The hand: where most of the class's weapon layers meet (they share
+    it, their blades differ in length); in a swing (the layers' trails make no line) the end of 연's
+    arm (the body's skin) by them. The line: from the hand towards the pixels most layers share
+    within a weapon's length. fix: the config's corrections ({"anim:f" | "anim" | "motion" | "*": {"ang": degrees
+    added, "set": degrees, "dx", "dy", "off": true, "keep": true (not turned off the head)}, "hand":
+    "left" | "right" (a weapon in each hand: which), "ref": [variants] (only these layers followed)}).
+    A clear line (its layers elongated) is taken along its own axis; in a swing or for a short weapon
+    the hand is the end of 연's arm by the weapons, and a hand the strike's lights pull off the body
+    takes the nearest frame's line. A line through 연's head is turned away from it.
+    Frames no weapon is drawn in (a cast's hands) get none."""
+    from scipy.ndimage import binary_dilation, gaussian_filter, label
+    cells = weapon_cells(h2, H)
+    body = H['layers']['body']['base']
+    head = H['layers'].get('head', {}).get('base')
+    raw = {}
+    for key, per in cells.items():
+        vs = [v for v, (a_, b_) in per.items() if (a_ | b_).sum() >= 6]
+        ref = (fix or {}).get('ref')
+        if ref:
+            # the config's own weapons of the class to follow (the 도깨비's clubs ride on its back;
+            # its sword, 청룡의검, is held as a blade is)
+            vs = [v for v in vs if v in ref]
+        if len(vs) < (1 if ref else 3):
+            continue
+        cnt = sum((per[v][0] | per[v][1]).astype(float) for v in vs)
+        cb = sum(per[v][1].astype(float) for v in vs)
+        cf = sum(per[v][0].astype(float) for v in vs)
+        N = len(vs)
+        core = cnt >= 0.5 * N
+        if core.sum() < 6:
+            core = cnt >= 0.3 * N
+        if core.sum() < 6:
+            continue
+        # a class with a weapon in each hand (the 격투가's claws, the 마도사's rod and orb, the 천인's
+        # sickles): one hand's, the config's "hand" ("left" / "right" on the screen), else the
+        # weightiest
+        lab, nl = label(binary_dilation(core, iterations=1))
+        if nl > 1:
+            wt = np.bincount(lab.ravel(), weights=cnt.ravel())[1:]
+            cand = [i + 1 for i in range(nl) if wt[i] >= 0.25 * wt.max()]
+            hand = (fix or {}).get('hand')
+            if len(cand) > 1 and hand in ('left', 'right'):
+                cx_ = {i: np.average(np.nonzero(lab == i)[1], weights=cnt[lab == i]) for i in cand}
+                pick = (min if hand == 'left' else max)(cand, key=cx_.get)
+            else:
+                pick = int(np.argmax(wt)) + 1
+            keep = binary_dilation(lab == pick, iterations=3)
+            cnt, cf, cb = cnt * keep, cf * keep, cb * keep
+            core &= keep
+        sm = gaussian_filter(cnt, 1.2)
+        gy, gx = np.unravel_index(np.argmax(sm * core), sm.shape)
+        ys, xs = np.nonzero(core)
+        wts = cnt[ys, xs]
+        mx_, my_ = np.average(xs, weights=wts), np.average(ys, weights=wts)
+        ev = np.linalg.eigvalsh(np.cov(np.vstack([xs - mx_, ys - my_]), aweights=wts))
+        elong = ev[1] / max(ev[0], 1e-6)
+        u = np.linalg.eigh(np.cov(np.vstack([xs - mx_, ys - my_]), aweights=wts))[1][:, 1]
+        pr = (xs - gx) * u[0] + (ys - gy) * u[1]
+        if np.percentile(pr, 95) < -np.percentile(pr, 5):
+            pr, u = -pr, -u
+        L = float(np.percentile(pr[pr > 0], 95)) if (pr > 0).any() else 0.0
+        raw[key] = (gx, gy, elong, L, cnt, N, cf, cb, math.atan2(u[1], u[0]))
+    names = {(a['row'], f): (n, f) for n, a in H['anims'].items() for f in range(a['n'])}
+    Ls = [r[3] for k, r in raw.items() if names[k][0].split('_')[0] in ('idle', 'walk')]
+    Lc = float(np.median(Ls)) if Ls else 0.35 * height
+    out = {}
+    yy, xx = np.mgrid[0:PH, 0:PW]
+    from scipy.ndimage import distance_transform_edt
+    got = {}
+    for key, (gx, gy, elong, L, cnt, N, cf, cb, ua) in raw.items():
+        b = layer_cell(h2, H, body, *key)
+        skin_b = skin_yeon(b) & (b[..., 3] > 100) & (yy > POY - 0.68 * height)
+        if elong < 6:
+            # a swing (or a short weapon): the end of 연's arm by the weapons, below the head
+            sk = skin_b & binary_dilation(cnt >= 0.3 * N, iterations=2)
+            if sk.sum() >= 3:
+                ys, xs = np.nonzero(sk)
+                dd = np.hypot(xs - POX, ys - (POY - 0.45 * height))
+                far = dd >= np.quantile(dd, 0.6)
+                gx, gy = xs[far].mean(), ys[far].mean()
+        d = np.hypot(xx - gx, yy - gy)
+        sel = (cnt >= 0.4 * N) & (d <= Lc) & (d >= 2)
+        if sel.sum() < 4:
+            sel = (cnt >= 0.25 * N) & (d <= Lc) & (d >= 1)
+        ys, xs = np.nonzero(sel)
+        ang = None
+        if len(xs) >= 3:
+            w = cnt[ys, xs]
+            ang = math.atan2(np.average(ys - gy, weights=w), np.average(xs - gx, weights=w))
+        if elong >= 6 and not (fix or {}).get('near'):
+            # a clear line: its own axis, the way it reaches farther from the hand (the pixels near
+            # the hand pull towards a scabbard or the other hand's piece)
+            ang = ua
+        # held: the hand on 연's body (a strike's trails and lights can pull the line off it)
+        # (where the layers make a clear line their shared hand stands, fists drawn with them)
+        near = elong >= 6 or distance_transform_edt(~(b[..., 3] > 100))[int(round(gy)), int(round(gx))] <= 3
+        front = gaussian_filter(cf, 1.5) >= gaussian_filter(cb, 1.5)
+        got[key] = [gx, gy, ang if near else None, front, cb.sum() > 0, skin_b]
+    for key, (gx, gy, ang, front, back, skin_b) in got.items():
+        n, f = names[key]
+        if ang is None:
+            # off the body: the hand is the end of 연's arm on the side the class holds it (the
+            # nearest frame's of the same pose), the line that frame's
+            a_ = H['anims'][n]
+            near = [(abs(g - f), (a_['row'], g)) for g in range(a_['n']) if g != f and got.get((a_['row'], g), [0, 0, None])[2] is not None]
+            if not near:
+                d0 = n.split('_')[1]
+                k2 = (H['anims'][f'idle_{d0}']['row'], 0) if f'idle_{d0}' in H['anims'] else None
+                if not k2 or got.get(k2, [0, 0, None])[2] is None:
+                    continue
+            else:
+                k2 = min(near)[1]
+            rx, ry, ang = got[k2][:3]
+            ys, xs = np.nonzero(skin_b)
+            if len(xs) < 3:
+                continue
+            side = np.sign(rx - POX) or 1
+            m = np.sign(xs - POX) == side
+            if m.sum() >= 3:
+                xs, ys = xs[m], ys[m]
+            dd = np.hypot(xs - POX, ys - (POY - 0.45 * height))
+            far = dd >= np.quantile(dd, 0.8)
+            gx, gy = xs[far].mean(), ys[far].mean()
+        fx_ = fix or {}
+        fx_ = fx_.get(f'{n}:{f}') or fx_.get(n) or fx_.get(n.split('_')[0]) or fx_.get('*') or {}
+        if fx_.get('off'):
+            continue
+        if 'set' in fx_:
+            ang = math.radians(fx_['set'])
+        ang += math.radians(fx_.get('ang', 0))
+        gx += fx_.get('dx', 0)
+        gy += fx_.get('dy', 0)
+        # not through 연's face or head (a line the class's mixed weapons pull across it): turned
+        # away from it, towards the hand's side, until the blade clears it
+        if head and not fx_.get('keep'):
+            hm = layer_cell(h2, H, head, *key)[..., 3] > 100
+            ts = np.linspace(3, 0.45 * height, 24)
+
+            def hits(a_):
+                xs_ = np.round(gx + np.cos(a_) * ts).astype(int)
+                ys_ = np.round(gy + np.sin(a_) * ts).astype(int)
+                ok_ = (xs_ >= 0) & (xs_ < PW) & (ys_ >= 0) & (ys_ < PH)
+                return hm[ys_[ok_], xs_[ok_]].sum()
+            if hits(ang) > 2:
+                hx = np.nonzero(hm)[1].mean()
+                for d in range(5, 95, 5):
+                    ok = [a_ for a_ in (ang + math.radians(d), ang - math.radians(d)) if hits(a_) <= 2]
+                    if ok:
+                        ang = max(ok, key=lambda a_: abs(gx + math.cos(a_) * 0.45 * height - hx))
+                        break
+        # where 연 draws its weapons in front of the body here (the rest behind: wback)
+        out[key] = dict(gx=float(gx) - POX, gy=float(gy) - POY, ang=ang, front=front, back=back)
+    return out, Lc
+
+
+def canon(item, render, conf):
+    """The weapon's picture as the original draws it in one clean frame (conf "src": [cd, mt, frame],
+    else standing facing down): (its pixels cut out, the grip and the tip in them, gauntlet). The grip:
+    the figure's skin closed round the hilt (a gauntlet's: the covered fist), else conf "grip" [x, y] in
+    the render's own pixels; the tip: the blade's end farthest from the grip (conf "tip")."""
+    from scipy.ndimage import binary_closing, label
+    cd, mt, j = conf.get('src', [2, 1, 0])
+    its, bas = render(item, cd, mt), render(None, cd, mt)
+    it, ba = its[min(j, len(its) - 1)], bas[min(j, len(bas) - 1)]
+    pp, ob = piece_pixels(it, ba)
+    own = in_palette(it, skin_palette(ba)) & (it[..., 3] > 0)
+    pp[..., 3] = np.where(own, 0, pp[..., 3])
+    solid = pp[..., 3] > 0
+    # a thin shaft across the figure's dark hair or outline (the same colours: no difference there)
+    # stays whole: the gaps closed with the render's own pixels
+    gap = binary_closing(solid, iterations=2) & ~solid & (it[..., 3] > 0) & ~own
+    pp[gap] = it[gap]
+    pp[..., 3] = np.where(solid | gap, 255, 0)
+    solid |= gap
+    # specks and the plain figure's stray differences dropped: the weapon's big pieces
+    lab, n = label(binary_closing(solid, iterations=2))
+    if n > 1:
+        sizes = np.bincount(lab.ravel())[1:]
+        keep = np.isin(lab, [i + 1 for i in range(n) if sizes[i] >= 0.08 * sizes.max()])
+        solid &= keep
+        pp[..., 3] = np.where(solid, pp[..., 3], 0)
+    gauntlet = bool(conf.get('gauntlet'))
+    if 'grip' in conf:
+        g = tuple(conf['grip'])
+    else:
+        grip = own & binary_closing(solid, iterations=4) & ~solid
+        if grip.sum() < 6:
+            grip = own & binary_closing(solid, iterations=7) & ~solid
+        cov = skin(ba) & ob & solid
+        m = cov if gauntlet and cov.sum() >= 6 else grip
+        if m.sum() < 3:
+            m = cov if cov.sum() >= 3 else grip
+        if m.sum() >= 3:
+            ys, xs = np.nonzero(m)
+            g = (xs.mean(), ys.mean())
+        else:
+            bb = bbox(solid)
+            g = ((bb[0] + bb[2]) / 2, bb[3])
+    if 'tip' in conf:
+        t = tuple(conf['tip'])
+    else:
+        ys, xs = np.nonzero(solid)
+        dd = np.hypot(xs - g[0], ys - g[1])
+        far = dd >= np.quantile(dd, 0.985)
+        t = (xs[far].mean(), ys[far].mean())
+    return pp, g, t, gauntlet
+
+
+def held(pp, g, t, ang, length, mirror):
+    """The weapon's picture turned and sized: its grip g to its tip t along ang (radians, y down),
+    length pixels long; mirrored first where it is held the other way across. Returns the touched-up
+    picture and where its grip is in it."""
+    bb = bbox(pp[..., 3] > 0)
+    x0, y0, x1, y1 = bb
+    cut = pp[y0:y1 + 1, x0:x1 + 1]
+    gx, gy, tx, ty = g[0] - x0, g[1] - y0, t[0] - x0, t[1] - y0
+    if mirror:
+        cut = cut[:, ::-1]
+        gx, tx = cut.shape[1] - 1 - gx, cut.shape[1] - 1 - tx
+    # on a square canvas round the grip, turned about it
+    R = int(np.ceil(max(np.hypot(*(np.array([[0, 0], [cut.shape[1], 0], [0, cut.shape[0]], [cut.shape[1], cut.shape[0]]]) - [gx, gy]).T)))) + 2
+    can = np.zeros((2 * R + 1, 2 * R + 1, 4), np.uint8)
+    ox, oy = R - int(round(gx)), R - int(round(gy))
+    can[oy:oy + cut.shape[0], ox:ox + cut.shape[1]] = cut
+    a0 = math.atan2(ty - gy, tx - gx)
+    im = Image.fromarray(can).rotate(math.degrees(a0 - ang), resample=Image.NEAREST, center=(R, R))
+    k = length / max(1.0, math.hypot(tx - gx, ty - gy))
+    sc = scaled(np.asarray(im), k, KEEP)
+    cy, cx = R * sc.shape[0] / can.shape[0], R * sc.shape[1] / can.shape[1]
+    bb = bbox(sc[..., 3] > 0)
+    if not bb:
+        return None, None
+    x0, y0, x1, y1 = bb
+    sc = sc[y0:y1 + 1, x0:x1 + 1]
+    return touch_up(sc, 'weapon'), (cx - x0 + 1, cy - y0 + 1)
+
+
+def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, height, kfig):
+    """The weapon held in 연's hand frame by frame (class_poses): its sheet, and the part 연 draws
+    behind the body (wback) where the class's own weapons have one. 연's fist (the body's skin and
+    its outline round the hand) drawn back over the grip of a held weapon; a gauntlet (the 칠지천지환
+    line: the blade out of a glove) sits on the fist instead. conf: "size" (SIZE's), "scale": "figure" (a
+    glove with no blade: as big as the original's against its figure), "mirror" (turned over)."""
+    from scipy.ndimage import binary_dilation
+    pp, g, t, gauntlet = canon(conf['item'], render, conf)
+    a0 = math.atan2(t[1] - g[1], t[0] - g[0])
+    length = height * conf.get('size', SIZE)
+    if conf.get('scale') == 'figure':
+        length = kfig * math.hypot(t[0] - g[0], t[1] - g[1])
+    cw, ch = H['cell']
+    fx, fy = H['foot']
+    PAD = 40
+    ocw, och = cw + 2 * PAD, ch + 2 * PAD
+    ofx, ofy = fx + PAD, fy + PAD
+    sheets = [np.zeros((rows * och, cols * ocw, 4), np.uint8) for _ in range(2)]
+    body = H['layers']['body']['base']
+    for name, a in H['anims'].items():
+        if name == 'dead':
+            continue
+        for f in range(a['n']):
+            p = poses.get((a['row'], f))
+            # where 연 draws no weapon (its frame's layers have neither part: a cast's hands), none
+            z = (a.get('z') or [None] * a['n'])[f] or ['weapon']
+            has_w, has_b = 'weapon' in z, 'wback' in z
+            if not p or not (has_w or has_b):
+                continue
+            # held the other way across from the picture: mirrored, so it is not turned upside down
+            mirror = (math.cos(p['ang']) * math.cos(a0) < 0) and abs(math.cos(p['ang'])) > 0.2
+            if conf.get('mirror') is not None:
+                mirror = mirror != bool(conf['mirror'])
+            sc, gp = held(pp, g, t, p['ang'], length, mirror)
+            if sc is None:
+                continue
+            gcx, gcy = gp
+            # on the class's canvas: the grip on 연's hand
+            lay = np.zeros((PH, PW, 4), np.uint8)
+            px, py = int(round(POX + p['gx'] - gcx)), int(round(POY + p['gy'] - gcy))
+            h, w = sc.shape[:2]
+            ya, xa = max(0, -py), max(0, -px)
+            yb, xb = min(h, PH - py), min(w, PW - px)
+            if yb <= ya or xb <= xa:
+                continue
+            sub = sc[ya:yb, xa:xb]
+            dst = lay[py + ya:py + yb, px + xa:px + xb]
+            lay[py + ya:py + yb, px + xa:px + xb] = np.where(sub[..., 3:4] > 0, sub, dst)
+            if not gauntlet:
+                # 연's fist over the grip: the body's skin by the hand, and its outline
+                b = layer_cell(h2, H, body, a['row'], f)
+                yy, xx = np.mgrid[0:PH, 0:PW]
+                near = np.hypot(xx - (POX + p['gx']), yy - (POY + p['gy'])) <= 3.2
+                sk = skin_yeon(b) & (b[..., 3] > 100) & near
+                ring = binary_dilation(sk, iterations=1) & (b[..., 3] > 100) & (b[..., :3].max(-1) < 70) & near
+                m = (sk | ring) & (lay[..., 3] > 0)
+                lay[m] = b[m]
+            # split: in front of the body where 연 draws its weapons so, else behind (wback)
+            solid = lay[..., 3] > 0
+            fr = p['front']
+            parts = [solid & fr, solid & ~fr] if p['back'] else [solid, np.zeros_like(solid)]
+            if not has_w:
+                parts = [np.zeros_like(solid), solid]
+            for i, m in enumerate(parts):
+                if not m.any():
+                    continue
+                ys, xs = np.nonzero(m)
+                ty_, tx_ = a['row'] * och + ofy + ys - POY, f * ocw + ofx + xs - POX
+                ok = (ty_ >= a['row'] * och) & (ty_ < (a['row'] + 1) * och) & (tx_ >= f * ocw) & (tx_ < (f + 1) * ocw)
+                sheets[i][ty_[ok], tx_[ok]] = lay[ys[ok], xs[ok]]
+    got = {}
+    for i, sh in enumerate(sheets):
+        if not sh[..., 3].any():
+            continue
+        key = piece if i == 0 else piece + '_wb'
+        fname = f'{key}_{cls}.png'
+        Image.fromarray(sh).save(os.path.join(root, fname), optimize=True)
+        got[key] = {'kind': 'weapon' if i == 0 else 'wback', 'file': 'sinsu/' + fname, 'cols': cols, 'cell': [ocw, och],
+                    'foot': [ofx, ofy], 'side': [], 'k': round(float(length / max(1.0, math.hypot(t[0] - g[0], t[1] - g[1]))), 3)}
+        if i:
+            got[key]['variant'] = 's_' + piece
+    return got
+
+
 def build(gear, *argv):
-    pieces = config(argv)
+    pieces = {k: v for k, v in config(argv).items() if not k.startswith('_')}
+    fixes = config(argv).get('_pose', {})
     raw = os.path.join(gear, 'sinsu_worn', 'raw')
     root = next((a for a in argv if not a.endswith('.json') and not a.startswith('--')), os.path.join(gear, 'sinsu_worn'))
     os.makedirs(root, exist_ok=True)
@@ -531,9 +900,6 @@ def build(gear, *argv):
         body = H['layers'].get('body', {}).get('base')
         if not body:
             continue
-        bim = np.asarray(Image.open(os.path.join(h2, body['file'])).convert('RGBA'))
-        bcw, bch = body.get('cell', [cw, ch])
-        bfx, bfy = body.get('foot', [fx, fy])
         # 연's figure: feet to the top of the head, standing facing down (its head layer on).
         hd = H['layers'].get('head', {}).get('base')
         ia = H['anims']['idle_down']
@@ -562,12 +928,14 @@ def build(gear, *argv):
                     out.setdefault(cls, {}).update(got)
                     print(cls, piece, 'hair', got[piece]['k'])
                 continue
-            # the 연 hand per frame: skin pixels of the class's own weapon layer
-            wl = None
             if mode == 'weapon':
+                # held as 연 holds the class's own weapons (class_poses)
                 if cls not in hands:
-                    hands[cls] = hand_layer(h2, H, cls)
-                wl = hands[cls]
+                    hands[cls] = class_poses(h2, H, -top, fixes.get(cls))
+                got = weapon_layers(h2, H, cls, piece, conf, render, *hands[cls], root, rows, cols, -top, k)
+                out.setdefault(cls, {}).update(got)
+                print(cls, piece, {k: v['k'] for k, v in got.items()})
+                continue
             PAD = 70
             ocw, och = cw + 2 * PAD, ch + 2 * PAD
             ofx, ofy = fx + PAD, fy + PAD
@@ -591,63 +959,7 @@ def build(gear, *argv):
                         j = min(len(its) - 1, f)  # wind-up, then the blow (held over 연's last frame)
                     ba = bas[min(j, len(bas) - 1)]
                     it = its[j]
-                    if mode == 'weapon' and motion != 'idle':
-                        # A weapon the original swings in a pose of its own (a staff's thrust): its
-                        # figure is not the plain one's, and the difference would carry the body. Such a
-                        # frame (the skin of the two figures far apart) shows the weapon as it stands.
-                        si, sb_ = in_palette(it, skin_palette(ba)) & (it[..., 3] > 0), skin(ba) & (ba[..., 3] > 0)
-                        # (skin where the plain figure has none: a body moved, not one a blade covers)
-                        if (si & ~sb_).sum() > 0.2 * max(1, si.sum()):
-                            it, ba = render(item, cd, 1)[0], render(None, cd, 1)[0]
                     pp, ob = piece_pixels(it, ba)
-                    gauntlet = False
-                    if mode == 'weapon':
-                        # The original figure's own skin is not the piece (its hand closed round a
-                        # grip, an arm in another pose): the plain figure's skin colours are dropped.
-                        from scipy.ndimage import binary_dilation
-                        pal = skin_palette(ba)
-                        own = in_palette(it, pal) & (it[..., 3] > 0)
-                        pp[..., 3] = np.where(own, 0, pp[..., 3])
-                        solid = pp[..., 3] > 0
-                        # Where the hand is: the figure's skin closed round the grip — drawn over the
-                        # hilt, so inside the piece's outline once its gaps are closed (not a face or
-                        # an arm the blade only passes beside)...
-                        from scipy.ndimage import binary_closing
-                        grip = own & binary_closing(solid, iterations=4) & ~solid
-                        if grip.sum() < 6:
-                            grip = own & binary_closing(solid, iterations=7) & ~solid
-                        cx, cy = FEET[0], FEET[1] - 0.55 * pc_h  # the original figure's chest
-
-                        def fist(m):
-                            # the end of the arm: what of it is farthest from the chest
-                            ys, xs = np.nonzero(m)
-                            dd = np.hypot(xs - cx, ys - cy)
-                            far = dd >= np.quantile(dd, 0.7)
-                            return xs[far].mean(), ys[far].mean()
-                        cov = skin(ba) & ob & solid
-                        if conf.get('gauntlet'):
-                            # A weapon whose hilt is a gauntlet (the 칠지천지환 line: the blade comes out
-                            # of a glove): it sits on the hand and wrist in every frame, never held —
-                            # its fist on 연's fist, and no 연 fist drawn over it.
-                            gauntlet = True
-                            m = cov if cov.sum() >= 6 else grip
-                            if m.sum() >= 3:
-                                ohx, ohy = fist(m)
-                            else:
-                                bbw = bbox(solid)
-                                ohx, ohy = ((bbw[0] + bbw[2]) / 2, bbw[3]) if bbw else FEET
-                        elif grip.sum() >= 6:
-                            ohx, ohy = fist(grip)
-                        else:
-                            # ...or none: a gauntlet (칠지천지환검's blade comes out of a glove) covers the
-                            # hand and forearm. The fist is the end of the covered arm farthest from the
-                            # body; the gauntlet takes its place (no 연 fist drawn over it).
-                            if cov.sum() >= 6:
-                                gauntlet = True
-                                ohx, ohy = fist(cov)
-                            else:
-                                bbw = bbox(solid)
-                                ohx, ohy = ((bbw[0] + bbw[2]) / 2, bbw[3]) if bbw else FEET
                     if mode == 'wings':
                         # off the plain figure's body (grown a little): wings and shoulder flares
                         from scipy.ndimage import binary_dilation, label
@@ -670,53 +982,11 @@ def build(gear, *argv):
                     x0, y0, x1, y1 = bb
                     cut = pp[y0:y1 + 1, x0:x1 + 1]
                     sc = touch_up(scaled(cut, k), mode)
-                    if mode == 'weapon':
-                        # anchor: the original hand (above) on 연's hand
-                        wim, wm = wl
-                        wcw, wch = wm.get('cell', [cw, ch])
-                        wfx, wfy = wm.get('foot', [fx, fy])
-                        wc = wim[a['row'] * wch:(a['row'] + 1) * wch, f * wcw:(f + 1) * wcw]
-                        # 연's hand in this frame: the body's skin where it meets the class's weapon
-                        # (the arm's end at the grip; the end farthest from the chest is the fist),
-                        # else the weapon layer's own pink fist near the body, else the weapon's middle.
-                        from scipy.ndimage import binary_dilation, shift as nd_shift
-                        bc = bim[a['row'] * bch:(a['row'] + 1) * bch, f * bcw:(f + 1) * bcw]
-                        wa = np.zeros((bch, bcw), bool)  # the weapon's pixels in the body's cell
-                        ys_, xs_ = np.nonzero(wc[..., 3] > 100)
-                        ys_, xs_ = ys_ - wfy + bfy, xs_ - wfx + bfx
-                        ok = (ys_ >= 0) & (ys_ < bch) & (xs_ >= 0) & (xs_ < bcw)
-                        wa[ys_[ok], xs_[ok]] = True
-                        yy, xx = np.mgrid[0:bch, 0:bcw]
-                        chx, chy, rad = bfx, bfy - 0.4 * (-top), 0.65 * (-top)
-                        near = np.hypot(xx - chx, yy - chy) < rad
-                        hs = skin_yeon(bc) & (bc[..., 3] > 100) & binary_dilation(wa, iterations=2) & near
-                        if hs.sum() >= 3:
-                            ys, xs = np.nonzero(hs)
-                            dd = np.hypot(xs - chx, ys - chy)
-                            far = dd >= np.quantile(dd, 0.6)
-                            hx, hy = xs[far].mean() - bfx + fx, ys[far].mean() - bfy + fy
-                        else:
-                            ws = skin_yeon(wc) & (wc[..., 3] > 100)
-                            wy, wx = np.mgrid[0:wch, 0:wcw]
-                            ws &= np.hypot(wx - wfx, wy - (wfy - 0.4 * (-top))) < rad
-                            if ws.sum() < 3:
-                                ws = wc[..., 3] > 100
-                            if not ws.any():
-                                hx, hy = fx, fy - 20
-                            else:
-                                ys, xs = np.nonzero(ws)
-                                hx, hy = xs.mean() - wfx + fx, ys.mean() - wfy + fy
-                        px = round(hx - (ohx - x0) * k)
-                        py = round(hy - (ohy - y0) * k)
-                        # in front unless the original draws it behind the figure (facing away)
-                        cover = (pp[..., 3] > 0) & ob
-                        side[a['row']] += 'b' if d == 'up' and not cover.any() else 'f'
-                    else:
-                        # from the original feet, scaled; raised a little (연's shoulders sit lower
-                        # under its bigger head than the scale alone puts them)
-                        px = round(fx + (x0 - FEET[0]) * k)
-                        py = round(fy + (y0 - FEET[1]) * k) + 2
-                        side[a['row']] += 'f' if d == 'up' else 'b'
+                    # from the original feet, scaled; raised a little (연's shoulders sit lower
+                    # under its bigger head than the scale alone puts them)
+                    px = round(fx + (x0 - FEET[0]) * k)
+                    py = round(fy + (y0 - FEET[1]) * k) + 2
+                    side[a['row']] += 'f' if d == 'up' else 'b'
                     px, py = px - 1, py - 1  # touch_up's one-pixel margin for the outline
                     ox, oy = f * ocw + PAD + px, a['row'] * och + PAD + py
                     h, w = sc.shape[:2]
@@ -728,26 +998,18 @@ def build(gear, *argv):
                     dst = sheet[y_0:y_1, x_0:x_1]
                     m = src[..., 3:4] > 0
                     sheet[y_0:y_1, x_0:x_1] = np.where(m, src, dst)
-                    if mode == 'weapon' and not gauntlet:
-                        # 연's own fist over the grip (the skin of the class's weapon layer, and the
-                        # dark outline round it), so the hand holds the original blade
-                        from scipy.ndimage import binary_dilation
-                        sk = skin_yeon(wc) & (wc[..., 3] > 100)
-                        hand = binary_dilation(sk, iterations=1) & (wc[..., 3] > 100) & (sk | (wc[..., :3].max(-1) < 70))
-                        ys, xs = np.nonzero(hand)
-                        for yy, xx in zip(ys, xs):
-                            ty, tx = a['row'] * och + PAD + yy - wfy + fy, f * ocw + PAD + xx - wfx + fx
-                            if 0 <= ty < sheet.shape[0] and 0 <= tx < sheet.shape[1]:
-                                sheet[ty, tx] = wc[yy, xx]
             fname = f'{piece}_{cls}.png'
             Image.fromarray(sheet).save(os.path.join(root, fname), optimize=True)
-            out.setdefault(cls, {})[piece] = {'kind': 'weapon' if mode == 'weapon' else 'aback', 'file': 'sinsu/' + fname,
+            out.setdefault(cls, {})[piece] = {'kind': 'aback', 'file': 'sinsu/' + fname,
                                                'cols': cols, 'cell': [ocw, och], 'foot': [ofx, ofy],
                                                'side': [side.get(r, '') for r in range(rows)], 'k': round(k, 3)}
             print(cls, piece, 'k', round(k, 3))
     ip = os.path.join(root, 'index.json')
     if want and os.path.exists(ip):
         old = json.load(open(ip, encoding='utf-8'))
+        for cls, ps in old.items():
+            for p in want:  # (a rebuilt weapon's part behind the body, gone now)
+                ps.pop(p + '_wb', None)
         for cls, ps in out.items():
             old.setdefault(cls, {}).update(ps)
         out = old
