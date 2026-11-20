@@ -780,7 +780,32 @@ function buildDetail(detail, cls) {
   strip.className = 'btn';
   strip.textContent = '모두 벗기';
   strip.onclick = () => { trial = {}; pick = null; buildCoordi(); };
-  row.append(strip, save);
+  // 되돌리기: the preview back to what the hero wears now (a trial not yet saved is dropped).
+  const undo = document.createElement('button');
+  undo.className = 'btn';
+  undo.textContent = '되돌리기';
+  undo.title = '미리 입어 본 것을 취소하고 지금 입은 모습으로';
+  undo.onclick = () => {
+    trial = Object.assign({}, state().wear[cls.id] || {});
+    for (const [k, id] of Object.entries(trial)) if (!ownsCostume(id)) delete trial[k];
+    pick = null;
+    buildCoordi();
+  };
+  // 원래 모습: every costume off at once and saved — the class's own look, as before any 코디
+  // (what was worn stays owned, and a 아바타 프리셋 can bring it back).
+  const orig = document.createElement('button');
+  orig.className = 'btn';
+  orig.textContent = '원래 모습으로';
+  orig.title = '코디를 모두 벗고 직업 본래의 모습으로 바로 저장합니다. 가진 코디는 그대로 남습니다.';
+  orig.onclick = () => {
+    for (const [kind] of KINDS) setCostume(cls.id, kind, null);
+    trial = {};
+    pick = null;
+    A.changed();
+    A.say('코디를 모두 벗고 원래 모습으로 돌아왔습니다.', 'sys');
+    buildCoordi();
+  };
+  row.append(undo, strip, orig, save);
   detail.append(presetRow(cls), row);
   drawPreview();
 }
