@@ -688,7 +688,7 @@ export const RARITY = {
 // ---- abyss weapon tuning (retune here) ----
 export const ABYSS_BASE = {
   warrior: [7100495, '진일염화검'], rogue: [7100303, "진'청일기창"], mage: [7100498, '청염단강봉'],
-  poet: [7100305, "진'적염곤봉"], archer: [7100500, '흑일멸화궁'], lancer: [7100524, '청염멸창'],
+  poet: [7100305, "진'적염곤봉"], archer: [7100500, '흑일멸화궁'], lancer: [7100501, '백일신멸창'],
   monk: [7100499, '백운뇌권갑'], magus: [9988277, '적혼의 단봉'], celestial: [7100502, '청월염표창'],
   dokkaebi: [7100503, '적월염퇴'], reaper: [7100654, '선일태도'],
 };
@@ -769,9 +769,9 @@ export const TAECHO_BASE = {
 // heroes (layers "s_ab_<class>"; ABYSS_BASE where a build lacks them), dressed black, blood and fire:
 // 주술사 고대마령의적혈장, 도사 할로윈천마적혈봉, 궁사 할로윈천마적혈궁, 격투가 주박권법혈천장갑,
 // 마도사 할로윈천마암흑단봉, 천인 흑옥방천극, 도깨비 고대마령의적혈봉, 차사 사혼명도. The 창술사 wears
-// 연's own 청염멸창 (ABYSS_BASE: drawn for 연's spear rig) instead; to lay an original's spear for it
-// (tools/sinsu_worn.json ab_lancer, built as a long spear), put 'lancer' back in ABYSS_LAID.
-const ABYSS_LAID = ['mage', 'poet', 'archer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'];
+// the original's 백만베기창 laid as a long spear (tools/sinsu_worn.json ab_lancer); 연's own 청염멸창
+// (id 7100524) is the alternative: set ABYSS_BASE.lancer to it and drop 'lancer' from ABYSS_LAID.
+const ABYSS_LAID = ['mage', 'poet', 'archer', 'lancer', 'monk', 'magus', 'celestial', 'dokkaebi', 'reaper'];
 export const ABYSS_WORN = Object.fromEntries(ABYSS_LAID.map(c => [c, 's_ab_' + c]));
 // 태초 and the abyss uniques are the top of the weapons: their 격 drawn this much larger again
 // (the picture only; GYEOK_TIER's reach by rank is unchanged).
