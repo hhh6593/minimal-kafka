@@ -1,7 +1,7 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
   CHAMPIONS_AT, FX, ELEMENTS, PROMOS, PROMO_NAMES, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
-  skillStats, skillName, levelText,
+  skillStats, skillName, levelText, isMend, MEND_FX,
 } from './data.js';
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT } from './gyeok.js';
@@ -7123,7 +7123,8 @@ function cast(skill, st) {
     // (A blink is a dash and a strike, but a caster's own (주술사's 이형환위) is a spell: the cast.)
     const melee = def.kind === 'slash' || (def.kind === 'blink' && !['mage', 'poet', 'magus'].includes(G.cls.id)) || (def.kind === 'spell' && G.cls.id === 'warrior')
       || (WEAPON_POSE.has(G.cls.id) && !['buff', 'heal'].includes(def.kind));
-    strikePose(melee ? 'attack' : 'magic');
+    // A 기원 of any kind (운기, 메밀묵섭취, 저승의기원 are 'regen', 신성제마술 a cleanse) is cast, never swung.
+    strikePose(melee && !isMend(def) ? 'attack' : 'magic');
     G.player.castUntil = G.t + 0.3; // 기본 공격: not in the middle of a cast
   }
 }
@@ -7801,8 +7802,9 @@ function tierDef(id) {
  * cast and a foe is within reach (the spells' waits do not matter, and it no longer holds back for
  * 1.5 s after a spell). A close-in class strikes the nearest foe up to `reach` tiles off, leaning
  * into it (the lunge) with its own 연 slash arc on the struck tile; a far class (archer, the four
- * casters) sends its first spell's own picture (and a small orb for the casters) at the nearest foe
- * in reach. Its power is a share (PLAIN_K) of the class's first spell at the level of the hero's
+ * casters) sends its first damage spell's own picture (and a small orb for the casters) at the nearest
+ * foe in reach. Never a 기원's: the orbs were 신령의기원's ring (131) for the 주술사 and 도사 and 누리의
+ * 기원's moon (3) for the 마도사, a 기원 thrown at every foe. Its power is a share (PLAIN_K) of the class's first spell at the level of the hero's
  * highest spell, so it never outgrows the spells; it is struck through hurtEnemy like any blow
  * (weapon, stats, crits) and looses 격 at half the spells' chance (G.plainHit).
  */
@@ -7816,15 +7818,27 @@ const PLAIN = {
   dokkaebi: { reach: 2, cd: 0.85 },
   reaper: { reach: 2.5, cd: 0.8 },
   archer: { reach: 6, cd: 0.8 },
-  mage: { reach: 5, cd: 0.95, orb: '131' },
-  poet: { reach: 5, cd: 0.95, orb: '131' },
-  magus: { reach: 5, cd: 0.95, orb: '3' },
-  celestial: { reach: 5, cd: 0.95, orb: '148' },
+  mage: { reach: 5, cd: 0.95, orb: ['k_x_md_orbfire_shot', '96'] },
+  poet: { reach: 5, cd: 0.95, orb: ['k_x_md_orbice_shot', '31'] },
+  magus: { reach: 5, cd: 0.95, orb: ['k_x_md_orblight_shot', '31'] },
+  celestial: { reach: 5, cd: 0.95, orb: ['148'] },
 };
+/** The class's first damage spell (its start, unless that is no blow): the 기본 공격's picture and sound. */
+function plainSpell(cls) {
+  const c = CLASSES.find(x => x.id === cls) || G.cls, d0 = SKILLS[c.start];
+  if (d0 && d0.dmg && !isMend(d0)) return { id: c.start, ...d0 };
+  const e = Object.entries(SKILLS).filter(([, d]) => d.cls === cls && d.dmg > 0 && !isMend(d) && d.kind !== 'ult' && !d.evolved)
+    .sort((a, b) => (a[1].promo || 0) - (b[1].promo || 0) || (a[1].req || 1) - (b[1].req || 1))[0];
+  return e ? { id: e[0], ...e[1] } : null;
+}
+/** A caster's orb: the first of its pictures the build has, never a 기원's. */
+function plainOrb(pr) {
+  return (pr.orb || []).find(id => M.fx[id] && !MEND_FX.has(id)) || null;
+}
 
 /** The plain blow's power: PLAIN_K (a quarter) of the first spell at the level of the hero's highest spell. */
 function plainDmg() {
-  const d0 = SKILLS[G.cls.start];
+  const d0 = plainSpell(G.cls.id);
   let lv = 1;
   for (const s of G.skills) {
     const d = SKILLS[s.id];
@@ -7859,7 +7873,7 @@ function plainAttack(dt) {
   const cls = G.cls.id, pr = PLAIN[cls] || PLAIN.warrior;
   const t = plainTarget(pr.reach);
   if (!t) { p.atkT = 0.1; return; } // no foe in reach: look again shortly
-  const start = SKILLS[G.cls.start];
+  const start = plainSpell(cls);
   const dmg = plainDmg();
   p.atkT = pr.cd;
   const dx = t.tx - p.tx, dy = t.ty - p.ty;
@@ -7872,7 +7886,7 @@ function plainAttack(dt) {
   }
   const far = !MELEE_LOOK[cls]; // the archer and the casters strike from where they stand
   strikePose(MELEE_LOOK[cls] || WEAPON_POSE.has(cls) ? 'attack' : 'magic');
-  audio.play('skill_' + G.cls.start, start && start.kind);
+  if (start) audio.play('skill_' + start.id, start.kind);
   const hit = (b, push) => {
     G.plainHit = true;
     G.spark = far && start ? sparkOf(start.id, start) : null;
@@ -7895,14 +7909,15 @@ function plainAttack(dt) {
     });
     return;
   }
-  // A far blow: the first spell's own picture on the foe, a small orb flying to it for a caster.
-  const fxid = start && start.fx;
+  // A far blow: the first damage spell's own picture on the foe, a small orb flying to it for a caster.
+  const fxid = start && !MEND_FX.has(start.fx) ? start.fx : null;
   const land = () => {
     if (t.hp <= 0 || G.dead) return;
     if (fxid && M.fx[fxid]) fxOn(fxid, t, { scale: 0.55 });
     hit(t, null);
   };
-  if (pr.orb && M.fx[pr.orb]) addShot(p, t, { fx: pr.orb, speed: 640, size: 4, onHit: land });
+  const orb = plainOrb(pr);
+  if (orb) addShot(p, t, { fx: orb, speed: 640, size: 4, onHit: land });
   else later(0.1, land);
 }
 
@@ -7930,7 +7945,8 @@ const ULT_PATH = {
   warrior: [[0, 'w_ult'], [4, 'w_blood'], [5, 'w_rush'], [8, 'w_blackdragon'], [9, 'w_myriad']],
   rogue: [[0, 'r_ult'], [4, 'r_heaven'], [6, 'r_shuriken'], [7, 'r_kill'], [9, 'r_gale']],
   mage: [[0, 'm_ult'], [4, 'm_fire3'], [6, 'm_twin'], [7, 'm_inferno'], [9, 'm_kalpa']],
-  poet: [[0, 'p_ult'], [4, 'p_phoenix'], [6, 'p_burst'], [7, 'p_bagua'], [9, 'p_taiji']],
+  // (4차 was 봉황의기원: a 기원 as the 필살기 that strikes the whole screen. 귀염추혼소, the 4차 screen spell.)
+  poet: [[0, 'p_ult'], [4, 'p_break'], [6, 'p_burst'], [7, 'p_bagua'], [9, 'p_taiji']],
   archer: [[0, 'a_ult'], [4, 'a_allwhirl'], [5, 'a_inferno'], [9, 'a_blood5']],
   lancer: [[0, 'l_ult'], [4, 'l_genesis'], [6, 'l_annihil'], [9, 'l_moonfull']],
   monk: [[0, 'mk_ult'], [4, 'mk_buddha'], [5, 'mk_combo'], [9, 'mk_aventhit']],
@@ -7942,7 +7958,7 @@ const ULT_PATH = {
 function ultLook(cls) {
   const base = SKILLS[CLASSES.find(c => c.id === cls).ult], promo = promoOf(cls);
   let id = null;
-  for (const [at, sid] of ULT_PATH[cls] || []) if (promo >= at && SKILLS[sid]) id = sid;
+  for (const [at, sid] of ULT_PATH[cls] || []) if (promo >= at && SKILLS[sid] && !isMend(SKILLS[sid])) id = sid;
   const d = SKILLS[id] || base;
   const fx = d.yeon ? d.fx : d.modern && M.fx[d.modern] ? d.modern : d.fxs ? d.fxs[d.fxs.length - 1] : d.fx;
   return { ...base, id: id || CLASSES.find(c => c.id === cls).ult, name: d.name, fx: M.fx[fx] ? fx : base.fx };
@@ -9892,11 +9908,14 @@ function updateShots(dt) {
   }
   G.shots = G.shots.filter(sh => !sh.done);
 }
-/** What flies between bodies is the game's own spell picture, small, by the colour it was given. */
+/** What flies between bodies is the game's own spell picture, small, by the colour it was given.
+ * Green (#58e868, 누리의 기원's moon 3) and gold (#ffe680, 신령의기원's ring 131) are 기원 and 부활
+ * flying to an ally: a shot at a foe is given its own picture (fx) — a war 궁사's shot was gold, a
+ * 신령의기원 at every foe. Nothing given falls back to a plain spark, not a 기원. */
 const SHOT_FX = { '#c02838': '148', '#ffe680': '131', '#58e868': '3', '#9a68ff': '98', '#5aa8ff': '96', '#ff8a20': '40', '#b040d0': '98' };
 function drawShots() {
   for (const sh of G.shots) {
-    const id = sh.fx || SHOT_FX[sh.color] || '131';
+    const id = sh.fx || SHOT_FX[sh.color] || '40';
     if (!M.fx[id]) continue;
     drawFx(id, sh.x, sh.y, sh.t, 0.45, 0, 'center', true);
   }
@@ -10216,7 +10235,8 @@ const TIER_K = 0.55;
 function tierKit(id, tier) {
   const defs = Object.keys(SKILLS).map(k => [k, tierDef(k)]).filter(([, d]) => d.cls === id && d.promo && d.promo <= tier && !d.hpCost && d.kind !== 'ult');
   const best = f => defs.filter(([, d]) => f(d)).sort((a, b) => b[1].promo - a[1].promo || (b[1].dmg || 0) - (a[1].dmg || 0));
-  const atk = best(d => TIER_ATK.has(d.kind)), kit = [], seen = new Set();
+  // (A 기원 is never among the blows, whatever plain kind it is cast as.)
+  const atk = best(d => TIER_ATK.has(d.kind) && !isMend(d)), kit = [], seen = new Set();
   for (const e of atk) if (!seen.has(e[1].kind) && kit.length < 5) { seen.add(e[1].kind); kit.push(e); }
   for (const e of atk) if (!kit.includes(e) && kit.length < 5) kit.push(e);
   kit.sort((a, b) => b[1].promo - a[1].promo || (b[1].dmg || 0) - (a[1].dmg || 0));
@@ -10308,7 +10328,7 @@ function memberTierCast(m, near, face, pose) {
     if (d.buff === 'haste') m.hasteUntil = G.t + (d.duration || 4);
     if (d.promo >= 4) partySay(m, d.name); else m.bubble = { text: d.name, t: G.t };
     // A fighter's blow is its weapon's swing; spells, 기원 and buffs the cast (the hero's own rule).
-    pose((MELEE_LOOK[m.cls.id] || WEAPON_POSE.has(m.cls.id)) && !['buff', 'heal'].includes(d.kind) ? 'attack' : 'magic');
+    pose((MELEE_LOOK[m.cls.id] || WEAPON_POSE.has(m.cls.id)) && !['buff', 'heal'].includes(d.kind) && !isMend(SKILLS[id]) ? 'attack' : 'magic');
     return true;
   }
   return false;
@@ -10641,7 +10661,7 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 14;
-        addFx(SKILLS.dk_body.fx, m.x, m.y - 20, { scale: 0.8 });
+        fxOnBody(SKILLS.dk_body.fx, m, -20, { scale: 0.8 });
         audio.play('skill_dk_body', 'heal');
         partySay(m, '귀체');
         healMember(m, m.maxHp * 0.2);
@@ -10679,7 +10699,7 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 13;
-        addFx(SKILLS.rp_drain.fx, m.x, m.y - 20, { scale: 0.8 });
+        fxOnBody(SKILLS.rp_drain.fx, m, -20, { scale: 0.8 });
         audio.play('skill_rp_drain', 'heal');
         partySay(m, '흡기공');
         healMember(m, m.maxHp * 0.2);

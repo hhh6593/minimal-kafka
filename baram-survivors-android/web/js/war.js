@@ -19,7 +19,7 @@
 //     the raid's boss and servants, which stay game.js's monsters (see the 레이드 section).
 
 import { frameBox, drawLayers, dyeImage, dropCostume, aiCostume, loadCostumes } from './costume.js';
-import { gwoeWeek } from './data.js';
+import { gwoeWeek, isMend, MEND_FX } from './data.js';
 
 let A = null; // game.js internals (initWar)
 const TILE = 48;
@@ -113,10 +113,13 @@ const CLOSE_KIT = new Set(['lancer', 'monk', 'dokkaebi', 'reaper', 'celestial'])
 const STRIKERS = new Set(['warrior', 'rogue', 'lancer', 'monk', 'dokkaebi', 'reaper', 'archer']);
 /** The pose of a fighter's blow: its weapon's swing, a caster's cast (the 천인's plain blow a strike, its spells cast). */
 const blowPose = (b, spell) => (STRIKERS.has(b.cls.id) || (!spell && b.cls.id === 'celestial') ? 'attack' : 'cast');
+/** A war 궁사's flying arrow: 연's own, else the old site's (53, 활쏘기). */
+const ARROW = () => (A.M().fx.k_a_shot ? 'k_a_shot' : '53');
 function kitFor(cls) {
   if (KITS[cls.id]) return KITS[cls.id];
   const mine = Object.entries(SK).filter(([, d]) => d.cls === cls.id && d.fx);
-  const hit = mine.filter(([, d]) => d.dmg).sort((a, b) => (a[1].req || 1) - (b[1].req || 1));
+  // Its blows: damage spells only (a 기원 is never a blow, whatever numbers it carries).
+  const hit = mine.filter(([, d]) => d.dmg && !isMend(d) && d.kind !== 'ult').sort((a, b) => (a[1].req || 1) - (b[1].req || 1));
   const heal = mine.find(([, d]) => d.kind === 'heal');
   // A close-in class fights close whatever reach its later spells have (each has one of four
   // tiles or more: the 무사, 격투가, 도깨비 and 차사 stood off and threw their blows as a caster's
@@ -1648,7 +1651,8 @@ function act(W, b, t) {
     const d = id && SK[id];
     const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
     if ((onScreen(b) || onScreen(t)) && G.shots.length < 14) {
-      A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#ffe680' : '#ff8a20', size: 3, speed: 460,
+      // (A 궁사's shot was gold, game.js's 신령의기원 ring (131): a 기원 flying at the foe. An arrow now.)
+      A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#e8c060' : '#ff8a20', fx: b.cls.id === 'archer' ? ARROW() : undefined, size: 3, speed: 460,
         onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, aiO(0.8)); } } });
     } else A.later(0.25, () => { if (!W.over) hit(W, b, t, n); });
     if (id) sound(W, b, 'skill_' + id, 'spell');

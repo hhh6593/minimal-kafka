@@ -1579,6 +1579,21 @@ export const CHAMPIONS_AT = [60, 120, 180];
 // ghost. A level-up shows no picture, as in the client (a message and a sound); 129 is 부활.
 export const FX = { hit: null, death: null, levelup: null, revive: '129', heal: null, ghost: null, shield: '77', summon: '44' };
 
+/**
+ * A mending skill (a 기원 and its like): 누리·태양·신령·봉황·현자·생명·금기의 기원, the 희원, 운기·메밀묵섭취·
+ * 저승의기원 (regen), 신성제마술 (a cleanse that heals), 권법의기원 (a 기원 by name, a buff). It is cast on
+ * the caster or its allies only: never on a foe, never in a rotation of blows, never as the picture
+ * or the sound of a blow (the 기본 공격, a shot, a 필살기).
+ */
+export function isMend(d) {
+  if (!d || d.kind === 'ult') return false;
+  return d.kind === 'heal' || d.kind === 'regen' || d.ck === 'heal' || (d.kind === 'cleanse' && !!d.heal) || /기원|희원/.test(d.name || '');
+}
+/** The 기원 pictures of the original site (누리의 기원's grades 3·4·64·32·10·79, 신령의기원 131, 태양 93,
+ *  현자 146, 천공 111, 백호 130·133 …): the boot gives those skills 연's own pictures, but the old ones are
+ *  still 기원 to the eye and never fly at, or burst on, a foe. */
+export const MEND_FX = new Set(['3', '4', '64', '32', '10', '79', '93', '146', '131', '130', '133', '111', '78', '125', '138', '142']);
+
 /** A skill's name at a level. */
 export function skillName(id, level) {
   const s = SKILLS[id];
