@@ -10,7 +10,8 @@ glove on the fist, no 연 fist over it), "size" (from the hand to the tip agains
 default SIZE), "scale": "figure" (a glove with no blade: the original's size against its figure),
 "src": [cd, mt, frame] (the render its picture is cut from, where the standing front hides part of
 it), "grip" / "tip": [x, y] (in that render's pixels, where found wrong), "mirror": true, "trail": true (the
-original's swing kept under the blade: 청룡신검's water)}, and
+original's swing kept under the blade: 청룡신검's water), "hold": 0..1 (a spear: held that far up its
+shaft from the butt, "size" its whole length), "stretch" (drawn out along its line: a longer shaft)}, and
 "_pose": {cls: corrections of 연's hand and weapon line, class_poses}}. --quick fetches only standing
 and striking (front, back, left): enough for candidate sheets; build then shows the stand where a
 walk or a cast is missing.
@@ -98,6 +99,9 @@ def fetch(gear, *argv):
                     try:
                         with urllib.request.urlopen(COORDI + q, timeout=40) as r:
                             data = r.read()
+                        # (a busy server answers with its error page, not a picture: tried again)
+                        if not data.startswith(b'GIF'):
+                            raise ValueError('not a GIF')
                         break
                     except Exception as e:  # noqa: BLE001 - retried
                         if attempt == 2:
@@ -644,8 +648,8 @@ def class_poses(h2, H, height, fix=None):
         # (where the layers make a clear line their shared hand stands, fists drawn with them)
         near = elong >= 6 or distance_transform_edt(~(b[..., 3] > 100))[int(round(gy)), int(round(gx))] <= 3
         front = gaussian_filter(cf, 1.5) >= gaussian_filter(cb, 1.5)
-        got[key] = [gx, gy, ang if near else None, front, cb.sum() > 0, skin_b]
-    for key, (gx, gy, ang, front, back, skin_b) in got.items():
+        got[key] = [gx, gy, ang if near else None, front, cb.sum() > 0, skin_b, cf, cb]
+    for key, (gx, gy, ang, front, back, skin_b, cf, cb) in got.items():
         n, f = names[key]
         if ang is None:
             # off the body: the hand is the end of 연's arm on the side the class holds it (the
@@ -698,7 +702,7 @@ def class_poses(h2, H, height, fix=None):
                         ang = max(ok, key=lambda a_: abs(gx + math.cos(a_) * 0.45 * height - hx))
                         break
         # where 연 draws its weapons in front of the body here (the rest behind: wback)
-        out[key] = dict(gx=float(gx) - POX, gy=float(gy) - POY, ang=ang, front=front, back=back)
+        out[key] = dict(gx=float(gx) - POX, gy=float(gy) - POY, ang=ang, front=front, back=back, cf=cf, cb=cb)
     return out, Lc
 
 
@@ -755,10 +759,11 @@ def canon(item, render, conf):
     return pp, g, t, gauntlet
 
 
-def held(pp, g, t, ang, length, mirror):
+def held(pp, g, t, ang, length, mirror, stretch=1.0):
     """The weapon's picture turned and sized: its grip g to its tip t along ang (radians, y down),
-    length pixels long; mirrored first where it is held the other way across. Returns the touched-up
-    picture and where its grip is in it."""
+    length pixels long; mirrored first where it is held the other way across; drawn out stretch
+    times along its own line (a spear's shaft, its width kept). Returns the touched-up picture and
+    where its grip is in it."""
     bb = bbox(pp[..., 3] > 0)
     x0, y0, x1, y1 = bb
     cut = pp[y0:y1 + 1, x0:x1 + 1]
@@ -766,16 +771,23 @@ def held(pp, g, t, ang, length, mirror):
     if mirror:
         cut = cut[:, ::-1]
         gx, tx = cut.shape[1] - 1 - gx, cut.shape[1] - 1 - tx
-    # on a square canvas round the grip, turned about it
+    # on a square canvas round the grip: turned to its line, drawn out along it, turned to ang
+    # (one mapping at the picture's own size, nearest: its pixels as they are)
     R = int(np.ceil(max(np.hypot(*(np.array([[0, 0], [cut.shape[1], 0], [0, cut.shape[0]], [cut.shape[1], cut.shape[0]]]) - [gx, gy]).T)))) + 2
-    can = np.zeros((2 * R + 1, 2 * R + 1, 4), np.uint8)
-    ox, oy = R - int(round(gx)), R - int(round(gy))
-    can[oy:oy + cut.shape[0], ox:ox + cut.shape[1]] = cut
+    R = int(np.ceil(R * max(1.0, stretch)))
     a0 = math.atan2(ty - gy, tx - gx)
-    im = Image.fromarray(can).rotate(math.degrees(a0 - ang), resample=Image.NEAREST, center=(R, R))
-    k = length / max(1.0, math.hypot(tx - gx, ty - gy))
+
+    def rot(a_):
+        return np.array([[math.cos(a_), -math.sin(a_)], [math.sin(a_), math.cos(a_)]])
+    # output (from the grip) -> picture (from the grip)
+    inv = rot(a0) @ np.diag([1.0 / stretch, 1.0]) @ rot(-ang)
+    src = Image.fromarray(cut)
+    data = (inv[0, 0], inv[0, 1], gx - inv[0, 0] * R - inv[0, 1] * R,
+            inv[1, 0], inv[1, 1], gy - inv[1, 0] * R - inv[1, 1] * R)
+    im = src.transform((2 * R + 1, 2 * R + 1), Image.AFFINE, data, resample=Image.NEAREST)
+    k = length / max(1.0, stretch * math.hypot(tx - gx, ty - gy))
     sc = scaled(np.asarray(im), k, KEEP)
-    cy, cx = R * sc.shape[0] / can.shape[0], R * sc.shape[1] / can.shape[1]
+    cy, cx = R * sc.shape[0] / (2 * R + 1), R * sc.shape[1] / (2 * R + 1)
     bb = bbox(sc[..., 3] > 0)
     if not bb:
         return None, None
@@ -825,6 +837,19 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
     length = height * conf.get('size', SIZE)
     if conf.get('scale') == 'figure':
         length = kfig * math.hypot(t[0] - g[0], t[1] - g[1])
+    stretch = conf.get('stretch', 1.0)
+    if 'hold' in conf:
+        # a spear: "size" is its whole length, butt to tip, and the hand holds it "hold" of the
+        # way up from the butt (연's spears are held along the shaft, not at the end)
+        d = math.hypot(t[0] - g[0], t[1] - g[1])
+        ux, uy = (t[0] - g[0]) / d, (t[1] - g[1]) / d
+        ys, xs = np.nonzero(pp[..., 3] > 0)
+        pmin = min(0.0, float(((xs - g[0]) * ux + (ys - g[1]) * uy).min()))
+        h_ = pmin + conf['hold'] * (d - pmin)
+        g = (g[0] + ux * h_, g[1] + uy * h_)
+        length *= (d - h_) / (d - pmin)
+    # the swing grown with the weapon (a little less: it spreads round the whole figure)
+    tk = kfig * (math.sqrt(conf.get('size', SIZE) / SIZE) if conf.get('trail') else 1)
     cw, ch = H['cell']
     fx, fy = H['foot']
     PAD = 40
@@ -846,7 +871,7 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
             mirror = (math.cos(p['ang']) * math.cos(a0) < 0) and abs(math.cos(p['ang'])) > 0.2
             if conf.get('mirror') is not None:
                 mirror = mirror != bool(conf['mirror'])
-            sc, gp = held(pp, g, t, p['ang'], length, mirror)
+            sc, gp = held(pp, g, t, p['ang'], length, mirror, stretch)
             if sc is None:
                 continue
             gcx, gcy = gp
@@ -855,7 +880,7 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
             if conf.get('trail') and name.startswith('atk_'):
                 # the original's own swing (청룡신검's blue water: its glowing pixels away from the
                 # blade) round 연's body as round the original's, under the blade
-                tr = trail(conf['item'], render, DIRS[name.split('_')[1]], f, kfig)
+                tr = trail(conf['item'], render, DIRS[name.split('_')[1]], f, tk)
                 if tr is not None:
                     t_, tx0, ty0 = tr
                     ys, xs = np.nonzero(t_[..., 3] > 0)
@@ -883,6 +908,18 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
             # split: in front of the body where 연 draws its weapons so, else behind (wback)
             solid = lay[..., 3] > 0
             fr = p['front']
+            if 'hold' in conf and p['back']:
+                # a spear: its shaft past the hand (to the butt) and its head each on the side of
+                # the body 연's own spears have that part on in this frame (the shaft behind the
+                # back, over the shoulder; seen from behind, across it)
+                yy, xx = np.mgrid[0:PH, 0:PW]
+                pr = (xx - POX - p['gx']) * math.cos(p['ang']) + (yy - POY - p['gy']) * math.sin(p['ang'])
+                # pixel by pixel where 연's spears are drawn (the butt poking out over the shoulder);
+                # where none is (a shaft 연 hides wholly behind the body), the shaft behind and the
+                # head in front
+                from scipy.ndimage import gaussian_filter
+                sf, sb = gaussian_filter(p['cf'], 1.5), gaussian_filter(p['cb'], 1.5)
+                fr = np.where(sf + sb > 0.05, sf >= sb, pr >= 0)
             parts = [solid & fr, solid & ~fr] if p['back'] else [solid, np.zeros_like(solid)]
             if not has_w:
                 parts = [np.zeros_like(solid), solid]
@@ -901,7 +938,7 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
         fname = f'{key}_{cls}.png'
         Image.fromarray(sh).save(os.path.join(root, fname), optimize=True)
         got[key] = {'kind': 'weapon' if i == 0 else 'wback', 'file': 'sinsu/' + fname, 'cols': cols, 'cell': [ocw, och],
-                    'foot': [ofx, ofy], 'side': [], 'k': round(float(length / max(1.0, math.hypot(t[0] - g[0], t[1] - g[1]))), 3)}
+                    'foot': [ofx, ofy], 'side': [], 'k': round(float(length / max(1.0, stretch * math.hypot(t[0] - g[0], t[1] - g[1]))), 3)}
         if i:
             got[key]['variant'] = 's_' + piece
     return got
