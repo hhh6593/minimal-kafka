@@ -1235,6 +1235,82 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
 - 주술사: 공력증강, 무장, 퇴마주, 중독, 절망, 혼돈, 만파지독·현자의기원(4차)
 - 도사: 퇴마주, 보호, 파혼술, 천공의희원, 무력화, 생명의기원, 백호의희원'첨(3차)
 
+### 차수별 고유 기술 (TIER_SKILLS)
+
+직업마다 승급 차수에 맞춘 기술 51개를 더했습니다(`web/js/data.js`의 `TIER_SKILLS`, 동작은 `game.js`의 `TIER_KINDS`).
+기술마다 그 직업의 다른 기술에 없는 동작이 하나씩 있습니다: 튀는 벼락(연쇄), 틱마다 치는 장판, 표식 뒤 지연 폭발(선심단멸·광야건곤에
+맞으면 바로 1.3배로 터짐), 상태이상 수만큼 커지는 폭발, 중첩 후 폭발, 퍼지는 고리, 꿰뚫을수록 강해지는 화살, 뒤로 회피, 단일 연타,
+토템, 구역 낙하, 왕복 투척, 회전체, 밀쳐내기, 끌어당기는 회오리, 회전 채널, 처형, 밀집 지점 돌진, 적 사이 연속 순간이동, 함정,
+체력 소모 비례 피해, 부채꼴 투사체, 유인(끌어모으기+피해 절반), 해로운 효과 해제, 재사용 초기화, 지속 회복, 바람 오라, 되받아치기, 보호막 폭발.
+
+- 초반(일반·1차): 전사·궁사·무사·격투가·도깨비·차사가 셋씩(차사는 둘) 얻어, 주술사·도사처럼 12칸을 일찍 채울 수 있습니다.
+- 후반(6~9차): 모든 직업이 셋씩 얻고, 9차가 비던 격투가·천인·도깨비·차사에 9차가 생깁니다. 차사는 2차(영혼공명)·4차(호신강기)도 얻습니다.
+  5차 이후 기술은 다른 후반 기술처럼 계열의 앞 기술 2단에서 그 자리와 단을 이어받습니다(표의 계승).
+- 이름은 그 직업의 연 기술 기록(새 번호와 옛 번호: 유인, 의지의외침, 영풍진격, 타력광풍, 광야건곤, 호기방출, 참간맹습, 혈독주입,
+  투도멸진, 사슬벼락, 즉발시전, 선심단멸, 혼마기, 신성제마술, 선기전도, 연사, 운상미보, 낙뢰충전, 투혈사식, 회천, 뇌기지체, 뇌기침투,
+  복수, 위위비보, 운기, 회오리, 허공답보, 무한류, 권기중첩, 광폭구슬'수·뇌·화, 회색지대, 그림자쐐기, 도깨비걸음, 도깨비불 1~3성,
+  메밀묵섭취, 마류귀체, 영기변환, 저승의기원, 영혼공명)이고, 직업 기록이 바닥난 곳은 연의 공용 기술(청명파살, 운화, 백열장, 약육강식,
+  분골쇄신, 호신강기, 폭화분격)을 씁니다. 차사 9차 **원혼소환**만은 연의 몬스터 기술 이름입니다(차사에 남은 기록이 없음).
+- 아이콘은 모두 연의 공식 기술 아이콘, 효과는 연의 그 기술 프리팹이 있으면 그것(`k_<id>`), 없으면 빌드에 이미 있는 연 효과입니다:
+  `tools/yeon_skills.py Skills.unity3d,FXs.unity3d tools/yeon_tier_skills.json GEAR_DIR/yskill GEAR_DIR/skillicon_y`.
+  소리는 `tools/yeon_sounds.py`의 MAP(같은 기록의 소리, 빌드에 없으면 그 계열의 소리).
+- 동료(`tierKit`/`memberTierCast`)는 각 기술을 `ck`의 평범한 종류로 씁니다(사슬벼락 → 마법, 장판 → 낙하 ...). 유인·회피·오라 같은
+  보조 기술은 동료 기술 묶음에서 빠집니다. 보조·지속형 기술(`hit` 표기)은 기술 연계와 사거리 대기에서 빠집니다.
+
+| 직업 | 차수 | 이름 | 고유 동작 | 피해 / 재사용 | 아이콘 / 효과 | 계승 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 전사 | 일반 | 유인 | 끌어모으기+피해 절반 `taunt` | 8(부가) / 10초 | skill_fighter_120401 / k_w_lure (Skill_Effect_0159_a) |  |
+| 전사 | 일반 | 의지의외침 | 해로운 효과 해제 `cleanse` | 10(부가) / 12초 | skill_fighter_120601 / k_w_will (skill_effect_fighter_120601) |  |
+| 전사 | 1차 | 영풍진격 | 밀집 지점으로 돌진·내려찍기 `charge` | 22 / 3초 | skill_fighter_110202 / k_w_gale (Skill_Effect_0003) |  |
+| 전사 | 6차 | 타력광풍 | 회전 채널(이동 가능) `spin` | 30 / 5초 | skill_fighter_120501 / k_w_tarok (SKill_Effect_0155) | 초혼비무 |
+| 전사 | 7차 | 광야건곤 | 처형(체력 % 이하 즉사) `execute` | 36 / 3.5초 | Skill_Icon_Warrior_5th_01 / k_w_flash | 동귀어진'첨 |
+| 전사 | 9차 | 호기방출 | 바람 오라(밀쳐내기)+공격력 `gust` | 34(부가) / 14초 | Skill_Icon_Warrior_5th_02 / k_w_blackdragon | 타력광풍 |
+| 도적 | 7차 | 참간맹습 | 적 사이 연속 순간이동 `hop` | 30 / 3초 | skill_thief_210302 / k_r_chamgan (Skill_Effect_0255) | 백호검무 |
+| 도적 | 8차 | 혈독주입 | 장판(틱 피해) `zone` | 26 / 6초 | Skill_Icon_Thief_5th_03 / g_poison_purple + y_hyeoldok | 흡성대법 |
+| 도적 | 9차 | 투도멸진 | 표식 후 지연 폭발 `mark` | 42 / 4.5초 | skill_thief_42810 / g_curse_zod + k_r_amsal | 지옥무영 |
+| 주술사 | 6차 | 사슬벼락 | 연쇄(튀는 벼락) `chain` | 26 / 2.4초 | Skill_Icon_Magician_4th_02 / k_m_chain (Skill_Effect_Magician_4th_02) | 청기폭렬 |
+| 주술사 | 7차 | 즉발시전 | 다른 기술 재사용 초기화 `reset` | - / 16초 | skill_magician_320201 / k_m_magi | 마기지체 |
+| 주술사 | 9차 | 선심단멸 | 상태이상 수만큼 폭발(표식 즉시 폭발) `detonate` | 34 / 3초 | skill_magician_42811 / k_m_manpa + k_m_curse | 저주 |
+| 도사 | 6차 | 혼마기 | 중첩 후 폭발 `stack` | 20 / 1.8초 | skill_sharman_420102 / k_p_daeseon + k_p_jiroe | 무력화 |
+| 도사 | 8차 | 신성제마술 | 해로운 효과 해제 `cleanse` | 회복 26 / 15초 | skill_sharman_420401 / k_p_judge | 백호의희원'첨 |
+| 도사 | 9차 | 선기전도 | 퍼지는 고리(밀어내기)+보호막 `wave` | 40 / 6초 | Skill_Icon_Shaman_5th_02 / k_p_wave | 대선지법 |
+| 궁사 | 일반 | 청명파살 | 관통(꿰뚫을수록 강해짐) `lance` | 16 / 2.2초 | Skill_Icon_20000011 / k_a_cheong (Skill_Effect_LightBow_Blue_Hit) |  |
+| 궁사 | 일반 | 운상미보 | 뒤로 회피+무적 `evade` | 14(부가) / 7초 | Skill_Icon_61301 / k_a_cloud (Skill_Effect_Archer_Cloud_Walk) |  |
+| 궁사 | 1차 | 연사 | 단일 연타 `flurry` | 14 / 2.4초 | Skill_Icon_61201 / k_a_shot |  |
+| 궁사 | 6차 | 낙뢰충전 | 토템(주기 공격) `totem` | 26(부가) / 8초 | Skill_Icon_64801 / k_a_thunder + k_dk_shock | 급냉화살 |
+| 궁사 | 7차 | 투혈사식 | 표식 후 지연 폭발 `mark` | 40 / 4초 | Skill_Icon_64201 / k_a_tuhyeol4 (Skill_Effect_Archer_BloodStrike_R4_Hit) | 대기파열 |
+| 궁사 | 9차 | 운화 | 구역에 낙하 연속 `rain` | 36 / 5초 | Skill_Icon_20000012 / y_baram + k_a_storm | 폭류마탄시 |
+| 무사 | 일반 | 회천 | 왕복 관통 `boomerang` | 14 / 2.2초 | Skill_Icon_100601 / k_l_hoecheon (Skill_Effect_Lancer_F_07) |  |
+| 무사 | 일반 | 뇌기지체 | 주위 회전체 `orbit` | 12(부가) / 12초 | Skill_Icon_101201 / g_astra + h_hit_light |  |
+| 무사 | 1차 | 뇌기침투 | 일렬 밀쳐내기(막히면 기절) `knock` | 22 / 2.6초 | Skill_Icon_101301 / k_l_moon |  |
+| 무사 | 6차 | 복수 | 되받아치기 오라 `thorns` | 30(부가) / 14초 | Skill_Icon_20710800 / k_l_reflect + h_ml_burst | 선천기공 |
+| 무사 | 7차 | 위위비보 | 뒤로 회피+무적 `evade` | 34(부가) / 8초 | skill_icon_101601 / k_a_weebo + k_l_spirit | 풍운보 |
+| 무사 | 9차 | 운기 | 지속 회복 `regen` | 3%/0.5초 / 18초 | skill_thief_230201 / k_l_innate | 복수 |
+| 격투가 | 일반 | 백열장 | 일렬 밀쳐내기(막히면 기절) `knock` | 18 / 2초 | Skill_Icon_20000000 / k_mk_whitepalm (Skill_Effect_ALL_WhitePalm_Hit) |  |
+| 격투가 | 일반 | 회오리 | 이동 회오리(끌어당김) `vortex` | 16 / 4초 | skill_icon_50501 / k_dk_whirl |  |
+| 격투가 | 1차 | 허공답보 | 밀집 지점으로 돌진·내려찍기 `charge` | 24 / 3초 | skill_icon_51301 / k_mk_air (Skill_Effect_Monk_IncreasesMPnSpeed) |  |
+| 격투가 | 6차 | 무한류 | 단일 연타 `flurry` | 34 / 3초 | skill_icon_54801 / h_ml_punch + k_mk_bung | 격풍권 |
+| 격투가 | 8차 | 권기중첩 | 중첩 후 폭발 `stack` | 30 / 1.8초 | Skill_Icon_20511200 / k_mk_pointblue + k_mk_pointburst | 점혈:폭 |
+| 격투가 | 9차 | 약육강식 | 처형(체력 % 이하 즉사) `execute` | 42 / 3초 | Skill_Icon_20000003 / k_mk_kyokushin | 극진권 |
+| 마도사 | 6차 | 광폭구슬'수 | 장판(틱 피해) `zone` | 26 / 5초 | Skill_Icon_23000210 / y_seori + k_md_orbice | 기공구슬'수 |
+| 마도사 | 7차 | 광폭구슬'뇌 | 연쇄(튀는 벼락) `chain` | 30 / 2.4초 | Skill_Icon_23000310 / k_md_orblight | 기공구슬'뇌 |
+| 마도사 | 9차 | 광폭구슬'화 | 표식 후 지연 폭발 `mark` | 46 / 3.5초 | Skill_Icon_23000410 / k_md_orbfire + k_md_bust | 기공구슬'화 |
+| 천인 | 6차 | 회색지대 | 이동 회오리(끌어당김) `vortex` | 30 / 4초 | Skill_Icon_111401 / g_grab_ghost | 불가살이선풍 |
+| 천인 | 8차 | 그림자쐐기 | 함정(근접 시 발동) `trap` | 34 / 6초 | Skill_Icon_116101 / g_curse_zod + k_cl_armor | 영역속박 |
+| 천인 | 9차 | 분골쇄신 | 체력 소모 비례 피해 `sacrifice` | 40 / 6초 | Skill_Icon_20000002 / k_cl_shatter (Skill_Effect_Celestial_BodyStrengthening_Cast) | 지열각 |
+| 도깨비 | 일반 | 도깨비걸음 | 밀집 지점으로 돌진·내려찍기 `charge` | 18 / 3초 | Skill_Icon_121301 / k_dk_hat + k_dk_paddle |  |
+| 도깨비 | 일반 | 도깨비불 1성 | 주위 회전체 `orbit` | 12(부가) / 11초 | Skill_Icon_121201 / g_flame + h_hit_fire |  |
+| 도깨비 | 1차 | 메밀묵섭취 | 지속 회복 `regen` | 2.5%/0.5초 / 16초 | Skill_Icon_121501 / k_dk_body |  |
+| 도깨비 | 6차 | 도깨비불 2성 | 토템(주기 공격) `totem` | 28(부가) / 8초 | Skill_Icon_124301 / k_dk_wisp + h_hit_fire | 도깨비불 1성 |
+| 도깨비 | 8차 | 마류귀체 | 되받아치기 오라 `thorns` | 32(부가) / 14초 | Skill_Icon_122301 / k_dk_strength + h_hit_fire | 귀체 |
+| 도깨비 | 9차 | 도깨비불 3성 | 부채꼴 다중 투사체 `barrage` | 38 / 3.5초 | Skill_Icon_126101 / g_sinsu_jujak_fire + k_dk_wispexp | 도깨비불 2성 |
+| 차사 | 일반 | 영기변환 | 중첩 후 폭발 `stack` | 14 / 1.8초 | Skill_Icon_21001200 / k_rp_shot + k_rp_burst |  |
+| 차사 | 1차 | 저승의기원 | 지속 회복 `regen` | 2.5%/0.5초 / 15초 | Skill_Icon_21001500 / k_rp_resurrect |  |
+| 차사 | 2차 | 영혼공명 | 주위 회전체 `orbit` | 14(부가) / 12초 | Skill_Icon_21001700 / g_jinhon + k_rp_shot |  |
+| 차사 | 4차 | 호신강기 | 보호막 후 폭발 `shieldburst` | 30(부가) / 12초 | Skill_Icon_20000004 / k_cl_wall + k_rp_madness |  |
+| 차사 | 6차 | 폭화분격 | 표식 후 지연 폭발 `mark` | 42 / 4초 | skill_200 / k_rp_bomb (Skill_Effect_dayboss_tues01) | 무간업화 |
+| 차사 | 9차 | 원혼소환 | 토템(주기 공격) `totem` | 36(부가) / 8초 | skill_summon / k_rp_soulbuff + k_rp_shot | 폭화분격 |
+
 ### 몬스터 성향 (원작 서버 규칙)
 
 영문판 바람의나라(NexusTK) 커뮤니티 서버 RTK-Server(github.com/unkmc/RTK-Server)의 몬스터 표와 AI를 따랐습니다.
