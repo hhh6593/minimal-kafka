@@ -893,7 +893,10 @@ export const War = {
   /** A hero's life at the raid's own level, for the servants' bites on a raider. */
   raidHeroHp: () => { const G = A.G(), W = G.war; return (150 + 20 * Math.floor(W.lvRec / 4)) * (1 + 0.08 * G.level); },
   /** The hero struck in a raid: its share of life, counted as a raider's. */
-  heroTaken: n => { const G = A.G(), W = G.war; credit(W.hero, 'taken', n / G.player.maxHp * W.refHp * (W.role === 'tank' ? 1.7 : 1)); },
+  // (Struck, as a fighter struck in hit() is: the healers' "being struck" — the tank first while
+  // it is, the 보호 at the brink — saw the hero struck only by the guilds, never by the boss or its
+  // servants, whose blows come here; a hero holding the 「쟁」 boss stood last in their eyes.)
+  heroTaken: n => { const G = A.G(), W = G.war; if (n > 0) W.hero.lastHitT = G.t; credit(W.hero, 'taken', n / G.player.maxHp * W.refHp * (W.role === 'tank' ? 1.7 : 1)); },
   raidEnd: (win, title) => raidEnd(win, title),
   raidShow: () => showResult(A.G().war),
   raidRoles: cls => rolesFor(cls),
