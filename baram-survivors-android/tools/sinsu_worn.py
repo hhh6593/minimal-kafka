@@ -8,7 +8,8 @@ CONFIG_JSON (default tools/sinsu_worn.json): {key: {"item": name, "mode": "weapo
 "classes": [cls, ...] (absent: all), and for a weapon: "gauntlet": true (a blade out of a glove: the
 glove on the fist, no 연 fist over it), "size" (from the hand to the tip against the hero's height,
 default SIZE), "scale": "figure" (a glove with no blade: the original's size against its figure),
-"src": [cd, mt, frame] (the render its picture is cut from, where the standing front hides part of
+"tone": [gamma, x] (a pale piece darkened before the
+game's dress), "src": [cd, mt, frame] (the render its picture is cut from, where the standing front hides part of
 it), "grip" / "tip": [x, y] (in that render's pixels, where found wrong), "mirror": true, "trail": true (the
 original's swing kept under the blade: 청룡신검's water), "hold": 0..1 (a spear: held that far up its
 shaft from the butt, "size" its whole length), "stretch" (drawn out along its line: a longer shaft)}, and
@@ -833,6 +834,13 @@ def weapon_layers(h2, H, cls, piece, conf, render, poses, Lc, root, rows, cols, 
     glove with no blade: as big as the original's against its figure), "mirror" (turned over)."""
     from scipy.ndimage import binary_dilation
     pp, g, t, gauntlet = canon(conf['item'], render, conf)
+    if 'tone' in conf:
+        # a pale piece darkened (gamma, then a multiple) before the game's dress turns it to its
+        # family's colours: the abyss maps light to embers, so near-white feathers would burn
+        # orange where the other abyss pieces are black and blood
+        gm, mu = conf['tone']
+        pp = pp.copy()
+        pp[..., :3] = np.clip(255 * mu * (pp[..., :3] / 255.0) ** gm, 0, 255).astype(np.uint8)
     a0 = math.atan2(t[1] - g[1], t[0] - g[0])
     length = height * conf.get('size', SIZE)
     if conf.get('scale') == 'figure':
