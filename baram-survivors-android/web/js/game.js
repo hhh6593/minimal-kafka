@@ -15,7 +15,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds, specialRank, JUDGE_EDGE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
+  GEAR_OPT, PROCS, optIds, specialRank, MUSIN_SET, musinSetOf, JUDGE_EDGE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
   sinsuCount, SINSU_GATE, needsMet, needsName, AKMA_DROP, FAMILY_TINT, SINSU_TINT, HEAVEN_DRESS, HEAVEN_COST,
 } from './items.js';
 import {
@@ -1124,8 +1124,12 @@ function applyGear() {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (sp) for (const o of optIds(sp)) bonus[o] = (bonus[o] || 0) + 1;
   }
+  // 사신수 무신 세트 (armory.js): 갑옷 and 기운 of one 신수 add their lines (and 현무's 호신강기).
+  const mset = musinSetOf(g);
+  if (mset) for (const o of mset.lines) bonus[o] = (bonus[o] || 0) + 1;
   // The features of the pieces besides the weapon (items.js PROCS): each once, however many carry it.
   p.procs = new Set(['weapon', 'armor', 'shield', 'helmet', 'cape'].map(k => g[k + 'Sp'] && SPECIAL[g[k + 'Sp']] && SPECIAL[g[k + 'Sp']].proc).filter(Boolean));
+  if (mset && mset.proc) p.procs.add(mset.proc);
   // 투구 adds health, 망토 guards (both only from today's crafted sets).
   const extra = k => (g[k] >= 0 || g[k + 'Sp'] ? Math.max(0, pow(k)) : 0);
   const cs = cardSet(), promo = promoOf(c), cb = costumeBonus(); // cb: 코디 수집
@@ -2162,7 +2166,7 @@ function pieceIcon(cls, kind, t, spId) {
   if (spId && SPECIAL[spId] && SPECIAL[spId].craft && (SPECIAL[spId].dress || SPECIAL[spId].worn || SPECIAL[spId].wornBack)) {
     const pic = picture(craftPicture(SPECIAL[spId], cls.id, starOf(cls, 'sp:' + spId)));
     // 악마 심판의낫: the original's picture in the abyss's dress and its red light, as it is worn.
-    if (pic && SPECIAL[spId].worn && !SPECIAL[spId].dress.pal) return dressedIcon(pic, SPECIAL[spId].dress) || pic;
+    if (pic && SPECIAL[spId].worn && SPECIAL[spId].dress && !SPECIAL[spId].dress.pal) return dressedIcon(pic, SPECIAL[spId].dress) || pic;
     if (pic) return pic;
   }
   // An abyss weapon's icon is its look's own 연 icon: the named weapon's, else the plain one's.
@@ -2404,6 +2408,7 @@ function showPieceTip(cls, kind, t, id) {
     if (sp.proc) lines.push(`<div class="pr">특수 · ${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}</div>`);
     if (sp.gyeok && GYEOK[sp.gyeok]) lines.push(`<div class="gy">${gyeokText(sp.gyeok)}</div>`);
     if (sp.ward) lines.push(`<div class="gy">${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다</div>`);
+    if (sp.craft && sp.craft.set && MUSIN_SET[sp.craft.set]) lines.push(`<div class="pr">세트 · ${MUSIN_SET[sp.craft.set].name} (같은 신수의 갑옷 + 기운): ${MUSIN_SET[sp.craft.set].text}</div>`);
   }
   el.hidden = false;
   el.innerHTML = lines.join('');
@@ -2430,6 +2435,8 @@ function wornGyeok(cls, g) {
     if (sp.ward) lines.push(`${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다`);
     if (sp.proc && !lines.some(l => l.startsWith(PROCS[sp.proc].name + ':'))) lines.push(`${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}`);
   }
+  const mset = musinSetOf(g);
+  if (mset) lines.push(`<b>세트 · ${mset.name}</b>: ${mset.text}`);
   if (!g.weaponSp && g.weapon === dragonTier(cls)) {
     const step = starOf(cls, `weapon:${g.weapon}`), dg = dragonGyeok(cls.id, step);
     lines.push(`${dg.name}: 타격 시 ${Math.round(dg.chance * 100)}% · 고정 피해${dg.st ? ' · 저주' : ''}${dg.cdCut ? ` · 핵심 기술 재사용 -${dg.cdCut * 100}%` : ''}`);
@@ -2858,12 +2865,13 @@ function openCraft(sink = null) {
     if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
     if (c.sinsu && c === CRAFTS.find(x => x.sinsu && (!x.only || x.only.includes(cls.id)))) head('조합 · 사신수 지존 장비 (성물 4종 → 신수의 격)');
     if (c.judge && c === CRAFTS.find(x => x.judge)) head('조합 · 심판의낫 (용궁의 보물 · 균형 딜)');
+    if (c.group && c === CRAFTS.find(x => x.group === c.group && (!x.only || x.only.includes(cls.id)))) head(c.group);
     // An evolution is made out of its base piece at ★5, which goes into the making.
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
     icon = pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id) || picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
-    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text, got };
+    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text + (c.set && MUSIN_SET[c.set] ? ` · 세트 ${MUSIN_SET[c.set].name}: ${MUSIN_SET[c.set].text}` : ''), got };
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
     // A recipe of the story's gate (items.js needs): shut until that ground or raid is won.
     const gateOk = got || needsMet(c.needs, progress);
@@ -2991,7 +2999,7 @@ $('#equip-craft').onclick = () => openForge();
 // and the chosen recipe in full — its picture, what it gives (격 included), each material
 // with what is held and where it drops, and the button.
 let forgeTab = null, forgePick = null;
-const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['각인', /각인/],
+const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['무신 방어구', /사신수 무신/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
   ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
   const t = FORGE_TABS.find(([, re]) => re.test(sec));
@@ -5372,7 +5380,9 @@ function rollSpecial(e) {
   // about one in 40 minutes.
   const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003;
   if (Math.random() >= chance) return;
-  const mine = SPECIALS.filter(s => s.src === G.stage.id && (s.kind !== 'shield' || hasShield(G.cls.id)));
+  // (and a smith's piece this place drops itself now and then: armory.js dropFrom)
+  const mine = SPECIALS.filter(s => (s.src === G.stage.id || (s.craft && s.craft.dropFrom && s.craft.dropFrom.includes(G.stage.id)
+    && (!s.craft.only || s.craft.only.includes(G.cls.id)))) && (s.kind !== 'shield' || hasShield(G.cls.id)));
   if (!mine.length) return;
   const sp = mine[Math.floor(Math.random() * mine.length)];
   G.drops.push({ x: e.x, y: e.y, kind: 'gear', gear: { kind: sp.kind, tier: specialBase(sp, G.cls.id), sp: sp.id } });
@@ -12387,6 +12397,10 @@ window.__abyssDrop = u => {
 };
 window.__openPortal = t => openPortal(t);
 window.__wear = (k, t, sp) => wear(k, t, sp); // test: put on a piece
+// test: the added armour (armory.js) and the worn layers a class's saved gear picks
+window.__armory = () => SPECIALS.filter(s => s.craft && s.craft.group).map(s => ({ id: s.id, kind: s.kind,
+  classes: CLASSES.map(c => c.id).filter(c => (!s.craft.only || s.craft.only.includes(c)) && (s.kind !== 'shield' || hasShield(c))) }));
+window.__variants = c => { const cls = CLASSES.find(x => x.id === c); return yGearVariants(cls, savedGear(cls)); };
 window.__pieceIcon = (k, t, sp) => pieceIcon(G.cls, k, t, sp); // test: its icon
 window.__silentSkills = () => {
   const has = n => (Array.isArray(n) ? n : [n]).some(x => x && x !== '-' && audio.has(String(x).split('@')[0]));

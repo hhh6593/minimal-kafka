@@ -9,6 +9,8 @@
 import { STAGES, RAIDS, CLASSES } from './data.js';
 import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, settleLateRaids, RAID_GEAR } from './avatar.js';
 import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
+import { ARMORY } from './armory.js';
+export { MUSIN_SET, musinSetOf } from './armory.js';
 
 // The name each source gives its specials.
 const PREFIX = {
@@ -426,6 +428,17 @@ for (const c of JUDGE_CRAFTS) {
 // The raids written after the crafted looks (지하국대적, 선계): their pieces' places in the lines now,
 // at the ends, so no place a save holds moves (avatar.js LATE_RAIDS).
 settleLateRaids();
+// 방어구 추가 (armory.js): the 사신수 무신 set and more 투구·방패·망토, made last of all (their looks,
+// where new to a line, at its end), so no place a save holds moves. Worn as 연's own items (base) or
+// the original's laid on 연's heroes (worn: tools/musin_worn.py).
+for (const c of ARMORY) {
+  CRAFTS.push(c);
+  const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
+    gyeok: null, base: c.base, worn: c.worn };
+  SPECIALS.push(sp);
+  SPECIAL[c.id] = sp;
+  for (const k of c.only || CLASSES.map(x => x.id)) specialBase(sp, k);
+}
 
 // ---------------------------------------------------------------- 장비 티어 (README "장비 티어")
 // The crafted pieces' ranks as the ladder sets them (over the recipes' own pow, kept above as they
@@ -498,6 +511,8 @@ function idHash(id) {
 /** The second line and the feature of a piece besides the weapon, from its id: { extra, proc }. */
 export function gearExtra(sp) {
   if (!sp || sp.kind === 'weapon' || sp.rarity || !EXTRA_POOL[sp.kind]) return { extra: null, proc: null };
+  // A piece whose lines are written for it (armory.js: the 무신 set's, by its 신수).
+  if (sp.craft && sp.craft.extra) return { extra: sp.craft.extra, proc: sp.craft.proc || null };
   const h = idHash(sp.id), high = highPiece(sp), pool = EXTRA_POOL[sp.kind];
   const first = sp.opt && sp.opt.id;
   const from = (high ? [...pool.low, ...pool.high] : pool.low).filter(o => o !== first && o !== 'power');
