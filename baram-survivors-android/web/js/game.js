@@ -15516,6 +15516,7 @@ window.__gather = (r = 4) => { // test: the field's foes set round the hero (for
   for (const e of G.enemies) { const s = spots.find(([x, y]) => free(x, y)); if (s && tkShove(e, s[0], s[1])) { e.mt = e.dur; e.moving = false; n++; } }
   return n;
 };
+window.__skillAlias = () => SKILL_ALIAS; // test: skills merged into others (스킬 2차 개편)
 window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
 window.__main = () => castMain(); // 몰이기 (test: a player pressing it into a heap)
 window.__mainCount = () => (G && mainOn() ? mainCount() : 0);
