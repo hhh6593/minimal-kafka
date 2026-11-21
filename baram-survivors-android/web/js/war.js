@@ -2838,14 +2838,15 @@ const AI_TIERS = {
   // 여섯 급, 무림식 이름. 상향평준화: 맨 아래(입문자)도 1만1천5백 이상, 맨 위(절정)와 4~6배.
   // The bands against the game's own ceiling, measured (game.js __maxPower: each slot's best piece at
   // full stars, every 승급, the card sets full, a Lv 60 record): 7.55만 for a class with a shield,
-  // 6.88만 without (AI_MAX_CP; no fighter above its class's). A hero half way through (청룡신검,
+  // 6.88만 without (AI_MAX_CP; no fighter above its class's). Their levels likewise to the game's top,
+  // Lv 60 (no cap: a whole hunt with every 승급 ends about Lv 55~58), the 절정 Lv 56~60. A hero half way through (청룡신검,
   // 4.7만) was the first of every 문파 against the old 4.2만 top.
-  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 54000, top: 75500, lv: [47, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
-  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 54000, lv: [43, 48], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2 },
-  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 34500, top: 43000, lv: [38, 44], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2 },
-  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 27000, top: 34500, lv: [32, 40], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
-  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 19500, top: 27000, lv: [26, 34], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1 },
-  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 12500, top: 19500, lv: [18, 28], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0 },
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 54000, top: 75500, lv: [56, 60], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
+  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 54000, lv: [50, 57], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2 },
+  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 34500, top: 43000, lv: [44, 51], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2 },
+  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 27000, top: 34500, lv: [37, 45], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
+  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 19500, top: 27000, lv: [30, 38], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1 },
+  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 12500, top: 19500, lv: [22, 31], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0 },
 };
 const TIER_ORDER = ['server', 'high', 'upper', 'mid', 'low', 'newbie'];
 // The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
