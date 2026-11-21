@@ -2890,11 +2890,27 @@ function applyPersonas(W) {
     warmKitFx(W);
     for (const b of own) setPlay(W, b, defaultPlay(b));
     // The ones who play badly: not a squad's leader nor the hero's own healer.
-    const cand = own.filter(b => !b.leader && !b.pocket);
+    const cand = own.filter(b => !b.leader && !b.pocket && b.role !== 'tank');
     for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
     const kinds = TROLLS.slice().sort(() => Math.random() - 0.5);
     for (let i = 0; i < Math.min(W.nTroll, cand.length); i++) setPlay(W, cand[i], kinds[i]);
   }
+  rankTitles(W);
+}
+// 칭호: each guild's five strongest by 전투력 (the hero among them) wear a star by the name, coloured
+// by rank (1 금, 2 은, 3 동, 4 보라, 5 하늘). In a raid the whole 공격대 is ranked as one.
+const RANK_COL = ['#ffd040', '#e8eef8', '#e0904a', '#d08aff', '#7fd0ff'];
+function rankTitles(W) {
+  for (const team of W.raid ? [0] : teamsOf(W)) {
+    const list = W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop && b.cp);
+    if (team === 0 && W.hero) list.push(W.hero);
+    const cpOfB = b => (b.hero ? W.heroCp : b.cp) || 0;
+    list.sort((a, b) => cpOfB(b) - cpOfB(a));
+    for (const b of list) b.rank = 0;
+    list.slice(0, 5).forEach((b, i) => { b.rank = i + 1; });
+  }
+  const r = W.hero && W.hero.rank;
+  if (r) A.say(`칭호: ${W.raid ? '공격대' : '길드'} 전투력 ${r}위 ★`, 'sys');
 }
 function setPersona(W, b, slot) {
   const heroCp = W.heroCp;
@@ -4586,7 +4602,7 @@ function rowHtml(W, x, i) {
   // Its 급 as a badge; the spec on hover (전투력, level, 승급, 단, way, gear).
   const tip = sp ? `${T.name} · 전투력 ${sp.cp.toLocaleString()} · Lv${sp.lv} · ${sp.promo}차 승급${sp.sl ? ` · 기술 ${sp.sl}단` : ''}${sp.play ? ` · ${sp.play}` : ''}${sp.gear ? ` · ${sp.gear}` : ''}` : '';
   const badge = sp ? `<span class="ai-tier" style="color:${T.col};font-weight:bold" title="${tip}">${T.short}</span>` : '';
-  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}">${x.b.name}${x.b.leader ? '★' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
+  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}">${x.b.name}${x.b.rank ? `<b style="color:${RANK_COL[x.b.rank - 1]};text-shadow:0 0 2px #000" title="${W.raid ? '공격대' : '길드'} 전투력 ${x.b.rank}위">★${x.b.rank}</b>` : ''}${x.b.leader ? ' <small>(분대장)</small>' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
     <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${Math.round(s.kills)}/${s.deaths}/${Math.round(s.assists)}</td><td>${s.revives}</td></tr>`;
 }
 function tables(W, rows) {
@@ -6916,21 +6932,36 @@ function drawBody(b) {
   const dh = d2(b, W.hero);
   if (b.troop ? dh < 4 : (dh < 8 || b.leader || b.cmdr)) {
     // The name, outlined once into a small picture and kept (four fillTexts a name a frame added up).
-    const key = b.name + nameCol;
+    const key = b.name + nameCol + (b.rank || '');
     let lab = labels.get(key);
     if (!lab) {
       lab = document.createElement('canvas');
       const g = lab.getContext('2d');
       g.font = '8px G7';
-      const w = Math.ceil(g.measureText(b.name).width) + 4;
+      // 칭호: the rank's star after the name (★ in the rank's colour, its number small beside it).
+      const tw = Math.ceil(g.measureText(b.name).width), sw = b.rank ? 17 : 0;
+      const w = tw + sw + 4;
       lab.width = w;
       lab.height = 12;
       g.font = '8px G7';
-      g.textAlign = 'center';
+      g.textAlign = 'left';
       g.fillStyle = '#000';
-      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) g.fillText(b.name, w / 2 + dx, 9 + dy);
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) g.fillText(b.name, 2 + dx, 9 + dy);
       g.fillStyle = nameCol;
-      g.fillText(b.name, w / 2, 9);
+      g.fillText(b.name, 2, 9);
+      if (b.rank) {
+        const x0 = 2 + tw + 2;
+        g.font = 'bold 10px G9';
+        g.fillStyle = '#000';
+        for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [-1, 0]]) g.fillText('★', x0 + dx, 10 + dy);
+        g.fillStyle = RANK_COL[b.rank - 1];
+        g.fillText('★', x0, 10);
+        g.font = 'bold 7px G7';
+        g.fillStyle = '#000';
+        g.fillText(String(b.rank), x0 + 11, 11);
+        g.fillStyle = RANK_COL[b.rank - 1];
+        g.fillText(String(b.rank), x0 + 10, 10);
+      }
       if (labels.size > 400) labels.clear();
       keep(labels, key, lab);
     }
