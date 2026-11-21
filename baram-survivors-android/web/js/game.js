@@ -4493,8 +4493,11 @@ function applyBuild(start) {
     const hits = d => (d.dmg ? 0 : 1);
     const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
     const heals = cls === 'poet' ? open.filter(([, d]) => d.kind === 'heal').sort((a, b) => skillReq(b[1]) - skillReq(a[1])).slice(0, 2) : [];
-    list = heals.concat(open.filter(e => !heals.includes(e))
-      .sort((a, b) => hits(a[1]) - hits(b[1]) || skillReq(b[1]) - skillReq(a[1]))).slice(0, 5).map(([id]) => [id, 8]);
+    // (9차 스킬 개편: an open 9차 set comes whole — its 보조 공격 and 아우라 strike by themselves — and five
+    // more after it, at most twelve with 누리의 기원.)
+    const nine = open.filter(e => e[1].promo === 9 && !heals.includes(e));
+    list = heals.concat(nine, open.filter(e => !heals.includes(e) && !nine.includes(e))
+      .sort((a, b) => hits(a[1]) - hits(b[1]) || skillReq(b[1]) - skillReq(a[1])).slice(0, 5)).slice(0, MAX_SKILLS - 1).map(([id]) => [id, 8]);
     list.push(['c_heal', 8]);
   }
   G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
@@ -6347,6 +6350,8 @@ function killEnemy(e) {
   if (G.endEnd) Hunt.sweepKill(e); // 사냥 기믹: 소탕's spoils
   if (G.player.abyssHunt && !G.allyHitting) abyssBurst(e);
   if (e.venom9) venomBurst(e); // 묵혈독바르기
+  // 영혼갈무리·죽음의희열 (9차): a foe felled while it is up brings the other skills' waits nearer
+  if (G.buffs.killCut > G.t) for (const s of G.skills) if (s.timer > 0.5 && SKILLS[s.id].kind !== 'ult') s.timer -= Math.min(s.timer * 0.25, G.buffs.killCutK || 0.125);
   gearProc('kill', e);
   // 이동기 한방컷 (연's 차사): a foe felled just after a dash brings the next dash sooner.
   if (G.dashAt !== undefined && G.t - G.dashAt < 0.6) G.dashAt -= 0.35;
@@ -7397,6 +7402,8 @@ function cast(skill, st) {
       break;
     }
   }
+  // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
+  if (used && def.nine && !st.nine && promoOf(G.cls.id) >= 9) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
@@ -7731,6 +7738,7 @@ const TIER_KINDS = {
   // little (heal: % of life) and bursting (fxBurst) where it struck.)
   rain({ st, def, fxid, smite }) {
     const p = G.player, self = def.at === 'self';
+    if (def.killCut) { G.buffs.killCut = Math.max(G.buffs.killCut || 0, G.t + def.dur + 0.5); G.buffs.killCutK = def.killCut; }
     const c = self ? (tkNear(p.tx, p.ty, st.radius + 1).length ? p : null) : tkDensest(st.range, 2);
     if (!c) return 0.3;
     const cx = c.tx, cy = c.ty, x = cx * TILE + TILE / 2, y = cy * TILE + TILE - 6;
@@ -8137,6 +8145,7 @@ const TIER_KINDS = {
       G.buffs.power = Math.max(G.buffs.power, G.t + life);
     }
     G.buffs.echo = G.t + life;
+    if (def.killCut) { G.buffs.killCut = Math.max(G.buffs.killCut || 0, G.t + life); G.buffs.killCutK = def.killCut; }
     addFx(bigFx(fxid, 150, 'e9'), 0, -26, { follow: true });
     // (its sign held over the hero while it lasts: 호기어검's swords, 묵혈독's dark blade …)
     if (def.fxLoop && M.fx[def.fxLoop]) tkLoop(bigFx(def.fxLoop, def.loopSize || 110, 'e9l'), 0, def.loopY || -40, life, { follow: true, alpha: settings.calmFx ? 0.5 : 0.8 });
@@ -8395,6 +8404,26 @@ const ECHO = {
         for (const o of around(tx, ty, def.radius || 1)) { hurtEnemy(o, d); if (def.dot) applyStatus(o, def.dot, 3, 1); }
       });
     });
+  },
+  // 치유의반향: the healing's echo strikes the nearest and gives the hero a little life back.
+  mend(def, d) {
+    const p = G.player;
+    let got = 0;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 1).forEach(e => {
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.8 });
+      hurtEnemy(e, d);
+      got++;
+    });
+    if (got && def.heal) heal(p.maxHp * def.heal / 100, false, true);
+  },
+  // 천공의공명: the marked (저주·표식) foes in reach are struck from the sky, the rest after them.
+  mark(def, d) {
+    const p = G.player, near = tkNear(p.tx, p.ty, def.range);
+    near.sort((a, b) => (b.curse > 0) - (a.curse > 0)).slice(0, def.shots || 2).forEach((e, i) => later(i * 0.06, () => {
+      if (e.hp <= 0) return;
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.6 });
+      hurtEnemy(e, d * (e.curse > 0 ? 1.5 : 1));
+    }));
   },
   // 권법의기원: fists of 기 strike the foes beside the hero.
   fist(def, d) {
