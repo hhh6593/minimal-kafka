@@ -8258,6 +8258,11 @@ const ULT_MECH = {
     const at = t.hold || 1.1;
     later(at, () => {
       if (t.burst) ultPic(t.burst, 0, -26, { follow: true, want: t.burstSize || 300 });
+      // (a ring of the burst's own picture round the hero as well: 만검귀종's swords, each its size)
+      if (t.ring && M.fx[t.ring]) for (let k = 0; k < 8; k++) {
+        const ang = (k / 8) * Math.PI * 2, R = 2.4 * TILE;
+        later(k * 0.03, () => ultPic(t.ring, p.x + Math.cos(ang) * R, p.y - 20 + Math.sin(ang) * R * 0.7, { want: 150 + k * 5, rot: ang + Math.PI / 2 }));
+      }
       G.shake = Math.max(G.shake, 0.45);
       shock(p.x, p.y - 4, 4);
       seen.forEach((e, j) => { ultHitPic(t, e, j * 0.015); strike(e, 1); });
@@ -8355,7 +8360,7 @@ const ULT_MECH = {
     const p = G.player, left = seen.slice(), path = [];
     let cur = p;
     while (left.length) { left.sort((a, b) => tdist(a, cur) - tdist(b, cur)); cur = left.shift(); path.push(cur); }
-    if (t.cast) later(0.02, () => screenFx(t.cast, t.id, t.frac || 0.8));
+    if (t.cast) later(0.02, () => screenFx(t.cast, t.castStages === false ? '-' : t.id, t.frac || 0.8));
     let prev = { x: p.x, y: p.y - 26 };
     path.forEach((e, i) => {
       const at = 0.35 + i * (t.gap || 0.05), from = prev;
