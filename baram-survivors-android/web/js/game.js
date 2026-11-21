@@ -14839,7 +14839,7 @@ $('#opt-bar').onclick = () => {
 const AI_FX_STEPS = [1, 0.8, 0.65, 0.5, 0.35];
 function aiFxAlpha() {
   const v = settings.aiFxAlpha;
-  return typeof v === 'number' && v > 0 && v <= 1 ? v : 0.65;
+  return typeof v === 'number' && v > 0 && v <= 1 ? v : 0.8;
 }
 $('#opt-aifx').onclick = () => {
   const i = AI_FX_STEPS.findIndex(v => Math.abs(v - aiFxAlpha()) < 0.01);

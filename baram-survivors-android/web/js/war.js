@@ -2024,12 +2024,12 @@ function onScreen(b) {
 // so who cast what reads at a glance.
 // (a raid's twenty-four strike one boss: a little smaller there, or they hide it)
 const aiFx = () => (A.G().war && A.G().war.raid ? 1.05 : 1.2);
-// The fighters' pictures see-through (메뉴 「AI 이펙트 투명도」, settings.aiFxAlpha: 0.65 opaque by default): every
+// The fighters' pictures see-through (메뉴 「AI 이펙트 투명도」, settings.aiFxAlpha: 0.8 opaque by default): every
 // blow of the field can be drawn and still the field shows through; the hero's own stay solid.
 // The budgets were 14 small and 9 great a 0.6 s for the whole field (in a fight they were spent
 // all the time, most blows showed nothing): now 18 and 10 (more cost a phone a frame in two at
 // CPU x4), and the 기원 a budget of their own.
-const AI_ALPHA = 0.65;
+const AI_ALPHA = 0.8;
 function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'number' && v > 0 && v <= 1 ? v : AI_ALPHA; }
 /** An AI picture's options: its size (by aiFx) and the see-through (a 기원 or buff also { on: body }:
  * game.js addFx keeps it on that body as it moves). */
@@ -2039,7 +2039,7 @@ function fxOk(big) { const r = A.G().war && A.G().war.raid ? 1 : 0; return !(win
 function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', A.G().war && A.G().war.raid ? 3 : 4); }
 // (2차 피드백: the skills cast together round the boss — 18 and 10 the 0.6 s before, the sparks among them.)
 // [war, raid]: a raid's thirty-five on one boss, all on the screen at once, fewer (measured at CPU x4).
-const AI_FX = [16, 12], AI_FX_BIG = [10, 7];
+const AI_FX = [16, 14], AI_FX_BIG = [10, 8];
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
 function castFx(W, b, id, at, scale) {
@@ -3220,11 +3220,13 @@ function castSkills(W, b, t, many, big) {
 function castSkill(W, b, t, s) {
   const G = A.G(), d = s.d, fx = aiSkillFx(b, s.id), name = spellName(s.id, b.lv);
   tally(b, s.kind === 'shield' ? 'buff' : s.kind);
+  const CS = W.castStat || (W.castStat = { cast: 0, vis: 0, shown: 0, nofx: 0 });
+  CS.cast++; if (!fx) CS.nofx++; if (onScreen(b) || (t && onScreen(t))) CS.vis++;
   if (s.kind === 'buff' || s.kind === 'shield') {
     if (s.kind === 'shield') b.shield = Math.max(b.shield || 0, G.t + 3);
     else if (d.buff === 'haste') b.hasteT = G.t + Math.min(5, d.duration || 4);
     else { b.powT = G.t + Math.min(5, d.duration || 4); b.powK = 1 + Math.min(0.3, (d.power || 0.4) * 0.4); }
-    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { on: b })); cue(b, 0.75); }
+    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { on: b })); cue(b, 0.75); CS.shown++; }
     if (Math.random() < 0.4) shout(W, b, name);
     sound(W, b, 'skill_' + s.id, 'buff');
     pose(b, 'cast');
@@ -3233,8 +3235,9 @@ function castSkill(W, b, t, s) {
   const n = W.U * b.pw * SK_K * s.k;
   // (On a boss the pictures of a whole raid land on the same few tiles: a few at a time there, the
   // rest only the caster's cue; drawn over each other they were most of a phone's frame.)
-  if (fx && (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 5)) && fxOk(s.kind === 'aoe')) {
+  if (fx && (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 8)) && fxOk(s.kind === 'aoe')) {
     cue(b, s.kind === 'aoe' ? 1 : 0.75);
+    CS.shown++;
     A.fxOn(fx, t, aiO(fitFx(fx, s.kind === 'aoe' ? 0.72 : 0.62)));
   }
   if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
