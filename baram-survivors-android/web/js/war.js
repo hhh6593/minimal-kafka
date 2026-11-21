@@ -2835,7 +2835,7 @@ function spellFx(id, lv) {
 // gcd: the wait after any skill; n: skills in its kit; ult: its 필살기's wait; heal: a healer's 기원 wait;
 // dodge: how much better it reads a red floor; edge: its hand (how fast it acts on an order).
 const AI_TIERS = {
-  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 38000, lv: [46, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 33000, lv: [46, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
   high: { name: '고수', short: '고수', col: '#ff9a5a', cp: 22000, lv: [40, 46], promo: [5, 7], sl: [6, 7], g: [9, 13.5], gcd: 0.74, n: 5, ult: 16, heal: 2.7, dodge: 0.06, edge: 0.12, step: 2 },
   mid: { name: '중수', short: '중수', col: '#a8d8ff', cp: 10000, lv: [30, 40], promo: [2, 4], sl: [4, 5], g: [4.5, 8.5], gcd: 0.88, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
   low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 4500, lv: [22, 30], promo: [1, 2], sl: [2, 3], g: [1.5, 4.5], gcd: 1.05, n: 3, ult: 23, heal: 3.6, dodge: -0.04, edge: -0.1, step: 0 },
@@ -2844,8 +2844,9 @@ const AI_TIERS = {
 const TIER_ORDER = ['server', 'high', 'mid', 'low', 'newbie'];
 // The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
 const CP_TOP = 60000;
-// The server's people (aiPlan): 전투력 log-normal about POP_MID (e^±0.85: about 4천 to 2만 5천 for two in three).
-const POP_MID = 10000, POP_SPREAD = 0.85;
+// The server's people (fieldPlan): 전투력 log-normal about POP_MID, flatter above it than below
+// (e^+0.5 / e^-0.8): the strong step down one after another, no lone giant over the rest.
+const POP_MID = 12000, POP_SPREAD = 0.8, POP_SPREAD_UP = 0.5;
 // Its 전투력 as the game reckons a hero's (combatPower: the gear's ranks, the 승급, the level).
 const cpOf = (g, promo, lv) => Math.round((g * 1440 + promo * 800 + lv * 60) * (1 + 0.04 * promo));
 const tierByCp = cp => TIER_ORDER.find(k => cp >= AI_TIERS[k].cp) || 'newbie';
@@ -2891,19 +2892,41 @@ function styledName(tier, base) {
   if (tier === 'newbie') return pick([`초보${base}`, `꼬마${base}`, `아기${base}`, `${base}${10 + Math.floor(Math.random() * 90)}`]);
   return base;
 }
-/** The 급 of every fighter of a side: one or two of the server's best and, in a big field, one of the
- *  상위 whatever the hero is; of the rest some above the hero (×1.5-4.5 its 전투력), most about it
- *  (×0.8-1.25), some below (×0.15-0.78: the 뉴비 among them). */
-function aiPlan(n) {
-  const out = [], ns = n >= 18 ? 2 : 1, nh = n >= 18 ? 1 : 0, left = n - ns - nh;
-  for (let i = 0; i < ns; i++) out.push({ server: true });
-  for (let i = 0; i < nh; i++) out.push({ high: true });
-  // The rest from the server's own people, not from the hero: 전투력 spread about a middle of
-  // 1만 (중간's floor). A weak hero finds most of its 문파 above it, a middling one half and half,
-  // a top one nearly all below (but for the fixed 서버 최강급).
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
-  for (let i = 0; i < left; i++) out.push({ cp: clamp(Math.exp(Math.log(POP_MID) + POP_SPREAD * gauss()), 600, AI_TIERS.server.cp * 0.97) });
-  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+/** The 전투력 of every fighter of the field at once (every 문파 together, or the whole 공격대): one
+ *  server's people, a smooth log-normal curve about POP_MID drawn by its quantiles (each fighter its
+ *  own slice of the curve, so no gap opens between the 1위 and the rest), dealt to the 문파 in turn
+ *  (1·2·3, 3·2·1, …) so each has its share of the strong and the weak. Returns team → its list. */
+const probit = p => {
+  // Acklam's inverse of the normal curve (good to 1e-9; p in (0, 1)).
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
+  const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
+  const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
+  const d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+  const lo = 0.02425, q = Math.min(Math.max(p, 1e-6), 1 - 1e-6);
+  if (q < lo) { const r = Math.sqrt(-2 * Math.log(q)); return (((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1); }
+  if (q > 1 - lo) { const r = Math.sqrt(-2 * Math.log(1 - q)); return -(((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1); }
+  const r = q - 0.5, t = r * r;
+  return (((((a[0] * t + a[1]) * t + a[2]) * t + a[3]) * t + a[4]) * t + a[5]) * r / (((((b[0] * t + b[1]) * t + b[2]) * t + b[3]) * t + b[4]) * t + 1);
+};
+function fieldPlan(sizes) {
+  const teams = Object.keys(sizes).map(Number), N = teams.reduce((x, t) => x + sizes[t], 0);
+  const cps = [];
+  for (let i = 0; i < N; i++) {
+    // Highest first: the i-th slice of the curve from the top, a little jitter within it.
+    const z = probit(1 - (i + 0.25 + 0.5 * Math.random()) / N);
+    cps.push(clamp(Math.exp(Math.log(POP_MID) + (z > 0 ? POP_SPREAD_UP : POP_SPREAD) * z), 600, CP_TOP * 0.92));
+  }
+  const out = Object.fromEntries(teams.map(t => [t, []]));
+  // Dealt round in a snake; a 문파 already full is passed over.
+  let k = 0;
+  for (let i = 0; i < N; i++) {
+    for (let tries = 0; tries < teams.length * 2; tries++) {
+      const round = Math.floor(k / teams.length), j = k % teams.length, t = teams[round % 2 ? teams.length - 1 - j : j];
+      k++;
+      if (out[t].length < sizes[t]) { out[t].push({ cp: cps[i] }); break; }
+    }
+  }
+  for (const t of teams) { const l = out[t]; for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } }
   return out;
 }
 /** Every fighter of the war, raid or 「쟁」 its 급, gear, kit and way (called once its squads are made). */
@@ -2913,10 +2936,13 @@ function applyPersonas(W) {
   // As many play badly on every side (two or three in a field of twenty and more, one in a small guild).
   const per = W.raid ? W.bodies.length : W.bodies.filter(b => b.cls && b.team === 0).length + 1;
   if (W.nTroll === undefined) W.nTroll = per >= 20 ? 2 + (Math.random() < 0.35 ? 1 : 0) : 1;
-  for (const team of W.raid ? [0] : teamsOf(W)) {
-    const list = W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop);
+  const sideOf = team => W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop);
+  const sides = W.raid ? [0] : teamsOf(W);
+  const plans = fieldPlan(Object.fromEntries(sides.map(t => [t, sideOf(t).filter(b => !b.alt).length])));
+  for (const team of sides) {
+    const list = sideOf(team);
     const own = list.filter(b => !b.alt);
-    const plan = aiPlan(own.length);
+    const plan = plans[team];
     own.forEach((b, i) => setPersona(W, b, plan[i]));
     // The side's strength on the whole toward the hero's: the spread is in who is strong.
     const mean = own.reduce((x, b) => x + b.pw, 0) / Math.max(1, own.length) / (team === 1 && !W.raid ? W.foeK || 1 : 1);
@@ -2958,16 +2984,17 @@ function setPersona(W, b, slot) {
     g = clamp(lv / 6, 1, 9);
     tier = tierByCp(cpOf(g, promo, lv));
   } else {
-    const want = slot.server ? Math.min(CP_TOP * 0.95, Math.max(heroCp * rnd(1.3, 1.9), rnd(40000, 52000)))
-      : slot.high ? Math.min(CP_TOP * 0.6, Math.max(heroCp * rnd(1.1, 1.5), rnd(23000, 33000))) : slot.cp;
-    tier = slot.server ? 'server' : slot.high ? 'high' : tierByCp(want);
+    const want = slot.cp;
+    tier = tierByCp(want);
     const T = AI_TIERS[tier];
     promo = rint(T.promo);
     lv = rint(T.lv);
     g = clamp((want / (1 + 0.04 * promo) - promo * 800 - lv * 60) / 1440, T.g[0], T.g[1]);
   }
   const T = AI_TIERS[tier];
-  Object.assign(b, { tier, promo, lv, skl: rint(T.sl), cp: cpOf(g, promo, lv), gcd: T.gcd, ultCd: T.ult, healCd: T.heal });
+  // (Its 전투력 is the curve's own (fieldPlan), not its gear's sum: the 급's gear and 승급 ranges stepped at
+  // each 급's edge and opened gaps; the gear and 승급 still show its 급.)
+  Object.assign(b, { tier, promo, lv, skl: rint(T.sl), cp: slot.cp ? Math.round(slot.cp) : cpOf(g, promo, lv), gcd: T.gcd, ultCd: T.ult, healCd: T.heal });
   if (!slot.alt) {
     b.gear = aiGear(W, b.cls, tier, g);
     b.name = styledName(tier, b.name);
