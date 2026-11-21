@@ -1417,8 +1417,8 @@ const S9 = {
   w_hogi: { name: '흑룡검풍', kind: 'aura9', fx: 'o_w_heukryong', fxCast: 'k_w_blackdragon', fxHit: 'k_w_fly', hit: 13, cd: 15, duration: 8, radius: 1, tick: 0.4,
     ward: 0.25, buff: 'shield', ck: 'buff', fxs: null, tint: null, modern: null,
     desc: '검은 용의 검풍이 8초 동안 몸 둘레를 돌며 곁의 몬스터를 거듭 베고 밀어내며, 그동안 받는 피해가 25% 준다' },
-  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', fx2: 'k_w_jinseom', fxHit: 'h_hit_tiger', dmg: 95, cd: 5, range: 3,
-    radius: 1, splash: 0.5, stun: 2, push: 1, ck: 'cleave', pre: 'w_sentence', branch: 2,
+  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', front: true, size: 300, dash: true, fx2: 'h_ml_burst', size2: 110,
+    fxHit: 'h_hit_tiger', dmg: 95, cd: 5, range: 4, radius: 1, splash: 0.5, stun: 2, push: 1, ck: 'cleave', pre: 'w_sentence', branch: 2,
     desc: '앞의 가장 강한 몬스터를 방패로 즉시 밀쳐 크게 치고, 그 둘레까지 밀어내며 2초 동안 기절시킨다' },
   // 도적: 묵혈독바르기 (보조 공격), 묵마수리검'쇄 (몸 주변), 묵혈파광참 (강한 일격)
   r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'echo', echo: 'venom', fx: 'o_r_mukdok', fx2: 'g_poison_purple', fxHit: 'k_u_r_backhit', hit: 30, cd: 16, duration: 8,
@@ -1632,7 +1632,7 @@ export const ULT_TIERS = {
     ult('warrior', 'w_blood', '혈겁만파', { mech: 'rain', main: 'k_w_blood', frac: 0.85, hit: 'h_hit_tiger', dropSize: 90, boss: 'w_roar3', k: 1.15, hpCost: 0.3 }),
     ult('warrior', 'w_charge', '돌격명령', { open: 'k_w_tarok', openW: 0.6, echoW: 200, echoCap: 2.5, echoN: 26, openCap: 2.5, aura: 'k_w_charge', echo: 'k_w_tarok', echo2: 'k_u_w_wave', mech: 'dash', cast: 'k_w_charge', castSize: 220, main: 'k_u_w_wave', mainSize: 170, hit: 'h_ml_burst', hitScale: 0.5, n: 9, boss: 'w_gwangya', k: 1.3, hpCost: 0.3,
       desc: '돌격을 명하며 몬스터에서 몬스터로 아홉 번 돌진해 베고, 마지막에 칼바람을 일으켜 화면의 나머지를 벤다' }),
-    ult('warrior', 'w_myriad', '만검귀종', { cutin: 'o_w_ult9', open: 'k_w_myriad', openW: 0.5, echo: 'k_w_fly', echo2: 'k_w_blackdragon', echoW: 170, fin: 'k_w_howl', aura: 'new_w_roar2', mech: 'vortex', main: 'new_w_roar2', mainScale: 3, burst: 'new_w_roar2', burstSize: 420, ring: 'new_w_roar2', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
+    ult('warrior', 'w_myriad', '만검귀종', { cutin: 'o_w_ult9', open: null, mech: 'vortex', main: 'k_w_myriad', mainScale: 1.2, burst: 'k_w_myriad', burstSize: 260, ring: 'k_w_fly', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
   ],
   rogue: [
     ult('rogue', 'r_ult', '필살검무', { mech: 'dash', main: 'k_u_r_ult0', mainSize: 180, hit: 'k_u_r_backhit', n: 8, gap: 0.09, boss: 'r_dance', k: 1 }),

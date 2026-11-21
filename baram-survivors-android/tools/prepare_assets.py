@@ -401,7 +401,8 @@ def add_s9(gear_src, out, manifest):
             (cw, ch), n = k["cell"], k["n"]
             sheet = Image.open(src9).convert("RGBA")
             pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
-            z = min(1.0, 360 / max(cw, ch))
+            # (a whole-screen 궁극 cinematic is kept at up to its own "cap", 560: drawn screen-wide)
+            z = min(1.0, k.get("cap", 360) / max(cw, ch))
             if z < 1:
                 pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
             fid = pre + sid

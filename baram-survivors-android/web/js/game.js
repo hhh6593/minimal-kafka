@@ -8214,7 +8214,9 @@ const TIER_KINDS = {
       wait = fl;
     }
     // the blow's own picture on it (drawn a little larger than the foe: it is the class's great blow)
-    if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(bigFx(fxid, def.size || 150, 'sm'), t, { scale: 1 }));
+    // (압도적진격: its double ring of fire bursts at the front, between the hero and the one struck, facing the blow)
+    if (def.front) later(wait, () => addFx(bigFx(fxid, def.size || 150, 'sm'), (p.x + t.x) / 2, (p.y + t.y) / 2 - 24, { flip: t.x > p.x, scale: 1 }));
+    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(bigFx(fxid, def.size || 150, 'sm'), t, { scale: 1 }));
     const tx = t.tx, ty = t.ty;
     // 천신의심판: the foes round it drawn into the middle first
     if (def.pull) {
@@ -8946,13 +8948,17 @@ function ultGrand(t, bi) {
   if (!bi) return;
   // 9차: the original 궁극's own full-screen art (2662 captures: data.js ULT_TIERS cutin, fx o_<cls>_ult9) framing the
   // darkened field, its middle left clear; not in a war, where thirty fighters are drawn too.
+  let cine = false;
   if (g.cutT && t.cutin && M.fx[t.cutin] && !G.war) {
     const c = M.fx[t.cutin], want = Math.max(VW, VH * c.w / c.h) * 1.04;
-    if (ultLayer(t.cutin, want, 'gc', 0, -10, { follow: true, cap: 3.5, alpha: calm ? 0.55 : 0.92 })) {
+    // (after the dark's first beat — the hero's glow — the cinematic plays, holds and fades)
+    later(0.25, () => {
+      if (G.dead || !G.player || !ultLayer(t.cutin, want, 'gc', 0, -10, { follow: true, cap: 3.5, alpha: calm ? 0.55 : 0.92 })) return;
       const f = G.fxs[G.fxs.length - 1];
       f.loop = true;
       f.life = g.cutT;
-    }
+    });
+    cine = true;
   }
   const ownScreen = ULT_SCREEN_OWN[t.mech] && t[ULT_SCREEN_OWN[t.mech]];
   const open = t.open !== undefined ? t.open : ownScreen ? null : t.cast || t.main;
@@ -8963,6 +8969,8 @@ function ultGrand(t, bi) {
     f.life = Math.min(f.life, (t.finAt || g.finAt) + 0.05);
   }
   if (light) return;
+  // (the original's own cinematic fills the screen: the echoes round it would only cover it)
+  if (cine) { G.darkUntil = Math.max(G.darkUntil, G.t + g.cutT + 0.3); return; }
   // The technique's picture held round the hero while it lasts (longer a band).
   // (a picture drawn added, light on light, is drawn whole — its black too — and costs a slowed phone
   // several times a plain one: the held picture and the many echoes are plain ones where the tier has them)

@@ -81,6 +81,44 @@ def build(spec, src_dir, out_dir):
             f = frames[i]
             if mode == "white":
                 a = unwhite(f)
+            elif mode == "key":
+                # a fiery effect over a red-and-tan floor (압도적진격's rings): its own colours keyed —
+                # bright red with green in it and little blue (the floor's tan is darker, the carpet has no green)
+                a = np.asarray(f.convert("RGB")).astype(np.float32)
+                r, g, bl = a[..., 0], a[..., 1], a[..., 2]
+                al = np.clip((r - 215) / 25, 0, 1) * np.clip((g - 110) / 40, 0, 1) * np.clip((150 - bl) / 50 + (g > 235), 0, 1)
+                a = np.dstack([a, al * 255]).astype(np.uint8)
+            elif mode == "cinema":
+                # an 궁극's whole-screen cinematic (만검귀종's vortex and its sword graveyard): the frame kept whole,
+                # its black (the client's darkening) see-through; the damage numbers (blue digits) and the hero in
+                # the middle filled from the art round them (a normalised blur), not drawn over
+                from PIL import ImageFilter
+                a = np.asarray(f.convert("RGB")).astype(np.float32)
+                r, g, bl = a[..., 0], a[..., 1], a[..., 2]
+                hole = ((bl > 170) & (r < 120) & (bl - r > 90)) | (a.min(axis=2) > e.get("white", 225))
+                hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
+                if e.get("hero"):
+                    cx, cy, rx, ry = e["hero"]
+                    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                    hole |= ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+                keep = (~hole).astype(np.float32)
+                num = np.dstack([a[..., c] * keep for c in range(3)])
+                rad = e.get("blur", 14)
+                bnum = np.dstack([np.asarray(Image.fromarray(num[..., c].astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) for c in range(3)])
+                bk = np.asarray(Image.fromarray((keep * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) / 255
+                fill = bnum / np.maximum(bk, 0.05)[..., None]
+                a = np.where(hole[..., None], np.clip(fill, 0, 255), a)
+                al = np.clip((a.max(axis=2) - e.get("t0", 16)) / max(1.0, e.get("t1", 60) - e.get("t0", 16)), 0, 1) * 255
+                # in the middle, where the field's monsters stood in the capture, only the art's vivid colour stays
+                # (the vortex, the waves); the grey-brown of what was filled and the hit stars' white fade out
+                if e.get("field"):
+                    cx, cy, rx, ry = e["field"]
+                    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                    inside = np.clip(1.6 - np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2), 0, 1)
+                    sat = a.max(axis=2) - a.min(axis=2)
+                    vivid = np.clip((sat - 90) / 70, 0, 1)
+                    al = al * (1 - inside + inside * vivid)
+                a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
                 # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the
                 # game's own dark shows through; the field in the middle is cleared by the masks
@@ -143,6 +181,8 @@ def build(spec, src_dir, out_dir):
             index[sid]["reach"] = e["reach"]
         if e.get("k"):
             index[sid]["k"] = e["k"]
+        if e.get("cap"):
+            index[sid]["cap"] = e["cap"]
         print(sid, cw, ch, len(pics), ms)
     if spec.get("_icons"):
         os.makedirs(os.path.join(out_dir, "icons"), exist_ok=True)
