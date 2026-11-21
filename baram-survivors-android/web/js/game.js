@@ -4070,6 +4070,9 @@ function frame(now) {
   // slow motion.
   const dt = Math.min(0.1, (now - (frame.last || now)) / 1000);
   frame.last = now;
+  // (the share of late frames lately, about the last second and a half: the 필살기's grand layers
+  // shrink to what the device keeps up with — ultGrand)
+  frame.late = (frame.late || 0) * 0.98 + (dt > 0.02 ? 0.02 : 0);
   // The 속도 key: x2 on any ground, x3 on one already conquered (farming goes quicker).
   const fast = huntSpeed();
   for (let i = 0; i < TEST_SPEED * fast; i++) {
@@ -7889,6 +7892,17 @@ const TIER_KINDS = {
     p.sts = {};
     addFx(fxid, 0, -26, { follow: true });
     if (def.party) {
+      // 신성제마술 (밋밋한 효과 보강): its holy light drawn tall over the hero, and the stars of the cleansing
+      // rising round the hero and on each companion while the guard lasts.
+      if (def.fxAfter && M.fx[def.fxAfter]) {
+        addFx(bigFx(fxid, 180, 'cl'), 0, -10, { follow: true, anchor: 'bottom' });
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          later(0.1 + i * 0.06, () => addFx(def.fxAfter, Math.cos(a) * 40, -20 + Math.sin(a) * 24, { follow: true, scale: 1.5 }));
+        }
+        tkLoop(def.fxAfter, 0, -40, st.duration, { follow: true, scale: 2, alpha: settings.calmFx ? 0.5 : 0.9 });
+        for (const m of G.party) if (!m.down) fxOnBody(def.fxAfter, m, -26, { scale: 1.4 });
+      }
       heal(st.heal, true);
       for (const m of G.party) { if (m.sts) m.sts = {}; healMember(m, st.heal); }
       G.buffs.guard = Math.max(G.buffs.guard, G.t + st.duration);
@@ -7900,12 +7914,20 @@ const TIER_KINDS = {
     note(`${skillName(skill.id, skill.lv)}: 해로운 효과가 사라졌습니다.`);
   },
   // 즉발시전: the other spells' waits all but done, and the spells quickened a moment.
-  reset({ skill, st, fxid }) {
+  // (밋밋한 효과 보강: the blue fire large over the hero, a flame of it for each spell made ready, round
+  // the hero, and the 마기 standing in the hero's light while the spells quicken — 연's own strips.)
+  reset({ skill, st, def, fxid }) {
     const cooling = G.skills.filter(s => s !== skill && SKILLS[s.id].kind !== 'ult' && s.timer > 1.2);
     if (cooling.length < 2 || !nearestEnemies(1, 7).length) return 0.5;
     for (const s of cooling) s.timer = Math.min(s.timer, 0.3);
     G.buffs.haste = Math.max(G.buffs.haste, G.t + st.duration);
-    addFx(fxid, 0, -26, { follow: true });
+    addFx(bigFx(fxid, 190, 'rs'), 0, -26, { follow: true });
+    const n = Math.min(6, cooling.length), small = bigFx(fxid, 84, 'rs2');
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      later(0.08 + i * 0.07, () => addFx(small, Math.cos(a) * 46, -26 + Math.sin(a) * 30, { follow: true }));
+    }
+    if (def.fxAfter && M.fx[def.fxAfter]) tkLoop(def.fxAfter, 0, -24, st.duration, { follow: true, scale: 1.3, alpha: settings.calmFx ? 0.5 : 0.85 });
   },
   // 운기, 메밀묵섭취, 저승의기원: life back a little every half second for a while (and a shield, mana).
   regen({ skill, st, def, fxid }) {
@@ -8409,6 +8431,136 @@ const ULT_MECH = {
   },
 };
 
+// ---- 필살기 단계 위엄 (2차 피드백): each band of 승급 must look grander than the one before — a higher
+// 필살기 seen smaller than a lower one (돌격명령·만검귀종 a knot round the hero after 혈겁만파's screen of
+// swords) read as a step down. Over the band's own way of striking (ULT_MECH, unchanged, as is the blow)
+// it lays, from the tier's own 연 pictures only (data.js ULT_TIERS open / echo / echo2 / fin / aura):
+//   open  — the call, the technique's picture large over the hero as it begins (3차~; not for the ways
+//           that already hang one over the screen),
+//   aura  — its picture held round the hero while it lasts (longer a band),
+//   echo  — the picture again over the field, one ring (3차), two or three (6차·9차), every other one
+//           the band's 보스용 technique or its hit (echo2), and a late ring as it fades (the moment lasts),
+//   fin   — 9차: a last burst after the striking, flash, shake and rings of force, echoes at the edge.
+// Each band darkens the field longer and shakes it harder. Measured (scratchpad ult3 probe.js): the
+// screen covered, its sum over time, the pictures at once and how long it lasts all grow band to band.
+// Cost: a picture blown up past its pixels is drawn smooth, and two of a screen's size cost a slowed phone
+// a frame in four — so the coverage is many pictures near their own size (echoCap), the call and the burst
+// at most twice theirs (openCap / finCap), and a device already late on frames gets fewer (ultGrand q).
+// In a war or a raid only the call (the party's spells are many there); 번쩍임 줄이기 halves the echoes.
+const ULT_GRAND = [
+  { dark: 0.7, shake: 0.5 },
+  { openW: 0.32, aura: 2.6, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.35, 1.5], lateN: 3, lateAt: 1.9, dark: 0.9, shake: 0.55 },
+  { openW: 0.45, aura: 3.1, auraW: 160, echoN: 16, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.25, 1.6], lateN: 5, lateAt: 1.8, dark: 1.1, shake: 0.65 },
+  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 26, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8 },
+];
+// (ways that already hang their main or cast picture over the screen: no second call of it)
+const ULT_SCREEN_OWN = { rain: 'main', mark: 'cast', chain: 'cast' };
+function ultBand(cls) {
+  const list = ULT_TIERS[cls] || [], t = ultTier(cls);
+  return Math.max(0, list.indexOf(t));
+}
+/** A grand layer's picture `want` game pixels across, pushed past the few-at-once limits of addFx (a
+ * handful a cast, counted: the 필살기 is the moment they are for) but never past the phone's cap. */
+function ultLayer(id, want, tag, x, y, o = {}) {
+  if (!id || !M.fx[id] || G.fxs.length > 240) return 0;
+  // (one to come is laid when its time comes, and left out, more often the later the frames are by then)
+  if (o.delay > 0) { later(o.delay, () => ultLayer(id, want, tag, x, y, { ...o, delay: 0, thin: true })); return 1; }
+  if (o.thin && (frame.late || 0) > 0.1 && Math.random() < Math.min(0.85, frame.late * 3)) return 0;
+  const f = M.fx[id], now = Math.max(f.w, f.h) * (f.k || 1);
+  // (larger than wanted, a screen picture as an echo: drawn smaller under a name of its own — under
+  // its own name it counted against the technique's own picture in addFx's few-of-one limit)
+  let b = id;
+  if (now > want) {
+    b = `${id}#${tag}`;
+    if (!M.fx[b]) M.fx[b] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
+  } else b = bigFx(id, want, tag, o.cap || (f.cls === 'yeon' ? 4 : 2.4));
+  const life = durs(b).reduce((a, d) => a + d, 0);
+  G.fxs.push({ id: b, x, y, t: 0, life, scale: 1, rot: o.rot || 0, follow: o.follow, anchor: o.anchor || 'mid',
+    flip: o.flip, alpha: o.alpha, skip: 0, fadeIn: 0 });
+  return life;
+}
+function ultGrand(t, bi) {
+  const g = ULT_GRAND[bi];
+  if (!g) return;
+  const p = G.player, calm = settings.calmFx, light = G.war || G.stage.raid;
+  // A device already late on frames (a slowed phone in a thick hunt) gets fewer of the layers: the echoes
+  // thinned to a half or a third, the last rings left out — each band still above the one before.
+  const late = frame.late || 0, q = late > 0.2 ? 0.34 : late > 0.06 ? 0.5 : 1;
+  G.darkUntil = Math.max(G.darkUntil || 0, G.t + (t.dark || g.dark));
+  G.shake = Math.max(G.shake, g.shake);
+  if (!bi) return;
+  const ownScreen = ULT_SCREEN_OWN[t.mech] && t[ULT_SCREEN_OWN[t.mech]];
+  const open = t.open !== undefined ? t.open : ownScreen ? null : t.cast || t.main;
+  // (9차: the call gives way to the last burst — never two screen pictures at once, a phone's worth)
+  const addK = id => (M.fx[id] && M.fx[id].add ? 0.7 : 1); // (an added picture drawn whole: smaller)
+  if (open && ultLayer(open, VW * (t.openW || g.openW) * (q < 1 ? 0.75 : 1) * addK(open), 'go' + bi + Math.round(q * 4) + addK(open), 0, -24, { follow: true, cap: t.openCap || 2, alpha: calm ? 0.5 : t.openA || (bi > 2 ? 0.75 : 0.85) }) && g.finAt) {
+    const f = G.fxs[G.fxs.length - 1];
+    f.life = Math.min(f.life, (t.finAt || g.finAt) + 0.05);
+  }
+  if (light) return;
+  // The technique's picture held round the hero while it lasts (longer a band).
+  // (a picture drawn added, light on light, is drawn whole — its black too — and costs a slowed phone
+  // several times a plain one: the held picture and the many echoes are plain ones where the tier has them)
+  const plain = id => id && M.fx[id] && !M.fx[id].add;
+  const pick = (...ids) => ids.find(plain) || ids.find(id => id && M.fx[id]);
+  const aura = pick(t.aura !== undefined ? t.aura : t.main, t.hit);
+  if (aura && ultLayer(aura, t.auraW || g.auraW, 'ga' + bi, 0, -24, { follow: true, cap: t.echoCap || 1.3, alpha: calm ? 0.4 : 0.65 })) tkLoopLast(g.aura);
+  const boss = M.fx['k_' + t.boss] ? 'k_' + t.boss : null;
+  const echo0 = t.echo !== undefined ? t.echo : t.drop || t.main || t.hit;
+  // (every other echo the band's own 보스용 technique, or its hit picture: one more layer)
+  const echo20 = t.echo2 !== undefined ? t.echo2 : boss && boss !== echo0 ? boss : t.hit && t.hit !== echo0 && M.fx[t.hit] ? t.hit : echo0;
+  const echo = pick(echo0, echo20, t.hit), echo2 = pick(echo20, echo0, t.hit);
+  // (6차~ every third its hit or its after picture, where that is another again: one more layer)
+  const third = [t.hit, t.after, t.cast].find(id => plain(id) && id !== echo && id !== echo2);
+  const echoAt = k => (bi > 1 && third && k % 3 === 2 ? third : k % 2 ? echo2 : echo);
+  const x0 = p.x, y0 = p.y - 16;
+  const ringAt = (k, n, rx, ry, off) => { const a = off + (k / n) * Math.PI * 2; return [x0 + Math.cos(a) * rx * VW, y0 + Math.sin(a) * ry * VH]; };
+  if (g.echoN && echo) {
+    const n = Math.round((calm ? (t.echoN || g.echoN) >> 1 : t.echoN || g.echoN) * q), rings = g.echoR, per = Math.ceil(n / rings.length);
+    for (let k = 0; k < n; k++) {
+      const r = rings[Math.min(rings.length - 1, Math.floor(k / per))], j = k % per;
+      const [x, y] = ringAt(j, per, r[0], r[1], (Math.floor(k / per) * Math.PI) / per + 0.3);
+      const want = (t.echoW || g.echoW) * (1 + 0.04 * (k % 4)), at = g.echoT[0] + ((g.echoT[1] - g.echoT[0]) * k) / n;
+      ultLayer(echoAt(k), want, 'ge' + Math.round(want), x, y, { delay: at, cap: t.echoCap || 1.3, flip: x < x0, alpha: calm ? 0.6 : 1 });
+    }
+  }
+  // (6차~: the technique's picture once more over the field as it fades — the moment lasts)
+  if (g.lateN && echo && q === 1) {
+    const n = calm ? g.lateN >> 1 : g.lateN;
+    for (let k = 0; k < n; k++) {
+      const [x, y] = ringAt(k, n, 0.3, 0.3, 0.5);
+      ultLayer(echoAt(k), (t.echoW || g.echoW) + k * 3, 'gl' + k, x, y, { delay: g.lateAt + k * 0.1, cap: t.echoCap || 1.3, flip: x < x0, alpha: calm ? 0.6 : 1 });
+    }
+  }
+  if (g.finAt) {
+    const at = t.finAt || g.finAt;
+    const fin = t.fin !== undefined ? t.fin : M.fx['k_' + t.boss] && Math.max(M.fx['k_' + t.boss].w, M.fx['k_' + t.boss].h) >= 120 ? 'k_' + t.boss : open || t.main;
+    later(at, () => {
+      if (G.dead || !G.player) return;
+      ultLayer(fin, VW * (t.finW || g.finW) * (q < 1 ? 0.75 : 1) * addK(fin), 'gf' + Math.round(q * 4), 0, -24, { follow: true, cap: t.finCap || 2, alpha: calm ? 0.55 : 0.95 });
+      const n = Math.round((calm ? g.edgeN >> 1 : g.edgeN) * q);
+      for (let k = 0; k < n; k++) {
+        const [x, y] = ringAt(k, n, 0.45, 0.42, 0);
+        ultLayer(echoAt(k) || fin, (t.echoW || g.echoW) * 1.15 + k * 4, 'gd' + k, x, y, { delay: k * 0.04, cap: 1, flip: x < x0, alpha: calm ? 0.6 : 1 });
+      }
+      for (let k = 0; k < 3; k++) later(k * 0.12, () => shock(G.player.x, G.player.y - 4, 4 + k * 3));
+      G.shake = Math.max(G.shake, g.shake);
+      if (!G.stage.raid && !G.war) {
+        if (screenFlashOk()) G.whiteAt = G.t;
+        hitStop(0.05, 'ult');
+      }
+    });
+  }
+}
+/** The aura just pushed (the last of G.fxs) held looping for `life` seconds round the hero. */
+function tkLoopLast(life) {
+  const f = G.fxs[G.fxs.length - 1];
+  f.loop = true;
+  f.life = life;
+  f.t = 0;
+  return f;
+}
+
 /** The way the class's 필살기 strikes: 'hunt' (the whole screen) or 'boss' (one, eight times as hard). */
 function ultMode(cls) {
   return (settings.ultMode && settings.ultMode[cls]) || 'hunt';
@@ -8607,6 +8759,7 @@ function castUlt() {
     G.ultHits = 0;
     const run = ULT_MECH[def.mech] || ULT_MECH.rain;
     if (seen.length || def.mech === 'sanctuary') run(def, seen, strike);
+    if (seen.length || def.mech === 'sanctuary') ultGrand(def, ultBand(G.cls.id));
   }
   // What a tier brings besides the blow (헬파이어's 보호막 …).
   if (def.shield) {
@@ -15419,6 +15572,40 @@ window.__gather = (r = 4) => { // test: the field's foes set round the hero (for
 };
 window.__skillAlias = () => SKILL_ALIAS; // test: skills merged into others (스킬 2차 개편)
 window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
+window.__ultGrand = () => ULT_GRAND; // test: the 필살기 단계 위엄 table (measuring what each layer costs)
+// Test (필살기 단계 위엄): what the effects up now cover of the view — the drawn part of each picture
+// (its trimmed box this frame, turned) on a grid of g×g/2 cells; n pictures, ids, the big ones.
+window.__fxCover = (g = 48) => {
+  if (!G || !G.camView) return null;
+  const [cx, cy] = G.camView, p = G.player, gw = g, gh = Math.round(g * VH / VW), on = new Uint8Array(gw * gh);
+  const ids = new Set();
+  let n = 0, big = 0;
+  for (const f of G.fxs) {
+    if (f.t < 0 || !M.fx[f.id]) continue;
+    n++;
+    if (f.big) big++;
+    ids.add(String(f.id).split('#')[0]);
+    const d = M.fx[f.id], src = d.src ? M.fx[d.src] : d, k = f.scale * (d.k || 1);
+    let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
+    if (f.mv) { const q = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - q) * (1 - q); x += f.mv[0] * e; y += f.mv[1] * e; }
+    const i = fxFrame(durs(f.id), f.loop ? G.t : f.t, f.loop) + (d.f0 || 0), bb = src.bb, b4 = i * 4;
+    const w = d.w * k, h = d.h * k;
+    const dx = d.ax !== undefined && f.anchor !== 'mid' ? -d.ax * k : -w / 2;
+    const dy = d.ax !== undefined && f.anchor !== 'mid' ? -d.ay * k + (f.anchor === 'bottom' ? 0 : 14) : (f.anchor === 'bottom' ? -h : -h / 2);
+    let r = bb && b4 + 3 < bb.length ? [dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k] : [dx, dy, w, h];
+    if (!r[2]) continue;
+    if (f.flip) r = [-r[0] - r[2], r[1], r[2], r[3]];
+    let pts = [[r[0], r[1]], [r[0] + r[2], r[1]], [r[0], r[1] + r[3]], [r[0] + r[2], r[1] + r[3]]];
+    if (f.rot) { const c = Math.cos(f.rot), s = Math.sin(f.rot); pts = pts.map(([a, b]) => [a * c - b * s, a * s + b * c]); }
+    const xs = pts.map(q => (x + q[0] - cx) / VW * gw), ys = pts.map(q => (y + q[1] - cy) / VH * gh);
+    const x0 = Math.max(0, Math.ceil(Math.min(...xs) - 0.5)), x1 = Math.min(gw - 1, Math.floor(Math.max(...xs) - 0.5));
+    const y0 = Math.max(0, Math.ceil(Math.min(...ys) - 0.5)), y1 = Math.min(gh - 1, Math.floor(Math.max(...ys) - 0.5));
+    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) on[yy * gw + xx] = 1;
+  }
+  let c = 0;
+  for (const v of on) c += v;
+  return { n, big, ids: ids.size, idl: [...ids], cover: c / on.length, shocks: (G.shocks || []).length, dark: Math.max(0, (G.darkUntil || 0) - G.t), shake: G.shake || 0 };
+};
 
 // ---------------------------------------------------------------- 사신수 길드대항전 (war.js)
 // The war lives in war.js; these are the hunt's own pieces it builds on (the hero, its spells,

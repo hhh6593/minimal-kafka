@@ -936,7 +936,7 @@ const TIER_SKILLS = {
     desc: '창을 회전시켜 던진다. 다섯 칸을 날아갔다 돌아오며 오가는 길의 몬스터를 두 번 친다' },
   l_noegi: { cls: 'lancer', req: 9, name: '뇌기지체', kind: 'orbit', fx: 'g_astra', fx2: 'h_hit_light', hit: 12, cd: 12, duration: 6, n: 3, k: 0.4, ck: 'nova', radius: 1,
     desc: '뇌기의 구슬 셋이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 친다' },
-  l_noegichim: { promo: 1, cls: 'lancer', req: 6, name: '뇌기침투', kind: 'knock', fx: 'k_l_moon', dmg: 22, cd: 2.6, depth: 4, push: 2, stun: 0.5, ck: 'line',
+  l_noegichim: { promo: 1, cls: 'lancer', req: 6, name: '뇌기침투', kind: 'knock', fx: 'k_x_l_meteor_shot', dmg: 22, cd: 2.6, depth: 4, push: 2, stun: 0.5, ck: 'line',
     desc: '뇌기를 실은 창끝으로 앞 네 칸을 꿰찔러 몬스터를 두 칸 밀어내고 잠시 멈춘다' },
   l_revenge: { promo: 6, cls: 'lancer', req: 24, name: '복수', kind: 'thorns', fx: 'k_l_reflect', fx2: 'h_ml_burst', hit: 30, cd: 14, duration: 6, radius: 1, tick: 0.5, k: 0.35, curse: 2,
     desc: '6초 동안 곁에서 덤비는 몬스터에게 복수의 분노로 거듭 되갚아 치고 약화시킨다' },
@@ -972,13 +972,13 @@ const TIER_SKILLS = {
   cl_shatter: { promo: 9, cls: 'celestial', req: 33, name: '분골쇄신', kind: 'sacrifice', fx: 'k_cl_shatter', fx2: 'k_cl_slam', dmg: 40, cd: 6, radius: 2, hpCost: 0.12, k: 1.5, ck: 'nova',
     desc: '몸을 부수듯 체력 12%를 바쳐 둘레 두 칸을 내리친다. 바친 체력이 클수록 피해가 커진다' },
   // 도깨비
-  dk_walk: { cls: 'dokkaebi', req: 4, name: '도깨비걸음', kind: 'charge', fx: 'k_dk_hat', fx2: 'k_dk_paddle', dmg: 18, cd: 3, range: 4, radius: 1, slow: 2, ck: 'nova',
+  dk_walk: { cls: 'dokkaebi', req: 4, name: '도깨비걸음', kind: 'charge', fx: 'k_x_dk_firebat_cast', fx2: 'k_dk_paddle', dmg: 18, cd: 3, range: 4, radius: 1, slow: 2, ck: 'nova',
     desc: '누구도 따라올 수 없는 걸음으로 몬스터 무리 한가운데 뛰어들어 둘레를 치고 느리게 한다' },
   dk_wisp1: { cls: 'dokkaebi', req: 9, name: '도깨비불 1성', kind: 'orbit', fx: 'g_flame', fx2: 'h_hit_fire', hit: 12, cd: 11, duration: 6, n: 2, k: 0.45, dot: 'burn', ck: 'nova', radius: 1,
     desc: '도깨비불 둘이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 태운다(화상)' },
   dk_mook: { promo: 1, cls: 'dokkaebi', req: 6, name: '메밀묵섭취', kind: 'regen', fx: 'k_dk_body', hot: 2.5, cd: 16, duration: 5, shieldT: 3, ck: 'heal',
     desc: '아껴 둔 메밀묵을 먹어 5초 동안 체력을 조금씩 채우고, 잠시 받는 피해가 절반이 된다' },
-  dk_wisp2: { promo: 6, cls: 'dokkaebi', req: 24, name: '도깨비불 2성', kind: 'totem', fx: 'k_dk_wisp', fx2: 'h_hit_fire', hit: 28, cd: 8, range: 5, duration: 6, every: 0.5, k: 0.35, dot: 'burn', ck: 'strike', radius: 0,
+  dk_wisp2: { promo: 6, cls: 'dokkaebi', req: 24, name: '도깨비불 2성', kind: 'totem', fx: 'k_dk_wisp', tint: 'sepia(1) saturate(5) hue-rotate(-30deg)', fxk: 1.35, fx2: 'h_hit_fire', hit: 28, cd: 8, range: 5, duration: 6, every: 0.5, k: 0.35, dot: 'burn', ck: 'strike', radius: 0,
     desc: '도깨비불 화로를 세운다. 6초 동안 둘레 다섯 칸의 몬스터에게 불덩이를 잇달아 날린다' },
   dk_maryu: { promo: 8, cls: 'dokkaebi', req: 30, name: '마류귀체', kind: 'thorns', fx: 'k_dk_strength', fx2: 'h_hit_fire', hit: 32, cd: 14, duration: 6, radius: 1, tick: 0.5, k: 0.35, drain: 0.01,
     desc: '6초 동안 곁에서 덤비는 몬스터를 거듭 되받아치며, 칠 때마다 체력을 조금씩 되찾는다' },
@@ -1263,7 +1263,7 @@ const REWORK = {
   m_coldveil: { name: '혼마염', promo: 5, req: 21, pattern: 'rain', fxDrop: 'k_m_jiokchak', dropSize: 90, curse: 4, slow: 0, stun: 0,
     desc: '혼을 태우는 보랏빛 마염이 화면의 몬스터마다 차례로 피어올라 태우고 받는 피해를 늘린다' },
   m_shift: { name: '마기순보', fxHit: 'k_u_m_bluefire', desc: '마기를 타고 바라보는 쪽 몬스터 너머로 순식간에 옮겨 가며 푸른 불꽃으로 친다' },
-  m_instant: { fx: 'k_u_m_bluefire' },
+  m_instant: { fx: 'k_u_m_bluefire', fxAfter: 'k_m_magi' },
   m_jiokchak: { fxCast: 'k_m_magi', fxAfter: 'k_m_quake', ticks: 2, desc: '지옥의 흑염으로 대상을 불사르고, 흑염이 그 자리에 남아 둘레를 거듭 태우며 받는 피해를 늘린다' },
   m_seongryeo: { strongest: true, desc: '가장 강한 몬스터(보스를 먼저)에게 운석을 떨어뜨려 주위까지 피해를 준다' },
   m_chain: { fxHit: 'h_hit_light' },
@@ -1274,7 +1274,7 @@ const REWORK = {
   p_wave: { fxHit: 'k_u_p_swirl' },
   p_judge: { fxHit: 'h_hit_light', fxAfter: 'k_u_p_sparkle' },
   p_honma: { fx: 'k_u_p_swirl', fx2: 'k_p_jiroe' },
-  p_saint: { fx: 'k_p_saint' },
+  p_saint: { fx: 'k_p_saint', fxAfter: 'k_u_p_sparkle' },
   p_seongi: { fx: 'k_u_p_bubble', fxCast: 'k_u_p_pillar_b' },
   p_cheonseon: { fxCast: 'k_u_p_seal', fxHit: 'k_u_p_pillar_o', hitScale: 0.6 },
   p_thunderbomb: { fxHit: 'k_p_noejeon', fxAfter: 'k_p_jiroe' },
@@ -1437,6 +1437,10 @@ for (const s of Object.values(SKILLS)) {
 // its own pictures in stages: cast (the call over the hero), main (the great picture), hit (on each
 // struck), after (what stays a moment), drop/shot/burst where its way has them. k: how hard (×the
 // class's blow). boss: the 보스용 필살기 of that band (five blows of that technique on the strongest foe).
+// 필살기 단계 위엄 (2차 피드백, game.js ultGrand): open (the call over the hero, openW × the view's width),
+// aura (held round the hero), echo / echo2 (over the field, echoN of them, echoW px), fin (9차's last burst);
+// the *Cap fields bound how far a picture is blown up (its smooth drawing is what a slowed phone pays for).
+// Each band must cover more of the screen, longer, than the one before (scratchpad ult3 probe.js).
 export const ULT_BANDS = [0, 3, 6, 9];
 const ult = (cls, id, name, o) => {
   if (!SKILLS[id]) SKILLS[id] = { cls, name, kind: 'ult', ultTier: true, desc: o.desc || '' };
@@ -1446,72 +1450,72 @@ const ult = (cls, id, name, o) => {
 export const ULT_TIERS = {
   warrior: [
     ult('warrior', 'w_ult', '건곤대나이', { mech: 'cleaveWave', main: 'k_w_ult', mainSize: 260, hit: 'k_u_w_wave', boss: 'w_jinseom', k: 1 }),
-    ult('warrior', 'w_blood', '혈겁만파', { mech: 'rain', main: 'k_w_blood', frac: 0.9, hit: 'h_hit_tiger', dropSize: 90, boss: 'w_roar3', k: 1.15, hpCost: 0.3 }),
-    ult('warrior', 'w_charge', '돌격명령', { mech: 'dash', cast: 'k_w_charge', castSize: 220, main: 'k_u_w_wave', mainSize: 170, hit: 'h_ml_burst', hitScale: 0.5, n: 9, boss: 'w_gwangya', k: 1.3, hpCost: 0.3,
+    ult('warrior', 'w_blood', '혈겁만파', { mech: 'rain', main: 'k_w_blood', frac: 0.85, hit: 'h_hit_tiger', dropSize: 90, boss: 'w_roar3', k: 1.15, hpCost: 0.3 }),
+    ult('warrior', 'w_charge', '돌격명령', { open: 'k_w_tarok', openW: 0.6, echoW: 200, echoCap: 2.5, echoN: 26, openCap: 2.5, aura: 'k_w_charge', echo: 'k_w_tarok', echo2: 'k_u_w_wave', mech: 'dash', cast: 'k_w_charge', castSize: 220, main: 'k_u_w_wave', mainSize: 170, hit: 'h_ml_burst', hitScale: 0.5, n: 9, boss: 'w_gwangya', k: 1.3, hpCost: 0.3,
       desc: '돌격을 명하며 몬스터에서 몬스터로 아홉 번 돌진해 베고, 마지막에 칼바람을 일으켜 화면의 나머지를 벤다' }),
-    ult('warrior', 'w_myriad', '만검귀종', { mech: 'vortex', main: 'new_w_roar2', mainScale: 3, burst: 'new_w_roar2', burstSize: 420, ring: 'new_w_roar2', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
+    ult('warrior', 'w_myriad', '만검귀종', { open: 'k_w_myriad', openW: 0.5, echo: 'k_w_fly', echo2: 'k_w_blackdragon', echoW: 170, fin: 'k_w_howl', aura: 'new_w_roar2', mech: 'vortex', main: 'new_w_roar2', mainScale: 3, burst: 'new_w_roar2', burstSize: 420, ring: 'new_w_roar2', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
   ],
   rogue: [
     ult('rogue', 'r_ult', '필살검무', { mech: 'dash', main: 'k_u_r_ult0', mainSize: 180, hit: 'k_u_r_backhit', n: 8, gap: 0.09, boss: 'r_dance', k: 1 }),
-    ult('rogue', 'r_bunhon', '분혼경천', { mech: 'mark', cast: 'k_r_bunhon', frac: 0.85, main: 'h_ml_cross', markScale: 0.6, hit: 'h_ml_spark', stun: 0.6, delay: 1.1, boss: 'r_flysword', k: 1.15 }),
-    ult('rogue', 'r_ult2', "필살검무'첨", { mech: 'sweep', main: 'k_r_ult2', mainSize: 240, hit: 'h_ml_cross', hitScale: 0.5, steps: 6, boss: 'r_amsal', k: 1.3,
+    ult('rogue', 'r_bunhon', '분혼경천', { echo: 'k_r_suhyo', aura: 'k_r_flysword', mech: 'mark', cast: 'k_r_bunhon', frac: 0.6, main: 'h_ml_cross', markScale: 0.6, hit: 'h_ml_spark', stun: 0.6, delay: 1.1, boss: 'r_flysword', k: 1.15 }),
+    ult('rogue', 'r_ult2', "필살검무'첨", { echoCap: 2, echoW: 220, open: 'k_r_amsal', mech: 'sweep', main: 'k_r_ult2', mainSize: 240, hit: 'h_ml_cross', hitScale: 0.5, steps: 6, boss: 'r_amsal', k: 1.3,
       desc: '필살검무의 극의. 검기의 벽이 화면을 가로지르며 지나는 몬스터를 모두 벤다' }),
-    ult('rogue', 'r_gale', '질풍난무', { mech: 'chain', main: 'new_r_storm', shot: 'h_ml_cross', markScale: 1.3, gap: 0.04, boss: 'r_pilgeom', k: 1.5 }),
+    ult('rogue', 'r_gale', '질풍난무', { echoN: 28, openW: 0.6, echoCap: 2, finCap: 3, open: 'k_r_gale', mech: 'chain', main: 'new_r_storm', shot: 'h_ml_cross', markScale: 1.3, gap: 0.04, boss: 'r_pilgeom', k: 1.5 }),
   ],
   mage: [
     ult('mage', 'm_ult', '헬파이어', { mech: 'meteor', main: 'k_m_ult', mainSize: 220, hit: 'k_x_m_ult_hit', n: 5, shield: 5, boss: 'm_seongryeo', k: 1 }),
-    ult('mage', 'm_hell2', "헬파이어'첨", { mech: 'cross', main: 'k_m_hell2', mainSize: 120, hit: 'h_hit_fire', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
+    ult('mage', 'm_hell2', "헬파이어'첨", { echoCap: 2.5, mech: 'cross', main: 'k_m_hell2', mainSize: 120, hit: 'h_hit_fire', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
       desc: '헬파이어의 극의. 여덟 갈래로 뻗는 불기둥이 화면을 가르고, 남은 몬스터에게 불길이 번진다' }),
     ult('mage', 'm_fire3', '폭류유성', { mech: 'rain', main: 'k_m_fire3', frac: 0.95, drop: 'k_u_m_meteor', dropSize: 170, hit: 'h_hit_fire', span: 1.6, shield: 5, boss: 'm_jiokchak', k: 1.3 }),
-    ult('mage', 'm_kalpa', '겁화', { mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
+    ult('mage', 'm_kalpa', '겁화', { open: 'k_m_cross', echo: 'k_m_hyeongsang', fin: 'k_m_hyeongsang', mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
   ],
   poet: [
     ult('poet', 'p_ult', '태양의희원', { iconFx: '124', mech: 'sanctuary', cast: 'k_p_ult', main: 'k_u_p_pillar_o', hit: 'h_hit_light', guard: 3, boss: 'p_jiroe', k: 1 }),
     ult('poet', 'p_break', '귀염추혼소', { iconFx: '120', mech: 'mark', cast: 'new_p_break', frac: 0.8, main: '120', markScale: 1.3, hit: 'k_u_p_sparkle', delay: 1.0, heal: 0.3, boss: 'p_noejeon', k: 1.15 }),
     ult('poet', 'p_daejijin', '대지진', { mech: 'rings', main: 'k_p_daejijin', mainSize: 300, hit: 'k_p_quake', heal: 0.3, boss: 'p_geomok', k: 1.3 }),
-    ult('poet', 'p_taiji', '태극팔괘진', { mech: 'totem', main: 'k_p_taiji', mainScale: 1.2, drop: 'k_u_p_pillar_b', dropSize: 160, hit: 'h_hit_light', n: 4, life: 2.4, heal: 0.4, guard: 2, boss: 'p_bonghwang', k: 1.5 }),
+    ult('poet', 'p_taiji', '태극팔괘진', { echoN: 28, echoCap: 2.5, openW: 0.5, echoW: 200, aura: 'k_u_p_sparkle', mech: 'totem', main: 'k_p_taiji', mainScale: 1.2, drop: 'k_u_p_pillar_b', dropSize: 160, hit: 'h_hit_light', n: 4, life: 2.4, heal: 0.4, guard: 2, boss: 'p_bonghwang', k: 1.5 }),
   ],
   archer: [
     ult('archer', 'a_ult', '일환탄시', { mech: 'barrage', cast: 'k_a_ult', castSize: 200, shot: 'k_u_a_whip', shotScale: 2.4, hit: 'k_a_shot', n: 3, boss: 'a_aim', k: 1 }),
-    ult('archer', 'a_allwhirl', '폭풍화우', { mech: 'vortex', main: 'k_a_allwhirl', burst: 'k_u_a_tornado', burstSize: 300, hit: 'h_hit_attack', hold: 1.2, boss: 'a_bomb', k: 1.15 }),
-    ult('archer', 'a_eagle', '독수리소환', { mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 2.4, lift: 90, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
-    ult('archer', 'a_blood5', '투혈오식', { mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
+    ult('archer', 'a_allwhirl', '폭풍화우', { openCap: 2.5, echoW: 170, openW: 0.55, mech: 'vortex', main: 'k_a_allwhirl', burst: 'k_u_a_tornado', burstSize: 300, hit: 'h_hit_attack', hold: 1.2, boss: 'a_bomb', k: 1.15 }),
+    ult('archer', 'a_eagle', '독수리소환', { open: 'k_a_eagle', openW: 0.8, openCap: 4.5, echoN: 20, echoW: 300, echoCap: 3.5, aura: 'k_a_eagle', auraW: 220, mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 4.6, lift: 90, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
+    ult('archer', 'a_blood5', '투혈오식', { auraW: 360, echoN: 28, echoCap: 2.5, aura: 'k_a_tuhyeol4', echo2: 'k_a_chase', echo: 'k_a_blood5', mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
   ],
   lancer: [
     ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'h_ml_thrust', hitScale: 0.6, len: 4, diag: true, boss: 'l_meteor', k: 1 }),
-    ult('lancer', 'l_genesis', '천지개벽', { mech: 'rain', main: 'k_l_genesis', frac: 0.9, drop: 'k_u_l_pillar', dropSize: 170, hit: 'k_u_l_bolt', boss: 'l_rush', k: 1.15 }),
-    ult('lancer', 'l_dragon', '맹룡승천', { mech: 'meteor', main: 'k_l_dragon', mainSize: 330, hit: 'k_u_l_dragonhead', hitScale: 0.6, n: 5, gap: 0.25, boss: 'l_annihil', k: 1.3 }),
-    ult('lancer', 'l_moonfull', '월하멸섬', { mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'h_ml_spark', steps: 7, boss: 'l_javelin', k: 1.5 }),
+    ult('lancer', 'l_genesis', '천지개벽', { mech: 'rain', main: 'k_l_genesis', frac: 0.75, drop: 'k_u_l_pillar', dropSize: 170, hit: 'k_u_l_bolt', boss: 'l_rush', k: 1.15 }),
+    ult('lancer', 'l_dragon', '맹룡승천', { echoN: 22, echoCap: 2, open: 'k_l_annihil', echo: 'k_u_l_dragonhead', echoW: 220, aura: 'k_l_annihil', mech: 'meteor', main: 'k_l_dragon', mainSize: 330, hit: 'k_u_l_dragonhead', hitScale: 0.6, n: 5, gap: 0.25, boss: 'l_annihil', k: 1.3 }),
+    ult('lancer', 'l_moonfull', '월하멸섬', { openW: 0.65, openCap: 3, echoN: 30, echo2: 'k_l_spiral', aura: 'k_l_halfmoon', mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'h_ml_spark', steps: 7, boss: 'l_javelin', k: 1.5 }),
   ],
   monk: [
     ult('monk', 'mk_ult', '필살권무', { mech: 'dash', main: 'k_mk_ult', mainSize: 190, hit: 'k_u_mk_bodyhit', hitScale: 0.7, n: 8, boss: 'mk_sudden', k: 1 }),
     ult('monk', 'mk_buddha', '여래신장', { mech: 'rain', main: 'k_mk_buddha', frac: 0.9, drop: 'k_u_mk_palm', dropSize: 150, hit: 'k_mk_bung', boss: 'mk_uppercut', k: 1.15 }),
-    ult('monk', 'mk_rupture', '천지파열', { mech: 'rings', main: 'k_x_mk_rupture_cast', mainSize: 260, hit: 'k_x_mk_rupture_hit', after: 'k_mk_rupture', boss: 'mk_muhan', k: 1.3 }),
-    ult('monk', 'mk_advent', '권신강림', { mech: 'totem', main: 'k_mk_advent', mainScale: 1.5, lift: 50, drop: 'k_u_mk_aventhit', dropSize: 180, hit: 'k_mk_aventhit', n: 5, life: 2.6, boss: 'mk_kyokushin', k: 1.5 }),
+    ult('monk', 'mk_rupture', '천지파열', { echoN: 28, echo2: 'k_mk_quake', aura: 'k_mk_rupture', mech: 'rings', main: 'k_x_mk_rupture_cast', mainSize: 260, hit: 'k_x_mk_rupture_hit', after: 'k_mk_rupture', boss: 'mk_muhan', k: 1.3 }),
+    ult('monk', 'mk_advent', '권신강림', { openCap: 3.5, echoCap: 2, echoW: 240, fin: 'k_mk_aventhit', mech: 'totem', main: 'k_mk_advent', mainScale: 1.5, lift: 50, drop: 'k_u_mk_aventhit', dropSize: 180, hit: 'k_mk_aventhit', n: 5, life: 2.6, boss: 'mk_kyokushin', k: 1.5 }),
   ],
   magus: [
     ult('magus', 'md_ult', '광폭구회격', { mech: 'barrage', cast: 'k_md_ult', castSize: 220, shot: 'k_u_md_orb', hit: 'k_u_md_storm', n: 3, darken: 0.9, boss: 'md_arrow', k: 1 }),
     ult('magus', 'md_exfrenzy', '광폭멸천강', { mech: 'meteor', main: 'k_md_exfrenzy', mainSize: 240, hit: 'k_u_md_storm', after: 'k_u_md_decay', n: 5, darken: 1, boss: 'md_bust', k: 1.15 }),
-    ult('magus', 'md_bloodbat', '혈마광폭열파', { mech: 'sweep', main: 'k_md_bloodbat', mainSize: 200, hit: 'k_u_md_decay', steps: 6, darken: 1, boss: 'md_ffire', k: 1.3 }),
-    ult('magus', 'md_wavefrenzy', '광폭파장', { mech: 'rings', cast: 'k_u_md_wing', main: 'k_md_wavefrenzy', mainSize: 280, hit: 'k_u_md_storm', darken: 1.1, boss: 'md_ray', k: 1.5 }),
+    ult('magus', 'md_bloodbat', '혈마광폭열파', { echoW: 190, aura: 'k_md_sphere', echo2: 'k_u_md_storm', mech: 'sweep', main: 'k_md_bloodbat', mainSize: 200, hit: 'k_u_md_decay', steps: 6, darken: 1, boss: 'md_ffire', k: 1.3 }),
+    ult('magus', 'md_wavefrenzy', '광폭파장', { echoN: 26, echoW: 200, open: 'k_md_wavefrenzy', fin: 'k_md_bust', mech: 'rings', cast: 'k_u_md_wing', main: 'k_md_wavefrenzy', mainSize: 280, hit: 'k_u_md_storm', darken: 1.1, boss: 'md_ray', k: 1.5 }),
   ],
   celestial: [
     ult('celestial', 'cl_ult', '전의상실', { mech: 'mark', cast: 'k_cl_ult', frac: 0.6, main: 'k_u_cl_loss', hit: 'k_u_cl_losshit', stun: 0.8, delay: 1.0, boss: 'cl_moment', k: 1 }),
-    ult('celestial', 'cl_thunder', '뇌격룡', { mech: 'chain', cast: 'k_u_cl_dragon', castStages: false, frac: 0.95, main: 'k_x_cl_thunder_2', markScale: 0.5, shot: 'h_hit_light', stun: 0.4, boss: 'cl_acumen', k: 1.15 }),
-    ult('celestial', 'cl_tiger', '범아귀', { mech: 'dash', cast: 'k_u_cl_speed', castSize: 150, main: 'k_cl_tiger', mainSize: 170, hit: 'h_hit_tiger', n: 8, boss: 'cl_ego', k: 1.3 }),
-    ult('celestial', 'cl_reindeer', "강림술'신록", { mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
+    ult('celestial', 'cl_thunder', '뇌격룡', { auraW: 150, mech: 'chain', cast: 'k_u_cl_dragon', castStages: false, frac: 0.95, main: 'k_x_cl_thunder_2', markScale: 0.5, shot: 'h_hit_light', stun: 0.4, boss: 'cl_acumen', k: 1.15 }),
+    ult('celestial', 'cl_tiger', '범아귀', { echoN: 18, echoCap: 1.8, aura: 'k_cl_claw', openW: 0.45, echo2: 'k_cl_slam', auraW: 220, echoW: 230, open: 'k_cl_tiger', mech: 'dash', cast: 'k_u_cl_speed', castSize: 150, main: 'k_cl_tiger', mainSize: 170, hit: 'h_hit_tiger', n: 8, boss: 'cl_ego', k: 1.3 }),
+    ult('celestial', 'cl_reindeer', "강림술'신록", { echoN: 34, openCap: 4, echoCap: 2, aura: 'k_cl_bind', openW: 0.65, fin: 'k_cl_ego', mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
   ],
   dokkaebi: [
     ult('dokkaebi', 'dk_ult', '금나와라,뚝딱', { mech: 'rain', cast: 'k_dk_ult', castSize: 200, drop: 'k_u_dk_gold', dropSize: 110, hit: 'k_dk_goldhit', boss: 'dk_punish', k: 1 }),
     ult('dokkaebi', 'dk_super', "일격필살'괴력난신", { mech: 'execute', main: 'k_dk_super', mainSize: 340, hit: 'h_ml_burst', hitScale: 0.5, n: 3, boss: 'dk_judgment', k: 1.15 }),
-    ult('dokkaebi', 'dk_storm', '도깨비폭풍', { mech: 'vortex', main: 'k_dk_storm', burst: 'k_dk_storm', burstSize: 320, hit: 'h_hit_fire', hold: 1.2, boss: 'dk_hamstring', k: 1.3 }),
-    ult('dokkaebi', 'dk_rage', '도깨비의 격노', { mech: 'rings', main: 'k_dk_rage', mainSize: 300, hit: 'h_hit_fire', boss: 'dk_nemesis', k: 1.5 }),
+    ult('dokkaebi', 'dk_storm', '도깨비폭풍', { openW: 0.5, echoW: 220, mech: 'vortex', main: 'k_dk_storm', burst: 'k_dk_storm', burstSize: 320, hit: 'h_hit_fire', hold: 1.2, boss: 'dk_hamstring', k: 1.3 }),
+    ult('dokkaebi', 'dk_rage', '도깨비의 격노', { aura: 'k_dk_judgment', mech: 'rings', main: 'k_dk_rage', mainSize: 300, hit: 'h_hit_fire', boss: 'dk_nemesis', k: 1.5 }),
   ],
   reaper: [
     ult('reaper', 'rp_ult', '차사강림', { mech: 'cleaveWave', main: 'k_rp_ult', mainSize: 260, hit: 'k_rp_cut', hitScale: 0.6, after: 'k_u_rp_ring', boss: 'rp_flash', k: 1 }),
-    ult('reaper', 'rp_madness', '나선광륜', { mech: 'rings', main: 'k_rp_madness', mainSize: 260, hit: 'h_ml_slash', boss: 'rp_asura', k: 1.15 }),
-    ult('reaper', 'rp_deadly', '살극', { mech: 'mark', main: 'k_rp_deadly', markScale: 1.4, hit: 'h_ml_wind', hitScale: 0.4, delay: 1.2, boss: 'rp_arrow', k: 1.3 }),
-    ult('reaper', 'rp_gate', '저승문', { mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
+    ult('reaper', 'rp_madness', '나선광륜', { echo2: 'k_rp_spiral', auraW: 320, echoCap: 2, aura: 'k_rp_asura', mech: 'rings', main: 'k_rp_madness', mainSize: 260, hit: 'h_ml_slash', boss: 'rp_asura', k: 1.15 }),
+    ult('reaper', 'rp_deadly', '살극', { echo2: 'k_rp_wind', aura: 'k_rp_crush', auraW: 220, open: 'k_rp_arrow', openW: 0.5, echoW: 220, mech: 'mark', main: 'k_rp_deadly', markScale: 1.4, hit: 'h_ml_wind', hitScale: 0.4, delay: 1.2, boss: 'rp_arrow', k: 1.3 }),
+    ult('reaper', 'rp_gate', '저승문', { echoN: 28, echoCap: 2.5, echoW: 200, fin: 'k_rp_gate', mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
   ],
 };
 
