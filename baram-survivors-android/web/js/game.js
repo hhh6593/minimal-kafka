@@ -8259,7 +8259,7 @@ const TIER_KINDS = {
       for (let k = def.depth; k >= 2; k--) if (tkMoveHero(sx + dx * k, sy + dy * k)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
     }
     // 이계의침식: what it raises stays along its way a moment
-    if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = 2; k <= def.depth; k += 2) later(k * step, () => addFx(def.trail, (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 10, { scale: 0.7 }));
+    if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = 2; k <= def.depth; k += 2) later(k * step, () => addFx(bigFx(def.trail, 110, 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 10, { scale: 1 }));
     for (let i = 0; i < (def.pulses || 1); i++) later(i * (def.gap || 0.3), () => {
       for (const [dx, dy] of ways) {
         addFx(bigFx(fxid, (w * 2 + 1) * TILE * 1.2, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
