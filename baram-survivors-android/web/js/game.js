@@ -949,11 +949,10 @@ function raidInfo(r) {
     b.onclick = () => { settings.raidRole = b.dataset.rrole; saveJson('bs_settings', settings); raidInfo(r); };
   });
   // How the hero starts: its recorded build, or picking cards as on a hunting ground.
-  const built = (progress.builds || {})[chosenClass.id];
   const sw = document.createElement('button');
   sw.className = 'btn';
   sw.style.marginTop = '4px';
-  sw.textContent = settings.raidManual ? '시작 기술: 직접 고르기' : `시작 기술: ${built ? '지난 빌드' : '자동 빌드'}`;
+  sw.textContent = settings.raidManual ? '시작 기술: 직접 고르기' : '시작 기술: 최고 빌드';
   sw.onclick = () => { settings.raidManual = !settings.raidManual; saveJson('bs_settings', settings); raidInfo(r); };
   $('#stage-info').append(sw);
   pactRow(() => raidInfo(r));
@@ -4480,33 +4479,39 @@ function floorCount(t) {
 
 // ---------------------------------------------------------------- raids
 
-/** The class's skills fitted to a level: its recorded build, or one made from its open spells. */
+/**
+ * The class's best skills at a level (raids, 쟁, 대항전): its strongest open kit (tierKit — the
+ * highest 승급's blows of every kind, its power, guard and 기원), each as high as the level allows;
+ * then the player's own recorded picks, then the rest of its strongest open spells, up to the bar's
+ * twelve. (It was the last good hunt's build as it was, often a low-level one.)
+ */
 function applyBuild(start) {
-  const cls = G.cls.id, rec = (progress.builds || {})[cls];
-  const fits = (id, d) => d && (d.cls === cls || d.cls === 'all') && d.kind !== 'ult' && promoOf(cls) >= (d.promo || 0)
+  const cls = G.cls.id, rec = (progress.builds || {})[cls], promo = promoOf(cls);
+  const fits = (id, d) => d && (d.cls === cls || d.cls === 'all') && d.kind !== 'ult' && promo >= (d.promo || 0)
     && skillReq(d) <= start;
-  let list = rec ? rec.skills.filter(([id]) => fits(id, SKILLS[id])) : [];
-  if (!list.length) {
-    // No record yet: the class's open spells, the ones that strike first (a raid boss is not
-    // felled by buffs), the newest of them, each as high as the level allows.
-    // A 도사 keeps two of its heals: in a raid it is the party's healer.
-    const hits = d => (d.dmg ? 0 : 1);
-    const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
-    const heals = cls === 'poet' ? open.filter(([, d]) => d.kind === 'heal').sort((a, b) => skillReq(b[1]) - skillReq(a[1])).slice(0, 2) : [];
-    list = heals.concat(open.filter(e => !heals.includes(e))
-      .sort((a, b) => hits(a[1]) - hits(b[1]) || skillReq(b[1]) - skillReq(a[1]))).slice(0, 5).map(([id]) => [id, 8]);
-    list.push(['c_heal', 8]);
-  }
-  G.skills = list.slice(0, MAX_SKILLS).map(([id, lv]) => {
+  const ids = [], add = id => { if (ids.length < MAX_SKILLS && !ids.includes(id) && fits(id, SKILLS[id])) ids.push(id); };
+  // A 도사 keeps two of its heals: in a raid it is the party's healer.
+  const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
+  if (cls === 'poet') open.filter(([, d]) => d.kind === 'heal').sort((a, b) => skillReq(b[1]) - skillReq(a[1])).slice(0, 2).forEach(([id]) => add(id));
+  tierKit(cls, promo).forEach(add);
+  if (rec) rec.skills.forEach(([id]) => { if (!SKILLS[id] || !SKILLS[id].evolved) add(id); });
+  open.sort((a, b) => (a[1].dmg ? 0 : 1) - (b[1].dmg ? 0 : 1) || (b[1].promo || 0) - (a[1].promo || 0) || (b[1].dmg || 0) - (a[1].dmg || 0)).forEach(([id]) => add(id));
+  add('c_heal');
+  G.skills = ids.map(id => {
     const d = SKILLS[id];
-    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(lv, start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
+    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
   });
-  const cap = Math.max(1, Math.floor(start / 4));
-  for (const k of Object.keys(G.passives)) G.passives[k] = Math.min(cap, rec ? rec.passives[k] || 0 : (k === 'life' || k === 'power' ? cap : 0));
+  // Its 보조 능력 at their best too: the six it may hold (MAX_PASSIVES), its own picks first and then
+  // those a fight wants, each as high as the level allows up to MAX_PASSIVE_LEVEL (it went past 5).
+  const cap = Math.min(MAX_PASSIVE_LEVEL, Math.max(1, Math.floor(start / 4)));
+  const pas = [];
+  for (const k of [...Object.keys(G.passives).filter(k => rec && rec.passives[k] > 0), 'life', 'power', 'haste', 'area', 'armor', 'mana'])
+    if (k in G.passives && !pas.includes(k) && pas.length < MAX_PASSIVES) pas.push(k);
+  for (const k of Object.keys(G.passives)) G.passives[k] = pas.includes(k) ? cap : 0;
   // 체력 단련 gives its health as when picked on a card.
   G.player.maxHp += 20 * G.passives.life;
   G.player.hp = G.player.maxHp;
-  say(`${rec ? '지난 빌드' : '자동 빌드'}로 시작: ${G.skills.map(s => skillName(s.id, s.lv)).join(', ')}`, 'sys');
+  say(`최고 빌드로 시작 (Lv ${start}): ${G.skills.map(s => skillName(s.id, s.lv)).join(', ')}`, 'sys');
 }
 
 /** A hunt's build, kept for the class when it went well (its raids start from it). */
@@ -4529,12 +4534,9 @@ function raidStars(r) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
 
-/**
- * The level a hero starts a raid at: three quarters of its best, up to 33 (the 9차's spells), so
- * the 승급 spells it has earned are in its build from the start.
- */
+/** The level a hero starts a raid (and a 쟁·대항전, floored there) at: the class's own level, its best. */
 function raidStart(rec) {
-  return Math.max(1, Math.min(33, Math.floor((rec ? rec.lvl : 1) * 0.75)));
+  return Math.max(1, rec ? rec.lvl : 1);
 }
 
 /** A raid: the hero starts grown (its build fitted to the start level), and the raid gathers. */
