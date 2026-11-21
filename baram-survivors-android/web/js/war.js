@@ -3152,6 +3152,7 @@ function aiVariants(cls, gear) {
 // AI_CD slower), AI_GCD between any two; plain blows between.
 const AI_ATK = new Set(['spell', 'strike', 'spell4', 'nova', 'cleave', 'line', 'screen', 'slash', 'blink']);
 const AOE_KINDS = new Set(['screen', 'nova', 'cleave', 'line', 'spell4']);
+const LASTING = new Set(['aura9', 'rain', 'zone', 'totem', 'spin', 'gust', 'thorns', 'starburst', 'wave', 'vortex', 'crosswave']);
 const AI_CD = 1.25;
 // A skill's blow in the field's units: SK_K × its wait^0.7 (a long wait a heavy blow), less on
 // each of a spread's victims; the plain blows between at BASIC_K of what they were (the skills
@@ -3248,8 +3249,14 @@ function castSkill(W, b, t, s) {
   if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
   else if (s.kind === 'aoe') {
     const vs = aoeVictims(W, t, s.r);
+    // 이펙트=판정: a lasting technique (an aura, a field, a rain: SK's own kind) strikes in three beats over its
+    // picture's life, not once at its start (the same blow in all)
+    const SKd = SK[s.id], lasting = SKd && LASTING.has(SKd.kind);
+    if (lasting) {
+      for (let k = 1; k <= 2; k++) A.later(k * 0.4, () => { if (W.over) return; for (const [e] of aoeVictims(W, t, s.r)) hit(W, b, e, (e === t ? n : n * 0.6) / 3); });
+    }
     for (const [e] of vs) {
-      hit(W, b, e, e === t ? n : n * 0.6);
+      hit(W, b, e, (e === t ? n : n * 0.6) / (lasting ? 3 : 1));
       if (e.war && !e.cmdr) {
         if (d.stun && Math.random() < 0.35) e.stun = Math.max(e.stun, Math.min(1, d.stun));
         if (d.curse) e.curse = Math.max(e.curse, Math.min(4, d.curse));

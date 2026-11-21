@@ -134,7 +134,8 @@ def main():
             continue
         pos, aw, ah = res
         old = im.width * im.height
-        if ds >= 1 and aw * ah > old * GAIN:
+        # (a strip wider than a phone's largest picture is packed whatever it gains: 9차 궁극 cinemas)
+        if ds >= 1 and aw * ah > old * GAIN and im.width <= MAX_SIDE and im.height <= MAX_SIDE:
             continue
         sheet = Image.new('RGBA', (max(1, aw), max(1, ah)), (0, 0, 0, 0))
         at = []

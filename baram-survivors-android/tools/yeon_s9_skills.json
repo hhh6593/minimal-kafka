@@ -1,0 +1,4 @@
+{
+ "cl_haeil": {"name": "해일강타", "prefab": "Skill_Effect_Celestial_ImmortalityStorm_Reinforce", "why": "the 천인's own water storm (불가살이선풍 강화's ring of water), which no skill of ours draws: the original 9차 해일강타's tidal water (2662 IMG51 is too covered by the field's damage numbers and posts to take out)"},
+ "mk_bujori": {"name": "부조리", "prefab": "Skill_Effect_Monk_IncoherenceSmash_Attackers", "why": "the 격투가's own fiery fist arcs (비연격's attackers, Skills_Player 20510300, which no skill of ours draws): 부조리, 흑화랑's 9차 (→ 격투가), its guard bursting"}
+}

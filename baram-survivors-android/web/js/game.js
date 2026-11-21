@@ -1273,7 +1273,7 @@ function startRun(cls, stage, training = false) {
       pose: null, poseT: 0, walkT: 0,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
-    buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0 },
+    buffs: { power: 0, stealth: 0, guard: 0, shield: 0, haste: 0, reflect: 0, ward9: 0, echo: 0 },
     enemies: [], dying: [], allies: [], party: [], fxs: [], drops: [], texts: [], log: [], shots: [], sparks: [], feed: [],
     combo: { n: 0, t: 0, best: 0, pop: 0 },
     chainRun: null,
@@ -4607,6 +4607,8 @@ function applyBuild(start) {
   // A 도사 keeps two of its heals: in a raid it is the party's healer.
   const open = Object.entries(SKILLS).filter(([id, d]) => fits(id, d) && !d.evolved && d.cls === cls);
   if (cls === 'poet') open.filter(([, d]) => d.kind === 'heal').sort((a, b) => skillReq(b[1]) - skillReq(a[1])).slice(0, 2).forEach(([id]) => add(id));
+  // (9차 스킬 개편: an open 9차 set comes whole — its 보조 공격 and 아우라 strike by themselves.)
+  open.filter(([, d]) => d.promo === 9).forEach(([id]) => add(id));
   tierKit(cls, promo).forEach(add);
   if (rec) rec.skills.forEach(([id]) => { if (!SKILLS[id] || !SKILLS[id].evolved) add(id); });
   open.sort((a, b) => (a[1].dmg ? 0 : 1) - (b[1].dmg ? 0 : 1) || (b[1].promo || 0) - (a[1].promo || 0) || (b[1].dmg || 0) - (a[1].dmg || 0)).forEach(([id]) => add(id));
@@ -5831,6 +5833,7 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
   if (p.sts && heroStatusOn('curse')) taken *= 1.25;
   if (G.buffs.g_ward > G.t) taken *= 1 - (G.buffs.g_wardK || 0);
+  if (G.buffs.ward9 > G.t) taken *= 1 - (G.buffs.ward9K || 0); // 9차 아우라 (data.js S9: ward)
   // 현무의 철옹's shell: whoever strikes the one in it is pricked back (each attacker twice a second at most).
   const thorn = from && from.m && from.hp > 0 && shellThorns();
   if (thorn && G.t - (from.thornAt || -9) >= 0.5) {
@@ -6461,6 +6464,9 @@ function killEnemy(e) {
   if (G.hunt) Hunt.kill(e); // 사냥 기믹: 토벌도
   if (G.endEnd) Hunt.sweepKill(e); // 사냥 기믹: 소탕's spoils
   if (G.player.abyssHunt && !G.allyHitting) abyssBurst(e);
+  if (e.venom9) venomBurst(e); // 묵혈독바르기
+  // 영혼갈무리·죽음의희열 (9차): a foe felled while it is up brings the other skills' waits nearer
+  if (G.buffs.killCut > G.t) for (const s of G.skills) if (s.timer > 0.5 && SKILLS[s.id].kind !== 'ult') s.timer -= Math.min(s.timer * 0.25, G.buffs.killCutK || 0.125);
   gearProc('kill', e);
   // 이동기 한방컷 (연's 차사): a foe felled just after a dash brings the next dash sooner.
   if (G.dashAt !== undefined && G.t - G.dashAt < 0.6) G.dashAt -= 0.35;
@@ -6987,7 +6993,7 @@ function cast(skill, st) {
   if (MELEE_LOOK[G.cls.id] && def.dmg) {
     // Its own picture on each one struck: the class's flash and slash arcs keep out of its way.
     // (A row's one travelling picture leaves the class's flash on each it passes.)
-    if (['strike', 'spell', 'blink'].includes(def.kind)) G.ownPicAt = G.t;
+    if (['strike', 'spell', 'blink', 'smite'].includes(def.kind)) G.ownPicAt = G.t;
     else if (def.kind !== 'slash') G.areaAt = G.t;
   }
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
@@ -7511,6 +7517,8 @@ function cast(skill, st) {
       break;
     }
   }
+  // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
+  if (used && def.nine && !st.nine && promoOf(G.cls.id) >= 9) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
@@ -7536,6 +7544,21 @@ function cast(skill, st) {
 // Persistent ones (fields, orbs, totems, traps, auras) run on later() ticks of their own; their
 // pictures are G.fxs entries kept alive for the effect's life (looped), moved by those ticks.
 
+/** 이펙트=판정: a picture drawn exactly `tiles` tiles across (larger or smaller than its own size), so what
+ *  is seen is what is struck. */
+function fxTiles(id, tiles, tag = 't') {
+  const f = id && M.fx[id];
+  if (!f) return id;
+  // (by what its frames draw — packed sheets know each frame's box — not the empty cell round it)
+  const src = f.src ? M.fx[f.src] || f : f;
+  let ext = Math.max(f.w, f.h);
+  if (src.bb && src.bb.length >= 4) { ext = 0; for (let i = 0; i + 3 < src.bb.length; i += 4) ext = Math.max(ext, src.bb[i + 2], src.bb[i + 3]); ext = ext || Math.max(f.w, f.h); }
+  const now = ext * (f.k || 1), want = tiles * TILE;
+  if (Math.abs(now - want) < 2) return id;
+  const key = `${id}#${tag}${Math.round(want)}`;
+  if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
+  return key;
+}
 /** A foe of the hero's (not its war's or raid's own side, not an ally). */
 function tkFoe(e) {
   return e && e.m && e.hp > 0 && !e.ally && !(e.war && e.team === 0);
@@ -7700,7 +7723,7 @@ const TIER_KINDS = {
       mark.burst = (k = 1) => {
         if (pic) pic.life = pic.t;
         const x = lx * TILE + TILE / 2, y = ly * TILE + TILE - 6;
-        if (def.fx2) addFx(def.fx2, x, y - 10, { scale: 1 });
+        if (def.fx2) addFx(fxTiles(def.fx2, st.radius * 2 + 1, 'mk'), x, y - 10);
         G.shake = Math.max(G.shake, 0.12);
         for (const o of around(lx, ly, st.radius)) { smite(o, st.dmg * k); tkAfflict(o, def, 0); }
       };
@@ -7749,7 +7772,7 @@ const TIER_KINDS = {
     const p = G.player;
     if (!tkNear(p.tx, p.ty, st.radius).length) return 0.3;
     const cx = p.tx, cy = p.ty, seen = new Set();
-    addFx(fxid, 0, -26, { follow: true, scale: 1.3 });
+    addFx(fxTiles(fxid, st.radius * 2 + 1, 'wv'), 0, -26, { follow: true });
     if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
     for (let r = 1; r <= st.radius; r++) later(r * 0.09, () => {
       shock(cx * TILE + TILE / 2, cy * TILE + TILE - 6, r + 0.3, '200,240,255');
@@ -7841,17 +7864,31 @@ const TIER_KINDS = {
     });
   },
   // 운화: a gate over the thickest of the foes, raining blows on random tiles round it for `dur`.
+  // (9차: 서리파편 over the thickest; 황천화 round the hero itself (at 'self'), each flower healing it a
+  // little (heal: % of life) and bursting (fxBurst) where it struck.)
   rain({ st, def, fxid, smite }) {
-    const c = tkDensest(st.range, 2);
+    const p = G.player, self = def.at === 'self';
+    if (def.killCut) { G.buffs.killCut = Math.max(G.buffs.killCut || 0, G.t + def.dur + 0.5); G.buffs.killCutK = def.killCut; }
+    const c = self ? (tkNear(p.tx, p.ty, st.radius + 1).length ? p : null) : tkDensest(st.range, 2);
     if (!c) return 0.3;
     const cx = c.tx, cy = c.ty, x = cx * TILE + TILE / 2, y = cy * TILE + TILE - 6;
-    tkLoop(fxid, x, y - 40, def.dur + 0.3, { scale: 1, alpha: 0.6 });
+    if (fxid && !def.noLoop) tkLoop(fxid, x, y - 40, def.dur + 0.3, { scale: 1, alpha: 0.6 });
+    const run = G;
     for (let i = 0; i < def.drops; i++) later(0.15 + (i * def.dur) / def.drops, () => {
-      const pool = around(cx, cy, st.radius);
+      if (G !== run) return;
+      const ox = self ? p.tx : cx, oy = self ? p.ty : cy;
+      const pool = around(ox, oy, st.radius);
       const t = pool.length && Math.random() < 0.75 ? pool[Math.floor(Math.random() * pool.length)] : null;
-      const tx = t ? t.tx : cx + Math.round(rand(-st.radius, st.radius)), ty = t ? t.ty : cy + Math.round(rand(-st.radius, st.radius));
-      if (def.fx2) addFx(def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 10, { scale: 0.55 });
-      later(0.12, () => { for (const o of around(tx, ty, 1)) smite(o, st.dmg * def.k); });
+      const tx = t ? t.tx : ox + Math.round(rand(-st.radius, st.radius)), ty = t ? t.ty : oy + Math.round(rand(-st.radius, st.radius));
+      if (def.fx2) addFx(def.dropScale ? fxTiles(def.fx2, 3, 'rd') : def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 10, { scale: def.dropScale ? 1 : 0.55 });
+      later(def.fxBurst ? 0.45 : 0.12, () => {
+        if (G !== run) return;
+        if (def.fxBurst && fxBudget('rainBurst', 3)) addFx(fxTiles(def.fxBurst, 3, 'rb'), tx * TILE + TILE / 2, ty * TILE + TILE - 20);
+        const hit = around(tx, ty, 1);
+        for (const o of hit) { smite(o, st.dmg * def.k); tkAfflict(o, def, 0); }
+        if (def.heal && hit.length) heal(p.maxHp * def.heal / 100, false, true);
+        if (def.mana && hit.length) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
+      });
     });
   },
   // 회천: out along the row and back, striking each foe in it both ways.
@@ -7938,6 +7975,17 @@ const TIER_KINDS = {
         tkAfflict(e, def, 0);
       }
     });
+    // 응축뇌전시: drawn together, the foes on the way are blown up at the end
+    if (def.endBurst) later(def.dur + 0.05, () => {
+      const ex = sx + dx * def.depth, ey = sy + dy * def.depth;
+      if (def.fx2) addFx(bigFx(def.fx2, 160, 'vb'), ex * TILE + TILE / 2, ey * TILE + TILE - 16, { scale: 1 });
+      G.shake = Math.max(G.shake, 0.08);
+      for (let k = 1; k <= def.depth; k++) for (const e of around(sx + dx * k, sy + dy * k, k >= def.depth - 1 ? def.burstR || 1 : 0)) {
+        if ((next.get(e) || 0) > G.t + 9) continue;
+        next.set(e, G.t + 10);
+        smite(e, st.dmg * (k >= def.depth - 1 ? def.endBurst : def.endBurst * 0.5));
+      }
+    });
   },
   // 타력광풍: spinning for ticks × tick seconds, the tiles round the hero struck each turn (it walks on).
   spin({ st, def, fxid, smite }) {
@@ -7998,7 +8046,17 @@ const TIER_KINDS = {
       if (def.fx2) fxOn(def.fx2, e.hp > 0 ? e : p, { scale: 1 });
       shock(p.x, p.y - 4, (st.radius || 1) + 1);
       meleeImpact(3);
-      for (const o of around(p.tx, p.ty, st.radius || 1)) { smite(o, st.dmg); tkAfflict(o, def); }
+      for (const o of around(p.tx, p.ty, def.linger ? def.radius || 1 : st.radius || 1)) { smite(o, st.dmg); tkAfflict(o, def); }
+      // 순보선풍: a gale stays where it landed, sweeping round it
+      if (def.linger) {
+        const lx = p.tx, ly = p.ty, run = G;
+        const lr = def.radius || 1;
+        tkLoop(fxTiles(def.lingerFx || def.fx2, lr * 2 + 1, 'cl'), lx * TILE + TILE / 2, ly * TILE + TILE - 10, def.linger, { alpha: 0.75 });
+        for (let k = 1; k <= Math.round(def.linger / 0.5); k++) later(k * 0.5, () => {
+          if (G !== run) return;
+          for (const o of around(lx, ly, lr)) smite(o, st.dmg * def.lingerK);
+        });
+      }
     });
   },
   // 참간맹습: foe to foe, the hero landing behind each in turn.
@@ -8079,8 +8137,9 @@ const TIER_KINDS = {
       const reach = Math.min(k, def.depth) * TILE, fly = 0.05 + 0.03 * Math.min(k, def.depth);
       later(i * 0.04, () => addFx(fxid, p.x, p.y - 24, { mv: [cx * reach, cy * reach, fly], scale: 0.8 }));
       if (hitAt) later(i * 0.04 + fly, () => {
-        if (def.fx2 && i % 2 === 0) addFx(def.fx2, hitAt[0] * TILE + TILE / 2, hitAt[1] * TILE + TILE - 14, { scale: 0.7 });
-        for (const o of around(hitAt[0], hitAt[1], st.radius || 1)) smite(o, st.dmg * def.k);
+        const br = def.radius === 0 ? 0 : def.radius || 1;
+        if (def.fx2) addFx(fxTiles(def.fx2, br * 2 + 1, 'br'), hitAt[0] * TILE + TILE / 2, hitAt[1] * TILE + TILE - 14);
+        for (const o of around(hitAt[0], hitAt[1], br)) { smite(o, st.dmg * def.k); tkAfflict(o, def, i % 2 ? 0 : 1); }
       });
     }
   },
@@ -8197,13 +8256,335 @@ const TIER_KINDS = {
     tkLoop(fxid, 0, -26, st.duration, { follow: true, alpha: 0.65 });
     later(st.duration, () => {
       if (G !== run || G.dead) return;
-      if (def.fx2) addFx(def.fx2, 0, -26, { follow: true, scale: 1.1 });
+      if (def.fx2) addFx(fxTiles(def.fx2, (st.radius || 2) * 2 + 1, 'sbu'), 0, -26, { follow: true });
       shock(p.x, p.y - 4, (st.radius || 2) + 1, '200,220,255');
       const d = tkHit(def, skill);
       for (const e of around(p.tx, p.ty, st.radius || 2)) { hurtEnemy(e, d); tkAfflict(e, def); }
     });
   },
+  // ---- 9차 스킬 개편 (data.js S9): 보조 공격 (echo), 몸 주변 아우라 (aura9), 강한 일격 (smite), 전방 물결
+  // (crosswave), 여덟 방향 수리검 (starburst).
+  // 호기어검, 묵혈독바르기, 전도체, 화살비폭격, 기공십자광선'쾌, 권법의기원: for `duration` the hero strikes harder
+  // (power) and every `every` seconds a follow-up blow of the class's own way (def.echo, ECHO below) goes out
+  // by itself at the foes near — the 보조 공격 the original's 9차 buffs add.
+  echo({ skill, st, def, fxid }) {
+    const p = G.player;
+    if (!tkNear(p.tx, p.ty, (def.range || 5) + 1).length) return 0.4;
+    // (its length does not grow with the 단; its wait shrinks slowly, data.js S9: aoe)
+    const run = G, life = def.duration, n = Math.floor(life / def.every), d = tkHit(def, skill), way = ECHO[def.echo] || ECHO.sword;
+    if (def.power) {
+      G.buffs.powerK = Math.max(G.buffs.power > G.t ? G.buffs.powerK || 0 : 0, def.power);
+      G.buffs.power = Math.max(G.buffs.power, G.t + life);
+    }
+    G.buffs.echo = G.t + life;
+    if (def.killCut) { G.buffs.killCut = Math.max(G.buffs.killCut || 0, G.t + life); G.buffs.killCutK = def.killCut; }
+    addFx(bigFx(fxid, 150, 'e9'), 0, -26, { follow: true });
+    // (its sign held over the hero while it lasts: 호기어검's swords, 묵혈독's dark blade …)
+    if (def.fxLoop && M.fx[def.fxLoop]) tkLoop(bigFx(def.fxLoop, def.loopSize || 110, 'e9l'), 0, def.loopY || -40, life, { follow: true, alpha: settings.calmFx ? 0.5 : 0.8 });
+    for (let k = 1; k <= n; k++) later(k * def.every, () => {
+      if (G !== run || G.dead) return;
+      way(def, d, k);
+    });
+    note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
+  },
+  // 흑룡검풍, 천신의기운, 천신의권역, 비사검, 반탄강기, 불사귀인: held round the hero for `duration`: every
+  // `tick` the foes within `radius` are struck (and shoved, slowed, burnt as the spell says); meanwhile
+  // the hero takes less (ward), sends blows back (reflect), heals (hot, with the party) or drinks (drain).
+  aura9({ skill, st, def, fxid }) {
+    // (it grows by one tile at most: held round the hero, a wider one hid the field)
+    const p = G.player, r = Math.min(st.radius || 1, (def.radius || 1) + 1);
+    const hurt = p.hp < p.maxHp * 0.85 || (def.party && G.party.some(m => !m.down && m.hp < m.maxHp * 0.7));
+    if (!tkNear(p.tx, p.ty, r + 1.5).length && !(def.hot && hurt)) return 0.4;
+    const run = G, life = def.duration, n = Math.round(life / def.tick), d = tkHit(def, skill);
+    if (def.ward) { G.buffs.ward9 = G.t + life; G.buffs.ward9K = def.ward; }
+    if (def.reflect) G.buffs.reflect = Math.max(G.buffs.reflect, G.t + life);
+    // the aura's own picture held round the hero, as wide as what it reaches
+    tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
+    for (let k = 1; k <= n; k++) later(k * def.tick, () => {
+      if (G !== run || G.dead) return;
+      const near = around(p.tx, p.ty, r);
+      let got = 0;
+      for (const e of near) {
+        if (def.fxHit && got < 2 && k % 2) fxOn(def.fxHit, e, { scale: 0.6 });
+        hurtEnemy(e, d);
+        tkAfflict(e, def, 0);
+        if (def.shove && k % def.shove === 0) tkShove(e, e.tx + Math.sign(e.tx - p.tx), e.ty + Math.sign(e.ty - p.ty));
+        got++;
+      }
+      if (def.drain && got) heal(p.maxHp * def.drain * Math.min(3, got), false, true);
+      if (def.hot) {
+        heal(p.maxHp * def.hot / 100 * (1 + 0.08 * (skill.lv - 1)), false, true);
+        if (def.party) for (const m of G.party) if (!m.down && tdist(m, p) <= r + 2) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * def.hot / 100);
+      }
+    });
+    note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
+  },
+  // 압도적진격, 묵혈파광참, 회선격풍, 폭렬천뢰탄, 무형투창, 점혈:통: the strongest foe within reach (a boss
+  // first) struck very hard: the hero dashes in (dash), a shot flies (shot), or a mark bursts after
+  // `delay`; round it a share (splash) of the blow; a storm may stay (linger) or the blow leap on (chain).
+  smite({ skill, st, def, fxid, smite, hitOn }) {
+    const p = G.player, foes = tkNear(p.tx, p.ty, st.range);
+    if (!foes.length) return 0.3;
+    // (천신의심판: the thickest of them, where the 천신 comes down; the rest the strongest)
+    const t = def.densest ? tkDensest(st.range, 2) || foes[0]
+      : foes.slice(0, 16).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp || a.hp - b.hp)[0];
+    const ex = t.tx - p.tx, ey = t.ty - p.ty;
+    if (Math.abs(ex) >= Math.abs(ey)) { p.fdx = Math.sign(ex) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(ey); }
+    if (def.dash && tdist(t, p) > 1.5 && !steering()) {
+      const spot = DIRS.map(([dx, dy]) => [t.tx + dx, t.ty + dy]).filter(([x, y]) => free(x, y) && !holdGround(x, y))
+        .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
+      if (spot) { tkMoveHero(spot[0], spot[1]); p.inv = Math.max(p.inv || 0, 0.3); }
+    }
+    let wait = def.delay || 0.18;
+    if (def.shot) {
+      const sp = def.fxShot && M.fx[def.fxShot] ? def.fxShot : fxid, dx = t.x - p.x, dy = t.y - 20 - (p.y - 26);
+      const fl = Math.min(0.24, 0.08 + Math.hypot(dx, dy) / 1500);
+      addFx(fxTiles(sp, 2, 'ss'), p.x, p.y - 26, { mv: [dx, dy, fl], rot: def.fxShot ? Math.atan2(dy, dx) + Math.PI / 2 : 0 });
+      wait = fl;
+    }
+    // the blow's own picture on it (drawn a little larger than the foe: it is the class's great blow)
+    // (압도적진격: its double ring of fire bursts at the front, between the hero and the one struck, facing the blow)
+    // (drawn as wide as it strikes: the one struck and its splash round it, or one and a half tiles alone)
+    const span = Math.max(1.5, (def.radius || 0) * 2 + 1);
+    if (def.front) later(wait, () => addFx(fxTiles(fxid, span, 'sm'), t.x, t.y - 24, { flip: t.x > p.x }));
+    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(fxTiles(fxid, span, 'sm'), t));
+    const tx = t.tx, ty = t.ty;
+    // 천신의심판: the foes round it drawn into the middle first
+    if (def.pull) {
+      if (def.fxPull && M.fx[def.fxPull]) addFx(fxTiles(def.fxPull, (def.radius + 1) * 2 + 1, 'smp'), tx * TILE + TILE / 2, ty * TILE + TILE - 20, { scale: 1, alpha: 0.85 });
+      for (const o of around(tx, ty, def.radius + 1)) if (o !== t) tkShove(o, o.tx - Math.sign(o.tx - tx), o.ty - Math.sign(o.ty - ty));
+    }
+    // 극청룡참: the thrown sickle comes back and cuts again
+    if (def.again) later(wait + 0.4, () => { if (t.hp > 0) { hitOn(t); smite(t, st.dmg * def.again); } });
+    later(wait + (def.delay && !def.shot ? 0 : 0.05), () => {
+      const sr = def.radius || 0;
+      if (def.fx2 && M.fx[def.fx2]) addFx(fxTiles(def.fx2, sr * 2 + 1, 'sm2'), tx * TILE + TILE / 2, ty * TILE + TILE - 16);
+      G.shake = Math.max(G.shake, 0.08);
+      meleeImpact(2);
+      if (t.hp > 0) { smite(t, st.dmg, def.push ? [Math.sign(ex), Math.sign(ey)] : null); tkAfflict(t, def); tkBurstMark(t); }
+      if (sr) for (const o of around(tx, ty, sr)) {
+        if (o === t) continue;
+        smite(o, st.dmg * (def.splash || 0.4));
+        tkAfflict(o, def);
+        if (def.push) tkShove(o, o.tx + Math.sign(o.tx - p.tx), o.ty + Math.sign(o.ty - p.ty));
+      }
+      // 폭렬천뢰탄: the orb discharges into the nearest few
+      if (def.chain) tkNear(tx, ty, 3).filter(o => o !== t).slice(0, def.chain).forEach((o, i) => later(0.08 * (i + 1), () => {
+        if (o.hp <= 0) return;
+        hitOn(o);
+        smite(o, st.dmg * (def.chainK || 0.5));
+      }));
+      // 회선격풍: the wind stays and cuts on
+      if (def.linger) {
+        const x = tx * TILE + TILE / 2, y = ty * TILE + TILE - 10, run = G;
+        tkLoop(fxTiles(fxid, 3, 'sl'), x, y - 10, def.linger, { alpha: 0.6 });
+        for (let k = 1; k <= Math.round(def.linger / 0.5); k++) later(k * 0.5, () => {
+          if (G !== run) return;
+          for (const o of around(tx, ty, 1)) smite(o, st.dmg * def.lingerK);
+        });
+      }
+    });
+  },
+  // 해일강타: a wave out along the row (ways 1: the thickest row; 4: all four), `width` tiles to each side,
+  // striking each foe once as it passes; `pulses` waves `gap` apart.
+  crosswave({ st, def, fxid, smite, hitOn }) {
+    const p = G.player;
+    let ways = DIRS;
+    if ((def.ways || 4) === 1) {
+      const best = tkBestRow(def.depth);
+      if (!best) return 0.3;
+      ways = [[best[0], best[1]]];
+    } else if (!tkNear(p.tx, p.ty, def.depth).length) return 0.3;
+    const sx = p.tx, sy = p.ty, w = def.width || 0, len = def.depth * TILE, step = 0.05;
+    // 화혼돌파: the hero goes with it, to the farthest free tile of the way
+    if (def.dash && !steering()) {
+      // (through the crowd: the end of the way, or the free tile nearest it)
+      const [dx, dy] = ways[0];
+      const spots = [];
+      for (let k = def.depth; k >= 2; k--) for (const [ox, oy] of [[0, 0], [dy, dx], [-dy, -dx], [dx, dy]]) spots.push([sx + dx * k + ox, sy + dy * k + oy]);
+      for (const [x, y] of spots) if (tkMoveHero(x, y)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
+    }
+    // 이계의침식: what it raises stays along its way a moment
+    // (명천검파: each pulse lays its 검기 along every arm, turned with it — the cross reads whole)
+    const trailAt = () => { if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = def.trailStep || 2; k <= def.depth; k += def.trailStep || 2) later(k * step, () => addFx(fxTiles(def.trail, (w * 2 + 1) * (def.trailK || 1), 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 14, { scale: 1, rot: def.trailRot ? Math.atan2(dy, dx) : 0 })); };
+    for (let i = 0; i < (def.pulses || 1); i++) later(i * (def.gap || 0.3), () => {
+      trailAt();
+      for (const [dx, dy] of ways) {
+        addFx(fxTiles(fxid, w * 2 + 1, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
+        const seen = new Set();
+        for (let k = 1; k <= def.depth; k++) later(k * step, () => {
+          const tiles = [];
+          for (let o = -w; o <= w; o++) tiles.push([sx + dx * k + (dy ? o : 0), sy + dy * k + (dx ? o : 0)]);
+          for (const e of onTiles(tiles)) {
+            if (seen.has(e)) continue;
+            seen.add(e);
+            hitOn(e);
+            smite(e, st.dmg, [dx, dy]);
+            tkAfflict(e, def);
+          }
+        });
+      }
+    });
+  },
+  // 묵마수리검'쇄: `n` stars out all round to `reach` tiles; each stays `dur` seconds at its end, cutting
+  // the foes round it every `tick`.
+  starburst({ st, def, fxid, smite }) {
+    const p = G.player;
+    if (!tkNear(p.tx, p.ty, def.reach + 1.5).length) return 0.3;
+    const sx = p.tx, sy = p.ty, run = G, n = def.n || 8, fly = 0.18;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, cx = Math.round(Math.cos(a) * def.reach), cy = Math.round(Math.sin(a) * def.reach);
+      const ex = sx + cx, ey = sy + cy, x = ex * TILE + TILE / 2, y = ey * TILE + TILE - 18;
+      addFx(fxid, p.x, p.y - 24, { mv: [x - p.x, y - (p.y - 24), fly], scale: 0.7 });
+      later(fly, () => {
+        if (G !== run) return;
+        tkLoop(fxTiles(fxid, (def.radius || 1) * 2 + 1, 'sb'), x, y, def.dur, { alpha: 0.9 });
+        for (let k = 0; k < Math.round(def.dur / def.tick); k++) later(k * def.tick, () => {
+          if (G !== run) return;
+          const hit = around(ex, ey, def.radius || 1);
+          if (hit.length && def.fx2 && k % 2 === 0) fxOn(def.fx2, hit[0], { scale: 0.5 });
+          for (const e of hit) smite(e, st.dmg * def.k);
+        });
+      });
+    }
+  },
 };
+
+// The follow-up blows of the 9차 보조 공격 (echo): (def, blow, tick).
+const ECHO = {
+  // 호기어검: swords fly from over the hero to the nearest foes, piercing.
+  sword(def, d) {
+    const p = G.player;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 1).forEach((e, i) => {
+      const dx = e.x - p.x, dy = e.y - 20 - (p.y - 60), fl = 0.14;
+      later(i * 0.07, () => {
+        addFx(bigFx(def.fx2, def.shotSize || 70, 'es'), p.x, p.y - 60, { mv: [dx, dy, fl], flip: dx < 0, scale: 1 });
+        later(fl, () => {
+          if (e.hp <= 0) return;
+          if (def.fxHit) fxOn(fxTiles(def.fxHit, def.splash ? 3 : 1.5, 'ew'), e);
+          hurtEnemy(e, d);
+          // (the sword goes through: those beside it take a share)
+          if (def.splash) for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * def.splash);
+        });
+      });
+    });
+  },
+  // 묵혈독바르기: the blade cuts the nearest and leaves 묵혈독 on it (a curse, venom; it bursts as it dies).
+  venom(def, d) {
+    const p = G.player;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 1).forEach(e => {
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.6 });
+      if (def.fx2 && fxBudget('venom9h', 4)) fxOn(def.fx2, e, { scale: 0.5 });
+      e.venom9 = { until: G.t + 7, burst: d * (def.burst || 0.8) * 3 };
+      e.curse = Math.max(e.curse || 0, def.curse || 3);
+      applyStatus(e, 'venom', 3, 1);
+      hurtEnemy(e, d);
+    });
+  },
+  // 전도체: a bolt from the hero to the nearest, leaping on to the next unstruck within `jump`.
+  chain(def, d) {
+    const p = G.player, first = tkNear(p.tx, p.ty, def.range)[0];
+    if (!first) return;
+    const seq = [first];
+    while (seq.length < (def.shots || 3)) {
+      const c = seq[seq.length - 1], nx = tkNear(c.tx, c.ty, def.jump || 3).find(o => !seq.includes(o));
+      if (!nx) break;
+      seq.push(nx);
+    }
+    seq.forEach((e, i) => later(i * 0.06, () => {
+      if (e.hp <= 0) return;
+      fxOn(def.fxHit || 'h_hit_light', e, { scale: 0.8 });
+      hurtEnemy(e, d * Math.pow(0.85, i));
+      if (i === 0) e.slow = Math.max(e.slow || 0, 0.6);
+    }));
+  },
+  // 화살비폭격: a rain of arrows on a foe's spot and round it.
+  rain(def, d) {
+    const p = G.player, pool = tkNear(p.tx, p.ty, def.range).slice(0, 8);
+    if (!pool.length) return;
+    const e = pool[Math.floor(Math.random() * pool.length)], tx = e.tx, ty = e.ty;
+    addFx(fxTiles(def.fx2, (def.radius || 1) * 2 + 1, 'er'), tx * TILE + TILE / 2, ty * TILE + TILE - 10);
+    later(0.2, () => { for (const o of around(tx, ty, def.radius || 1)) hurtEnemy(o, d); });
+  },
+  // 기공십자광선'쾌: beams out of the hero's mirror in the four ways, every foe in the rows struck.
+  cross(def, d, k) {
+    const p = G.player, len = def.depth || 6, w = def.width === undefined ? 1 : def.width;
+    // (each beam drawn as long as it reaches, every tick it strikes; its arms `w` tiles to each side)
+    const pic = fxTiles(def.fx2, len * 2 + 1, 'cq');
+    addFx(pic, 0, -20, { follow: true, alpha: 0.85 });
+    const tiles = [];
+    for (const [dx, dy] of DIRS) for (let i = 1; i <= len; i++) for (let o = -w; o <= w; o++) tiles.push([p.tx + dx * i + (dy ? o : 0), p.ty + dy * i + (dx ? o : 0)]);
+    let got = 0;
+    for (const e of onTiles(tiles)) {
+      if (def.fxHit && got++ < 3) fxOn(def.fxHit, e, { scale: 0.5 });
+      hurtEnemy(e, d);
+    }
+  },
+  // 차원개방: fragments of the 이계의낫 out of the opened dimension cut the foes round the hero.
+  shard(def, d) {
+    const p = G.player;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 2).forEach((e, i) => later(i * 0.07, () => {
+      if (e.hp <= 0) return;
+      if (def.fxHit) addFx(fxTiles(def.fxHit, 3, 'sh'), e.x, e.y - 20);
+      hurtEnemy(e, d);
+      for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * (def.splash || 0.3));
+    }));
+  },
+  // 불길한혼불: an ill-omened fire clings to a foe near and bursts a moment later round it.
+  hex(def, d) {
+    const p = G.player, run = G;
+    tkNear(p.tx, p.ty, def.range).filter(e => !e.hex9).slice(0, def.shots || 1).forEach(e => {
+      e.hex9 = true;
+      const pic = tkLoop(def.fx2, e.x, e.y - 30, def.delay || 1.2, { scale: def.markScale || 0.45, alpha: 1 });
+      later(def.delay || 1.2, () => {
+        if (G !== run) return;
+        e.hex9 = false;
+        if (pic) pic.life = pic.t;
+        const tx = e.tx, ty = e.ty;
+        if (fxBudget('hex9', 4)) addFx(fxTiles(def.fxBurst || def.fx2, (def.radius || 1) * 2 + 1, 'hx'), tx * TILE + TILE / 2, ty * TILE + TILE - 12);
+        for (const o of around(tx, ty, def.radius || 1)) { hurtEnemy(o, d); if (def.dot) applyStatus(o, def.dot, 3, 1); }
+      });
+    });
+  },
+  // 치유의반향: the healing's echo strikes the nearest and gives the hero a little life back.
+  mend(def, d) {
+    const p = G.player;
+    let got = 0;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 1).forEach(e => {
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.8 });
+      hurtEnemy(e, d);
+      got++;
+    });
+    if (got && def.heal) heal(p.maxHp * def.heal / 100, false, true);
+  },
+  // 천공의공명: the marked (저주·표식) foes in reach are struck from the sky, the rest after them.
+  mark(def, d) {
+    const p = G.player, near = tkNear(p.tx, p.ty, def.range);
+    near.sort((a, b) => (b.curse > 0) - (a.curse > 0)).slice(0, def.shots || 2).forEach((e, i) => later(i * 0.06, () => {
+      if (e.hp <= 0) return;
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.6 });
+      hurtEnemy(e, d * (e.curse > 0 ? 1.5 : 1));
+    }));
+  },
+  // 권법의기원: fists of 기 strike the foes beside the hero.
+  fist(def, d) {
+    const p = G.player;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 1).forEach((e, i) => later(i * 0.08, () => {
+      if (e.hp <= 0) return;
+      fxOn(i % 2 ? def.fxHit : def.fx2, e, { scale: 0.7 });
+      hurtEnemy(e, d);
+    }));
+  },
+};
+/** 묵혈독바르기: a foe falling with 묵혈독 on it bursts, striking those round it. */
+function venomBurst(e) {
+  const v = e.venom9;
+  if (!v || v.until < G.t) return;
+  e.venom9 = null;
+  if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 20, { scale: 0.9 });
+  later(0.05, () => { for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); });
+}
 
 /** A companion's view of a 차수별 기술: the plain kind it casts it as (def.ck), or the skill as it is. */
 const TIER_ALIAS = {};
@@ -8662,7 +9043,7 @@ const ULT_GRAND = [
   { dark: 0.7, shake: 0.5 },
   { openW: 0.32, aura: 2.6, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.35, 1.5], lateN: 3, lateAt: 1.9, dark: 0.9, shake: 0.55 },
   { openW: 0.45, aura: 3.1, auraW: 160, echoN: 12, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.25, 1.6], lateN: 5, lateAt: 1.8, dark: 1.1, shake: 0.65 },
-  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8 },
+  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8, cutT: 3.4 },
 ];
 // (ways that already hang their main or cast picture over the screen: no second call of it)
 const ULT_SCREEN_OWN = { rain: 'main', mark: 'cast', chain: 'cast' };
@@ -8700,6 +9081,20 @@ function ultGrand(t, bi) {
   G.darkUntil = Math.max(G.darkUntil || 0, G.t + (t.dark || g.dark));
   G.shake = Math.max(G.shake, g.shake);
   if (!bi) return;
+  // 9차: the original 궁극's own full-screen art (2662 captures: data.js ULT_TIERS cutin, fx o_<cls>_ult9) framing the
+  // darkened field, its middle left clear; not in a war, where thirty fighters are drawn too.
+  let cine = false;
+  if (g.cutT && t.cutin && M.fx[t.cutin] && !G.war) {
+    const c = M.fx[t.cutin], want = Math.max(VW, VH * c.w / c.h) * 1.04;
+    // (after the dark's first beat — the hero's glow — the cinematic plays, holds and fades)
+    later(0.25, () => {
+      if (G.dead || !G.player || !ultLayer(t.cutin, want, 'gc', 0, -10, { follow: true, cap: 3.5, alpha: calm ? 0.55 : 0.92 })) return;
+      const f = G.fxs[G.fxs.length - 1];
+      f.loop = true;
+      f.life = g.cutT;
+    });
+    cine = true;
+  }
   const ownScreen = ULT_SCREEN_OWN[t.mech] && t[ULT_SCREEN_OWN[t.mech]];
   const open = t.open !== undefined ? t.open : ownScreen ? null : t.cast || t.main;
   // (9차: the call gives way to the last burst — never two screen pictures at once, a phone's worth)
@@ -8709,6 +9104,8 @@ function ultGrand(t, bi) {
     f.life = Math.min(f.life, (t.finAt || g.finAt) + 0.05);
   }
   if (light) return;
+  // (the original's own cinematic fills the screen: the echoes round it would only cover it)
+  if (cine) { G.darkUntil = Math.max(G.darkUntil, G.t + g.cutT + 0.3); return; }
   // The technique's picture held round the hero while it lasts (longer a band).
   // (a picture drawn added, light on light, is drawn whole — its black too — and costs a slowed phone
   // several times a plain one: the held picture and the many echoes are plain ones where the tier has them)
@@ -8969,7 +9366,16 @@ function castUlt() {
     const strike = (e, k) => { if (e.hp > 0) hurtEnemy(e, base * k); };
     G.ultHits = 0;
     const run = ULT_MECH[def.mech] || ULT_MECH.rain;
-    if (seen.length || def.mech === 'sanctuary') run(def, seen, strike);
+    // 9차: the original 궁극's own cinematic (ultGrand) is the picture; the way of striking keeps its blows,
+    // but its own big pictures give way to a small hit flash (they covered the cinematic)
+    const cine = def.cutin && M.fx[def.cutin] && !G.war && ultBand(G.cls.id) === 3;
+    const quiet = cine ? { ...def, main: 'h_ml_burst', cast: null, burst: null, ring: null, drop: 'h_ml_burst', shot: 'h_ml_burst', after: null, hit: 'h_ml_burst', hitScale: 0.6, mainScale: 0.6, castStages: false } : def;
+    // 이펙트=판정: the cinematic covers the whole screen while it plays, so it strikes the whole screen while it
+    // plays — the way of striking keeps 60% of the blow, the rest comes in 8 beats over the cinematic's 3.4 s.
+    const CINE_N = 8, cineK = 0.4 / CINE_N;
+    const blow = cine ? (e, k) => strike(e, k * 0.6) : strike;
+    if (cine) for (let i = 0; i < CINE_N; i++) later(0.3 + i * 0.42, () => { if (!G.dead) for (const e of onScreen()) strike(e, cineK); });
+    if (seen.length || def.mech === 'sanctuary') run(quiet, seen, blow);
     if (seen.length || def.mech === 'sanctuary') ultGrand(def, ultBand(G.cls.id));
   }
   // What a tier brings besides the blow (헬파이어's 보호막 …).
@@ -12763,6 +13169,7 @@ function thick(text, x, y, color) {
 }
 
 function floatText(x, y, text, color, box = false) {
+  if (window.__quietText) return; // test: frames of a skill without the numbers over it
   if (G.texts.length > 50) G.texts.shift();
   G.texts.push({ x: x + rand(-4, 4), y, text: String(text), color, t: 0, box });
 }
@@ -14338,6 +14745,7 @@ function render(now) {
     ctx.globalAlpha = t.t < 0.7 ? 1 : 1 - (t.t - 0.7) / 0.4;
     // No number over the top bar (the ground's name, the boss's life): one up there is not drawn.
     if (t.num && t.y < camY + 56) continue;
+    if (t.num && window.__quietText) continue; // test: a skill's frames without its numbers
     if (t.box) {
       const w = Math.ceil(ctx.measureText(t.text).width) + 6, x = Math.round(t.x - w / 2), y = Math.round(t.y - 10);
       ctx.fillStyle = 'rgba(34,30,92,0.9)';
@@ -15925,10 +16333,34 @@ window.__gather = (r = 4) => { // test: the field's foes set round the hero (for
   return n;
 };
 window.__skillAlias = () => SKILL_ALIAS; // test: skills merged into others (스킬 2차 개편)
+window.__skills = () => SKILLS; // test: the skill table (9차 스킬 개편)
 window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
 window.__ultGrand = () => ULT_GRAND; // test: the 필살기 단계 위엄 table (measuring what each layer costs)
 // Test (필살기 단계 위엄): what the effects up now cover of the view — the drawn part of each picture
 // (its trimmed box this frame, turned) on a grid of g×g/2 cells; n pictures, ids, the big ones.
+// Test (이펙트=판정): each effect up now as a box in tiles from the hero's tile [x0, y0, x1, y1] with its id.
+window.__fxBoxes = () => {
+  const p = G.player, out = [];
+  for (const f of G.fxs) {
+    if (f.t < 0 || !M.fx[f.id]) continue;
+    const d = M.fx[f.id], src = d.src ? M.fx[d.src] : d, k = f.scale * (d.k || 1);
+    let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
+    if (f.mv) { const q = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - q) * (1 - q); x += f.mv[0] * e; y += f.mv[1] * e; }
+    const i = fxFrame(durs(f.id), f.loop ? G.t : f.t, f.loop) + (d.f0 || 0), bb = src.bb, b4 = i * 4;
+    const w = d.w * k, h = d.h * k;
+    const dx = d.ax !== undefined && f.anchor !== 'mid' ? -d.ax * k : -w / 2;
+    const dy = d.ax !== undefined && f.anchor !== 'mid' ? -d.ay * k + (f.anchor === 'bottom' ? 0 : 14) : (f.anchor === 'bottom' ? -h : -h / 2);
+    let r = bb && b4 + 3 < bb.length ? [dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k] : [dx, dy, w, h];
+    if (!r[2]) continue;
+    if (f.flip) r = [-r[0] - r[2], r[1], r[2], r[3]];
+    let pts = [[r[0], r[1]], [r[0] + r[2], r[1]], [r[0], r[1] + r[3]], [r[0] + r[2], r[1] + r[3]]];
+    if (f.rot) { const c = Math.cos(f.rot), s = Math.sin(f.rot); pts = pts.map(([a, b]) => [a * c - b * s, a * s + b * c]); }
+    // (a body's tile: its feet are 6 px over the tile's foot, its middle about 24 px up)
+    const tx = q => (x + q[0]) / TILE - 0.5 - p.tx, ty = q => (y + q[1] + 30) / TILE - 1 - p.ty;
+    out.push([String(f.id).split('#')[0], Math.min(...pts.map(tx)), Math.min(...pts.map(ty)), Math.max(...pts.map(tx)), Math.max(...pts.map(ty))]);
+  }
+  return out;
+};
 window.__fxCover = (g = 48) => {
   if (!G || !G.camView) return null;
   const [cx, cy] = G.camView, p = G.player, gw = g, gh = Math.round(g * VH / VW), on = new Uint8Array(gw * gh);
