@@ -143,8 +143,8 @@ export const SKILLS = {
     desc: '신수마법. 백호의 땅 기운으로 몬스터를 치고 느리게 한다' },
   m_curse: { cls: 'mage', req: 6, name: '저주', kind: 'strike', fx: '84', dmg: 3, cd: 5, range: 7, radius: 1, count: 1,
     hitAt: 0.3, curse: 4, desc: '몬스터와 그 주위의 방어를 깎아 4초 동안 받는 피해가 40% 늘어난다' },
-  m_fire4: { elem: 'fire', fxs: ['92', '92', '94', '94', '96', '96', '144', '144'], cls: 'mage', req: 1, name: '화염주첨', kind: 'spell4', fx: '92',
-    dmg: 10, cd: 2.2, range: 5, names: FIRE.map(n => n + '첨'), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다(사정거리가 짧다)' },
+  m_fire4: { elem: 'fire', fxs: ['92', '92', '94', '94', '96', '96', '144', '144'], cls: 'mage', req: 1, name: "화염주'첨", kind: 'spell4', fx: '92',
+    dmg: 10, cd: 2.2, range: 5, names: FIRE.map(n => n.replace(' ', '') + "'첨"), desc: '상하좌우 네 줄에서 가장 가까운 몬스터를 한꺼번에 태운다(사정거리가 짧다)' },
   m_para: { cls: 'mage', req: 12, name: '마비', kind: 'strike', fx: '85', dmg: 4, cd: 4.5, range: 7, radius: 1, count: 1,
     hitAt: 0.2, stun: 2, desc: '몬스터와 그 주위를 마비시켜 잠시 움직이지 못하게 한다' },
   // 1차 승급
@@ -1169,6 +1169,352 @@ export const YEON_FX = {
   // and p_thunderbomb its lightning (연's 봉황 is a phoenix, not a thunderbolt).
 };
 
+// ================================================================ 스킬 2차 개편 (2차 피드백)
+// What players found wrong, and what this block does about it (audit: README "스킬 2차 개편"):
+//  · another class's picture or name on a class's card (연's 5차 previews lent across classes: 황룡승천 wore
+//    the 무사's 화룡사멸, 대살격 the 천인's 자아파괴, 무신의가호 the 격투가's 권신 …; 청명파살·운화·백열장·약육강식·
+//    분골쇄신·호신강기·폭화분격·원혼소환 are every class's or a monster's, not the class's own) — each card now wears
+//    its own class's 연 picture and a name from that class's own 연/원작 records, or is merged away;
+//  · the same spell twice under two names (혈겁만파 and 만검귀종 were one picture; 분혼경천 and 질풍난무, 사슬벼락 and
+//    천뢰마옥쌍구, 혈독주입 and 맹독표창 …) — one of each pair is merged into the other (SKILL_ALIAS keeps a saved
+//    build's slot) or moved up into the 필살기 ladder below;
+//  · the 필살기 one spell for all of 승급, the normal spell blown up — ULT_TIERS: four 필살기 a class, by 승급 band
+//    (0~2차, 3~5차, 6~8차, 9차), each its own way of striking (game.js ULT_MECH) in its own layered 연 pictures;
+//  · the area spells coming round too fast — AOE_CD below: a floor on their wait (and they quicken less a 단),
+//    their blow raised to keep the hunt's pace.
+
+// Merged away: [the skill, the one it lives on as]. A saved build's slot goes to that one (game.js).
+const RETIRE = {
+  // into the 필살기 ladder (ULT_TIERS)
+  w_blood: 'w_howl', w_myriad: 'w_blackdragon', r_bunhon: 'r_jiok', r_gale: 'r_tudo', m_fire3: 'm_seongryeo', m_kalpa: 'm_cross',
+  p_break: 'p_daeseon', p_daejijin: 'p_cheonseon', p_taiji: 'p_seongi', a_allwhirl: 'a_whirl', a_eagle: 'a_chain', a_blood5: 'a_air',
+  l_genesis: 'l_burst', l_dragon: 'l_annihil', l_moonfull: 'l_javelin', mk_buddha: 'mk_pointburst', mk_rupture: 'mk_quake',
+  mk_advent: 'mk_combo', mk_aventhit: 'mk_point', md_exfrenzy: 'md_crossfrenzy', md_bloodbat: 'md_silence', md_wavefrenzy: 'md_wave',
+  cl_thunder: 'cl_storm2', cl_tiger: 'cl_claw', cl_reindeer: 'cl_gumiho', dk_super: 'dk_judgment', dk_storm: 'dk_weight', dk_rage: 'dk_nemesis',
+  rp_madness: 'rp_spiral', rp_deadly: 'rp_crush', rp_gate: 'rp_chain',
+  // another class's (or everyone's) name, or a picture borrowed from another class
+  c_kick: null, a_unhwa: 'a_storm', a_rod: 'a_thunder', a_tuhyeol4: 'a_chain', mk_whitepalm: 'mk_body', mk_yuk: 'mk_kyokushin',
+  rp_guard: 'rp_barrier', rp_bomb: 'rp_inferno', rp_wraith: 'rp_burst', l_weebo: 'l_reflect', l_ungi: 'l_innate',
+  w_dragon: 'w_chohonjin', w_advance: 'w_gale', w_swords: 'w_bigeom', r_flamesword: 'r_flysword', r_chainstar: 'r_shuriken',
+  r_kill: 'r_pilgeom', r_bloodslash: 'r_pilgeom', m_thunderball: 'm_chain', m_desert: 'm_jiokchak', m_inferno: 'm_jiokchak',
+  p_wargod: 'p_aegis', p_bind: 'p_geomok', p_realm: 'p_spirit', p_skyspirit: 'p_spirit', p_bagua: 'p_cheonseon',
+  // the same spell twice: one name kept
+  w_stone: 'w_bless', md_storm: 'md_stormfrenzy', w_thunder: 'w_howl', w_flash: 'w_gwangya', w_dawn: 'w_frenzy', r_phantom: 'r_clone', r_shadowclone: 'r_clone',
+  r_shadowstar: 'r_shuriken', r_bloom: 'r_hidden', m_twin: 'm_chain', m_wisdom: 'm_magi', m_gale: 'm_cross', m_shards: 'm_frost',
+  p_burst: 'p_flash', p_dragongod: 'p_aegis', p_warmth: 'p_life', dk_mook: 'dk_body', rp_nether: 'rp_resurrect',
+};
+export const SKILL_ALIAS = {};
+for (const [id, to] of Object.entries(RETIRE)) {
+  const s = SKILLS[id];
+  Object.assign(s, { retired: true, was: s.cls, cls: '-', pre: undefined, up: undefined });
+  if (to) SKILL_ALIAS[id] = to;
+}
+// No spell grows into one merged away.
+for (const s of Object.values(SKILLS)) if (s.up && SKILLS[s.up].retired) delete s.up;
+
+// Each card's own look and way, where it changes. fx: its class's own 연 strip (k_<id>, or a layer k_u_<name>,
+// tools/yeon_skill2_skills.json). fxCast · fxHit · fxAfter: the stages of a high-tier spell (game.js cast()).
+// pattern: how a screen-wide spell goes (game.js 'screen').
+const REWORK = {
+  // 전사 — 백호의 검사: 정면을 쪼개고(검기), 둘레를 쓸고(백호), 버틴다(투혼). Its 필살기 are its great cleaves.
+  w_lion: { name: '난공불락', kind: 'buff', buff: 'shield', fx: 'k_w_lion', cd: 16, duration: 4, aura: 9, auraR: 1, fxHit: 'k_u_w_wave', dmg: 0, stun: 0, falloff: 0,
+    desc: '난공불락의 기세로 4초 동안 받는 피해가 절반이 되고, 곁에서 덤비는 몬스터를 거듭 베어 낸다' },
+  w_buff: { up: 'w_jin', desc: '잠시 공격력이 크게 오른다. 8단 + 2차 승급이면 진백호령이 된다' },
+  w_jin: { evolved: true, power: 0.8, crit: 0.15, desc: '백호령 8단 + 2차 승급. 백호의 힘이 깃들어 잠시 공격력이 두 배 가까이 되고 치명타가 잦아진다' },
+  w_howl: { pattern: 'ring', fxHit: 'k_w_roar', desc: '포효가 몸에서부터 물결처럼 퍼져 화면의 몬스터를 차례로 친다. 멀어질수록 약하다' },
+  w_frenzy: { power: 0.6, alsoHaste: true, desc: '광폭해져 잠시 공격력이 오르고 모든 기술이 빨리 돈다' },
+  w_roar: { up: 'w_roar3', desc: '체력을 깎아 바치며 정면 한 칸의 몬스터에게 아주 큰 피해를 준다. 8단 + 3차 승급이면 동귀어진\'첨이 된다' },
+  w_roar3: { evolved: true, desc: '동귀어진 8단 + 3차 승급. 많은 체력을 바쳐 정면 한 칸의 몬스터에게 치명적인 피해를 주고 잠시 기절시킨다' },
+  w_fly: { kind: 'line', depth: 4, max: undefined, desc: '검을 날려 몬스터가 가장 많은 쪽 일렬 네 칸을 꿰뚫는다' },
+  w_rush: { fxHit: 'k_u_w_wave', fxAfter: 'k_w_tiger', desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 꿰뚫고, 지난 자리에 검기가 남는다' },
+  w_chohonjin: { fxCast: 'k_w_chohon', fxHit: 'k_w_roar3', desc: '혼을 부르는 사슬로 둘레의 몬스터를 휘감아 조인다' },
+  w_tarok: { fxHit: 'k_u_w_wave' },
+  w_gwangya: { fxCast: 'k_w_gale', fxHit: 'k_w_jinseom', fxAfter: 'k_w_tiger' },
+  w_blackdragon: { kind: 'vortex', depth: 5, dur: 1.2, k: 0.4, radius: 0, ck: 'line', fxHit: 'k_w_fly', dmg: 32, cd: 5.5,
+    desc: '검은 용의 칼바람이 앞으로 다섯 칸을 휘몰아치며 곁의 몬스터를 끌어들여 거듭 벤다' },
+  w_sentence: { kind: 'mark', fx: 'h_hit_tiger', fx2: 'k_u_w_wave', dmg: 40, cd: 5, range: 6, count: 3, radius: 1, delay: 1.2, strongest: true, ck: 'strike', stun: 1,
+    desc: '가장 강한 몬스터 셋에 사형을 선고해 묶어 두고, 1.2초 뒤 백호의 검기로 둘레까지 벤다' },
+  w_hogi: { fx: 'y_baram', fxHit: 'k_w_tiger' },
+  // 도적 — 그림자의 검객: 등 뒤로 파고들고(검무), 던지고(암기), 숨는다(그림자).
+  r_nuri: { buff: 'crit', crit: 0.3, desc: '누리의 힘을 빌려 잠시 치명타가 크게 잦아진다' },
+  r_pajin: { up: 'r_venom' },
+  r_venom: { evolved: true, fx: 'k_r_pajin', fxHit: 'k_r_drain', desc: '파진표창 8단 + 5차 승급. 독 묻은 표창이 몬스터 셋에 박혀 받는 피해를 늘린다' },
+  r_muyoung: { kind: 'evade', hit: 10, count: 2, guard: 0.5, range: 4, fx2: 'k_r_blink', cd: 6, dmg: 0,
+    desc: '그림자 없는 걸음으로 가까운 몬스터에게서 물러나며 잠시 몸을 피하고, 물러나며 둘을 벤다' },
+  r_jiok: { kind: 'orbit', fx: 'k_r_jiok', fx2: 'k_u_r_backhit', hit: 14, cd: 13, duration: 6, n: 3, k: 0.45, radius: 1, ck: 'nova', dmg: 0, falloff: 0,
+    desc: '지옥의 그림자 분신 셋을 불러 6초 동안 몸 둘레를 돌며 닿는 몬스터를 베게 한다' },
+  r_hidden: { fx: 'k_u_r_backhit', fxCast: 'k_r_muyoung', desc: '모습을 감춘 채 바라보는 쪽 몬스터의 등 뒤로 날아들어 네 번 벤다' },
+  r_shuriken: { fx: 'k_r_shadowstar', fxHit: 'k_r_formless', desc: '묵마의 십자 수리검이 몬스터 둘과 그 상하좌우 두 칸에서 터진다' },
+  r_amsal: { fxCast: 'k_r_stealth', fxHit: 'k_u_r_backhit' },
+  r_suhyo: { fxHit: 'k_r_dance' },
+  r_pilgeom: { fxHit: 'k_u_r_backhit', fxAfter: 'k_r_formless' },
+  r_chamgan: { fxHit: 'k_r_flysword' },
+  r_hyeoldok: { fx2: 'y_hyeoldok' },
+  r_tudo: { fx2: 'k_r_amsal', fxCast: 'k_r_gimun' },
+  // 주술사 — 신수마법과 저주: 태우고(화염), 얼리고(빙뢰), 묶는다(주술).
+  m_toema: { name: '마성제마술', fx: 'k_m_toema', fx2: 'k_m_cheonggi', kind: 'stack', count: 2, stacks: 3, per: 0.3, ck: 'spell', dmg: 13, cd: 2.2,
+    desc: '마성을 물리치는 고리를 몬스터 둘에 겹겹이 씌운다. 셋이 쌓이면 고리가 터져 둘레까지 친다' },
+  m_frost: { fx: 'k_u_m_ice', noBig: true, pattern: 'rain', fxDrop: 'k_u_m_ice', dropSize: 70, fxHit: 'h_hit_6', desc: '서리 바람이 화면을 쓸며 몬스터마다 얼음이 맺혀 치고 느리게 한다' },
+  m_quake: { pattern: 'ring' },
+  m_nodo: { pattern: 'pull', desc: '노한 물결의 소용돌이가 곁의 몬스터를 끌어들인 뒤 화면의 몬스터를 치고 잠시 멈춘다' },
+  m_chaos: { pattern: 'mark', fxMark: 'k_m_chaos', desc: '혼돈의 혼을 화면의 몬스터에 씌우고, 잠시 뒤 한꺼번에 흔들어 멈추게 한다' },
+  m_manpa: { pattern: 'sweep', desc: '만 갈래 독이 화면을 쓸고 지나가며 몬스터를 치고 느리게 하며 피해를 늘린다' },
+  m_cross: { fxCast: 'k_u_m_seal', fxHit: 'k_x_m_ult_hit', fxAfter: 'k_m_quake' },
+  m_coldveil: { name: '혼마염', promo: 5, req: 21, pattern: 'rain', fxDrop: 'k_m_jiokchak', dropSize: 90, curse: 4, slow: 0, stun: 0,
+    desc: '혼을 태우는 보랏빛 마염이 화면의 몬스터마다 차례로 피어올라 태우고 받는 피해를 늘린다' },
+  m_shift: { name: '마기순보', fxHit: 'k_u_m_bluefire', desc: '마기를 타고 바라보는 쪽 몬스터 너머로 순식간에 옮겨 가며 푸른 불꽃으로 친다' },
+  m_instant: { fx: 'k_u_m_bluefire' },
+  m_jiokchak: { fxCast: 'k_m_magi', fxAfter: 'k_m_quake', ticks: 2, desc: '지옥의 흑염으로 대상을 불사르고, 흑염이 그 자리에 남아 둘레를 거듭 태우며 받는 피해를 늘린다' },
+  m_seongryeo: { strongest: true, desc: '가장 강한 몬스터(보스를 먼저)에게 운석을 떨어뜨려 주위까지 피해를 준다' },
+  m_chain: { fxHit: 'h_hit_light' },
+  m_seonsim: { fx: 'k_m_curse', fx2: 'k_m_manpa' },
+  // 도사 — 기원과 진법: 살리고(기원), 하늘의 벌로 치고(천벌), 진을 펼친다(진법).
+  p_aegis: { aura: 6, auraR: 1, fxHit: 'k_u_p_sparkle', fxCast: 'k_u_p_seal', desc: '진을 펼쳐 잠시 받는 피해를 절반으로 줄이고, 진에 닿은 몬스터를 거듭 친다' },
+  p_daeseon: { pattern: 'mark', fxMark: 'k_p_daeseon', desc: '화면의 몬스터에 혼을 씌우고 잠시 뒤 한꺼번에 흔들어 치고 느리게 한다' },
+  p_wave: { fxHit: 'k_u_p_swirl' },
+  p_judge: { fxHit: 'h_hit_light', fxAfter: 'k_u_p_sparkle' },
+  p_honma: { fx: 'k_u_p_swirl', fx2: 'k_p_jiroe' },
+  p_saint: { fx: 'k_p_saint' },
+  p_seongi: { fx: 'k_u_p_bubble', fxCast: 'k_u_p_pillar_b' },
+  p_cheonseon: { fxCast: 'k_u_p_seal', fxHit: 'k_u_p_pillar_o', hitScale: 0.6 },
+  p_thunderbomb: { fxHit: 'k_p_noejeon', fxAfter: 'k_p_jiroe' },
+  p_flash: { fxHit: 'k_u_p_sparkle' },
+  p_geomok: { fxAfter: 'k_p_quake' },
+  p_bonghwang: { fxCast: 'k_p_phoenix' },
+  // 궁사 — 연의 명궁: 꿰뚫고(사격), 터뜨리고(마탄), 화살을 강화한다(궁술).
+  p_toema: { kind: 'chain', count: 3, jump: 3, decay: 0.85, ck: 'spell', desc: '마를 물리치는 주문이 몬스터에서 몬스터로 셋까지 옮겨 붙는다' },
+  a_cheong: { name: '투혈', fxCast: 'k_u_a_r3cast', desc: '피를 실은 화살이 아홉 칸을 꿰뚫는다. 꿰뚫을 때마다 12%씩 강해진다' },
+  a_thunder: { kind: 'reset', buff: undefined, duration: 2, cd: 18, desc: '천기를 모아 다른 모든 기술의 재사용 대기를 거의 끝내고, 잠시 모든 기술이 빨리 돈다' },
+  a_aim: { kind: 'mark', fx: 'k_a_aim', fx2: 'k_a_shot', count: 1, radius: 0, delay: 0.7, strongest: true, ck: 'spell', range: 8,
+    desc: '가장 강한 몬스터를 0.7초 동안 조준한 뒤 강한 화살을 꽂는다' },
+  a_firewall: { kind: 'zone', fx: 'k_a_firewall', radius: 1, duration: 3, tick: 0.5, k: 0.35, dot: 'burn', ck: 'strike', range: 6,
+    desc: '몬스터가 가장 많은 곳에 불화살을 꽂아 3초 동안 타오르는 화염 장벽을 세운다' },
+  a_air: { kind: 'barrage', fx: 'k_a_air', fx2: 'k_u_a_wind', fxCast: 'k_u_a_hawk', depth: 6, n: 5, k: 0.5, radius: 0, count: 3, range: 8, ck: 'spell',
+    desc: '미리 장전한 화살 다섯 발을 조준 없이 부채꼴로 쏟아 낸다' },
+  a_bless: { power: 0.8, crit: 0.25, desc: '활에 혼을 불어넣어 잠시 공격력이 오르고 치명타가 크게 잦아진다' },
+  a_spiral: { fxHit: 'k_u_a_wind' },
+  a_whirl: { fxHit: 'k_u_a_tornado' },
+  a_storm: { kind: 'rain', fx: 'k_a_storm', fx2: 'k_u_a_tornado', radius: 3, drops: 9, dur: 2, k: 0.5, ck: 'strike', count: 1, hitAt: undefined, dmg: 30, cd: 6,
+    desc: '하늘로 쏘아 올린 화살이 몬스터가 가장 많은 곳에 2초 동안 비처럼 쏟아진다' },
+  a_chain: { fxHit: 'k_a_bomb' },
+  a_chase: { fxCast: 'k_u_a_wind' },
+  a_inferno: { fxCast: 'k_u_a_r5cast' },
+  // 무사 — 창의 달인: 일렬로 꿰찌르고(창술), 휘두르고 내리꽂고(창격), 기를 돌린다(기공).
+  l_union: { power: 0.8, alsoHaste: true, desc: '창과 혼이 하나가 되어 잠시 공격력이 오르고 모든 기술이 빨리 돈다' },
+  l_thunder: { aura: 10, auraR: 1, fxHit: 'k_u_l_bolt', desc: '뇌신의 힘을 몸에 받아 잠시 모든 기술이 빨리 돌고, 곁의 몬스터에게 벼락이 튄다' },
+  l_noegi: { fx: 'k_u_l_bolt' },
+  l_noegichim: { fxHit: 'k_u_l_bolt' },
+  l_revenge: { fx: 'k_u_l_avenge', fxCast: 'k_l_unity' },
+  l_annihil: { fxHit: 'h_hit_fire' },
+  l_javelin: { fxHit: 'k_u_l_bolt' },
+  l_extinct2: { fxAfter: 'k_l_extinct' },
+  l_formless: { fxHit: 'k_u_l_bolt' },
+  // 격투가 — 맨주먹: 파고들어 두들기고(권법), 혈을 짚는다(점혈), 내공으로 버틴다(내공).
+  mk_origin: { power: 0.6, aura: 12, auraR: 1, fxHit: 'k_u_mk_energy', desc: '권법의 근원에 닿아 잠시 공격력이 오르고, 곁의 몬스터를 기의 주먹이 거듭 친다' },
+  mk_technique: { power: 0.5, crit: 0.2, desc: '권신의 기법을 깨쳐 잠시 공격력이 오르고 치명타가 잦아진다' },
+  mk_whirl: { fx: 'k_mk_whirl' },
+  mk_stack: { fx: 'k_u_mk_area' },
+  mk_muhan: { fx: 'k_u_mk_bodyhit' },
+  mk_body: { fxHit: 'k_u_mk_bodyhit' },
+  mk_kyokushin: { fxHit: 'k_u_mk_bodyhit', fxAfter: 'k_u_mk_area' },
+  mk_combo: { fxHit: 'k_u_mk_aventhit', hitScale: 0.7 },
+  mk_point: { fxHit: 'k_u_mk_energy' },
+  // 마도사 — 금기된 마력: 구슬과 광선(기공), 광폭기(광폭), 결계와 기원(금기).
+  md_arrow: { kind: 'line', depth: 5, desc: '마력의 화살이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다' },
+  md_cross: { up: 'md_crossfrenzy' },
+  md_crossfrenzy: { evolved: true, fxHit: 'k_u_md_storm', desc: '기공십자광선 8단 + 5차 승급. 광폭기를 실은 십자광선이 대상과 그 상하좌우를 불사른다' },
+  md_resonance: { kind: 'chain', count: 4, jump: 3, decay: 0.85, ck: 'spell', fxHit: 'k_u_md_orb' },
+  md_frenetic: { power: 0.9, drain: 0.08, fxCast: 'k_u_md_wing', desc: '광폭해져 잠시 공격력이 오르고, 입힌 피해의 일부로 체력을 되찾는다' },
+  md_fice: { fx: 'k_md_orbice', fx2: 'k_x_md_orbice_shot' },
+  md_stormfrenzy: { fxHit: 'k_u_md_storm' },
+  md_storm: { fxHit: 'h_hit_light' },
+  md_decay: { fxHit: 'k_u_md_decay' },
+
+  // 천인 — 하늘의 힘으로 뛰어드는 술사: 하늘의 불·번개(천벌), 질주, 수호.
+  cl_intrep: { power: 0.3, crit: 0.35, alsoShield: 3, desc: '깨달음을 얻어 잠시 치명타가 크게 잦아지고, 3초 동안 받는 피해가 절반이 된다' },
+  cl_defense: { kind: 'shieldburst', hit: 30, cd: 14, duration: 4, radius: 2, stun: 0.6, fx2: 'k_cl_defense', buff: undefined,
+    desc: '완전한 방어로 4초 동안 받는 피해가 절반이 되고, 방어가 풀릴 때 터져 둘레 두 칸을 치고 멈춘다' },
+  cl_wedge: { fx: 'k_u_cl_soul2' },
+  cl_shatter: { name: '신체강화' , desc: '몸을 단단히 강화하며 체력 12%를 바쳐 둘레 두 칸을 내리친다. 바친 체력이 클수록 피해가 커진다' },
+  cl_bind: { pattern: 'mark', fxMark: 'k_u_cl_grayhit' },
+  cl_gumiho: { kind: 'orbit', fx: 'k_cl_gumiho', fx2: 'k_u_cl_gumiho', hit: 26, duration: 6, n: 2, k: 0.5, radius: 1, ck: 'nova', dmg: 0,
+    desc: '아홉 꼬리의 수호 구미호 둘이 6초 동안 몸 둘레를 돌며 닿는 몬스터를 휘감는다' },
+  cl_crow: { kind: 'chain', count: 3, jump: 3, decay: 0.9, ck: 'spell', desc: '세 발 까마귀가 몬스터에서 몬스터로 날아다니며 셋을 쪼아 댄다' },
+  cl_claw: { kind: 'hop', count: 3, stun: 0.3, ck: 'blink', desc: '용의 발톱으로 몬스터에서 몬스터로 옮겨 다니며 셋을 할퀸다' },
+  cl_crowfire: { fxAfter: 'k_u_cl_pillar', afterScale: 0.5 },
+  cl_ego: { fxCast: 'k_u_cl_soul', fxAfter: 'k_u_cl_soul2' },
+  cl_snake: { fxHit: 'h_hit_tiger' },
+  // 도깨비 — 방망이의 장사: 강한 놈부터 내리찍고(일격), 휘두르고(방망이), 도깨비불을 부린다.
+  dk_flatten: { pattern: 'ring' },
+  dk_maryu: { fx: 'k_dk_body' },
+  dk_goldhit: { fxHit: 'k_u_dk_gold' },
+  dk_nemesis: { fxAfter: 'k_dk_flatten', afterScale: 0.4 },
+  dk_hamstring: { fxHit: 'k_dk_paddle', hitScale: 0.4 },
+  // 차사 — 저승의 백도: 베고 파고들고(검술), 혼을 쏘고(영혼), 저승의 기운(저승).
+  rp_eye: { power: 0.4, crit: 0.3, drain: 0.06, desc: '저승의 눈을 떠 잠시 치명타가 잦아지고, 입힌 피해의 일부로 체력을 되찾는다' },
+  rp_convert: { fx: 'k_u_rp_ring' },
+  rp_resonate: { fx: 'k_u_rp_reshit' },
+  rp_chain: { fxCast: 'k_u_rp_redeem' },
+  rp_burst: { fxHit: 'k_u_rp_reshit', fxAfter: 'k_u_rp_redeem', afterScale: 0.6 },
+  rp_crush: { fxHit: 'k_rp_cut', hitScale: 0.5 },
+};
+for (const [id, o] of Object.entries(REWORK)) {
+  const s = SKILLS[id];
+  Object.assign(s, o);
+  // a picture of its own now: not the old tinted or borrowed one
+  if (o.fx) Object.assign(s, { fxs: null, tint: null, modern: null });
+}
+// The stages of the high tiers (5~9차): each a call, a hit and what stays, out of its class's own 연 strips.
+const LAYERS = {
+  w_tarok: { fxCast: 'k_w_chohon', fxAfter: 'k_w_tiger' }, w_blackdragon: { fxCast: 'k_u_w_wave', fxAfter: 'k_w_roar2', afterScale: 0.6 },
+  w_sentence: { fxCast: 'k_w_will' }, w_hogi: { fxCast: 'k_w_ungong' },
+  r_venom: { fxCast: 'k_r_stealth', fxAfter: 'g_poison_green', afterScale: 0.5 }, r_hidden: { fxHit: 'k_r_dance' },
+  r_shuriken: { fxAfter: 'k_r_forget' }, r_chamgan: { fxAfter: 'k_u_r_backhit', afterScale: 0.6 }, r_hyeoldok: { fxCast: 'k_r_drain' },
+  r_nuri: { fx: 'h_levelup_force' },
+  m_coldveil: { fxHit: 'k_m_curse' }, m_chain: { fxCast: 'k_m_cheonggi' }, m_instant: { fxCast: 'k_m_sun' }, m_shift: { fxCast: 'k_m_magi' },
+  m_seonsim: { fxCast: 'k_m_chaos' },
+  p_honma: { fxCast: 'k_p_daeseon' }, p_flash: { fxCast: 'k_u_p_seal' }, p_saint: { fxCast: 'k_u_p_pillar_b' }, p_seongi: { fxHit: 'k_u_p_sparkle' },
+  a_fetter: { fxHit: 'h_hit_attack', fxAfter: 'k_u_a_tornado', afterScale: 0.5 },
+  mk_muhan: { fxCast: 'k_u_mk_energy' }, mk_point: { fxCast: 'k_mk_pointblue' }, mk_stack: { fxCast: 'k_u_mk_energy' },
+  md_fice: { fxCast: 'k_u_md_orb' }, md_stormfrenzy: { fxCast: 'k_u_md_wing' }, md_flight: { fxCast: 'k_u_md_orb', fxHit: 'h_hit_light' },
+  md_resonance: { fxCast: 'k_md_enhance' }, md_ffire: { fxCast: 'k_u_md_orb' },
+  cl_gumiho: { fxCast: 'k_u_cl_soul' }, cl_snake: { fxCast: 'k_cl_blood' }, cl_defense: { fxCast: 'k_u_cl_speed' }, cl_wedge: { fxCast: 'k_u_cl_soul' },
+  cl_shatter: { fxCast: 'k_u_cl_soul2' },
+  dk_firebat: { fxHit: 'h_hit_fire' }, dk_wisp2: { fxCast: 'k_dk_wispexp' }, dk_goldhit: { fxCast: 'k_dk_strength' }, dk_maryu: { fxCast: 'k_dk_strength' },
+  dk_nemesis: { fxCast: 'k_dk_strength' }, dk_wisp3: { fxCast: 'k_dk_wisp' },
+  rp_chain: { fxHit: 'k_u_rp_reshit' },
+};
+for (const [id, o] of Object.entries(LAYERS)) Object.assign(SKILLS[id], o, o.fx ? { fxs: null, tint: null, modern: null } : {});
+// 연's 5차·6차 previews lent to another class's card are taken back (the card has its own above).
+for (const id of ['w_dragon', 'w_sentence', 'w_advance', 'w_swords', 'w_stone', 'w_blood', 'r_flamesword', 'r_hidden', 'r_shuriken', 'r_kill',
+  'r_chainstar', 'r_bloodslash', 'r_venom', 'm_thunderball', 'm_frost', 'm_desert', 'm_twin', 'm_inferno', 'p_wargod', 'p_skyspirit',
+  'p_bagua', 'p_bind', 'p_realm']) delete YEON_FX[id];
+
+// The lines (계열) without the merged ones; a spell after a merged one comes after the one it became.
+for (const branches of Object.values(BRANCHES)) for (const b of branches) b.ids = b.ids.filter(id => !SKILLS[id].retired);
+for (const s of Object.values(SKILLS)) {
+  if (!s.pre) continue;
+  let from = s.pre[0];
+  while (from && SKILLS[from] && SKILLS[from].retired) from = SKILL_ALIAS[from];
+  if (!from || from === s || !SKILLS[from] || SKILLS[from].cls !== s.cls) delete s.pre;
+  else s.pre = [from, s.pre[1]];
+}
+for (const [id, s] of Object.entries(SKILLS)) if (s.pre && s.pre[0] === id) delete s.pre;
+
+// 다수기 cadence: a spell that strikes many waits at least this long (s, at 1단), and its wait shrinks
+// only 3% a 단 (skillStats: s.aoe); its blow grows with the wait (to the 0.75th power: a little less a
+// second than before, more in each). Single blows are a little quicker, to fill the gaps.
+const AOE_CD = { screen: 12, nova: 5, wave: 7, rain: 6, zone: 6.5, vortex: 5.5, totem: 9, barrage: 4.5, spin: 6, gust: 14, orbit: 12, trap: 7 };
+function aoeFloor(s) {
+  if (s.kind in AOE_CD) return AOE_CD[s.kind];
+  if (s.kind === 'strike' && ((s.radius || 0) >= 2 || (s.count || 1) >= 3)) return 4;
+  if (s.kind === 'strike' && (s.radius || 0) >= 1) return 3;
+  if (s.kind === 'spell' && (s.count || 1) >= 3) return 3.2;
+  if (['chain', 'mark', 'stack'].includes(s.kind) && (s.count || 1) >= 3) return 4;
+  if (s.kind === 'cleave' && ((s.max || 0) >= 6 || (s.depth || 0) >= 3)) return 3.4;
+  if (s.kind === 'line' && (s.depth || 0) >= 6) return 3.2;
+  if (s.kind === 'spell4') return 3;
+  return 0;
+}
+for (const s of Object.values(SKILLS)) {
+  if (s.retired || ['ult', 'buff', 'heal', 'regen', 'cleanse', 'reset', 'evade', 'taunt', 'thorns', 'shieldburst'].includes(s.kind) || !s.cd) continue;
+  const f = aoeFloor(s);
+  if (f) {
+    s.aoe = true;
+    if (s.cd < f) {
+      const k = Math.pow(f / s.cd, 0.75);
+      if (s.dmg) s.dmg = Math.round(s.dmg * k * 10) / 10;
+      if (s.hit) s.hit = Math.round(s.hit * k * 10) / 10;
+      s.cd = f;
+    }
+  } else if ((s.dmg || 0) > 0 && s.cd >= 1 && ['spell', 'blink', 'strike', 'line', 'cleave', 'slash', 'flurry', 'lance', 'boomerang', 'charge', 'knock', 'hop'].includes(s.kind)) {
+    s.cd = Math.round(s.cd * 0.9 * 100) / 100;
+  }
+}
+
+// ---- 필살기의 길 (ULT_TIERS): four a class, by 승급 band (ULT_BANDS: 0~2차, 3~5차, 6~8차, 9차). Each by a
+// name of the class's own (연 Skills_Player / 원작 list), its own way of striking (game.js ULT_MECH), and
+// its own pictures in stages: cast (the call over the hero), main (the great picture), hit (on each
+// struck), after (what stays a moment), drop/shot/burst where its way has them. k: how hard (×the
+// class's blow). boss: the 보스용 필살기 of that band (five blows of that technique on the strongest foe).
+export const ULT_BANDS = [0, 3, 6, 9];
+const ult = (cls, id, name, o) => {
+  if (!SKILLS[id]) SKILLS[id] = { cls, name, kind: 'ult', ultTier: true, desc: o.desc || '' };
+  else Object.assign(SKILLS[id], { ultTier: true });
+  return { id, ...o };
+};
+export const ULT_TIERS = {
+  warrior: [
+    ult('warrior', 'w_ult', '건곤대나이', { mech: 'cleaveWave', main: 'k_w_ult', mainSize: 260, hit: 'k_u_w_wave', boss: 'w_jinseom', k: 1 }),
+    ult('warrior', 'w_blood', '혈겁만파', { mech: 'rain', main: 'k_w_blood', frac: 0.9, hit: 'h_hit_tiger', dropSize: 90, boss: 'w_roar3', k: 1.15, hpCost: 0.3 }),
+    ult('warrior', 'w_charge', '돌격명령', { mech: 'dash', cast: 'k_w_charge', castSize: 220, main: 'k_u_w_wave', mainSize: 170, hit: 'h_ml_burst', hitScale: 0.5, n: 9, boss: 'w_gwangya', k: 1.3, hpCost: 0.3,
+      desc: '돌격을 명하며 몬스터에서 몬스터로 아홉 번 돌진해 베고, 마지막에 칼바람을 일으켜 화면의 나머지를 벤다' }),
+    ult('warrior', 'w_myriad', '만검귀종', { mech: 'vortex', main: 'new_w_roar2', mainScale: 3, burst: 'new_w_roar2', burstSize: 420, ring: 'new_w_roar2', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
+  ],
+  rogue: [
+    ult('rogue', 'r_ult', '필살검무', { mech: 'dash', main: 'k_u_r_ult0', mainSize: 180, hit: 'k_u_r_backhit', n: 8, gap: 0.09, boss: 'r_dance', k: 1 }),
+    ult('rogue', 'r_bunhon', '분혼경천', { mech: 'mark', cast: 'k_r_bunhon', frac: 0.85, main: 'h_ml_cross', markScale: 0.6, hit: 'h_ml_spark', stun: 0.6, delay: 1.1, boss: 'r_flysword', k: 1.15 }),
+    ult('rogue', 'r_ult2', "필살검무'첨", { mech: 'sweep', main: 'k_r_ult2', mainSize: 240, hit: 'h_ml_cross', hitScale: 0.5, steps: 6, boss: 'r_amsal', k: 1.3,
+      desc: '필살검무의 극의. 검기의 벽이 화면을 가로지르며 지나는 몬스터를 모두 벤다' }),
+    ult('rogue', 'r_gale', '질풍난무', { mech: 'chain', main: 'new_r_storm', shot: 'h_ml_cross', markScale: 1.3, gap: 0.04, boss: 'r_pilgeom', k: 1.5 }),
+  ],
+  mage: [
+    ult('mage', 'm_ult', '헬파이어', { mech: 'meteor', main: 'k_m_ult', mainSize: 220, hit: 'k_x_m_ult_hit', n: 5, shield: 5, boss: 'm_seongryeo', k: 1 }),
+    ult('mage', 'm_hell2', "헬파이어'첨", { mech: 'cross', main: 'k_m_hell2', mainSize: 120, hit: 'h_hit_fire', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
+      desc: '헬파이어의 극의. 여덟 갈래로 뻗는 불기둥이 화면을 가르고, 남은 몬스터에게 불길이 번진다' }),
+    ult('mage', 'm_fire3', '폭류유성', { mech: 'rain', main: 'k_m_fire3', frac: 0.95, drop: 'k_u_m_meteor', dropSize: 170, hit: 'h_hit_fire', span: 1.6, shield: 5, boss: 'm_jiokchak', k: 1.3 }),
+    ult('mage', 'm_kalpa', '겁화', { mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
+  ],
+  poet: [
+    ult('poet', 'p_ult', '태양의희원', { iconFx: '124', mech: 'sanctuary', cast: 'k_p_ult', main: 'k_u_p_pillar_o', hit: 'h_hit_light', guard: 3, boss: 'p_jiroe', k: 1 }),
+    ult('poet', 'p_break', '귀염추혼소', { iconFx: '120', mech: 'mark', cast: 'new_p_break', frac: 0.8, main: '120', markScale: 1.3, hit: 'k_u_p_sparkle', delay: 1.0, heal: 0.3, boss: 'p_noejeon', k: 1.15 }),
+    ult('poet', 'p_daejijin', '대지진', { mech: 'rings', main: 'k_p_daejijin', mainSize: 300, hit: 'k_p_quake', heal: 0.3, boss: 'p_geomok', k: 1.3 }),
+    ult('poet', 'p_taiji', '태극팔괘진', { mech: 'totem', main: 'k_p_taiji', mainScale: 1.2, drop: 'k_u_p_pillar_b', dropSize: 160, hit: 'h_hit_light', n: 4, life: 2.4, heal: 0.4, guard: 2, boss: 'p_bonghwang', k: 1.5 }),
+  ],
+  archer: [
+    ult('archer', 'a_ult', '일환탄시', { mech: 'barrage', cast: 'k_a_ult', castSize: 200, shot: 'k_u_a_whip', shotScale: 2.4, hit: 'k_a_shot', n: 3, boss: 'a_aim', k: 1 }),
+    ult('archer', 'a_allwhirl', '폭풍화우', { mech: 'vortex', main: 'k_a_allwhirl', burst: 'k_u_a_tornado', burstSize: 300, hit: 'h_hit_attack', hold: 1.2, boss: 'a_bomb', k: 1.15 }),
+    ult('archer', 'a_eagle', '독수리소환', { mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 2.4, lift: 90, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
+    ult('archer', 'a_blood5', '투혈오식', { mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
+  ],
+  lancer: [
+    ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'h_ml_thrust', hitScale: 0.6, len: 4, diag: true, boss: 'l_meteor', k: 1 }),
+    ult('lancer', 'l_genesis', '천지개벽', { mech: 'rain', main: 'k_l_genesis', frac: 0.9, drop: 'k_u_l_pillar', dropSize: 170, hit: 'k_u_l_bolt', boss: 'l_rush', k: 1.15 }),
+    ult('lancer', 'l_dragon', '맹룡승천', { mech: 'meteor', main: 'k_l_dragon', mainSize: 330, hit: 'k_u_l_dragonhead', hitScale: 0.6, n: 5, gap: 0.25, boss: 'l_annihil', k: 1.3 }),
+    ult('lancer', 'l_moonfull', '월하멸섬', { mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'h_ml_spark', steps: 7, boss: 'l_javelin', k: 1.5 }),
+  ],
+  monk: [
+    ult('monk', 'mk_ult', '필살권무', { mech: 'dash', main: 'k_mk_ult', mainSize: 190, hit: 'k_u_mk_bodyhit', hitScale: 0.7, n: 8, boss: 'mk_sudden', k: 1 }),
+    ult('monk', 'mk_buddha', '여래신장', { mech: 'rain', main: 'k_mk_buddha', frac: 0.9, drop: 'k_u_mk_palm', dropSize: 150, hit: 'k_mk_bung', boss: 'mk_uppercut', k: 1.15 }),
+    ult('monk', 'mk_rupture', '천지파열', { mech: 'rings', main: 'k_x_mk_rupture_cast', mainSize: 260, hit: 'k_x_mk_rupture_hit', after: 'k_mk_rupture', boss: 'mk_muhan', k: 1.3 }),
+    ult('monk', 'mk_advent', '권신강림', { mech: 'totem', main: 'k_mk_advent', mainScale: 1.5, lift: 50, drop: 'k_u_mk_aventhit', dropSize: 180, hit: 'k_mk_aventhit', n: 5, life: 2.6, boss: 'mk_kyokushin', k: 1.5 }),
+  ],
+  magus: [
+    ult('magus', 'md_ult', '광폭구회격', { mech: 'barrage', cast: 'k_md_ult', castSize: 220, shot: 'k_u_md_orb', hit: 'k_u_md_storm', n: 3, darken: 0.9, boss: 'md_arrow', k: 1 }),
+    ult('magus', 'md_exfrenzy', '광폭멸천강', { mech: 'meteor', main: 'k_md_exfrenzy', mainSize: 240, hit: 'k_u_md_storm', after: 'k_u_md_decay', n: 5, darken: 1, boss: 'md_bust', k: 1.15 }),
+    ult('magus', 'md_bloodbat', '혈마광폭열파', { mech: 'sweep', main: 'k_md_bloodbat', mainSize: 200, hit: 'k_u_md_decay', steps: 6, darken: 1, boss: 'md_ffire', k: 1.3 }),
+    ult('magus', 'md_wavefrenzy', '광폭파장', { mech: 'rings', cast: 'k_u_md_wing', main: 'k_md_wavefrenzy', mainSize: 280, hit: 'k_u_md_storm', darken: 1.1, boss: 'md_ray', k: 1.5 }),
+  ],
+  celestial: [
+    ult('celestial', 'cl_ult', '전의상실', { mech: 'mark', cast: 'k_cl_ult', frac: 0.6, main: 'k_u_cl_loss', hit: 'k_u_cl_losshit', stun: 0.8, delay: 1.0, boss: 'cl_moment', k: 1 }),
+    ult('celestial', 'cl_thunder', '뇌격룡', { mech: 'chain', cast: 'k_u_cl_dragon', castStages: false, frac: 0.95, main: 'k_x_cl_thunder_2', markScale: 0.5, shot: 'h_hit_light', stun: 0.4, boss: 'cl_acumen', k: 1.15 }),
+    ult('celestial', 'cl_tiger', '범아귀', { mech: 'dash', cast: 'k_u_cl_speed', castSize: 150, main: 'k_cl_tiger', mainSize: 170, hit: 'h_hit_tiger', n: 8, boss: 'cl_ego', k: 1.3 }),
+    ult('celestial', 'cl_reindeer', "강림술'신록", { mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
+  ],
+  dokkaebi: [
+    ult('dokkaebi', 'dk_ult', '금나와라,뚝딱', { mech: 'rain', cast: 'k_dk_ult', castSize: 200, drop: 'k_u_dk_gold', dropSize: 110, hit: 'k_dk_goldhit', boss: 'dk_punish', k: 1 }),
+    ult('dokkaebi', 'dk_super', "일격필살'괴력난신", { mech: 'execute', main: 'k_dk_super', mainSize: 340, hit: 'h_ml_burst', hitScale: 0.5, n: 3, boss: 'dk_judgment', k: 1.15 }),
+    ult('dokkaebi', 'dk_storm', '도깨비폭풍', { mech: 'vortex', main: 'k_dk_storm', burst: 'k_dk_storm', burstSize: 320, hit: 'h_hit_fire', hold: 1.2, boss: 'dk_hamstring', k: 1.3 }),
+    ult('dokkaebi', 'dk_rage', '도깨비의 격노', { mech: 'rings', main: 'k_dk_rage', mainSize: 300, hit: 'h_hit_fire', boss: 'dk_nemesis', k: 1.5 }),
+  ],
+  reaper: [
+    ult('reaper', 'rp_ult', '차사강림', { mech: 'cleaveWave', main: 'k_rp_ult', mainSize: 260, hit: 'k_rp_cut', hitScale: 0.6, after: 'k_u_rp_ring', boss: 'rp_flash', k: 1 }),
+    ult('reaper', 'rp_madness', '나선광륜', { mech: 'rings', main: 'k_rp_madness', mainSize: 260, hit: 'h_ml_slash', boss: 'rp_asura', k: 1.15 }),
+    ult('reaper', 'rp_deadly', '살극', { mech: 'mark', main: 'k_rp_deadly', markScale: 1.4, hit: 'h_ml_wind', hitScale: 0.4, delay: 1.2, boss: 'rp_arrow', k: 1.3 }),
+    ult('reaper', 'rp_gate', '저승문', { mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
+  ],
+};
+
 // 승급 효과: each 승급 makes the class a little stronger for good (피해 +4%, 체력 +8 a step).
 export const PROMO_BONUS = { dmg: 0.04, hp: 8 };
 
@@ -1649,7 +1995,9 @@ export function skillStats(id, level, p) {
     // its shape (a triangle, the whole screen), not in a number grown four times over.
     // +15% a 단 (8단 is 2.7 times 1단).
     dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
-    cd: s.cd * Math.pow(0.93, l) * Math.pow(0.92, p.haste),
+    // A spell striking many (s.aoe, 스킬 2차 개편) quickens less with its 단 (3% a step, not 7%):
+    // its weight is in the blow, not in its pace.
+    cd: s.cd * Math.pow(s.aoe ? 0.97 : 0.93, l) * Math.pow(0.92, p.haste),
     // Tiles: reach grows by one every three levels, and with 공력.
     range: (s.range || 0) + Math.floor(l / 3) + Math.floor(p.area / 2),
     // Only a spell that already strikes an area grows it; a single blow stays single.
@@ -1671,7 +2019,7 @@ export function levelText(id, level) {
   if (s.kind === 'heal') return '회복량 +45%, 재사용 -7%';
   if (s.buff === 'stealth') return '암습 피해 +0.25배, 재사용 -7%';
   if (s.kind === 'buff') return '지속 시간 +10%, 재사용 -7%';
-  const parts = ['피해 +15%', '재사용 -7%'];
+  const parts = ['피해 +15%', s.aoe ? '재사용 -3%' : '재사용 -7%'];
   if ((level === 4 || level === 7) && s.kind !== 'cleave' && s.kind !== 'nova')
     parts.push(s.kind === 'summon' ? '소환 +1' : '대상 +1');
   if (s.range && (level - 1) % 3 === 0) parts.push('거리 +1칸');
