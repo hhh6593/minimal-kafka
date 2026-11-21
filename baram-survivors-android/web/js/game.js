@@ -25,7 +25,10 @@ import {
 
 const $ = s => document.querySelector(s);
 const canvas = $('#game');
-const ctx = canvas.getContext('2d');
+// Opaque: the page under the field is black anyway (body's background) and every frame paints the
+// whole canvas (a ground, or render's black fill off the field), so the compositor need not blend
+// the canvas over the page each frame (on a phone a full-screen blend of its own).
+const ctx = canvas.getContext('2d', { alpha: false });
 
 // A picture drawn straight from an <img> goes through the browser's decode cache on every draw;
 // with a crowd of monster sheets, digits and effects in a frame that cache overflowed and was
