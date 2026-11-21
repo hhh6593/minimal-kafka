@@ -2009,10 +2009,10 @@ function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'numb
 const aiO = (scale, o) => ({ scale: scale * aiFx(), alpha: aiAlpha(), ...o });
 function fxOk(big) { const r = A.G().war && A.G().war.raid ? 1 : 0; return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', AI_FX_BIG[r]) : A.fxBudget('war', AI_FX[r])); }
 /** A plain blow's spark (a budget of its own, so the skills' pictures show first). */
-function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', A.G().war && A.G().war.raid ? 4 : 8); }
+function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', A.G().war && A.G().war.raid ? 3 : 4); }
 // (2차 피드백: the skills cast together round the boss — 18 and 10 the 0.6 s before, the sparks among them.)
 // [war, raid]: a raid's thirty-five on one boss, all on the screen at once, fewer (measured at CPU x4).
-const AI_FX = [20, 13], AI_FX_BIG = [12, 8];
+const AI_FX = [16, 12], AI_FX_BIG = [10, 7];
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
 function castFx(W, b, id, at, scale) {
@@ -2862,12 +2862,12 @@ function styledName(tier, base) {
 }
 /** The 급 of every fighter of a side: one or two of the server's best and, in a big field, one of the
  *  상위 whatever the hero is; of the rest some above the hero (×1.5-4.5 its 전투력), most about it
- *  (×0.8-1.25), some below (×0.35-0.78). */
+ *  (×0.8-1.25), some below (×0.15-0.78: the 뉴비 among them). */
 function aiPlan(n) {
   const out = [], ns = n >= 18 ? 2 : 1, nh = n >= 18 ? 1 : 0, left = n - ns - nh, up = Math.round(left * 0.12), lo = Math.round(left * 0.28);
   for (let i = 0; i < ns; i++) out.push({ server: true });
   for (let i = 0; i < nh; i++) out.push({ high: true });
-  for (let i = 0; i < left; i++) out.push({ r: i < up ? Math.exp(rnd(Math.log(1.5), Math.log(4.5))) : i < up + lo ? rnd(0.35, 0.78) : rnd(0.8, 1.25) });
+  for (let i = 0; i < left; i++) out.push({ r: i < up ? Math.exp(rnd(Math.log(1.5), Math.log(4.5))) : i < up + lo ? Math.exp(rnd(Math.log(0.15), Math.log(0.78))) : rnd(0.8, 1.25) });
   for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
   return out;
 }
@@ -3141,7 +3141,9 @@ function castSkill(W, b, t, s) {
     return;
   }
   const n = W.U * b.pw * SK_K * s.k;
-  if (fx && (onScreen(b) || onScreen(t)) && fxOk(s.kind === 'aoe')) {
+  // (On a boss the pictures of a whole raid land on the same few tiles: a few at a time there, the
+  // rest only the caster's cue; drawn over each other they were most of a phone's frame.)
+  if (fx && (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 5)) && fxOk(s.kind === 'aoe')) {
     cue(b, s.kind === 'aoe' ? 1 : 0.75);
     A.fxOn(fx, t, aiO(fitFx(fx, s.kind === 'aoe' ? 0.72 : 0.62)));
   }
@@ -4585,7 +4587,7 @@ function rowHtml(W, x, i) {
   const tip = sp ? `${T.name} · 전투력 ${sp.cp.toLocaleString()} · Lv${sp.lv} · ${sp.promo}차 승급${sp.sl ? ` · 기술 ${sp.sl}단` : ''}${sp.play ? ` · ${sp.play}` : ''}${sp.gear ? ` · ${sp.gear}` : ''}` : '';
   const badge = sp ? `<span class="ai-tier" style="color:${T.col};font-weight:bold" title="${tip}">${T.short}</span>` : '';
   return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}">${x.b.name}${x.b.leader ? '★' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
-    <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${s.kills}/${s.deaths}/${Math.round(s.assists)}</td><td>${s.revives}</td></tr>`;
+    <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${Math.round(s.kills)}/${s.deaths}/${Math.round(s.assists)}</td><td>${s.revives}</td></tr>`;
 }
 function tables(W, rows) {
   const head = '<tr><th>#</th><th>이름</th><th>급</th><th>전투력</th><th>승급</th><th>직업</th><th>역할</th><th>기여</th><th>피해</th><th>회복</th><th>받은</th><th>목표</th><th>K/D/A</th><th>부활</th></tr>';
