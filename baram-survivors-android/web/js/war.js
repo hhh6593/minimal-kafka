@@ -2832,13 +2832,16 @@ function spellFx(id, lv) {
 // gcd: the wait after any skill; n: skills in its kit; ult: its 필살기's wait; heal: a healer's 기원 wait;
 // dodge: how much better it reads a red floor; edge: its hand (how fast it acts on an order).
 const AI_TIERS = {
-  // 여섯 급, 무림식 이름. 상향평준화: 맨 아래(입문자)도 1차·2차 승급의 7천 이상, 맨 위(절정)와 4~5배.
-  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 30000, top: 42000, lv: [47, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
-  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 24000, top: 30000, lv: [43, 48], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2 },
-  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 19000, top: 24000, lv: [38, 44], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2 },
-  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 15000, top: 19000, lv: [32, 40], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
-  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 11000, top: 15000, lv: [26, 34], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1 },
-  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 7000, top: 11000, lv: [18, 28], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0 },
+  // 여섯 급, 무림식 이름. 상향평준화: 맨 아래(입문자)도 1만1천5백 이상, 맨 위(절정)와 4~6배.
+  // The bands against the game's own ceiling (a class fully geared: about 6~7만 전투력 — the 용무기
+  // 제십·9차·Lv 60 weapon alone 2.9만, armour, helmet, cape and the card sets the rest): a hero half way
+  // through (청룡신검, 4.7만) was already the first of every 문파 against the old 4.2만 top.
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 50000, top: 70000, lv: [47, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
+  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 40000, top: 50000, lv: [43, 48], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2 },
+  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 32000, top: 40000, lv: [38, 44], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2 },
+  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 25000, top: 32000, lv: [32, 40], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
+  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 18000, top: 25000, lv: [26, 34], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1 },
+  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 11500, top: 18000, lv: [18, 28], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0 },
 };
 const TIER_ORDER = ['server', 'high', 'upper', 'mid', 'low', 'newbie'];
 // The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
@@ -2894,11 +2897,11 @@ function styledName(tier, base) {
  *  band (AI_TIERS cp … top), so the gaps stay those of six 급 a few thousand apart. team → its list. */
 const SIDE_MAKES = [
   // w: the share of each 급 (절정, 일류, 이류, 삼류, 하수, 입문); lead: fixed heads (급 and how close).
-  { name: '절정 하나', w: [0, 0.08, 0.17, 0.3, 0.27, 0.18], lead: [['server']] },
-  { name: '상위권 탄탄', w: [0.1, 0.22, 0.25, 0.23, 0.12, 0.08] },
-  { name: '쌍두마차', w: [0, 0.06, 0.2, 0.32, 0.26, 0.16], lead: [['server', 'pair'], ['server', 'pair']] },
-  { name: '고른 문파', w: [0.04, 0.12, 0.22, 0.3, 0.2, 0.12] },
-  { name: '삼류 중심', w: [0, 0.05, 0.2, 0.4, 0.25, 0.1], lead: [['high']] },
+  { name: '절정 하나', w: [0, 0.16, 0.22, 0.27, 0.21, 0.14], lead: [['server']] },
+  { name: '상위권 탄탄', w: [0.16, 0.26, 0.24, 0.18, 0.1, 0.06] },
+  { name: '쌍두마차', w: [0.04, 0.14, 0.24, 0.28, 0.18, 0.12], lead: [['server', 'pair'], ['server', 'pair']] },
+  { name: '고른 문파', w: [0.1, 0.18, 0.24, 0.24, 0.14, 0.1] },
+  { name: '삼류 중심', w: [0, 0.1, 0.24, 0.38, 0.18, 0.1], lead: [['high']] },
 ];
 const bandCp = t => { const T = AI_TIERS[t], lo = T.bot || T.cp, hi = T.top; return Math.exp(rnd(Math.log(lo), Math.log(hi))); };
 function sidePlan(n, make) {
