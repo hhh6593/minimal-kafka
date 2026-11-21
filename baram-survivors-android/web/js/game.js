@@ -42,6 +42,21 @@ const BITMAP_BUDGET = 128e6, BITMAP_MAX = 8e6;
 const rawDrawImage = ctx.drawImage;
 let bitmapClock = 0, bitmapBytes = 0;
 ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
+  // A picture wholly off the canvas is not drawn (about half the draws of a crowded hunt: monsters,
+  // shadows and props in the margin round the view). Exact: only a picture none of whose pixels
+  // could land on the canvas, judged by the followed transform (xfFollow) when it has no turn.
+  if (xb === 0 && xc === 0) {
+    const n = arguments.length;
+    let x = a, y = b, w, ht;
+    if (n === 9) { x = e; y = f; w = g; ht = h; } else if (n === 5) { w = c; ht = d; } else { w = im.naturalWidth !== undefined ? im.naturalWidth : im.width; ht = im.naturalHeight !== undefined ? im.naturalHeight : im.height; }
+    const x0 = xa * x + xe, x1 = x0 + xa * w, y0 = xd * y + xf, y1 = y0 + xd * ht;
+    // (a pixel's margin: the canvas keeps its transform in single precision)
+    if ((x0 > x1 ? x0 : x1) < -1 || (x0 < x1 ? x0 : x1) > cvW + 1 || (y0 > y1 ? y0 : y1) < -1 || (y0 < y1 ? y0 : y1) > cvH + 1) {
+      if (CULL_CHECK) xfCheck(true);
+      return;
+    }
+  }
+  if (CULL_CHECK) xfCheck(false);
   if (im instanceof HTMLImageElement && window.createImageBitmap) {
     const bm = bitmapOf.get(im);
     if (bm === undefined) {
@@ -62,6 +77,92 @@ ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
     default: return rawDrawImage.call(this, im, a, b, c, d, e, f, g, h);
   }
 };
+
+// The main canvas's transform, followed in step with the canvas (save/restore, translate, scale,
+// rotate, transform, setTransform) so a draw can be judged and a scale read without getTransform,
+// which makes a new DOMMatrix each call (a hundred and more a frame: footShadow, textPic).
+// Test: ?cullcheck compares it with the canvas's own at every draw (window.__xfBad).
+let xa = 1, xb = 0, xc = 0, xd = 1, xe = 0, xf = 0, cvW = 0, cvH = 0;
+const xfStack = [];
+function xfReset() {
+  xa = xd = 1;
+  xb = xc = xe = xf = 0;
+  xfStack.length = 0;
+  cvW = canvas.width;
+  cvH = canvas.height;
+}
+const CULL_CHECK = /[?&]cullcheck/.test(location.search);
+function xfCheck(culled) {
+  // (the canvas keeps it in single precision: equal to a millionth, its move to a thousandth of a pixel)
+  const m = ctx.getTransform(), near = (u, v, k) => Math.abs(u - v) <= k * Math.max(1, Math.abs(v));
+  const ok = near(m.a, xa, 1e-6) && near(m.b, xb, 1e-6) && near(m.c, xc, 1e-6) && near(m.d, xd, 1e-6) && near(m.e, xe, 1e-3) && near(m.f, xf, 1e-3)
+    && cvW === canvas.width && cvH === canvas.height;
+  const r = window.__xfBad || (window.__xfBad = { draws: 0, culled: 0, bad: 0, first: null });
+  r.draws++;
+  if (culled) r.culled++;
+  if (!ok) { r.bad++; if (!r.first) r.first = [[m.a, m.b, m.c, m.d, m.e, m.f], [xa, xb, xc, xd, xe, xf], new Error().stack]; }
+}
+(function xfFollow() {
+  const fin = Number.isFinite, raw = {};
+  for (const k of ['save', 'restore', 'translate', 'scale', 'rotate', 'transform', 'setTransform', 'resetTransform']) raw[k] = ctx[k];
+  ctx.save = function () {
+    xfStack.push(xa, xb, xc, xd, xe, xf);
+    raw.save.call(this);
+  };
+  ctx.restore = function () {
+    // (a restore with nothing saved does nothing, as the canvas's own)
+    if (xfStack.length) {
+      xf = xfStack.pop(); xe = xfStack.pop(); xd = xfStack.pop();
+      xc = xfStack.pop(); xb = xfStack.pop(); xa = xfStack.pop();
+    }
+    raw.restore.call(this);
+  };
+  // (a call with a value not finite is let be by the canvas: so here too)
+  ctx.translate = function (x, y) {
+    if (fin(x) && fin(y)) { xe += xa * x + xc * y; xf += xb * x + xd * y; }
+    raw.translate.call(this, x, y);
+  };
+  ctx.scale = function (x, y) {
+    if (fin(x) && fin(y)) { xa *= x; xb *= x; xc *= y; xd *= y; }
+    raw.scale.call(this, x, y);
+  };
+  ctx.rotate = function (t) {
+    if (fin(t)) {
+      const cs = Math.cos(t), sn = Math.sin(t), a = xa, b = xb;
+      xa = a * cs + xc * sn; xb = b * cs + xd * sn;
+      xc = xc * cs - a * sn; xd = xd * cs - b * sn;
+    }
+    raw.rotate.call(this, t);
+  };
+  ctx.transform = function (a, b, c, d, e, f) {
+    if (fin(a) && fin(b) && fin(c) && fin(d) && fin(e) && fin(f)) {
+      const A = xa, B = xb, C = xc, D = xd;
+      xa = A * a + C * b; xb = B * a + D * b;
+      xc = A * c + C * d; xd = B * c + D * d;
+      xe += A * e + C * f; xf += B * e + D * f;
+    }
+    raw.transform.call(this, a, b, c, d, e, f);
+  };
+  ctx.setTransform = function (a, b, c, d, e, f) {
+    if (arguments.length >= 6) {
+      if (fin(a) && fin(b) && fin(c) && fin(d) && fin(e) && fin(f)) { xa = a; xb = b; xc = c; xd = d; xe = e; xf = f; }
+      return raw.setTransform.call(this, a, b, c, d, e, f);
+    }
+    raw.setTransform.call(this, a);
+    // (a matrix: whatever the canvas made of it)
+    const m = CanvasRenderingContext2D.prototype.getTransform.call(this);
+    xa = m.a; xb = m.b; xc = m.c; xd = m.d; xe = m.e; xf = m.f;
+  };
+  ctx.resetTransform = function () {
+    xa = xd = 1;
+    xb = xc = xe = xf = 0;
+    raw.resetTransform.call(this);
+  };
+  // (a lost and restored canvas starts again from nothing)
+  canvas.addEventListener('contextrestored', xfReset);
+  xfReset();
+})();
+
 function dropBitmap(rec) {
   bitmapsLive.delete(rec);
   bitmapOf.delete(rec.im);
@@ -602,6 +703,7 @@ function resize() {
   const r = Math.max(1, full / zFull);
   canvas.width = Math.round(canvas.clientWidth * r);
   canvas.height = Math.round(canvas.clientHeight * r);
+  xfReset(); // (a canvas given a size starts again: its transform too)
   Z = zFull * r / full;
   VW = canvas.width / Z;
   VH = canvas.height / Z;
@@ -13682,7 +13784,7 @@ function whiteFrame(im, sx, sy, w, h) {
 // filled ninety ellipse paths a frame.
 const shadowPics = new Map();
 function footShadow(x, y, rx, ry, a) {
-  const sc = ctx.getTransform().a;
+  const sc = Math.fround(xa); // (the canvas's scale, followed: xfFollow; kept in single precision there)
   rx = Math.round(rx * 2) / 2;
   ry = Math.round(ry * 2) / 2;
   const key = rx * 1000 + ry + sc * 1e7;
@@ -14589,8 +14691,8 @@ function bar(x, y, w, h, k, color, back = 'rgba(0,0,0,0.65)') {
 const textPics = new Map();
 let textPicN = 0;
 function textPic(kind, text, color, paint, padL = 2, padR = 2, padT = 2, padB = 3) {
-  const tr = ctx.getTransform(), sc = tr.a;
-  if (tr.b || tr.c || tr.d !== sc || !(sc > 0) || sc > 6) return null;
+  const sc = Math.fround(xa); // (the canvas's transform, followed: xfFollow; single precision there)
+  if (xb || xc || Math.fround(xd) !== sc || !(sc > 0) || sc > 6) return null;
   const key = kind + '|' + ctx.font + '|' + ctx.textAlign + '|' + ctx.textBaseline + '|' + color + '|' + sc + '|' + text;
   let e = textPics.get(key);
   if (e) return e;
