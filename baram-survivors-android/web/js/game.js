@@ -15690,6 +15690,52 @@ window.__progress = () => progress;
 window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
+// test: the 전투력 of a class with everything at its end — each slot's best piece (a plain tier, the
+// 용무기 at its last step, any special it may wear) at full stars, every 승급, the card sets full,
+// the record at `lvl` — the save put back after. Returns { cp, gear }.
+window.__maxPower = (ci, lvl = 60) => {
+  const cls = CLASSES[ci], c = cls.id;
+  const keep = JSON.stringify({ gear: progress.gear, stars: progress.stars, cards: progress.cards, byClass: progress.byClass }), keepBest = best[c];
+  try {
+    progress.byClass = progress.byClass || {};
+    progress.byClass[c] = Object.fromEntries(STAGES.map(st => [st.id, true]));
+    progress.cards = { all: { max: 99 } };
+    best[c] = { lvl, kills: 0 };
+    const st = (progress.stars = progress.stars || {})[c] = {};
+    const g = (progress.gear = progress.gear || {})[c] = { armor: 0, weapon: 0, shield: -1, helmet: -1, cape: -1 };
+    const kinds = ['weapon', 'armor', 'shield', 'helmet', 'cape'];
+    const cands = k => {
+      const out = [];
+      if (k === 'shield' && !hasShield(c)) return out;
+      for (const t of plainList(c, k)) out.push([t, null]);
+      for (const sp of Object.values(SPECIAL)) {
+        if (sp.kind !== k || (sp.cls && sp.cls !== c) || (sp.craft && sp.craft.only && !sp.craft.only.includes(c))) continue;
+        let base; try { base = specialBase(sp, c); } catch (e) { continue; }
+        if (base === undefined || base === null || base < 0) continue;
+        out.push([base, sp.id]);
+      }
+      return out;
+    };
+    for (let pass = 0; pass < 2; pass++) for (const k of kinds) {
+      let bestCp = -1, pick = null;
+      for (const [t, sp] of cands(k)) {
+        const was = [g[k], g[k + 'Sp']];
+        g[k] = t; if (sp) g[k + 'Sp'] = sp; else delete g[k + 'Sp'];
+        st[`${k}:${t}`] = isDragonKey(cls, `${k}:${t}`) ? DRAGON_MAX : STAR_MAX;
+        if (sp) st['sp:' + sp] = STAR_MAX;
+        const v = combatPower(cls);
+        if (v > bestCp) { bestCp = v; pick = [t, sp]; }
+        g[k] = was[0]; if (was[1]) g[k + 'Sp'] = was[1]; else delete g[k + 'Sp'];
+      }
+      if (pick) { g[k] = pick[0]; if (pick[1]) g[k + 'Sp'] = pick[1]; else delete g[k + 'Sp']; }
+    }
+    return { cp: combatPower(cls), gear: JSON.stringify(g) };
+  } finally {
+    const k0 = JSON.parse(keep);
+    Object.assign(progress, k0);
+    if (keepBest) best[c] = keepBest; else delete best[c];
+  }
+};
 window.__ult = () => castUlt();
 // Test (tools/fx_pack.py, before/after): effects drawn alone on the canvas, then read back.
 window.__fxWarm = ids => fxWarm(ids).then(() => true);
