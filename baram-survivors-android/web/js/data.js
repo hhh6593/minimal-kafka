@@ -1417,8 +1417,8 @@ const S9 = {
   w_hogi: { name: '흑룡검풍', kind: 'aura9', fx: 'o_w_heukryong', fxCast: 'k_w_blackdragon', fxHit: 'k_w_fly', hit: 13, cd: 15, duration: 8, radius: 1, tick: 0.4,
     ward: 0.25, buff: 'shield', ck: 'buff', fxs: null, tint: null, modern: null,
     desc: '검은 용의 검풍이 8초 동안 몸 둘레를 돌며 곁의 몬스터를 거듭 베고 밀어내며, 그동안 받는 피해가 25% 준다' },
-  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', front: true, size: 300, dash: true, fx2: 'h_ml_burst', size2: 110,
-    fxHit: 'h_hit_tiger', dmg: 95, cd: 5, range: 4, radius: 1, splash: 0.5, stun: 2, push: 1, ck: 'cleave', pre: 'w_sentence', branch: 2,
+  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', front: true, size: 300, dash: true,
+    fxHit: 'h_ml_slash', hitScale: 0.8, dmg: 95, cd: 5, range: 4, radius: 1, splash: 0.5, stun: 2, push: 1, ck: 'cleave', pre: 'w_sentence', branch: 2,
     desc: '앞의 가장 강한 몬스터를 방패로 즉시 밀쳐 크게 치고, 그 둘레까지 밀어내며 2초 동안 기절시킨다' },
   // 도적: 묵혈독바르기 (보조 공격), 묵마수리검'쇄 (몸 주변), 묵혈파광참 (강한 일격)
   r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'echo', echo: 'venom', fx: 'o_r_mukdok', fx2: 'g_poison_purple', fxHit: 'k_u_r_backhit', hit: 30, cd: 16, duration: 8,

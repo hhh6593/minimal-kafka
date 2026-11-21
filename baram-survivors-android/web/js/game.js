@@ -6878,7 +6878,7 @@ function cast(skill, st) {
   if (MELEE_LOOK[G.cls.id] && def.dmg) {
     // Its own picture on each one struck: the class's flash and slash arcs keep out of its way.
     // (A row's one travelling picture leaves the class's flash on each it passes.)
-    if (['strike', 'spell', 'blink'].includes(def.kind)) G.ownPicAt = G.t;
+    if (['strike', 'spell', 'blink', 'smite'].includes(def.kind)) G.ownPicAt = G.t;
     else if (def.kind !== 'slash') G.areaAt = G.t;
   }
   // A boss close by and the hero standing: it turns to the boss for the spells that go ahead of it
@@ -9231,7 +9231,11 @@ function castUlt() {
     const strike = (e, k) => { if (e.hp > 0) hurtEnemy(e, base * k); };
     G.ultHits = 0;
     const run = ULT_MECH[def.mech] || ULT_MECH.rain;
-    if (seen.length || def.mech === 'sanctuary') run(def, seen, strike);
+    // 9차: the original 궁극's own cinematic (ultGrand) is the picture; the way of striking keeps its blows,
+    // but its own big pictures give way to a small hit flash (they covered the cinematic)
+    const cine = def.cutin && M.fx[def.cutin] && !G.war && ultBand(G.cls.id) === 3;
+    const quiet = cine ? { ...def, main: 'h_ml_burst', cast: null, burst: null, ring: null, drop: 'h_ml_burst', shot: 'h_ml_burst', after: null, hit: 'h_ml_burst', hitScale: 0.6, mainScale: 0.6, castStages: false } : def;
+    if (seen.length || def.mech === 'sanctuary') run(quiet, seen, strike);
     if (seen.length || def.mech === 'sanctuary') ultGrand(def, ultBand(G.cls.id));
   }
   // What a tier brings besides the blow (헬파이어's 보호막 …).

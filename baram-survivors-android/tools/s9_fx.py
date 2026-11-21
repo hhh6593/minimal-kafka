@@ -116,7 +116,7 @@ def build(spec, src_dir, out_dir):
                     yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                     inside = np.clip(1.6 - np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2), 0, 1)
                     sat = a.max(axis=2) - a.min(axis=2)
-                    vivid = np.clip((sat - 90) / 70, 0, 1)
+                    vivid = np.clip((sat - 120) / 60, 0, 1) * np.clip((a.max(axis=2) - 120) / 60, 0, 1)
                     al = al * (1 - inside + inside * vivid)
                 a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
@@ -127,6 +127,20 @@ def build(spec, src_dir, out_dir):
                 a = np.dstack([a, al]).astype(np.uint8)
             else:
                 a = diffed(f, bg, e.get("t0", 18), e.get("t1", 70))
+                if e.get("gold"):
+                    # only the bright gold of the art (장승영역's glyphs and 태극), not the flat floor it lies on
+                    c = a[..., :3].astype(np.float32)
+                    lo, hi = e["gold"]
+                    k = np.clip((c[..., 0] - lo) / 30, 0, 1) * np.clip((c[..., 1] - lo * 0.7) / 30, 0, 1) * np.clip((c[..., 0] - c[..., 2] - 80) / 40, 0, 1)
+                    k *= np.clip((c.max(axis=2) - hi) / 25, 0, 1) if hi else 1
+                    a[..., 3] = (a[..., 3] * k).astype(np.uint8)
+                if e.get("digits"):
+                    # the damage numbers (blue digits, their white-orange stars) cleared out of the capture
+                    from PIL import ImageFilter
+                    c = a[..., :3].astype(np.float32)
+                    hole = ((c[..., 2] > 170) & (c[..., 0] < 120) & (c[..., 2] - c[..., 0] > 90))
+                    hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 13)))) > 0
+                    a[..., 3] = np.where(hole, 0, a[..., 3])
             for m in e.get("mask", []):
                 # a box cleared, or filled from the same frame's own pixels: "from" [dx, dy] (the
                 # water beside a damage number), "rot" [cx, cy] (the vortex's far side, turned 180°).
