@@ -15093,6 +15093,9 @@ const War = initWar({
   // 「쟁」 (the world boss fought over by three guilds)
   RAIDS, bossBrain, raidMarks, addEnemy, pickMonster: champ => pickMonster(champ), leave, josa, emote,
   raidSet, raidTier, pickGear, bag: c => bag(c),
+  // AI 동료 (war.js personas): the hero's 전투력 (the spread of the fighters' specs), a skill's own
+  // definition and its picture at a 단 (the fighters' rotations, as the companions').
+  combatPower: c => combatPower(c), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
