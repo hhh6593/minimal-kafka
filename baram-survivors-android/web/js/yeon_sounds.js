@@ -243,7 +243,7 @@ export const YEON_SOUNDS = {
  "skill_w_rush": "fx_skill_110201",
  "skill_w_stone": "SFX_Warrior_Impregnability",
  "skill_w_sentence": "SFX_Thief_5th_1",
- "skill_w_advance": "SFX_Lancer_5th_1",
+ "skill_w_advance": "SFX_Warrior_5th_2_4",
  "skill_w_swords": "fx_skill_0088",
  "skill_w_dragon": "SFX_Lancer_4th_02",
  "skill_w_thunder": "SFX_Shaman_ThunderCloud",

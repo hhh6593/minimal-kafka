@@ -10,6 +10,8 @@
 # SKILL_FX_DIR: the skill-icon download's numbered effect GIFs (사이트번호별/).
 # MODERN_DIR: today's client effects for the last spell of each tree, new_<skill id>.gif.
 # GEAR_DIR: today's client item pictures, <item name>.png (tools/fetch_gear.py downloads them).
+#   Its s9fx/ (tools/s9_fx.py: the original 9차 skills' effects and icons) and s9yfx/ (tools/yeon_skills.py
+#   with tools/yeon_s9_skills.json) are the 9차 skills' pictures (prepare_assets.py add_s9).
 # TOWN_DIR holds town.png (a village map from the 1996 client, 48-pixel tiles) and smithy.png.
 # The art and sound go into the APK only, never into the repository.
 #

@@ -15,7 +15,8 @@ here: each frame is the client's own pixels, taken off their backdrop:
 Each entry: src, mode, frames [start, end, step] (default all), box [x0, y0, x1, y1], bg (frame
 index, diff), t0/t1 (diff ramp), mask [[x0, y0, x1, y1] ...], half (halve the size: the client draws
 at about twice the old one's pixel size), anchor [fx, fy] (where the target's feet fall, as a share
-of the cell; default the middle), ms (per frame), add (drawn added), max (cell's longest side, 360).
+of the cell; default the middle), ms (per frame), add (drawn added), max (cell's longest side, 360),
+k (how large the game draws it; prepare_assets' default 0.75: today's client draws its pixels larger).
 "_icons": {skill id: tooltip PNG} — each 9차 skill's own icon, cut from its tooltip in the 2662 post (the
 40-pixel square at its top left), written OUT_DIR/icons/<skill id>.png (prepare_assets: skillicon/<id>.png).
 
@@ -134,6 +135,8 @@ def build(spec, src_dir, out_dir):
                       "anchor": [round(float(ax), 1), round(float(ay), 1)], "src": e["src"]}
         if e.get("reach"):
             index[sid]["reach"] = e["reach"]
+        if e.get("k"):
+            index[sid]["k"] = e["k"]
         print(sid, cw, ch, len(pics), ms)
     if spec.get("_icons"):
         os.makedirs(os.path.join(out_dir, "icons"), exist_ok=True)

@@ -385,8 +385,8 @@ def add_s9(gear_src, out, manifest):
     # from the official client's sprites and captures), fx "o_<id>", and icons/<skill id>.png, the 9차
     # skills' own icons (to skillicon/); GEAR_DIR/s9yfx/ — 연's own prefabs for them (tools/yeon_skills.py
     # with tools/yeon_s9_skills.json), fx "k_<id>". Both are yskill strips + index.json; "k" in an entry
-    # is how large it is drawn (default: the o_ captures at half, today's client drawing at about
-    # twice the old one's pixel size; the 연 ones as the yskill block draws them).
+    # is how large it is drawn (default: the o_ captures at 0.75, today's client drawing its pixels
+    # larger than the old one; the 연 ones as the yskill block draws them).
     s9icons = []
     for sub, pre in (("s9fx", "o_"), ("s9yfx", "k_")):
         sdir9 = os.path.join(gear_src, sub) if gear_src else None
@@ -407,7 +407,7 @@ def add_s9(gear_src, out, manifest):
             fid = pre + sid
             strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
             icon(pics, k.get("add", False)).save(os.path.join(out, "icon", fid + ".png"))
-            draw = k.get("k", 0.5 if pre == "o_" else 1 / k.get("scale", 1))
+            draw = k.get("k", 0.75 if pre == "o_" else 1 / k.get("scale", 1))
             manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
                                    "add": bool(k.get("add")), "cls": "yeon", "k": round(draw / z, 3),
                                    "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
