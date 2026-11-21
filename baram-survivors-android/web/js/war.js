@@ -2898,8 +2898,8 @@ function applyPersonas(W) {
   rankTitles(W);
 }
 // 칭호: each guild's five strongest by 전투력 (the hero among them) wear a star by the name, coloured
-// by rank (1 금, 2 은, 3 동, 4 보라, 5 하늘). In a raid the whole 공격대 is ranked as one.
-const RANK_COL = ['#ffd040', '#e8eef8', '#e0904a', '#d08aff', '#7fd0ff'];
+// by rank (1 빨강, 2 은, 3 동, 4 보라, 5 하늘). In a raid the whole 공격대 is ranked as one.
+const RANK_COL = ['#ff3a3a', '#e8eef8', '#e0904a', '#d08aff', '#7fd0ff'];
 function rankTitles(W) {
   for (const team of W.raid ? [0] : teamsOf(W)) {
     const list = W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop && b.cp);
