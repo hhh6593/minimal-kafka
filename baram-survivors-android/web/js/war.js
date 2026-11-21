@@ -1343,26 +1343,17 @@ function packNear(W, t, r) {
   return out;
 }
 /**
- * A spread spell's victims round t, as 연's area spells strike: the struck and at most AOE_CAP-1
- * others, the nearest first, one a tile (the struck's own tile aside). Since a side's fighters
- * may share a tile (three to one), the same 1.5-tile spell found two and three times the bodies it
- * did and a side's deaths in a 현무전 rose from 4~25 to 36~67 a war (crowd A/B): the crowding's
- * gain (more of the crowd fighting) is kept, its price in one spell is not.
+ * A spread spell's blow, as 연's area spells strike: the struck and AOE_CAP-1 others' worth. Since a side's
+ * fighters may share a tile (three to one), the same 1.5-tile spell found two and three times the bodies it
+ * did and a side's deaths in a 현무전 rose from 4~25 to 36~67 a war (crowd A/B): the crowding's gain (more
+ * of the crowd fighting) is kept, its price in one spell is not. 이펙트=판정: every one inside the drawn area is
+ * struck (aoeAll), the others' worth shared among them (it was the nearest two struck, the rest left untouched).
  */
 const AOE_CAP = 3;
-function aoeVictims(W, t, r) {
-  // (A raid's or a 「쟁」's monsters never share a tile: as before.)
+/** Every foe within r of t (the whole drawn area), the struck first. */
+function aoeAll(W, t, r) {
   if (t.team === undefined) return packNear(W, t, r);
-  const all = packNear(W, t, r).sort((a, b) => a[1] - b[1]);
-  const out = [], per = new Map();
-  for (const x of all) {
-    const k = k2(x[0].tx, x[0].ty), n = per.get(k) || 0;
-    if (x[0] !== t && n >= 1) continue;
-    per.set(k, n + 1);
-    out.push(x);
-    if (out.length >= AOE_CAP) break;
-  }
-  return out;
+  return packNear(W, t, r).sort((a, b) => (a[0] === t ? -1 : b[0] === t ? 1 : a[1] - b[1]));
 }
 /**
  * A spread spell seen coming (a 필살기's wind-up, a 광역 drawn on a crowd): those of t's side sharing
@@ -1917,14 +1908,15 @@ function act(W, b, t) {
       for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) { healBody(W, b, m, m.maxHp * 0.3); guard(W, m, 4); }
       castFx(W, b, id, b, 1.0);
     } else {
-      castFx(W, b, id, t, 1.0);
+      const cf = castFx(W, b, id, t, 1.0, 1.5);
       const fall = kit.ult[1] * W.U * b.pw;
       if (!W.raid) scatterFrom(W, t, 1.5);
-      A.later(0.3, () => {
+      // (이펙트=판정: all in its drawn area struck, the two-others' half shared among them; spread over the picture)
+      for (const [dt, k] of aiBeats(cf.life - 0.3)) A.later(0.3 + dt, () => {
         if (W.over) return;
-        hit(W, b, t, fall);
-        for (const [e] of aoeVictims(W, t, 1.5)) if (e !== t) hit(W, b, e, fall * 0.5);
-        burstAt(W, t);
+        const vs = aoeAll(W, t, cf.r), m = Math.max(1, vs.length - 1);
+        for (const [e] of vs) hit(W, b, e, (e === t ? fall : fall * Math.min(0.5, 1 / m)) * k);
+        if (!dt) burstAt(W, t);
       });
     }
     shout(W, b, SK[id] ? SK[id].name : '필살');
@@ -1938,13 +1930,15 @@ function act(W, b, t) {
     b.cd.c = kit.aoe[2] * rnd(0.9, 1.15);
     tally(b, 'aoe');
     const id = kit.aoe[0];
-    castFx(W, b, id, t, 0.9);
+    const cf = castFx(W, b, id, t, 0.9, 1.5);
     const n = kit.aoe[1] * W.U * 2 * b.pw;
     if (t.gate) hit(W, b, t, n * 1.2);
     else {
-      const vs = aoeVictims(W, t, 1.5);
+      // (이펙트=판정: all in its drawn area, the blow of three shared among them; spread over the picture)
+      const vs = aoeAll(W, t, cf.r), bk = aiBeats(cf.life), per = m => n * Math.min(1, AOE_CAP / Math.max(1, m));
+      for (const [dt, k] of bk.slice(1)) A.later(dt, () => { if (W.over) return; const v2 = aoeAll(W, t, cf.r); for (const [e] of v2) hit(W, b, e, per(v2.length) * k); });
       for (const [e] of vs) {
-        hit(W, b, e, n);
+        hit(W, b, e, per(vs.length) * bk[0][1]);
         if (id === 'm_para' || id === 'w_roar') e.stun = Math.max(e.stun, 1);
         if (id === 'm_curse') e.curse = Math.max(e.curse, 4);
       }
@@ -2039,11 +2033,14 @@ function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBu
 const AI_FX = [16, 14], AI_FX_BIG = [10, 8];
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
-function castFx(W, b, id, at, scale) {
-  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !(SK[id].kind === 'heal' ? healFxOk() : fxOk(true))) return;
-  const fx = SK[id].fx;
+function castFx(W, b, id, at, scale, r = 0) {
+  // (이펙트=판정: with a reach r, the picture drawn 2r tiles across — capped, the reach following it — fitArea)
+  const fx = id && SK[id] && SK[id].fx, fit = r ? fitArea(fx, { kind: 'aoe', r }) : null;
+  const out = { life: 0, r: fit ? fit.r : r };
+  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !(SK[id].kind === 'heal' ? healFxOk() : fxOk(true))) return out;
   cue(b, scale >= 1 ? 1 : 0.75);
-  if (fx && A.M().fx[fx]) A.fxOn(fx, at, aiO(scale));
+  if (fx && A.M().fx[fx]) out.life = fit ? A.fxOnArea(fit.pic, at, aiO(fit.scale)) : A.fxOn(fx, at, aiO(scale));
+  return out;
 }
 /** The caster's cue: a glow of its side's colour under its feet for a moment. */
 function cue(b, k = 1) { b.cue = { t: A.G().t, k }; }
@@ -3152,7 +3149,6 @@ function aiVariants(cls, gear) {
 // AI_CD slower), AI_GCD between any two; plain blows between.
 const AI_ATK = new Set(['spell', 'strike', 'spell4', 'nova', 'cleave', 'line', 'screen', 'slash', 'blink']);
 const AOE_KINDS = new Set(['screen', 'nova', 'cleave', 'line', 'spell4']);
-const LASTING = new Set(['aura9', 'rain', 'zone', 'totem', 'spin', 'gust', 'thorns', 'starburst', 'wave', 'vortex', 'crosswave']);
 const AI_CD = 1.25;
 // A skill's blow in the field's units: SK_K × its wait^0.7 (a long wait a heavy blow), less on
 // each of a spread's victims; the plain blows between at BASIC_K of what they were (the skills
@@ -3239,24 +3235,29 @@ function castSkill(W, b, t, s) {
     return;
   }
   const n = W.U * b.pw * SK_K * s.k;
+  // 이펙트=판정: the picture drawn exactly over what the blow strikes — a spread one 2r tiles across round
+  // the struck (r the kit's reach; where the phone's cap on an AI picture holds it smaller, the reach
+  // follows the picture), a single blow a body across — and a picture that stays strikes while it stays:
+  // half at once, the rest in beats (fitArea, aiBeats). Every one inside it is struck (the cap of three a
+  // spell holds as a share of the blow, spread over all of them, not as bodies left unstruck).
+  const fit = fitArea(fx, s);
+  let life = 0;
   // (On a boss the pictures of a whole raid land on the same few tiles: a few at a time there, the
   // rest only the caster's cue; drawn over each other they were most of a phone's frame.)
   if (fx && (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 8)) && fxOk(s.kind === 'aoe')) {
     cue(b, s.kind === 'aoe' ? 1 : 0.75);
     CS.shown++;
-    A.fxOn(fx, t, aiO(fitFx(fx, s.kind === 'aoe' ? 0.72 : 0.62)));
+    life = A.fxOnArea(fit.pic, t, aiO(fit.scale));
   }
+  const beats = aiBeats(life);
+  if (window.__aiProbe && life) window.__aiProbe({ id: s.id, kind: s.kind, r: fit.r, life, beats: beats.map(x => +x[0].toFixed(2)), n: s.kind === 'aoe' ? aoeAll(W, t, fit.r).length : 1, fx: A.G().fxs.length - 1 }); // test (이펙트=판정)
   if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
   else if (s.kind === 'aoe') {
-    const vs = aoeVictims(W, t, s.r);
-    // 이펙트=판정: a lasting technique (an aura, a field, a rain: SK's own kind) strikes in three beats over its
-    // picture's life, not once at its start (the same blow in all)
-    const SKd = SK[s.id], lasting = SKd && LASTING.has(SKd.kind);
-    if (lasting) {
-      for (let k = 1; k <= 2; k++) A.later(k * 0.4, () => { if (W.over) return; for (const [e] of aoeVictims(W, t, s.r)) hit(W, b, e, (e === t ? n : n * 0.6) / 3); });
-    }
+    const vs = aoeAll(W, t, fit.r);
+    const share = (e, m) => (e === t ? n : n * Math.min(0.6, (0.6 * (AOE_CAP - 1)) / Math.max(1, m - 1)));
+    for (const [dt, k] of beats.slice(1)) A.later(dt, () => { if (W.over) return; const v2 = aoeAll(W, t, fit.r); for (const [e] of v2) hit(W, b, e, share(e, v2.length) * k); });
     for (const [e] of vs) {
-      hit(W, b, e, (e === t ? n : n * 0.6) / (lasting ? 3 : 1));
+      hit(W, b, e, share(e, vs.length) * beats[0][1]);
       if (e.war && !e.cmdr) {
         if (d.stun && Math.random() < 0.35) e.stun = Math.max(e.stun, Math.min(1, d.stun));
         if (d.curse) e.curse = Math.max(e.curse, Math.min(4, d.curse));
@@ -3265,7 +3266,8 @@ function castSkill(W, b, t, s) {
     }
     if (!W.raid && vs.length >= 3 && Math.random() < 0.5) { scatterFrom(W, t, s.r); burstAt(W, t); }
   } else {
-    hit(W, b, t, n);
+    for (const [dt, k] of beats.slice(1)) A.later(dt, () => { if (!W.over && !t.dead && t.hp > 0) hit(W, b, t, n * k); });
+    hit(W, b, t, n * beats[0][1]);
     if (t.war && !t.cmdr && d.curse) t.curse = Math.max(t.curse, Math.min(4, d.curse));
   }
   if (Math.random() < (b.tier === 'server' ? 0.5 : 0.3)) shout(W, b, name);
@@ -3275,11 +3277,30 @@ function castSkill(W, b, t, s) {
 /** An AI skill's picture no bigger than AI_FX_AREA on the screen (the 승급 skills' great pictures,
  *  thirty-five at once round a boss, were what cost a phone its frames: measured, the effects alone). */
 const AI_FX_AREA = { raid: 120 * 120, war: 150 * 150 };
-function fitFx(fx, scale) {
-  const f = A.M().fx[fx];
-  if (!f || !f.w || !f.h) return scale;
-  const s = scale * aiFx(), area = f.w * f.h * (f.k || 1) ** 2 * s * s, max = A.G().war && A.G().war.raid ? AI_FX_AREA.raid : AI_FX_AREA.war;
-  return area > max ? scale * Math.sqrt(max / area) : scale;
+/** 이펙트=판정: an AI skill's picture scale and reach. A spread one is drawn 2r tiles across (its drawn part, the
+ *  frames' boxes), at most the AI cap (AI_FX_AREA) — and then it strikes as far as it is drawn; a single blow
+ *  a body and a bit across. { scale (before aiO's aiFx), r }. */
+function fitArea(fx, s) {
+  const f = fx && A.M().fx[fx];
+  const raid = A.G().war && A.G().war.raid, cap = Math.sqrt(raid ? AI_FX_AREA.raid : AI_FX_AREA.war);
+  const aoe = s.kind === 'aoe', want = Math.min(cap, aoe ? s.r * 2 * TILE : 2.2 * TILE), r = aoe ? want / TILE / 2 : 0;
+  if (!f || !f.w) return { pic: fx, scale: aoe ? 0.72 : 0.62, r: aoe ? s.r : 0 };
+  // (a spread one: its drawn part made the square it strikes, stretched up or down to it — fxSquare)
+  if (aoe) return { pic: A.fxSquare(fx, want / TILE, 'ai'), scale: 1 / aiFx(), r };
+  const src = f.src ? A.M().fx[f.src] || f : f, tall = f.h > f.w * 1.4;
+  let ext = 0;
+  if (src.bb && src.bb.length >= 4) for (let i = 0; i + 3 < src.bb.length; i += 4) ext = Math.max(ext, src.bb[i + 2], tall ? 0 : src.bb[i + 3]);
+  ext = (ext || (tall ? f.w : Math.max(f.w, f.h))) * (f.k || 1);
+  return { pic: fx, scale: want / ext / aiFx(), r };
+}
+/** A blow under an AI picture that stays `life` s: [[delay, share], …] — at once when it is soon gone, else half at
+ *  once and the rest in beats about every 0.4 s while it stays (a phone's worth: never more than four). */
+function aiBeats(life) {
+  const span = life - 0.25;
+  if (!(span > 0.9)) return [[0, 1]];
+  const m = Math.min(4, Math.max(2, Math.round(span / 0.4))), out = [[0, 0.5]];
+  for (let i = 1; i <= m; i++) out.push([(i * span) / m, 0.5 / m]);
+  return out;
 }
 /** Test counters: what each fighter cast (kinds as the 'before' build counted them). */
 function tally(b, k) { const T = b.tally || (b.tally = {}); T[k] = (T[k] || 0) + 1; }
