@@ -1,0 +1,14 @@
+{
+ "md_heal": {"yid": "23001100", "name": "금기의기원", "prefab": "Skill_Effect_Warlock_Heal_Cast", "icon": "Skill_Icon_23001100", "keep_reach": true, "scale": 0.7,
+  "why": "Skills_Player 23001100 금기의기원: CastEffectPath Skill_Effect_Warlock_Heal_Cast (was 체마변환's Convert_Cast)"},
+ "md_bust": {"yid": "23002500", "name": "광폭기대방출", "prefab": "Skill_Effect_Warlock_Frenzy_Bust_Hit", "icon": "Skill_Icon_23002500", "keep_reach": true, "scale": 0.5,
+  "why": "Skills_Player 23002500 광폭기대방출: its own Frenzy_Bust_Hit alone (the disc layered on it was 광폭기폭사's Frenzy_Explosion)"},
+ "dk_paddle": {"yid": "20910500", "name": "밭다리걸기", "prefab": "Mountain_Phase3_Parrying_Hit", "icon": "Skill_Icon_120501", "keep_reach": true, "scale": 0.75,
+  "why": "Skills_Player 20910500 밭다리걸기: HitEffectPath Mountain_Phase3_Parrying_Hit (was 일격필살'괴력난신's Supernatural_Hit)"},
+ "a_aim": {"yid": "20610200", "name": "조준 활쏘기", "prefab": "Skill_Effect_Archer_BloodStrike_R4_Casting", "icon": "Skill_Icon_60003", "keep_reach": true, "scale": 0.6,
+  "why": "20610200 has no Cast/HitEffectPath (the basic arrow, Attack_Archer + SFX_Archer_Attack_Basic); 연 ties it to the 투혈 family (20610801 투혈오식 - 조준 활쏘기 = R5_Hit, ours a_blood5). R4_Casting, the 투혈 focus ring no live record and no skill of ours uses, shows its 1초 집중 (was 추격's 6th_01_Hit)"},
+ "mk_air": {"yid": "20510800", "name": "허공답보", "prefab": "Skill_Effect_Monk_IncoherenceArea_Hit", "icon": "skill_icon_51301", "keep_reach": true, "scale": 0.7,
+  "why": "20510800 is a passive (상시효과, Type PASSIVE/ADD_BUFF, buff 20510800 without a prefab): no picture in 연. IncoherenceArea_Hit, a 격투가 prefab no table and no skill of ours uses, is the landing's blue footfall (was 약육강식's IncreasesMPnSpeed; Monk_Whirlwind is mk_whirl's tornado again)"},
+ "dk_nemesis": {"yid": "20911200", "name": "권선징악", "prefab": "Mountain_Phase3_Parrying", "icon": "Skill_Icon_121601", "keep_reach": true, "scale": 0.8,
+  "why": "20911200 is a party buff (SkillType BUFF, Spell motion, only SFX_Dokkaebi_Nemesis; buffs 20911200/20911201 without a prefab): no picture in 연. Every free 도깨비 prefab is another 도깨비 skill's (징벌·금나와라·부채 casts) but the 16px wisp counter; Mountain_Phase3_Parrying is the unclaimed other half of the pair 연 gives the 도깨비 (밭다리걸기 = Parrying_Hit), blue and gold as the icon (was 일격필살'징벌's Punishment_ReinForce_Skill)"}
+}

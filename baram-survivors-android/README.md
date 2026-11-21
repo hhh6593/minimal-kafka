@@ -1295,7 +1295,7 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
 | 무사 | 9차 | 운기 | 지속 회복 `regen` | 3%/0.5초 / 18초 | skill_thief_230201 / k_l_innate | 복수 |
 | 격투가 | 일반 | 백열장 | 일렬 밀쳐내기(막히면 기절) `knock` | 18 / 2초 | Skill_Icon_20000000 / k_mk_whitepalm (Skill_Effect_ALL_WhitePalm_Hit) |  |
 | 격투가 | 일반 | 회오리 | 이동 회오리(끌어당김) `vortex` | 16 / 4초 | skill_icon_50501 / k_dk_whirl |  |
-| 격투가 | 1차 | 허공답보 | 밀집 지점으로 돌진·내려찍기 `charge` | 24 / 3초 | skill_icon_51301 / k_mk_air (Skill_Effect_Monk_IncreasesMPnSpeed) |  |
+| 격투가 | 1차 | 허공답보 | 밀집 지점으로 돌진·내려찍기 `charge` | 24 / 3초 | skill_icon_51301 / k_mk_air (Skill_Effect_Monk_IncoherenceArea_Hit) |  |
 | 격투가 | 6차 | 무한류 | 단일 연타 `flurry` | 34 / 3초 | skill_icon_54801 / h_ml_punch + k_mk_bung | 격풍권 |
 | 격투가 | 8차 | 권기중첩 | 중첩 후 폭발 `stack` | 30 / 1.8초 | Skill_Icon_20511200 / k_mk_pointblue + k_mk_pointburst | 점혈:폭 |
 | 격투가 | 9차 | 약육강식 | 처형(체력 % 이하 즉사) `execute` | 42 / 3초 | Skill_Icon_20000003 / k_mk_kyokushin | 극진권 |
@@ -1532,6 +1532,14 @@ python3 tools/fetch_icons.py GEAR_DIR --yeon-items Items.unity3d [--compare 비�
 `yeon_skills.py Skills.unity3d,FXs.unity3d tools/yeon_skill2_skills.json GEAR_DIR/yskill GEAR_DIR/skillicon_y`
 (층 그림은 `k_u_<이름>`, 돌격명령·헬파이어'첨·필살검무'첨은 그 기록의 아이콘·효과). 「번쩍임 줄이기」에선 잔상과 필살기 고리가 옅게
 그려지고 화면 흰 번쩍임은 없습니다.
+
+**아이콘과 효과가 다르던 마지막 6개** (`tools/yeon_last6_skills.json`, 마지막에
+`yeon_skills.py Skills.unity3d,FXs.unity3d tools/yeon_last6_skills.json GEAR_DIR/yskill`): 연 기술 표(Skills_Player)를 문자열 순서가
+아니라 칸 이름(`CastEffectPath`·`HitEffectPath`)으로 읽으면 금기의기원 = Warlock_Heal_Cast, 광폭기대방출 = Warlock_Frenzy_Bust_Hit(광폭기폭사의
+원반을 겹치지 않음), 밭다리걸기 = Mountain_Phase3_Parrying_Hit입니다. 조준 활쏘기(기본 화살), 허공답보(상시효과), 권선징악(파티 버프, 소리만)은
+연에 자기 효과가 없어, 어느 표에도 다른 기술 이름으로 적히지 않고 우리 기술도 쓰지 않는 그림을 줍니다: 투혈의 집중 고리 BloodStrike_R4_Casting
+(연은 조준 활쏘기를 투혈과 묶음: 20610801 투혈오식 - 조준 활쏘기), 격투가 IncoherenceArea_Hit, 밭다리걸기 맞는 효과의 짝 Mountain_Phase3_Parrying.
+모두 `keep_reach`라 닿는 범위는 그대로입니다.
 
 **다수기 리듬** (`AOE_CD`, `skillStats`의 `aoe`): 여럿을 치는 기술의 재사용 하한 — 화면 12초, 고리·장판·회오리 5~7초, 토템 9초,
 범위 2칸 이상이거나 셋 이상 치는 낙하 4초, 셋 이상 날리는 주문 3.2초, 넓은 베기 3.4초. 하한까지 늘어난 만큼 피해를 0.75제곱으로
