@@ -7302,7 +7302,8 @@ function cast(skill, st) {
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
-    if (def.darken) G.darkUntil = G.t + def.darken;
+    // (The field goes dark only under a 필살기 (castUlt): a plain skill comes round every few seconds,
+    // and a dark sheet each time — 마도사's 광폭멸천강·광폭파장 did — read as the screen flickering.)
     audio.play('skill_' + skill.id, def.kind, skill.lv);
     // (A blink is a dash and a strike, but a caster's own (주술사's 이형환위) is a spell: the cast.)
     const melee = def.kind === 'slash' || (def.kind === 'blink' && !['mage', 'poet', 'magus'].includes(G.cls.id)) || (def.kind === 'spell' && G.cls.id === 'warrior')
@@ -13730,7 +13731,7 @@ function render(now) {
     ctx.fillRect(camX, camY, VW, VH);
   }
 
-  // A 마도사's void (def.darken): the field goes dark round the bodies for a moment, as in 연.
+  // A 필살기's dark (castUlt): the field goes dark round the bodies for a moment, as in 연.
   if (G.darkUntil > G.t) {
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.9, (G.darkUntil - G.t) * 2.5)})`;
     ctx.fillRect(camX, camY, VW, VH);
