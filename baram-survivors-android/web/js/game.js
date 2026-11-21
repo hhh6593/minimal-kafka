@@ -486,15 +486,22 @@ function propKinds(terrain) {
 const PROP_CELL = 160;
 
 /** The props standing in view: one cell of the endless ground at a time, the same every visit. */
+// (the last answer, kept while the view stays over the same cells and the same pictures are in:
+// it was made anew every frame, some forty objects and closures)
+let propsSeen = null;
 function propsInView(camX, camY) {
   const kinds = propKinds(G.stage.terrain);
   if (!kinds.length) return [];
   const list = kinds.filter(([n]) => M.prop[n] && images[`prop/${n}.png`] && images[`prop/${n}.png`].width);
   const total = list.reduce((a, [, w]) => a + w, 0);
   if (!total) return [];
-  const out = [];
   const x0 = Math.floor((camX - 220) / PROP_CELL), x1 = Math.floor((camX + VW + 220) / PROP_CELL);
   const y0 = Math.floor((camY - 60) / PROP_CELL), y1 = Math.floor((camY + VH + 120) / PROP_CELL);
+  const L = propsSeen;
+  if (L && L.stage === G.stage && L.kinds === kinds && L.n === list.length && L.total === total
+    && L.x0 === x0 && L.x1 === x1 && L.y0 === y0 && L.y1 === y1) return L.out;
+  const out = [];
+  propsSeen = { stage: G.stage, kinds, n: list.length, total, x0, x1, y0, y1, out };
   for (let cy = y0; cy <= y1; cy++) {
     for (let cx = x0; cx <= x1; cx++) {
       let h = (Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ G.stage.id.length * 83492791) >>> 0;
@@ -1165,7 +1172,9 @@ function locate(b) {
  */
 function jostle(b, dt) {
   if (b.j0 === undefined) b.j0 = Math.random() * Math.PI * 2;
-  const k = key(b.tx, b.ty), c = crowd.get(k);
+  // (its tile's key kept while it stands there: a new string per monster per frame before)
+  if (b.jkx !== b.tx || b.jky !== b.ty) { b.jkx = b.tx; b.jky = b.ty; b.jk = key(b.tx, b.ty); }
+  const k = b.jk, c = crowd.get(k);
   let tx = Math.cos(b.j0) * 5, ty = Math.sin(b.j0) * 3;
   if (c) {
     const n = c.length + 1, i = occ.get(k) === b ? 0 : c.indexOf(b) + 1;
@@ -11212,6 +11221,7 @@ function battleInfo(key, n, text) {
   L.push({ key, n, t: G.t, text: text(n) });
   if (L.length > 3) L.shift();
 }
+const binfoWraps = new Map();
 function drawBattleInfo() {
   G.binfoBottom = 0;
   if (!document.body.classList.contains('yeon') || G.war || settings.battleInfo === false) return;
@@ -11223,13 +11233,20 @@ function drawBattleInfo() {
   // The last lines, wrapped at word breaks as 연 wraps them, the newest kept when they are many.
   const rows = [];
   for (const l of (G.binfo || []).filter(l => G.t - l.t < 9).reverse()) {
-    const out = [];
-    let cur = '';
-    for (const word of l.text.split(' ')) {
-      const t = cur ? cur + ' ' + word : word;
-      if (cur && ctx.measureText(t).width > w - 8 * d) { out.push(cur); cur = word; } else cur = t;
+    // (a line's wrapping kept by its words, font and width: it was measured word by word each frame)
+    const wk = ctx.font + '|' + (w - 8 * d) + '|' + l.text;
+    let out = binfoWraps.get(wk);
+    if (!out) {
+      out = [];
+      let cur = '';
+      for (const word of l.text.split(' ')) {
+        const t = cur ? cur + ' ' + word : word;
+        if (cur && ctx.measureText(t).width > w - 8 * d) { out.push(cur); cur = word; } else cur = t;
+      }
+      if (cur) out.push(cur);
+      if (binfoWraps.size > 200) binfoWraps.clear();
+      binfoWraps.set(wk, out);
     }
-    if (cur) out.push(cur);
     if (rows.length + out.length > MAXROWS) break;
     rows.unshift(...out.map(text => ({ text, a: Math.min(1, (9 - (G.t - l.t)) * 0.8) })));
   }
@@ -12721,16 +12738,18 @@ function josa(word, withFinal, without) {
   return word + (has ? withFinal : without);
 }
 
+// (the painters are kept functions handed the text and colour: a new closure per call before)
+function paintThick(g, x0, y0, text, color) {
+  g.fillStyle = '#1a1a1a';
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) g.fillText(text, x0 + dx, y0 + dy);
+  g.fillStyle = color;
+  g.fillText(text, x0, y0);
+}
 /** Big numbers with a heavy dark edge, as the game shows damage and healing. */
 function thick(text, x, y, color) {
   x = Math.round(x);
   y = Math.round(y);
-  const e = textPic('t', text, color, (g, x0, y0) => {
-    g.fillStyle = '#1a1a1a';
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) g.fillText(text, x0 + dx, y0 + dy);
-    g.fillStyle = color;
-    g.fillText(text, x0, y0);
-  }, 3, 3, 3, 4);
+  const e = textPic('t', text, color, paintThick, 3, 3, 3, 4);
   if (e) {
     ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
     return;
@@ -13126,12 +13145,17 @@ function hitNum(n) {
 
 function drawDigits(text, x, y, color, k, font = 'font_damage') {
   const f = M.hud[font], sheet = font === 'font_gold' ? goldFont() : font.startsWith('font_dmgk') ? images[`hud/${font}.png`] : digitSheet(color);
-  const glyphs = [...text].map(ch => f.glyphs[ch]).filter(Boolean);
-  const w = glyphs.reduce((a, g) => a + g[4], 0) * k;
+  // (by index, no arrays: the numbers are digits and signs, one UTF-16 unit each)
+  const gl = f.glyphs;
+  let w = 0;
+  for (let i = 0; i < text.length; i++) { const g = gl[text[i]]; if (g) w += g[4]; }
+  w *= k;
   let cx = x - w / 2;
-  for (const [gx, gy, gw, gh, adv] of glyphs) {
-    ctx.drawImage(sheet, gx, gy, gw, gh, Math.round(cx), Math.round(y - f.height * k), gw * k, gh * k);
-    cx += adv * k;
+  for (let i = 0; i < text.length; i++) {
+    const g = gl[text[i]];
+    if (!g) continue;
+    ctx.drawImage(sheet, g[0], g[1], g[2], g[3], Math.round(cx), Math.round(y - f.height * k), g[2] * k, g[3] * k);
+    cx += g[4] * k;
   }
 }
 
@@ -13728,13 +13752,19 @@ function drawAbyss(px, py, camX, camY) {
 // idle, attack and death in three directions (the side one faces left; mirrored for right),
 // every frame standing on the same foot point. Loaded the first time the monster is drawn.
 
+// (its path and its answer kept by the unit's id: a new string and object per body per frame before)
+const yunitSeen = new Map();
 function yunit(m) {
   const u = M.yunit && M.yunit[m.id];
   if (!u) return null;
-  const path = `yunit/${m.id}.png`;
+  let c = yunitSeen.get(m.id);
+  if (!c) yunitSeen.set(m.id, (c = { path: `yunit/${m.id}.png`, r: null }));
+  const path = c.path;
   if (!(path in images)) loadImage(path);
   const im = images[path];
-  return im && im.complete && im.width ? { u, im } : null;
+  if (!(im && im.complete && im.width)) return null;
+  if (!c.r || c.r.u !== u || c.r.im !== im) c.r = { u, im };
+  return c.r;
 }
 
 // Units whose 연 attack row reads badly here and strike from their standing pose instead
@@ -13742,21 +13772,37 @@ function yunit(m) {
 // 반고 (삼두룡), 용마 (청기린), 폭염왕 (화령), 고균도 저주의 추장, 숭숭이 (제천대성).
 const STILL_ATK = new Set(['y606011', 'y304624', 'y511013', 'y611001', 'y617201']);
 /** Which row: the way it last moved (or faces), and what it is doing. */
+// The rows a unit has for each way it faces, looked up once (a crowd made a dozen arrays and
+// strings each a frame), and one answer reused: every caller reads it at once.
+const yunitRows = new WeakMap(), yunitOut = { a: null, f: 0, dir: '', dx: 0 };
+function yunitRowsOf(u, dir) {
+  let R = yunitRows.get(u);
+  if (!R) yunitRows.set(u, (R = {}));
+  if (!R[dir]) {
+    const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
+    R[dir] = { atk: pick(`atk_${dir}`, 'atk_side', 'atk_down'), walk: pick(`walk_${dir}`, 'walk_side', 'walk_down'), idle: pick(`idle_${dir}`) };
+  }
+  return R[dir];
+}
 function yunitAnim(u, b) {
   const dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
   const dir = dx ? 'side' : dy < 0 ? 'up' : 'down';
-  const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
-  const atk = pick(`atk_${dir}`, 'atk_side', 'atk_down');
+  const R = yunitRowsOf(u, dir), atk = R.atk, o = yunitOut;
+  o.dir = dir;
+  o.dx = dx;
   if (atk && b.atkAt !== undefined && !STILL_ATK.has((b.m && b.m.id) || b.unit) && (G.t - b.atkAt) * 1000 < atk.n * atk.ms) {
-    return { a: atk, f: Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms)), dir, dx };
+    o.a = atk;
+    o.f = Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms));
+    return o;
   }
-  const walk = pick(`walk_${dir}`, 'walk_side', 'walk_down');
-  const idle = pick(`idle_${dir}`);
+  const walk = R.walk, idle = R.idle;
   // A unit that never walks (연's cursed torch) keeps standing in its idle row as it moves.
   const a = (b.moving || !idle) && walk ? walk : idle || walk;
   if (!a) return null;
   b.seed = b.seed || Math.floor(Math.random() * 1000);
-  return { a, f: Math.floor((performance.now() + b.seed) / a.ms) % a.n, dir, dx };
+  o.a = a;
+  o.f = Math.floor((performance.now() + b.seed) / a.ms) % a.n;
+  return o;
 }
 
 // Struck, a monster flashes white: a white copy of that one frame, not of its whole sheet.
@@ -14030,6 +14076,21 @@ function camFollow(now, lead) {
   return [Math.round(C.x + lead.x - VW / 2), Math.round(C.y + lead.y - 30 - VH / 2)];
 }
 
+// Back to front by the feet, in place, those at the same height kept in their order (as the
+// stable sort kept them). A loop of its own rather than sort with a comparator: each of the
+// thousand calls of a crowd made new numbers (the feet read out, the difference handed back).
+function sortByFeet(list) {
+  for (let i = 1; i < list.length; i++) {
+    const b = list[i], y = b.y;
+    if (!(list[i - 1].y > y)) continue;
+    let lo = 0, hi = i - 1;
+    // (the first place whose y is past this one's: after every equal one)
+    while (lo < hi) { const m = (lo + hi) >> 1; if (list[m].y > y) hi = m; else lo = m + 1; }
+    for (let j = i; j > lo; j--) list[j] = list[j - 1];
+    list[lo] = b;
+  }
+  return list;
+}
 function render(now) {
   sweepBitmaps(now);
   ctx.imageSmoothingEnabled = false;
@@ -14120,7 +14181,7 @@ function render(now) {
   G.seenProps = seenProps;
   const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(seenProps) : War.props()) : seenProps, G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
   bodies.push(p);
-  bodies.sort((a, b) => a.y - b.y);
+  sortByFeet(bodies);
   const hidden = G.buffs.stealth > G.t;
   for (const b of bodies) {
     if (b.war) {
@@ -14710,7 +14771,7 @@ function textPic(kind, text, color, paint, padL = 2, padR = 2, padT = 2, padB = 
   g.font = ctx.font;
   g.textAlign = ctx.textAlign;
   g.textBaseline = ctx.textBaseline;
-  paint(g, ox, oy);
+  paint(g, ox, oy, text, color);
   e = { c, ox, oy, w: c.width / sc, h: c.height / sc };
   keepTextPic(key, e);
   return e;
@@ -14720,18 +14781,19 @@ function keepTextPic(key, e) {
   textPics.set(key, e);
 }
 
+function paintOutline(g, x0, y0, text, color) {
+  g.fillStyle = '#000';
+  g.fillText(text, x0 + 1, y0);
+  g.fillText(text, x0, y0 + 1);
+  g.fillText(text, x0 + 1, y0 + 1);
+  g.fillStyle = color;
+  g.fillText(text, x0, y0);
+}
 /** Text with a one-pixel dark edge, crisp at any whole scale. */
 function outline(text, x, y, color = '#efe3c2') {
   x = Math.round(x);
   y = Math.round(y);
-  const e = textPic('o', text, color, (g, x0, y0) => {
-    g.fillStyle = '#000';
-    g.fillText(text, x0 + 1, y0);
-    g.fillText(text, x0, y0 + 1);
-    g.fillText(text, x0 + 1, y0 + 1);
-    g.fillStyle = color;
-    g.fillText(text, x0, y0);
-  });
+  const e = textPic('o', text, color, paintOutline);
   if (e) {
     ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
     return;
