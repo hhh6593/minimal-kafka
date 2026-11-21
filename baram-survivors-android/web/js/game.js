@@ -8187,7 +8187,9 @@ const TIER_KINDS = {
   smite({ skill, st, def, fxid, smite, hitOn }) {
     const p = G.player, foes = tkNear(p.tx, p.ty, st.range);
     if (!foes.length) return 0.3;
-    const t = foes.slice(0, 16).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp || a.hp - b.hp)[0];
+    // (천신의심판: the thickest of them, where the 천신 comes down; the rest the strongest)
+    const t = def.densest ? tkDensest(st.range, 2) || foes[0]
+      : foes.slice(0, 16).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp || a.hp - b.hp)[0];
     const ex = t.tx - p.tx, ey = t.ty - p.ty;
     if (Math.abs(ex) >= Math.abs(ey)) { p.fdx = Math.sign(ex) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(ey); }
     if (def.dash && tdist(t, p) > 1.5 && !steering()) {
@@ -8205,6 +8207,13 @@ const TIER_KINDS = {
     // the blow's own picture on it (drawn a little larger than the foe: it is the class's great blow)
     if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(bigFx(fxid, def.size || 150, 'sm'), t, { scale: 1 }));
     const tx = t.tx, ty = t.ty;
+    // 천신의심판: the foes round it drawn into the middle first
+    if (def.pull) {
+      if (def.fxPull && M.fx[def.fxPull]) addFx(bigFx(def.fxPull, (st.radius * 2 + 1) * TILE, 'smp'), tx * TILE + TILE / 2, ty * TILE + TILE - 20, { scale: 1, alpha: 0.85 });
+      for (const o of around(tx, ty, st.radius + 1)) if (o !== t) tkShove(o, o.tx - Math.sign(o.tx - tx), o.ty - Math.sign(o.ty - ty));
+    }
+    // 극청룡참: the thrown sickle comes back and cuts again
+    if (def.again) later(wait + 0.4, () => { if (t.hp > 0) { hitOn(t); smite(t, st.dmg * def.again); } });
     later(wait + (def.delay && !def.shot ? 0 : 0.05), () => {
       if (def.fx2 && M.fx[def.fx2]) addFx(bigFx(def.fx2, def.size2 || 130, 'sm2'), tx * TILE + TILE / 2, ty * TILE + TILE - 16, { scale: 1 });
       G.shake = Math.max(G.shake, 0.08);
@@ -8244,6 +8253,13 @@ const TIER_KINDS = {
       ways = [[best[0], best[1]]];
     } else if (!tkNear(p.tx, p.ty, def.depth).length) return 0.3;
     const sx = p.tx, sy = p.ty, w = def.width || 0, len = def.depth * TILE, step = 0.05;
+    // 화혼돌파: the hero goes with it, to the farthest free tile of the way
+    if (def.dash && !steering()) {
+      const [dx, dy] = ways[0];
+      for (let k = def.depth; k >= 2; k--) if (tkMoveHero(sx + dx * k, sy + dy * k)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
+    }
+    // 이계의침식: what it raises stays along its way a moment
+    if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = 2; k <= def.depth; k += 2) later(k * step, () => addFx(def.trail, (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 10, { scale: 0.7 }));
     for (let i = 0; i < (def.pulses || 1); i++) later(i * (def.gap || 0.3), () => {
       for (const [dx, dy] of ways) {
         addFx(bigFx(fxid, (w * 2 + 1) * TILE * 1.2, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
@@ -8353,6 +8369,32 @@ const ECHO = {
       if (def.fxHit && got++ < 3) fxOn(def.fxHit, e, { scale: 0.5 });
       hurtEnemy(e, d);
     }
+  },
+  // 차원개방: fragments of the 이계의낫 out of the opened dimension cut the foes round the hero.
+  shard(def, d) {
+    const p = G.player;
+    tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 2).forEach((e, i) => later(i * 0.07, () => {
+      if (e.hp <= 0) return;
+      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.7 });
+      hurtEnemy(e, d);
+      for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * (def.splash || 0.3));
+    }));
+  },
+  // 불길한혼불: an ill-omened fire clings to a foe near and bursts a moment later round it.
+  hex(def, d) {
+    const p = G.player, run = G;
+    tkNear(p.tx, p.ty, def.range).filter(e => !e.hex9).slice(0, def.shots || 1).forEach(e => {
+      e.hex9 = true;
+      const pic = tkLoop(def.fx2, e.x, e.y - 30, def.delay || 1.2, { scale: 0.45, alpha: 0.9 });
+      later(def.delay || 1.2, () => {
+        if (G !== run) return;
+        e.hex9 = false;
+        if (pic) pic.life = pic.t;
+        const tx = e.tx, ty = e.ty;
+        if (fxBudget('hex9', 4)) addFx(def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 12, { scale: 0.75 });
+        for (const o of around(tx, ty, def.radius || 1)) { hurtEnemy(o, d); if (def.dot) applyStatus(o, def.dot, 3, 1); }
+      });
+    });
   },
   // 권법의기원: fists of 기 strike the foes beside the hero.
   fist(def, d) {

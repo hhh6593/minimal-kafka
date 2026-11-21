@@ -1,4 +1,3 @@
 {
- "l_reflect9": {"name": "반탄강기", "prefab": "Skill_Effect_Lancer_S_01_b", "why": "Skills_Player 20711601 반탄강기: its second prefab (the golden sphere that holds), unused till now: the 무사's 9차 aura"},
  "cl_haeil": {"name": "해일강타", "prefab": "Skill_Effect_Celestial_ImmortalityStorm_Reinforce", "why": "the 천인's own water storm (불가살이선풍 강화's ring of water), which no skill of ours draws: the original 9차 해일강타's tidal water (2662 IMG51 is too covered by the field's damage numbers and posts to take out)"}
 }
