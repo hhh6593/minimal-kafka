@@ -81,6 +81,12 @@ def build(spec, src_dir, out_dir):
             f = frames[i]
             if mode == "white":
                 a = unwhite(f)
+            elif mode == "cutin":
+                # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the
+                # game's own dark shows through; the field in the middle is cleared by the masks
+                a = np.asarray(f.convert("RGB")).astype(np.float32)
+                al = np.clip((a.max(axis=2) - e.get("t0", 16)) / max(1.0, e.get("t1", 60) - e.get("t0", 16)), 0, 1) * 255
+                a = np.dstack([a, al]).astype(np.uint8)
             else:
                 a = diffed(f, bg, e.get("t0", 18), e.get("t1", 70))
             for m in e.get("mask", []):

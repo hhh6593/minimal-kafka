@@ -8168,7 +8168,7 @@ const TIER_KINDS = {
     if (def.reflect) G.buffs.reflect = Math.max(G.buffs.reflect, G.t + life);
     // the aura's own picture held round the hero, as wide as what it reaches
     const f = M.fx[fxid], want = (r * 2 + 1) * TILE * (def.auraSize || 1);
-    tkLoop(fxid, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : 0.7,
+    tkLoop(fxid, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7,
       scale: f ? Math.max(0.6, Math.min(2.2, want / (Math.max(f.w, f.h) * (f.k || 1)))) : 1 });
     if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
     for (let k = 1; k <= n; k++) later(k * def.tick, () => {
@@ -8264,12 +8264,17 @@ const TIER_KINDS = {
     const sx = p.tx, sy = p.ty, w = def.width || 0, len = def.depth * TILE, step = 0.05;
     // 화혼돌파: the hero goes with it, to the farthest free tile of the way
     if (def.dash && !steering()) {
+      // (through the crowd: the end of the way, or the free tile nearest it)
       const [dx, dy] = ways[0];
-      for (let k = def.depth; k >= 2; k--) if (tkMoveHero(sx + dx * k, sy + dy * k)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
+      const spots = [];
+      for (let k = def.depth; k >= 2; k--) for (const [ox, oy] of [[0, 0], [dy, dx], [-dy, -dx], [dx, dy]]) spots.push([sx + dx * k + ox, sy + dy * k + oy]);
+      for (const [x, y] of spots) if (tkMoveHero(x, y)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
     }
     // 이계의침식: what it raises stays along its way a moment
-    if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = 2; k <= def.depth; k += 2) later(k * step, () => addFx(bigFx(def.trail, 110, 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 10, { scale: 1 }));
+    // (명천검파: each pulse lays its 검기 along every arm, turned with it — the cross reads whole)
+    const trailAt = () => { if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = def.trailStep || 2; k <= def.depth; k += def.trailStep || 2) later(k * step, () => addFx(bigFx(def.trail, def.trailSize || 110, 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 14, { scale: 1, rot: def.trailRot ? Math.atan2(dy, dx) : 0 })); };
     for (let i = 0; i < (def.pulses || 1); i++) later(i * (def.gap || 0.3), () => {
+      trailAt();
       for (const [dx, dy] of ways) {
         addFx(bigFx(fxid, (w * 2 + 1) * TILE * 1.2, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
         const seen = new Set();
@@ -8394,13 +8399,13 @@ const ECHO = {
     const p = G.player, run = G;
     tkNear(p.tx, p.ty, def.range).filter(e => !e.hex9).slice(0, def.shots || 1).forEach(e => {
       e.hex9 = true;
-      const pic = tkLoop(def.fx2, e.x, e.y - 30, def.delay || 1.2, { scale: 0.45, alpha: 0.9 });
+      const pic = tkLoop(def.fx2, e.x, e.y - 30, def.delay || 1.2, { scale: def.markScale || 0.45, alpha: 1 });
       later(def.delay || 1.2, () => {
         if (G !== run) return;
         e.hex9 = false;
         if (pic) pic.life = pic.t;
         const tx = e.tx, ty = e.ty;
-        if (fxBudget('hex9', 4)) addFx(def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 12, { scale: 0.75 });
+        if (fxBudget('hex9', 4)) addFx(def.fxBurst || def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 12, { scale: def.burstScale || 0.75 });
         for (const o of around(tx, ty, def.radius || 1)) { hurtEnemy(o, d); if (def.dot) applyStatus(o, def.dot, 3, 1); }
       });
     });
@@ -8901,7 +8906,7 @@ const ULT_GRAND = [
   { dark: 0.7, shake: 0.5 },
   { openW: 0.32, aura: 2.6, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.35, 1.5], lateN: 3, lateAt: 1.9, dark: 0.9, shake: 0.55 },
   { openW: 0.45, aura: 3.1, auraW: 160, echoN: 12, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.25, 1.6], lateN: 5, lateAt: 1.8, dark: 1.1, shake: 0.65 },
-  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8 },
+  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8, cutT: 2.1 },
 ];
 // (ways that already hang their main or cast picture over the screen: no second call of it)
 const ULT_SCREEN_OWN = { rain: 'main', mark: 'cast', chain: 'cast' };
@@ -8939,6 +8944,16 @@ function ultGrand(t, bi) {
   G.darkUntil = Math.max(G.darkUntil || 0, G.t + (t.dark || g.dark));
   G.shake = Math.max(G.shake, g.shake);
   if (!bi) return;
+  // 9차: the original 궁극's own full-screen art (2662 captures: data.js ULT_TIERS cutin, fx o_<cls>_ult9) framing the
+  // darkened field, its middle left clear; not in a war, where thirty fighters are drawn too.
+  if (g.cutT && t.cutin && M.fx[t.cutin] && !G.war) {
+    const c = M.fx[t.cutin], want = Math.max(VW, VH * c.w / c.h) * 1.04;
+    if (ultLayer(t.cutin, want, 'gc', 0, -10, { follow: true, cap: 3.5, alpha: calm ? 0.55 : 0.92 })) {
+      const f = G.fxs[G.fxs.length - 1];
+      f.loop = true;
+      f.life = g.cutT;
+    }
+  }
   const ownScreen = ULT_SCREEN_OWN[t.mech] && t[ULT_SCREEN_OWN[t.mech]];
   const open = t.open !== undefined ? t.open : ownScreen ? null : t.cast || t.main;
   // (9차: the call gives way to the last burst — never two screen pictures at once, a phone's worth)
@@ -12992,6 +13007,7 @@ function thick(text, x, y, color) {
 }
 
 function floatText(x, y, text, color, box = false) {
+  if (window.__quietText) return; // test: frames of a skill without the numbers over it
   if (G.texts.length > 50) G.texts.shift();
   G.texts.push({ x: x + rand(-4, 4), y, text: String(text), color, t: 0, box });
 }
@@ -14525,6 +14541,7 @@ function render(now) {
     ctx.globalAlpha = t.t < 0.7 ? 1 : 1 - (t.t - 0.7) / 0.4;
     // No number over the top bar (the ground's name, the boss's life): one up there is not drawn.
     if (t.num && t.y < camY + 56) continue;
+    if (t.num && window.__quietText) continue; // test: a skill's frames without its numbers
     if (t.box) {
       const w = Math.ceil(ctx.measureText(t.text).width) + 6, x = Math.round(t.x - w / 2), y = Math.round(t.y - 10);
       ctx.fillStyle = 'rgba(34,30,92,0.9)';
