@@ -9,7 +9,8 @@ costs as much as the rest (every pixel of a cell is blended), and with forty eff
 crowded fight that was a good part of a slow phone's frame. Each sheet's entry in manifest.json
 gets "bb": per cell, the box [x, y, w, h] of its pixels that show (alpha 3 and up; w 0 for an
 empty cell), when the boxes leave out a tenth of the sheet or more. game.js drawFx draws that box.
-Run after webp_fx.py (it reads the sheets as the game loads them).
+Run after webp_fx.py (it reads the sheets as the game loads them). Sheets fx_pack.py packed
+("at" in the manifest) already have their boxes and are left alone.
 """
 import json
 import os
@@ -29,8 +30,8 @@ def main():
     kept = total = 0
     sheets = 0
     for fid, f in fx.items():
-        if f.get('src') or not f.get('w') or not f.get('h'):
-            continue
+        if f.get('src') or f.get('at') or not f.get('w') or not f.get('h'):
+            continue  # (a packed sheet's boxes are fx_pack.py's)
         path = os.path.join(assets, 'fx', fid + ('.webp' if fid in webp else '.png'))
         if not os.path.exists(path):
             continue

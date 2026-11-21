@@ -486,11 +486,8 @@ async function startWar(id, cls, role, opts = {}) {
   for (const id of ['c_heal', 'p_realm', 'p_barrier', 'w_tiger', 'w_roar', 'm_curse', 'p_sky']) skFx(id);
   for (const [id, d] of Object.entries(SK)) if (d.cls === cls.id) skFx(id);
   for (const col of Object.values(A.SHOT_FX || {})) fxIds.add(col);
-  for (const id of fxIds) {
-    const f = id && A.M().fx[id];
-    const im = f && A.images[`fx/${f.src || id}.png`];
-    if (im && im.decode && !im.__decoded) loads.push(im.decode().then(() => { im.__decoded = true; }).catch(() => {}));
-  }
+  // (loaded too: an effect sheet is loaded as a run needs it, game.js fxWarm)
+  loads.push(A.fxWarm(fxIds));
   await Promise.all(loads);
   const stage = {
     id: 'war_' + id, name: def.name, war: def, terrain: 'war', level: 10, monsters: [], intro: def.desc, pages: [],
@@ -3194,7 +3191,7 @@ function aiSkillFx(b, id) {
 function warmKitFx(W) {
   const seen = new Set();
   for (const b of W.bodies) for (const s of b.skills || []) { const fx = aiSkillFx(b, s.id); if (fx) seen.add(A.M().fx[fx].src || fx); }
-  for (const id of seen) { const im = A.images[`fx/${id}.png`]; if (im && im.decode) im.decode().catch(() => {}); }
+  A.fxWarm(seen);
   W.kitFx = seen.size;
 }
 /** One skill of the fighter's turn, if one is ready and it suits; true when it cast. */

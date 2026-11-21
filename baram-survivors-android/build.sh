@@ -40,6 +40,8 @@ rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
 cp -r "$HERE/web" "$OUT/assets/www"
 python3 -I "$HERE/tools/prepare_assets.py" "$IMAGES" "$OUT/assets/www/assets" "$AUDIO" $AVATAR $TOWN $SKILLFX $MODERN $GEAR
+# Effect sheets packed tight, and shrunk where the game never draws them as large (fx_drawscale.json).
+python3 -I "$HERE/tools/fx_pack.py" "$OUT/assets/www/assets" "$HERE/tools/fx_drawscale.json"
 python3 -I "$HERE/tools/webp_fx.py" "$OUT/assets/www/assets"
 python3 -I "$HERE/tools/fx_trim.py" "$OUT/assets/www/assets"
 cp -r "$HERE/res" "$OUT/res"

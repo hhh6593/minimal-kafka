@@ -158,6 +158,88 @@ function loadImage(path) {
   });
 }
 
+// ---- effect sheets, loaded as they are needed
+// Every effect sheet loaded at boot was some 1.2 GB decoded: a phone's WebView renderer was killed
+// a few seconds into a hunt. Only the common ones (hit sparks, revive, ...) load at boot; a run
+// loads and decodes its own (fxWarm(runFxIds(...)): the hero's kit, its 필살기 band, the war's kits)
+// and lets go of the previous run's (fxKeep); anything else loads on its first use and is drawn
+// from when it is decoded (fxPic: null until then, so a first use is skipped, never a stall).
+const fxPending = new Map(), fxPinned = new Set();
+/** The decoded sheet of effect `id` (its own sheet, f.src), or null while it loads (and starts it). */
+function fxPic(id) {
+  const f = M.fx[id], src = f ? f.src || id : id, im = images[`fx/${src}.png`];
+  if (im && im.__ok) return im;
+  if (f) fxLoad(src);
+  return null;
+}
+function fxLoad(src) {
+  const path = `fx/${src}.png`;
+  if (images[path] && images[path].__ok) return Promise.resolve(images[path]);
+  let p = fxPending.get(src);
+  if (!p) {
+    p = loadImage(path).then(im => {
+      if (!im) return null;
+      return (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => { im.__ok = true; return im; });
+    }).finally(() => fxPending.delete(src));
+    fxPending.set(src, p);
+  }
+  return p;
+}
+/** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
+function fxWarm(ids, wait = 0) {
+  const srcs = new Set();
+  for (const id of ids) { const f = id && M.fx[id]; if (f) srcs.add(f.src || id); }
+  const all = Promise.all([...srcs].map(fxLoad));
+  return wait ? Promise.race([all, new Promise(r => setTimeout(r, wait))]) : all;
+}
+/** Lets go of every effect sheet but the common ones and these (a run's own): the next run's are
+ *  loaded instead, and a sheet let go loads again if it is used. */
+function fxKeep(ids) {
+  const keep = new Set(fxPinned);
+  for (const id of ids) { const f = id && M.fx[id]; if (f) keep.add(f.src || id); }
+  for (const path of Object.keys(images)) {
+    if (!path.startsWith('fx/')) continue;
+    const src = path.slice(3, -4);
+    if (keep.has(src) || fxPending.has(src)) continue;
+    const im = images[path];
+    delete images[path];
+    if (im) { tintCache.delete(im); const bm = bitmapOf.get(im); if (bm && bm.bm) { bitmapsLive.delete(bm); bitmapBytes -= bm.bytes; bm.bm.close && bm.bm.close(); } bitmapOf.delete(im); }
+  }
+}
+/** The effect ids an object names (a skill, a 필살기 tier, a look): its string values that are
+ *  effects, or whose k_ form is (a tier's boss, a technique), arrays and nested objects too. */
+function fxRefs(o, out, depth = 0) {
+  if (!o || depth > 3) return out;
+  for (const v of Array.isArray(o) ? o : Object.values(o)) {
+    if (typeof v === 'string') { if (M.fx[v]) out.add(v); if (M.fx['k_' + v]) out.add('k_' + v); } else if (v && typeof v === 'object') fxRefs(v, out, depth + 1);
+  }
+  return out;
+}
+let fxByPrefix = null;
+/** A skill's effects: what its data names, and 연's pieces by its name (k_<id>, k_x_<id>_*, k_v_<id>_*, new_, s_). */
+function skillFxIds(id, out = new Set()) {
+  const d = SKILLS[id];
+  if (!d) return out;
+  fxRefs(d, out);
+  for (const k of ['k_' + id, 'new_' + id, 's_' + id]) if (M.fx[k]) out.add(k);
+  if (!fxByPrefix) {
+    fxByPrefix = new Map();
+    for (const k of Object.keys(M.fx)) { const m = /^k_[xv]_(.+?)_[^_]+$/.exec(k); if (m) { if (!fxByPrefix.has(m[1])) fxByPrefix.set(m[1], []); fxByPrefix.get(m[1]).push(k); } }
+  }
+  for (const k of fxByPrefix.get(id) || []) out.add(k);
+  return out;
+}
+/** What a run of this class on this ground can draw from its start: the class's kit open at its
+ *  승급 (as the level-up cards offer it), its 필살기 band, its close-in look, the ground's own effect. */
+function runFxIds(cls, stage) {
+  const out = new Set(), promo = promoOf(cls.id);
+  for (const [id, d] of Object.entries(SKILLS)) if ((d.cls === cls.id || d.cls === 'all' || !d.cls) && promo >= (d.promo || 0)) skillFxIds(id, out);
+  try { fxRefs(ultTier(cls.id, promoOf(cls.id)), out); fxRefs(ultLook(cls.id), out); } catch (e) { /* no tier */ }
+  fxRefs(MELEE_LOOK[cls.id], out);
+  if (stage) { fxRefs([stage.fx, 'new_' + stage.id], out); if (stage.boss) fxRefs(stage.boss, out); }
+  return out;
+}
+
 const monsterById = {};
 
 async function boot() {
@@ -171,8 +253,13 @@ async function boot() {
   audio.setSfx(settings.sfx);
   audio.setBgmVolume(volOf('bgm'));
   audio.setSfxVolume(volOf('sfx'));
+  // The common effects (hit sparks, the level-up, kill and revive, the procs' and shots' pictures)
+  // at boot, pinned; the rest as a run or a first use needs them (fxWarm, fxPic).
+  for (const id of Object.keys(M.fx)) if (id.startsWith('h_')) fxPinned.add(id);
+  for (const id of [...Object.values(FX), ...Object.values(SHOT_FX), ...Object.values(PROCS).map(p => p && p.fx), 'k_revive', '131', 'k_x_hero_foot']) {
+    if (id && M.fx[id]) fxPinned.add(M.fx[id].src || id);
+  }
   const paths = [
-    ...Object.keys(M.fx).map(id => `fx/${id}.png`),
     // Hit sparks and the level-up burst are never in a spell slot: no icon of their own.
     ...Object.keys(M.fx).filter(id => !id.startsWith('new_') && !id.startsWith('h_') && !id.startsWith('g_')).map(id => `icon/${id}.png`),
     ...M.heroes.map(h => `hero/${h.id}.png`),
@@ -198,8 +285,9 @@ async function boot() {
   ];
   let done = 0;
   const bar = $('#load-bar');
-  await Promise.all(paths.map(p => loadImage(p).then(() => {
-    bar.style.width = (100 * ++done / paths.length) + '%';
+  const total = paths.length + fxPinned.size;
+  await Promise.all([...paths.map(p => loadImage(p)), ...[...fxPinned].map(fxLoad)].map(q => q.then(() => {
+    bar.style.width = (100 * ++done / total) + '%';
   })));
   // 연's own effects where the build has them: the spell's picture as it is, no tint.
   for (const [id, fx] of Object.entries(YEON_FX)) {
@@ -1060,6 +1148,8 @@ function startRun(cls, stage, training = false) {
   const mons = stageMonsters(stage);
   occ.clear();
   crowd.clear();
+  // The run's own effects, loaded and decoded now (goHunt waits for them; a war's kits are warmed by war.js).
+  fxWarm(runFxIds(cls, stage));
   G = {
     cls, stage, ...mons, level: stage.level !== undefined ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
@@ -3667,8 +3757,10 @@ function forgeLater(ms, fn) { forgeTimers.push(setTimeout(fn, ms)); }
 /** One of 연's/the game's effect sheets on the window's canvas, centred on the card's picture. */
 function forgeSprite(id, o = {}) {
   const f = M.fx && M.fx[id];
-  const im = f && images[`fx/${f.src || id}.png`];
-  if (!im || !$('.ffx-live .ffx-cv')) return;
+  if (!f || !$('.ffx-live .ffx-cv')) return;
+  const im = fxPic(id);
+  // (not loaded yet: shown when it is, if the window is still up)
+  if (!im) { const t0 = performance.now(); fxLoad(f.src || id).then(x => { if (x) forgeSprite(id, { ...o, delay: Math.max(0, (o.delay || 0) - (performance.now() - t0)) }); }); return; }
   forgeSprites.push({ id, f, im, t0: performance.now() + (o.delay || 0), scale: o.scale || 1, dy: o.dy || 0 });
   if (!forgeRaf) forgeRaf = requestAnimationFrame(forgeDraw);
 }
@@ -3684,13 +3776,13 @@ function forgeDraw(now) {
     const d = durs(s.id), life = d.reduce((a, b) => a + b, 0), t = (now - s.t0) / 1000;
     if (t >= life) return false;
     if (t < 0) return true;
-    const f = s.f, cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9, i = fxFrame(d, t, false) + (f.f0 || 0);
+    const f = s.f, i = fxFrame(d, t, false) + (f.f0 || 0);
     const k = s.scale * (f.k || 1), w = f.w * k, h = f.h * k;
     const c = f.add ? cA : cN;
     c.globalCompositeOperation = f.add ? 'lighter' : 'source-over';
     c.imageSmoothingEnabled = k > 1.5;
     const cx = cv.width / 2, cy = cv.height / 2 + s.dy;
-    c.drawImage(s.im, (i % cols) * f.w, Math.floor(i / cols) * f.h, f.w, f.h, cx - w / 2, f.ax !== undefined ? cy - f.ay * k + h * 0.15 : cy - h / 2, w, h);
+    fxBlit(c, s.im, f, i, cx - w / 2, f.ax !== undefined ? cy - f.ay * k + h * 0.15 : cy - h / 2, k, s.id);
     return true;
   });
   if (forgeSprites.length) forgeRaf = requestAnimationFrame(forgeDraw);
@@ -8900,7 +8992,7 @@ function tigerFollow(pet, x, y, walkDx, belowPet, speed, dt) {
   }
 }
 function drawPet(pet) {
-  const f = M.fx.g_pet_baekho, im = images['fx/g_pet_baekho.png'];
+  const f = M.fx.g_pet_baekho, im = f && fxPic('g_pet_baekho');
   if (!f || !im || !im.width) return;
   const k = 0.78 * (f.k || 1); // a beast about the hero's size: at 연's full size it towered over the hero
   ctx.save();
@@ -9029,7 +9121,7 @@ function portalSprite(tint, size, upright) {
   const key = (tint || '') + '|' + size + '|' + (upright ? 1 : 0);
   let c = portalSprites.get(key);
   if (c) return c;
-  const f = M.fx[PORTAL_FX], im0 = images[`fx/${PORTAL_FX}.png`];
+  const f = M.fx[PORTAL_FX], im0 = f && fxPic(PORTAL_FX);
   if (!f || !im0 || !im0.complete || !im0.width) return null;
   const im = tint ? tinted(im0, tint) : im0;
   const R = 2, top = upright ? size * 0.95 : size * 0.3, W = Math.ceil(size * R), H = Math.ceil((top + size * 0.3) * R);
@@ -9304,6 +9396,8 @@ function goArea(area, x, y, fdy) {
 
 function enterTown(cls) {
   chosenClass = cls;
+  // Out of a run: its effect sheets are let go (the next run loads its own).
+  fxKeep([]);
   if (!M.ui.town && !M.ui.ytown) {
     showScreen('stages');
     return;
@@ -12611,13 +12705,32 @@ function fxFrame(d, t, loop) {
   return d.length - 1;
 }
 
+/**
+ * Frame i of effect f on canvas c, its cell's top left at (dx, dy), k canvas pixels a cell pixel.
+ * Only the part of the cell that shows is drawn (bb, tools/fx_trim.py: most of a cell is empty, and
+ * every pixel drawn is blended). A packed sheet (tools/fx_pack.py: "at") holds just those parts,
+ * each at [x, y, w, h] of the sheet, maybe at fewer pixels than the cell's (an effect never drawn
+ * as large as its frames): bb stays in the cell's own pixels, so it is drawn the same size.
+ */
+let fxScaleLog = null; // test (tools/fx_drawscale.json): the largest canvas pixels a cell pixel each sheet is drawn at
+function fxBlit(c, pic, f, i, dx, dy, k, sid) {
+  const sh = f.src ? M.fx[f.src] : f, bb = sh.bb, at = sh.at, b4 = i * 4;
+  if (fxScaleLog && sid) { const T = c.getTransform(), q = Math.hypot(T.a, T.b) * k, key = f.src || sid; if (!(fxScaleLog[key] >= q)) fxScaleLog[key] = q; }
+  if (at) {
+    if (b4 + 3 < at.length && at[b4 + 2]) c.drawImage(pic, at[b4], at[b4 + 1], at[b4 + 2], at[b4 + 3], dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k);
+    return;
+  }
+  const cols = sh.cols || 1e9, sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h;
+  if (bb && b4 + 3 < bb.length) {
+    if (bb[b4 + 2]) c.drawImage(pic, sx + bb[b4], sy + bb[b4 + 1], bb[b4 + 2], bb[b4 + 3], dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k);
+  } else c.drawImage(pic, sx, sy, f.w, f.h, dx, dy, f.w * k, f.h * k);
+}
+
 function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const f = M.fx[id];
-  const im = images[`fx/${f.src || id}.png`];
+  const im = fxPic(id);
+  if (!im) return; // (still loading: drawn from when it is ready)
   const i = fxFrame(durs(id), t, loop) + (f.f0 || 0);
-  // Long effects are folded into rows of "cols" frames (a phone holds no picture past 4096).
-  const cols = (f.src ? M.fx[f.src].cols : f.cols) || 1e9;
-  const sx = (i % cols) * f.w, sy = Math.floor(i / cols) * f.h;
   const w = f.w * scale * (f.k || 1), h = f.h * scale * (f.k || 1);
   // No save()/restore() round each one: with forty effects up in a crowded fight the restores were
   // a fifth of the frame on a slow phone. The two settings it changes are put back by hand, and the
@@ -12625,8 +12738,9 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const op0 = ctx.globalCompositeOperation, sm0 = ctx.imageSmoothingEnabled;
   if (f.add) ctx.globalCompositeOperation = 'lighter';
   const pic = tint || f.tint ? tinted(im, tint || f.tint) : im;
-  // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks.
-  if (scale * (f.k || 1) > 1.5) ctx.imageSmoothingEnabled = true;
+  // Blown up past its own pixels an effect is drawn smooth, a soft light rather than blocks (and a
+  // sheet the build shrank, ds, always: its pixels are no longer the cell's).
+  if (scale * (f.k || 1) > 1.5 || (f.src ? M.fx[f.src] : f).ds) ctx.imageSmoothingEnabled = true;
   const turn = rot || flip;
   let ox = x, oy = y;
   if (turn) {
@@ -12642,10 +12756,7 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const dy = f.ax !== undefined && anchor !== 'mid' ? oy - f.ay * k + (anchor === 'bottom' ? 0 : 14) : oy + (anchor === 'bottom' ? -h : -h / 2);
   // Only the part of the cell that shows (tools/fx_trim.py): most of a cell is empty, and every
   // pixel drawn is blended.
-  const bb = (f.src ? M.fx[f.src] : f).bb, b4 = i * 4;
-  if (bb && b4 + 3 < bb.length) {
-    if (bb[b4 + 2]) ctx.drawImage(pic, sx + bb[b4], sy + bb[b4 + 1], bb[b4 + 2], bb[b4 + 3], dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k);
-  } else ctx.drawImage(pic, sx, sy, f.w, f.h, dx, dy, w, h);
+  fxBlit(ctx, pic, f, i, dx, dy, k, id);
   if (turn) {
     if (flip) ctx.scale(-1, 1);
     if (rot) ctx.rotate(-rot);
@@ -13332,8 +13443,7 @@ function tongues(color = '#ff8c4c') {
   if (flameTongues) return flameTongues.length ? flameTongues : null;
   const fm = M.fx.k_a_firewall, path = fm && `fx/${fm.src || 'k_a_firewall'}.png`;
   if (!fm) return flameSets.set(color, []), (flameTongues = []), null;
-  if (!(path in images)) loadImage(path);
-  const im = images[path];
+  const im = fxPic('k_a_firewall');
   if (!im || !im.complete || !im.width) return null;
   const out = [], cols = (fm.src ? M.fx[fm.src].cols : fm.cols) || 1e9, n = Math.min(durs('k_a_firewall').length, 24);
   for (let k = 0; k < n; k++) {
@@ -14803,9 +14913,16 @@ $('#back-title').onclick = () => showScreen('title');
 $('#back-select').onclick = () => enterTown(chosenClass);
 $('#go').onclick = () => goHunt();
 /** Into the picked ground (remembered, for 「이전 사냥터」 in the town). */
-function goHunt() {
+let goingHunt = false;
+async function goHunt() {
+  if (goingHunt) return;
   settings.lastHunt = { id: pickedStage.id, mode: pickedMode };
   saveJson('bs_settings', settings);
+  // The hunt's effects decoded first (a few seconds at most: what is not ready yet shows when it is).
+  const go = $('#go');
+  if (go) go.disabled = true;
+  goingHunt = true;
+  try { await fxWarm(runFxIds(chosenClass, pickedStage), 3000); } finally { goingHunt = false; if (go) go.disabled = false; }
   startRun(chosenClass, pickedStage);
   if (G && G.hunt && G.hunt.mode === 'conquer' && pickedMode === 'sweep' && progress.cleared[G.stage.id]) Hunt.sweep(G); // 사냥 기믹: 소탕
 }
@@ -15564,6 +15681,18 @@ window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
 window.__ult = () => castUlt();
+// Test (tools/fx_pack.py, before/after): effects drawn alone on the canvas, then read back.
+window.__fxWarm = ids => fxWarm(ids).then(() => true);
+window.__fxDraw = (list, w, h) => {
+  const T = ctx.getTransform();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#203020';
+  ctx.fillRect(0, 0, w, h);
+  for (const [id, x, y, t, s] of list) drawFx(id, x, y, t, s, 0, 'center', false, false, null);
+  ctx.setTransform(T);
+  return canvas.toDataURL();
+};
+window.__fxScale = on => { if (on) fxScaleLog = fxScaleLog || {}; return fxScaleLog; }; // test: tools/fx_drawscale.json
 window.__gather = (r = 4) => { // test: the field's foes set round the hero (for frames of a skill going off)
   const p = G.player, spots = [];
   for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if ((x || y) && Math.hypot(x, y) <= r + 0.5) spots.push([p.tx + x, p.ty + y]);
@@ -15618,7 +15747,7 @@ const War = initWar({
   saveProgress: () => saveJson('bs_progress', progress),
   ctx, canvas, images, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
-  drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
+  drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, fxWarm, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
   SINSU_GATE, specialName, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
   heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
