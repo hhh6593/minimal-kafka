@@ -7,10 +7,12 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -31,6 +33,9 @@ public class MainActivity extends Activity {
     private WebView web;
     private NativeMusic music;
     private long lastBack;
+    // Renderer deaths (memory) seen lately: a WebView is rebuilt for each, up to a few a minute.
+    private long goneAt;
+    private int goneN;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +60,14 @@ public class MainActivity extends Activity {
         }
         WebView.setWebContentsDebuggingEnabled(true);
 
+        makeWeb();
+
+        if (savedInstanceState != null) web.restoreState(savedInstanceState);
+        else web.loadUrl(START_URL);
+    }
+
+    /** The game's WebView, made at start and again after its renderer dies. */
+    private void makeWeb() {
         web = new WebView(this);
         web.setBackgroundColor(Color.BLACK);
         // A game, not a document: no haptic buzz or overscroll glow when a finger drags.
@@ -81,7 +94,7 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         // Music outside the WebView, so it never takes the audio focus (see NativeMusic).
-        music = new NativeMusic(START_URL);
+        if (music == null) music = new NativeMusic(START_URL);
         web.addJavascriptInterface(music, "BaramMusic");
 
         web.setWebViewClient(new WebViewClient() {
@@ -90,10 +103,32 @@ public class MainActivity extends Activity {
                 // The game never leaves its own page.
                 return !String.valueOf(request.getUrl()).startsWith(START_URL);
             }
-        });
 
-        if (savedInstanceState != null) web.restoreState(savedInstanceState);
-        else web.loadUrl(START_URL);
+            // The page's renderer died (on a phone, mostly out of memory). Without this the
+            // whole app was killed with it, and Samsung offered to remove the WebView update.
+            // Instead: a new WebView on the same page; the hero's records are in its storage.
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                Log.e(TAG, "renderer gone, crashed=" + (Build.VERSION.SDK_INT >= 26 && detail.didCrash()));
+                if (view != web) return true;
+                long now = SystemClock.uptimeMillis();
+                goneN = now - goneAt < 60000 ? goneN + 1 : 1;
+                goneAt = now;
+                ViewGroup parent = (ViewGroup) view.getParent();
+                if (parent != null) parent.removeView(view);
+                view.destroy();
+                web = null;
+                if (goneN > 3) {
+                    Toast.makeText(MainActivity.this, "메모리가 부족해 게임을 종료합니다", Toast.LENGTH_LONG).show();
+                    finish();
+                    return true;
+                }
+                makeWeb();
+                web.loadUrl(START_URL);
+                Toast.makeText(MainActivity.this, "메모리가 부족해 화면을 다시 불러왔습니다", Toast.LENGTH_LONG).show();
+                return true;
+            }
+        });
     }
 
     @SuppressWarnings("deprecation")

@@ -15544,6 +15544,7 @@ window.__game = () => G;
 window.__images = () => images; // test: the loaded pictures
 window.__clear = () => clearStage();
 window.__tierKit = (id, tier) => tierKit(id, tier).map(k => SKILLS[k].promo + "차 " + SKILLS[k].name);
+window.__tierIds = (id, tier) => tierKit(id, tier); // test: a 승급 band's kit (ids)
 window.__start = (c, s, m) => { pickedMode = m || 'conquer'; startRun(CLASSES[c], STAGES[s]); if (m === 'sweep' && G.hunt) Hunt.sweep(G); };
 window.__enterTown = c => enterTown(CLASSES[c]);
 window.__stageList = () => STAGES.map((s, i) => [i, s.id, s.terrain]);
