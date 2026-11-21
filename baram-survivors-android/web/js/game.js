@@ -25,7 +25,10 @@ import {
 
 const $ = s => document.querySelector(s);
 const canvas = $('#game');
-const ctx = canvas.getContext('2d');
+// Opaque: the page under the field is black anyway (body's background) and every frame paints the
+// whole canvas (a ground, or render's black fill off the field), so the compositor need not blend
+// the canvas over the page each frame (on a phone a full-screen blend of its own).
+const ctx = canvas.getContext('2d', { alpha: false });
 
 // A picture drawn straight from an <img> goes through the browser's decode cache on every draw;
 // with a crowd of monster sheets, digits and effects in a frame that cache overflowed and was
@@ -39,6 +42,21 @@ const BITMAP_BUDGET = 128e6, BITMAP_MAX = 8e6;
 const rawDrawImage = ctx.drawImage;
 let bitmapClock = 0, bitmapBytes = 0;
 ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
+  // A picture wholly off the canvas is not drawn (about half the draws of a crowded hunt: monsters,
+  // shadows and props in the margin round the view). Exact: only a picture none of whose pixels
+  // could land on the canvas, judged by the followed transform (xfFollow) when it has no turn.
+  if (xb === 0 && xc === 0) {
+    const n = arguments.length;
+    let x = a, y = b, w, ht;
+    if (n === 9) { x = e; y = f; w = g; ht = h; } else if (n === 5) { w = c; ht = d; } else { w = im.naturalWidth !== undefined ? im.naturalWidth : im.width; ht = im.naturalHeight !== undefined ? im.naturalHeight : im.height; }
+    const x0 = xa * x + xe, x1 = x0 + xa * w, y0 = xd * y + xf, y1 = y0 + xd * ht;
+    // (a pixel's margin: the canvas keeps its transform in single precision)
+    if ((x0 > x1 ? x0 : x1) < -1 || (x0 < x1 ? x0 : x1) > cvW + 1 || (y0 > y1 ? y0 : y1) < -1 || (y0 < y1 ? y0 : y1) > cvH + 1) {
+      if (CULL_CHECK) xfCheck(true);
+      return;
+    }
+  }
+  if (CULL_CHECK) xfCheck(false);
   if (im instanceof HTMLImageElement && window.createImageBitmap) {
     const bm = bitmapOf.get(im);
     if (bm === undefined) {
@@ -59,6 +77,92 @@ ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
     default: return rawDrawImage.call(this, im, a, b, c, d, e, f, g, h);
   }
 };
+
+// The main canvas's transform, followed in step with the canvas (save/restore, translate, scale,
+// rotate, transform, setTransform) so a draw can be judged and a scale read without getTransform,
+// which makes a new DOMMatrix each call (a hundred and more a frame: footShadow, textPic).
+// Test: ?cullcheck compares it with the canvas's own at every draw (window.__xfBad).
+let xa = 1, xb = 0, xc = 0, xd = 1, xe = 0, xf = 0, cvW = 0, cvH = 0;
+const xfStack = [];
+function xfReset() {
+  xa = xd = 1;
+  xb = xc = xe = xf = 0;
+  xfStack.length = 0;
+  cvW = canvas.width;
+  cvH = canvas.height;
+}
+const CULL_CHECK = /[?&]cullcheck/.test(location.search);
+function xfCheck(culled) {
+  // (the canvas keeps it in single precision: equal to a millionth, its move to a thousandth of a pixel)
+  const m = ctx.getTransform(), near = (u, v, k) => Math.abs(u - v) <= k * Math.max(1, Math.abs(v));
+  const ok = near(m.a, xa, 1e-6) && near(m.b, xb, 1e-6) && near(m.c, xc, 1e-6) && near(m.d, xd, 1e-6) && near(m.e, xe, 1e-3) && near(m.f, xf, 1e-3)
+    && cvW === canvas.width && cvH === canvas.height;
+  const r = window.__xfBad || (window.__xfBad = { draws: 0, culled: 0, bad: 0, first: null });
+  r.draws++;
+  if (culled) r.culled++;
+  if (!ok) { r.bad++; if (!r.first) r.first = [[m.a, m.b, m.c, m.d, m.e, m.f], [xa, xb, xc, xd, xe, xf], new Error().stack]; }
+}
+(function xfFollow() {
+  const fin = Number.isFinite, raw = {};
+  for (const k of ['save', 'restore', 'translate', 'scale', 'rotate', 'transform', 'setTransform', 'resetTransform']) raw[k] = ctx[k];
+  ctx.save = function () {
+    xfStack.push(xa, xb, xc, xd, xe, xf);
+    raw.save.call(this);
+  };
+  ctx.restore = function () {
+    // (a restore with nothing saved does nothing, as the canvas's own)
+    if (xfStack.length) {
+      xf = xfStack.pop(); xe = xfStack.pop(); xd = xfStack.pop();
+      xc = xfStack.pop(); xb = xfStack.pop(); xa = xfStack.pop();
+    }
+    raw.restore.call(this);
+  };
+  // (a call with a value not finite is let be by the canvas: so here too)
+  ctx.translate = function (x, y) {
+    if (fin(x) && fin(y)) { xe += xa * x + xc * y; xf += xb * x + xd * y; }
+    raw.translate.call(this, x, y);
+  };
+  ctx.scale = function (x, y) {
+    if (fin(x) && fin(y)) { xa *= x; xb *= x; xc *= y; xd *= y; }
+    raw.scale.call(this, x, y);
+  };
+  ctx.rotate = function (t) {
+    if (fin(t)) {
+      const cs = Math.cos(t), sn = Math.sin(t), a = xa, b = xb;
+      xa = a * cs + xc * sn; xb = b * cs + xd * sn;
+      xc = xc * cs - a * sn; xd = xd * cs - b * sn;
+    }
+    raw.rotate.call(this, t);
+  };
+  ctx.transform = function (a, b, c, d, e, f) {
+    if (fin(a) && fin(b) && fin(c) && fin(d) && fin(e) && fin(f)) {
+      const A = xa, B = xb, C = xc, D = xd;
+      xa = A * a + C * b; xb = B * a + D * b;
+      xc = A * c + C * d; xd = B * c + D * d;
+      xe += A * e + C * f; xf += B * e + D * f;
+    }
+    raw.transform.call(this, a, b, c, d, e, f);
+  };
+  ctx.setTransform = function (a, b, c, d, e, f) {
+    if (arguments.length >= 6) {
+      if (fin(a) && fin(b) && fin(c) && fin(d) && fin(e) && fin(f)) { xa = a; xb = b; xc = c; xd = d; xe = e; xf = f; }
+      return raw.setTransform.call(this, a, b, c, d, e, f);
+    }
+    raw.setTransform.call(this, a);
+    // (a matrix: whatever the canvas made of it)
+    const m = CanvasRenderingContext2D.prototype.getTransform.call(this);
+    xa = m.a; xb = m.b; xc = m.c; xd = m.d; xe = m.e; xf = m.f;
+  };
+  ctx.resetTransform = function () {
+    xa = xd = 1;
+    xb = xc = xe = xf = 0;
+    raw.resetTransform.call(this);
+  };
+  // (a lost and restored canvas starts again from nothing)
+  canvas.addEventListener('contextrestored', xfReset);
+  xfReset();
+})();
+
 function dropBitmap(rec) {
   bitmapsLive.delete(rec);
   bitmapOf.delete(rec.im);
@@ -382,15 +486,22 @@ function propKinds(terrain) {
 const PROP_CELL = 160;
 
 /** The props standing in view: one cell of the endless ground at a time, the same every visit. */
+// (the last answer, kept while the view stays over the same cells and the same pictures are in:
+// it was made anew every frame, some forty objects and closures)
+let propsSeen = null;
 function propsInView(camX, camY) {
   const kinds = propKinds(G.stage.terrain);
   if (!kinds.length) return [];
   const list = kinds.filter(([n]) => M.prop[n] && images[`prop/${n}.png`] && images[`prop/${n}.png`].width);
   const total = list.reduce((a, [, w]) => a + w, 0);
   if (!total) return [];
-  const out = [];
   const x0 = Math.floor((camX - 220) / PROP_CELL), x1 = Math.floor((camX + VW + 220) / PROP_CELL);
   const y0 = Math.floor((camY - 60) / PROP_CELL), y1 = Math.floor((camY + VH + 120) / PROP_CELL);
+  const L = propsSeen;
+  if (L && L.stage === G.stage && L.kinds === kinds && L.n === list.length && L.total === total
+    && L.x0 === x0 && L.x1 === x1 && L.y0 === y0 && L.y1 === y1) return L.out;
+  const out = [];
+  propsSeen = { stage: G.stage, kinds, n: list.length, total, x0, x1, y0, y1, out };
   for (let cy = y0; cy <= y1; cy++) {
     for (let cx = x0; cx <= x1; cx++) {
       let h = (Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663) ^ G.stage.id.length * 83492791) >>> 0;
@@ -599,6 +710,7 @@ function resize() {
   const r = Math.max(1, full / zFull);
   canvas.width = Math.round(canvas.clientWidth * r);
   canvas.height = Math.round(canvas.clientHeight * r);
+  xfReset(); // (a canvas given a size starts again: its transform too)
   Z = zFull * r / full;
   VW = canvas.width / Z;
   VH = canvas.height / Z;
@@ -1059,7 +1171,9 @@ function locate(b) {
  */
 function jostle(b, dt) {
   if (b.j0 === undefined) b.j0 = Math.random() * Math.PI * 2;
-  const k = key(b.tx, b.ty), c = crowd.get(k);
+  // (its tile's key kept while it stands there: a new string per monster per frame before)
+  if (b.jkx !== b.tx || b.jky !== b.ty) { b.jkx = b.tx; b.jky = b.ty; b.jk = key(b.tx, b.ty); }
+  const k = b.jk, c = crowd.get(k);
   let tx = Math.cos(b.j0) * 5, ty = Math.sin(b.j0) * 3;
   if (c) {
     const n = c.length + 1, i = occ.get(k) === b ? 0 : c.indexOf(b) + 1;
@@ -11109,6 +11223,7 @@ function battleInfo(key, n, text) {
   L.push({ key, n, t: G.t, text: text(n) });
   if (L.length > 3) L.shift();
 }
+const binfoWraps = new Map();
 function drawBattleInfo() {
   G.binfoBottom = 0;
   if (!document.body.classList.contains('yeon') || G.war || settings.battleInfo === false) return;
@@ -11120,13 +11235,20 @@ function drawBattleInfo() {
   // The last lines, wrapped at word breaks as 연 wraps them, the newest kept when they are many.
   const rows = [];
   for (const l of (G.binfo || []).filter(l => G.t - l.t < 9).reverse()) {
-    const out = [];
-    let cur = '';
-    for (const word of l.text.split(' ')) {
-      const t = cur ? cur + ' ' + word : word;
-      if (cur && ctx.measureText(t).width > w - 8 * d) { out.push(cur); cur = word; } else cur = t;
+    // (a line's wrapping kept by its words, font and width: it was measured word by word each frame)
+    const wk = ctx.font + '|' + (w - 8 * d) + '|' + l.text;
+    let out = binfoWraps.get(wk);
+    if (!out) {
+      out = [];
+      let cur = '';
+      for (const word of l.text.split(' ')) {
+        const t = cur ? cur + ' ' + word : word;
+        if (cur && ctx.measureText(t).width > w - 8 * d) { out.push(cur); cur = word; } else cur = t;
+      }
+      if (cur) out.push(cur);
+      if (binfoWraps.size > 200) binfoWraps.clear();
+      binfoWraps.set(wk, out);
     }
-    if (cur) out.push(cur);
     if (rows.length + out.length > MAXROWS) break;
     rows.unshift(...out.map(text => ({ text, a: Math.min(1, (9 - (G.t - l.t)) * 0.8) })));
   }
@@ -12618,16 +12740,18 @@ function josa(word, withFinal, without) {
   return word + (has ? withFinal : without);
 }
 
+// (the painters are kept functions handed the text and colour: a new closure per call before)
+function paintThick(g, x0, y0, text, color) {
+  g.fillStyle = '#1a1a1a';
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) g.fillText(text, x0 + dx, y0 + dy);
+  g.fillStyle = color;
+  g.fillText(text, x0, y0);
+}
 /** Big numbers with a heavy dark edge, as the game shows damage and healing. */
 function thick(text, x, y, color) {
   x = Math.round(x);
   y = Math.round(y);
-  const e = textPic('t', text, color, (g, x0, y0) => {
-    g.fillStyle = '#1a1a1a';
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 2; dy++) if (dx || dy) g.fillText(text, x0 + dx, y0 + dy);
-    g.fillStyle = color;
-    g.fillText(text, x0, y0);
-  }, 3, 3, 3, 4);
+  const e = textPic('t', text, color, paintThick, 3, 3, 3, 4);
   if (e) {
     ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
     return;
@@ -13023,12 +13147,17 @@ function hitNum(n) {
 
 function drawDigits(text, x, y, color, k, font = 'font_damage') {
   const f = M.hud[font], sheet = font === 'font_gold' ? goldFont() : font.startsWith('font_dmgk') ? images[`hud/${font}.png`] : digitSheet(color);
-  const glyphs = [...text].map(ch => f.glyphs[ch]).filter(Boolean);
-  const w = glyphs.reduce((a, g) => a + g[4], 0) * k;
+  // (by index, no arrays: the numbers are digits and signs, one UTF-16 unit each)
+  const gl = f.glyphs;
+  let w = 0;
+  for (let i = 0; i < text.length; i++) { const g = gl[text[i]]; if (g) w += g[4]; }
+  w *= k;
   let cx = x - w / 2;
-  for (const [gx, gy, gw, gh, adv] of glyphs) {
-    ctx.drawImage(sheet, gx, gy, gw, gh, Math.round(cx), Math.round(y - f.height * k), gw * k, gh * k);
-    cx += adv * k;
+  for (let i = 0; i < text.length; i++) {
+    const g = gl[text[i]];
+    if (!g) continue;
+    ctx.drawImage(sheet, g[0], g[1], g[2], g[3], Math.round(cx), Math.round(y - f.height * k), g[2] * k, g[3] * k);
+    cx += g[4] * k;
   }
 }
 
@@ -13625,13 +13754,19 @@ function drawAbyss(px, py, camX, camY) {
 // idle, attack and death in three directions (the side one faces left; mirrored for right),
 // every frame standing on the same foot point. Loaded the first time the monster is drawn.
 
+// (its path and its answer kept by the unit's id: a new string and object per body per frame before)
+const yunitSeen = new Map();
 function yunit(m) {
   const u = M.yunit && M.yunit[m.id];
   if (!u) return null;
-  const path = `yunit/${m.id}.png`;
+  let c = yunitSeen.get(m.id);
+  if (!c) yunitSeen.set(m.id, (c = { path: `yunit/${m.id}.png`, r: null }));
+  const path = c.path;
   if (!(path in images)) loadImage(path);
   const im = images[path];
-  return im && im.complete && im.width ? { u, im } : null;
+  if (!(im && im.complete && im.width)) return null;
+  if (!c.r || c.r.u !== u || c.r.im !== im) c.r = { u, im };
+  return c.r;
 }
 
 // Units whose 연 attack row reads badly here and strike from their standing pose instead
@@ -13639,21 +13774,37 @@ function yunit(m) {
 // 반고 (삼두룡), 용마 (청기린), 폭염왕 (화령), 고균도 저주의 추장, 숭숭이 (제천대성).
 const STILL_ATK = new Set(['y606011', 'y304624', 'y511013', 'y611001', 'y617201']);
 /** Which row: the way it last moved (or faces), and what it is doing. */
+// The rows a unit has for each way it faces, looked up once (a crowd made a dozen arrays and
+// strings each a frame), and one answer reused: every caller reads it at once.
+const yunitRows = new WeakMap(), yunitOut = { a: null, f: 0, dir: '', dx: 0 };
+function yunitRowsOf(u, dir) {
+  let R = yunitRows.get(u);
+  if (!R) yunitRows.set(u, (R = {}));
+  if (!R[dir]) {
+    const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
+    R[dir] = { atk: pick(`atk_${dir}`, 'atk_side', 'atk_down'), walk: pick(`walk_${dir}`, 'walk_side', 'walk_down'), idle: pick(`idle_${dir}`) };
+  }
+  return R[dir];
+}
 function yunitAnim(u, b) {
   const dx = b.mdx || 0, dy = b.mdy === undefined ? 1 : b.mdy;
   const dir = dx ? 'side' : dy < 0 ? 'up' : 'down';
-  const pick = (...names) => names.map(n => u.anims[n]).find(Boolean);
-  const atk = pick(`atk_${dir}`, 'atk_side', 'atk_down');
+  const R = yunitRowsOf(u, dir), atk = R.atk, o = yunitOut;
+  o.dir = dir;
+  o.dx = dx;
   if (atk && b.atkAt !== undefined && !STILL_ATK.has((b.m && b.m.id) || b.unit) && (G.t - b.atkAt) * 1000 < atk.n * atk.ms) {
-    return { a: atk, f: Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms)), dir, dx };
+    o.a = atk;
+    o.f = Math.min(atk.n - 1, Math.floor((G.t - b.atkAt) * 1000 / atk.ms));
+    return o;
   }
-  const walk = pick(`walk_${dir}`, 'walk_side', 'walk_down');
-  const idle = pick(`idle_${dir}`);
+  const walk = R.walk, idle = R.idle;
   // A unit that never walks (연's cursed torch) keeps standing in its idle row as it moves.
   const a = (b.moving || !idle) && walk ? walk : idle || walk;
   if (!a) return null;
   b.seed = b.seed || Math.floor(Math.random() * 1000);
-  return { a, f: Math.floor((performance.now() + b.seed) / a.ms) % a.n, dir, dx };
+  o.a = a;
+  o.f = Math.floor((performance.now() + b.seed) / a.ms) % a.n;
+  return o;
 }
 
 // Struck, a monster flashes white: a white copy of that one frame, not of its whole sheet.
@@ -13681,7 +13832,7 @@ function whiteFrame(im, sx, sy, w, h) {
 // filled ninety ellipse paths a frame.
 const shadowPics = new Map();
 function footShadow(x, y, rx, ry, a) {
-  const sc = ctx.getTransform().a;
+  const sc = Math.fround(xa); // (the canvas's scale, followed: xfFollow; kept in single precision there)
   rx = Math.round(rx * 2) / 2;
   ry = Math.round(ry * 2) / 2;
   const key = rx * 1000 + ry + sc * 1e7;
@@ -13927,6 +14078,21 @@ function camFollow(now, lead) {
   return [Math.round(C.x + lead.x - VW / 2), Math.round(C.y + lead.y - 30 - VH / 2)];
 }
 
+// Back to front by the feet, in place, those at the same height kept in their order (as the
+// stable sort kept them). A loop of its own rather than sort with a comparator: each of the
+// thousand calls of a crowd made new numbers (the feet read out, the difference handed back).
+function sortByFeet(list) {
+  for (let i = 1; i < list.length; i++) {
+    const b = list[i], y = b.y;
+    if (!(list[i - 1].y > y)) continue;
+    let lo = 0, hi = i - 1;
+    // (the first place whose y is past this one's: after every equal one)
+    while (lo < hi) { const m = (lo + hi) >> 1; if (list[m].y > y) hi = m; else lo = m + 1; }
+    for (let j = i; j > lo; j--) list[j] = list[j - 1];
+    list[lo] = b;
+  }
+  return list;
+}
 function render(now) {
   sweepBitmaps(now);
   ctx.imageSmoothingEnabled = false;
@@ -14017,7 +14183,7 @@ function render(now) {
   G.seenProps = seenProps;
   const bodies = G.enemies.concat(G.allies, G.party, G.war ? (G.war.raid ? War.props().concat(seenProps) : War.props()) : seenProps, G.pet ? [G.pet] : [], G.cpet ? [G.cpet] : []);
   bodies.push(p);
-  bodies.sort((a, b) => a.y - b.y);
+  sortByFeet(bodies);
   const hidden = G.buffs.stealth > G.t;
   for (const b of bodies) {
     if (b.war) {
@@ -14588,8 +14754,8 @@ function bar(x, y, w, h, k, color, back = 'rgba(0,0,0,0.65)') {
 const textPics = new Map();
 let textPicN = 0;
 function textPic(kind, text, color, paint, padL = 2, padR = 2, padT = 2, padB = 3) {
-  const tr = ctx.getTransform(), sc = tr.a;
-  if (tr.b || tr.c || tr.d !== sc || !(sc > 0) || sc > 6) return null;
+  const sc = Math.fround(xa); // (the canvas's transform, followed: xfFollow; single precision there)
+  if (xb || xc || Math.fround(xd) !== sc || !(sc > 0) || sc > 6) return null;
   const key = kind + '|' + ctx.font + '|' + ctx.textAlign + '|' + ctx.textBaseline + '|' + color + '|' + sc + '|' + text;
   let e = textPics.get(key);
   if (e) return e;
@@ -14607,7 +14773,7 @@ function textPic(kind, text, color, paint, padL = 2, padR = 2, padT = 2, padB = 
   g.font = ctx.font;
   g.textAlign = ctx.textAlign;
   g.textBaseline = ctx.textBaseline;
-  paint(g, ox, oy);
+  paint(g, ox, oy, text, color);
   e = { c, ox, oy, w: c.width / sc, h: c.height / sc };
   keepTextPic(key, e);
   return e;
@@ -14617,18 +14783,19 @@ function keepTextPic(key, e) {
   textPics.set(key, e);
 }
 
+function paintOutline(g, x0, y0, text, color) {
+  g.fillStyle = '#000';
+  g.fillText(text, x0 + 1, y0);
+  g.fillText(text, x0, y0 + 1);
+  g.fillText(text, x0 + 1, y0 + 1);
+  g.fillStyle = color;
+  g.fillText(text, x0, y0);
+}
 /** Text with a one-pixel dark edge, crisp at any whole scale. */
 function outline(text, x, y, color = '#efe3c2') {
   x = Math.round(x);
   y = Math.round(y);
-  const e = textPic('o', text, color, (g, x0, y0) => {
-    g.fillStyle = '#000';
-    g.fillText(text, x0 + 1, y0);
-    g.fillText(text, x0, y0 + 1);
-    g.fillText(text, x0 + 1, y0 + 1);
-    g.fillStyle = color;
-    g.fillText(text, x0, y0);
-  });
+  const e = textPic('o', text, color, paintOutline);
   if (e) {
     ctx.drawImage(e.c, x - e.ox, y - e.oy, e.w, e.h);
     return;
