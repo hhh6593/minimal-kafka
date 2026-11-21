@@ -1515,7 +1515,7 @@ export const ULT_TIERS = {
     ult('reaper', 'rp_ult', '차사강림', { mech: 'cleaveWave', main: 'k_rp_ult', mainSize: 260, hit: 'k_rp_cut', hitScale: 0.6, after: 'k_u_rp_ring', boss: 'rp_flash', k: 1 }),
     ult('reaper', 'rp_madness', '나선광륜', { echo2: 'k_rp_spiral', auraW: 320, echoCap: 2, aura: 'k_rp_asura', mech: 'rings', main: 'k_rp_madness', mainSize: 260, hit: 'h_ml_slash', boss: 'rp_asura', k: 1.15 }),
     ult('reaper', 'rp_deadly', '살극', { echo2: 'k_rp_wind', aura: 'k_rp_crush', auraW: 220, open: 'k_rp_arrow', openW: 0.5, echoW: 220, mech: 'mark', main: 'k_rp_deadly', markScale: 1.4, hit: 'h_ml_wind', hitScale: 0.4, delay: 1.2, boss: 'rp_arrow', k: 1.3 }),
-    ult('reaper', 'rp_gate', '저승문', { echoN: 28, echoCap: 2.5, echoW: 200, fin: 'k_rp_gate', mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
+    ult('reaper', 'rp_gate', '저승문', { aura: 'k_x_rp_burst_cast', auraW: 260, echoN: 28, echoCap: 2.5, echoW: 200, fin: 'k_rp_gate', mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
   ],
 };
 
