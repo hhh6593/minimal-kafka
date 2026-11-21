@@ -13337,12 +13337,14 @@ function waterRows(H, meta) {
 /** A worn layer as the hero wears it: 현무불괴갑's outfit recoloured (SINSU_DRESS with armor), else as it is. */
 function armorDressed(gear, kind, im, path) {
   const az = (kind === 'armor' || kind === 'aback') && gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress;
-  // (the original's own wings, an "s_" layer, keep their colours)
+  // (the original's own wings, an "s_" layer, keep their colours; and a 코디 outfit worn over it is
+  // that outfit's own colours, not 현무's)
+  if (az && gear.cos && gear.cos.armor && gear.cos.armor !== 'hide') return im;
   return az && az.armor && !path.includes('/sinsu/') ? dressedSheet(im, path, az.tint, az.pal) : im;
 }
 /** The same for a still picture of the hero (the class card): 청룡신검's blade too. */
 function sinsuDressed(gear, kind, im, path) {
-  const w = (kind === 'weapon' || kind === 'wback') && gear.weaponSp && SPECIAL[gear.weaponSp];
+  const w = (kind === 'weapon' || kind === 'wback') && gear.weaponSp && SPECIAL[gear.weaponSp] && !(gear.cos && gear.cos.weapon);
   return w && w.craft && w.dress && !path.includes('/sinsu/') ? dressedSheet(im, path, w.dress.tint, w.dress.pal) : armorDressed(gear, kind, im, path);
 }
 function dressedSheet(im, path, t, pal, swing) {
