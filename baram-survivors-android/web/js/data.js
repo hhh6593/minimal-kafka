@@ -1500,7 +1500,7 @@ const S9 = {
   mk_yeonok: { promo: 9, cls: 'monk', req: 33, name: "연옥'만월", kind: 'aura9', fx: 'o_mk_yeonok', fxCast: 'k_u_mk_area', fxHit: 'k_u_mk_bodyhit', hit: 8, cd: 11, duration: 2.5, radius: 2, tick: 0.2,
     ward: 0.5, auraSize: 1.1, ck: 'nova', pre: 'mk_stack', branch: 1,
     desc: '둘레를 장악하는 화려한 권무를 펼친다. 2.5초 동안 둘레 두 칸의 몬스터를 쉴 새 없이 치고, 그동안 몸을 피해 받는 피해가 절반이 된다' },
-  mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'smite', fx: 'k_u_mk_palm', fxShot: 'k_u_mk_palm', fx2: 'k_u_mk_area', fxHit: 'k_u_mk_energy', dmg: 110, cd: 4.5, range: 7,
+  mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'smite', fx: 'k_u_mk_palm', fxShot: 'k_u_mk_palm', fxHit: 'k_u_mk_energy', dmg: 110, cd: 4.5, range: 7,
     radius: 0, shot: true, chain: 3, chainK: 0.45, ck: 'spell', pre: 'mk_kyokushin', branch: 0,
     desc: '마력의 화살을 가장 강한 몬스터에게 쏘아 크게 친다. 맞은 자리에서 유도 화살이 튀어나가 곁의 몬스터 셋을 더 친다' },
   // 도깨비 ← 영술사 9차 (혼과 불을 부리는 술사 → 도깨비불과 귀신의 도깨비): 불길한혼불 (보조 공격), 화혼돌파 (광역 돌진), 천신의심판 (강한 일격).
@@ -1514,7 +1514,7 @@ const S9 = {
     range: 6, radius: 2, splash: 0.6, densest: true, pull: true, delay: 0.6, size: 220, ck: 'strike', pre: 'dk_nemesis', branch: 0,
     desc: '몬스터가 가장 많은 곳의 둘레를 가운데로 끌어모은 뒤, 분노한 거대한 천신의 주먹이 내려와 짓이긴다' },
   // ---- 네 번째 9차 (모든 직업 4개: 보조 공격·몸 주변·광역·강한 일격 하나씩). 원작의 패시브는 켜는 기술로, PVP 기술은 몬스터 상대로.
-  w_mcheon: { promo: 9, cls: 'warrior', req: 33, name: '명천검파', kind: 'crosswave', fx: 'o_w_mcheon', fxCast: 'k_u_w_wave', fxHit: 'k_w_jinseom', trail: 'o_w_mcheon', trailStep: 1, trailSize: 70, trailRot: true, dmg: 30, cd: 6, depth: 5, width: 0,
+  w_mcheon: { promo: 9, cls: 'warrior', req: 33, name: '명천검파', kind: 'crosswave', fx: 'o_w_mcheon', fxCast: 'k_u_w_wave', fxHit: 'k_w_jinseom', trail: 'o_w_mcheon', trailStep: 1, trailRot: true, dmg: 30, cd: 6, depth: 5, width: 0,
     ways: 4, pulses: 3, gap: 0.3, ck: 'nova', pre: 'w_blackdragon', branch: 1,
     desc: '십자 방향으로 다섯 칸까지 나아가는 검기를 세 번에 걸쳐 내보내 지나는 길의 몬스터를 벤다' },
   r_jugeum: { promo: 9, cls: 'rogue', req: 33, name: '죽음의희열', kind: 'rain', at: 'self', fx: 'o_r_jugeum', noLoop: true, fx2: 'k_r_shadowstar', fxCast: 'k_r_gimun',
@@ -1546,7 +1546,7 @@ const S9 = {
     radius: 3, stun: 0.8, pre: 'mk_focus', branch: 2,
     desc: '부조리한 공격을 막아 4초 동안 받는 피해가 절반이 되고, 막이 풀릴 때 막아 둔 힘이 터져 둘레 세 칸을 치고 멈춘다' },
   dk_jangseung: { promo: 9, cls: 'dokkaebi', req: 33, name: '장승영역', kind: 'aura9', fx: 'o_dk_jangseung', fxHit: 'h_hit_fire', hit: 10, cd: 17, duration: 8, radius: 2,
-    tick: 0.5, ward: 0.5, auraSize: 1.35, auraAlpha: 0.95, ck: 'buff', buff: 'shield', pre: 'dk_body', branch: 2,
+    tick: 0.5, ward: 0.5, auraAlpha: 0.95, ck: 'buff', buff: 'shield', pre: 'dk_body', branch: 2,
     desc: '자신을 중심으로 장승이 둘러싼 영역을 8초 동안 세운다. 영역 밖의 공격은 반만 들어오고, 영역에 든 몬스터는 장승에게 거듭 맞는다' },
 };
 for (const [id, o] of Object.entries(S9)) {

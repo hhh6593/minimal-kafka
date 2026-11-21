@@ -7429,6 +7429,21 @@ function cast(skill, st) {
 // Persistent ones (fields, orbs, totems, traps, auras) run on later() ticks of their own; their
 // pictures are G.fxs entries kept alive for the effect's life (looped), moved by those ticks.
 
+/** 이펙트=판정: a picture drawn exactly `tiles` tiles across (larger or smaller than its own size), so what
+ *  is seen is what is struck. */
+function fxTiles(id, tiles, tag = 't') {
+  const f = id && M.fx[id];
+  if (!f) return id;
+  // (by what its frames draw — packed sheets know each frame's box — not the empty cell round it)
+  const src = f.src ? M.fx[f.src] || f : f;
+  let ext = Math.max(f.w, f.h);
+  if (src.bb && src.bb.length >= 4) { ext = 0; for (let i = 0; i + 3 < src.bb.length; i += 4) ext = Math.max(ext, src.bb[i + 2], src.bb[i + 3]); ext = ext || Math.max(f.w, f.h); }
+  const now = ext * (f.k || 1), want = tiles * TILE;
+  if (Math.abs(now - want) < 2) return id;
+  const key = `${id}#${tag}${Math.round(want)}`;
+  if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
+  return key;
+}
 /** A foe of the hero's (not its war's or raid's own side, not an ally). */
 function tkFoe(e) {
   return e && e.m && e.hp > 0 && !e.ally && !(e.war && e.team === 0);
@@ -7593,7 +7608,7 @@ const TIER_KINDS = {
       mark.burst = (k = 1) => {
         if (pic) pic.life = pic.t;
         const x = lx * TILE + TILE / 2, y = ly * TILE + TILE - 6;
-        if (def.fx2) addFx(def.fx2, x, y - 10, { scale: 1 });
+        if (def.fx2) addFx(fxTiles(def.fx2, st.radius * 2 + 1, 'mk'), x, y - 10);
         G.shake = Math.max(G.shake, 0.12);
         for (const o of around(lx, ly, st.radius)) { smite(o, st.dmg * k); tkAfflict(o, def, 0); }
       };
@@ -7642,7 +7657,7 @@ const TIER_KINDS = {
     const p = G.player;
     if (!tkNear(p.tx, p.ty, st.radius).length) return 0.3;
     const cx = p.tx, cy = p.ty, seen = new Set();
-    addFx(fxid, 0, -26, { follow: true, scale: 1.3 });
+    addFx(fxTiles(fxid, st.radius * 2 + 1, 'wv'), 0, -26, { follow: true });
     if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
     for (let r = 1; r <= st.radius; r++) later(r * 0.09, () => {
       shock(cx * TILE + TILE / 2, cy * TILE + TILE - 6, r + 0.3, '200,240,255');
@@ -7750,10 +7765,10 @@ const TIER_KINDS = {
       const pool = around(ox, oy, st.radius);
       const t = pool.length && Math.random() < 0.75 ? pool[Math.floor(Math.random() * pool.length)] : null;
       const tx = t ? t.tx : ox + Math.round(rand(-st.radius, st.radius)), ty = t ? t.ty : oy + Math.round(rand(-st.radius, st.radius));
-      if (def.fx2) addFx(def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 10, { scale: def.dropScale || 0.55 });
+      if (def.fx2) addFx(def.dropScale ? fxTiles(def.fx2, 3, 'rd') : def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 10, { scale: def.dropScale ? 1 : 0.55 });
       later(def.fxBurst ? 0.45 : 0.12, () => {
         if (G !== run) return;
-        if (def.fxBurst && fxBudget('rainBurst', 3)) addFx(def.fxBurst, tx * TILE + TILE / 2, ty * TILE + TILE - 20, { scale: 0.5 });
+        if (def.fxBurst && fxBudget('rainBurst', 3)) addFx(fxTiles(def.fxBurst, 3, 'rb'), tx * TILE + TILE / 2, ty * TILE + TILE - 20);
         const hit = around(tx, ty, 1);
         for (const o of hit) { smite(o, st.dmg * def.k); tkAfflict(o, def, 0); }
         if (def.heal && hit.length) heal(p.maxHp * def.heal / 100, false, true);
@@ -7916,14 +7931,15 @@ const TIER_KINDS = {
       if (def.fx2) fxOn(def.fx2, e.hp > 0 ? e : p, { scale: 1 });
       shock(p.x, p.y - 4, (st.radius || 1) + 1);
       meleeImpact(3);
-      for (const o of around(p.tx, p.ty, st.radius || 1)) { smite(o, st.dmg); tkAfflict(o, def); }
+      for (const o of around(p.tx, p.ty, def.linger ? def.radius || 1 : st.radius || 1)) { smite(o, st.dmg); tkAfflict(o, def); }
       // 순보선풍: a gale stays where it landed, sweeping round it
       if (def.linger) {
         const lx = p.tx, ly = p.ty, run = G;
-        tkLoop(def.lingerFx || def.fx2, lx * TILE + TILE / 2, ly * TILE + TILE - 10, def.linger, { scale: 1.1, alpha: 0.75 });
+        const lr = def.radius || 1;
+        tkLoop(fxTiles(def.lingerFx || def.fx2, lr * 2 + 1, 'cl'), lx * TILE + TILE / 2, ly * TILE + TILE - 10, def.linger, { alpha: 0.75 });
         for (let k = 1; k <= Math.round(def.linger / 0.5); k++) later(k * 0.5, () => {
           if (G !== run) return;
-          for (const o of around(lx, ly, st.radius || 1)) smite(o, st.dmg * def.lingerK);
+          for (const o of around(lx, ly, lr)) smite(o, st.dmg * def.lingerK);
         });
       }
     });
@@ -8006,8 +8022,9 @@ const TIER_KINDS = {
       const reach = Math.min(k, def.depth) * TILE, fly = 0.05 + 0.03 * Math.min(k, def.depth);
       later(i * 0.04, () => addFx(fxid, p.x, p.y - 24, { mv: [cx * reach, cy * reach, fly], scale: 0.8 }));
       if (hitAt) later(i * 0.04 + fly, () => {
-        if (def.fx2 && i % 2 === 0) addFx(def.fx2, hitAt[0] * TILE + TILE / 2, hitAt[1] * TILE + TILE - 14, { scale: 0.7 });
-        for (const o of around(hitAt[0], hitAt[1], st.radius || 1)) { smite(o, st.dmg * def.k); tkAfflict(o, def, i % 2 ? 0 : 1); }
+        const br = def.radius === 0 ? 0 : def.radius || 1;
+        if (def.fx2) addFx(fxTiles(def.fx2, br * 2 + 1, 'br'), hitAt[0] * TILE + TILE / 2, hitAt[1] * TILE + TILE - 14);
+        for (const o of around(hitAt[0], hitAt[1], br)) { smite(o, st.dmg * def.k); tkAfflict(o, def, i % 2 ? 0 : 1); }
       });
     }
   },
@@ -8124,7 +8141,7 @@ const TIER_KINDS = {
     tkLoop(fxid, 0, -26, st.duration, { follow: true, alpha: 0.65 });
     later(st.duration, () => {
       if (G !== run || G.dead) return;
-      if (def.fx2) addFx(def.fx2, 0, -26, { follow: true, scale: 1.1 });
+      if (def.fx2) addFx(fxTiles(def.fx2, (st.radius || 2) * 2 + 1, 'sbu'), 0, -26, { follow: true });
       shock(p.x, p.y - 4, (st.radius || 2) + 1, '200,220,255');
       const d = tkHit(def, skill);
       for (const e of around(p.tx, p.ty, st.radius || 2)) { hurtEnemy(e, d); tkAfflict(e, def); }
@@ -8167,9 +8184,7 @@ const TIER_KINDS = {
     if (def.ward) { G.buffs.ward9 = G.t + life; G.buffs.ward9K = def.ward; }
     if (def.reflect) G.buffs.reflect = Math.max(G.buffs.reflect, G.t + life);
     // the aura's own picture held round the hero, as wide as what it reaches
-    const f = M.fx[fxid], want = (r * 2 + 1) * TILE * (def.auraSize || 1);
-    tkLoop(fxid, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7,
-      scale: f ? Math.max(0.6, Math.min(2.2, want / (Math.max(f.w, f.h) * (f.k || 1)))) : 1 });
+    tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
     if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
     for (let k = 1; k <= n; k++) later(k * def.tick, () => {
       if (G !== run || G.dead) return;
@@ -8210,27 +8225,30 @@ const TIER_KINDS = {
     if (def.shot) {
       const sp = def.fxShot && M.fx[def.fxShot] ? def.fxShot : fxid, dx = t.x - p.x, dy = t.y - 20 - (p.y - 26);
       const fl = Math.min(0.24, 0.08 + Math.hypot(dx, dy) / 1500);
-      addFx(sp, p.x, p.y - 26, { mv: [dx, dy, fl], rot: def.fxShot ? Math.atan2(dy, dx) + Math.PI / 2 : 0, scale: def.fxShot ? 1.1 : 0.55 });
+      addFx(fxTiles(sp, 2, 'ss'), p.x, p.y - 26, { mv: [dx, dy, fl], rot: def.fxShot ? Math.atan2(dy, dx) + Math.PI / 2 : 0 });
       wait = fl;
     }
     // the blow's own picture on it (drawn a little larger than the foe: it is the class's great blow)
     // (압도적진격: its double ring of fire bursts at the front, between the hero and the one struck, facing the blow)
-    if (def.front) later(wait, () => addFx(bigFx(fxid, def.size || 150, 'sm'), (p.x + t.x) / 2, (p.y + t.y) / 2 - 24, { flip: t.x > p.x, scale: 1 }));
-    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(bigFx(fxid, def.size || 150, 'sm'), t, { scale: 1 }));
+    // (drawn as wide as it strikes: the one struck and its splash round it, or one and a half tiles alone)
+    const span = Math.max(1.5, (def.radius || 0) * 2 + 1);
+    if (def.front) later(wait, () => addFx(fxTiles(fxid, span, 'sm'), t.x, t.y - 24, { flip: t.x > p.x }));
+    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(fxTiles(fxid, span, 'sm'), t));
     const tx = t.tx, ty = t.ty;
     // 천신의심판: the foes round it drawn into the middle first
     if (def.pull) {
-      if (def.fxPull && M.fx[def.fxPull]) addFx(bigFx(def.fxPull, (st.radius * 2 + 1) * TILE, 'smp'), tx * TILE + TILE / 2, ty * TILE + TILE - 20, { scale: 1, alpha: 0.85 });
-      for (const o of around(tx, ty, st.radius + 1)) if (o !== t) tkShove(o, o.tx - Math.sign(o.tx - tx), o.ty - Math.sign(o.ty - ty));
+      if (def.fxPull && M.fx[def.fxPull]) addFx(fxTiles(def.fxPull, (def.radius + 1) * 2 + 1, 'smp'), tx * TILE + TILE / 2, ty * TILE + TILE - 20, { scale: 1, alpha: 0.85 });
+      for (const o of around(tx, ty, def.radius + 1)) if (o !== t) tkShove(o, o.tx - Math.sign(o.tx - tx), o.ty - Math.sign(o.ty - ty));
     }
     // 극청룡참: the thrown sickle comes back and cuts again
     if (def.again) later(wait + 0.4, () => { if (t.hp > 0) { hitOn(t); smite(t, st.dmg * def.again); } });
     later(wait + (def.delay && !def.shot ? 0 : 0.05), () => {
-      if (def.fx2 && M.fx[def.fx2]) addFx(bigFx(def.fx2, def.size2 || 130, 'sm2'), tx * TILE + TILE / 2, ty * TILE + TILE - 16, { scale: 1 });
+      const sr = def.radius || 0;
+      if (def.fx2 && M.fx[def.fx2]) addFx(fxTiles(def.fx2, sr * 2 + 1, 'sm2'), tx * TILE + TILE / 2, ty * TILE + TILE - 16);
       G.shake = Math.max(G.shake, 0.08);
       meleeImpact(2);
       if (t.hp > 0) { smite(t, st.dmg, def.push ? [Math.sign(ex), Math.sign(ey)] : null); tkAfflict(t, def); tkBurstMark(t); }
-      if (st.radius) for (const o of around(tx, ty, st.radius)) {
+      if (sr) for (const o of around(tx, ty, sr)) {
         if (o === t) continue;
         smite(o, st.dmg * (def.splash || 0.4));
         tkAfflict(o, def);
@@ -8245,7 +8263,7 @@ const TIER_KINDS = {
       // 회선격풍: the wind stays and cuts on
       if (def.linger) {
         const x = tx * TILE + TILE / 2, y = ty * TILE + TILE - 10, run = G;
-        tkLoop(fxid, x, y - 10, def.linger, { scale: 0.6, alpha: 0.6 });
+        tkLoop(fxTiles(fxid, 3, 'sl'), x, y - 10, def.linger, { alpha: 0.6 });
         for (let k = 1; k <= Math.round(def.linger / 0.5); k++) later(k * 0.5, () => {
           if (G !== run) return;
           for (const o of around(tx, ty, 1)) smite(o, st.dmg * def.lingerK);
@@ -8274,11 +8292,11 @@ const TIER_KINDS = {
     }
     // 이계의침식: what it raises stays along its way a moment
     // (명천검파: each pulse lays its 검기 along every arm, turned with it — the cross reads whole)
-    const trailAt = () => { if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = def.trailStep || 2; k <= def.depth; k += def.trailStep || 2) later(k * step, () => addFx(bigFx(def.trail, def.trailSize || 110, 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 14, { scale: 1, rot: def.trailRot ? Math.atan2(dy, dx) : 0 })); };
+    const trailAt = () => { if (def.trail && M.fx[def.trail]) for (const [dx, dy] of ways) for (let k = def.trailStep || 2; k <= def.depth; k += def.trailStep || 2) later(k * step, () => addFx(fxTiles(def.trail, (w * 2 + 1) * (def.trailK || 1), 'cwt'), (sx + dx * k) * TILE + TILE / 2, (sy + dy * k) * TILE + TILE - 14, { scale: 1, rot: def.trailRot ? Math.atan2(dy, dx) : 0 })); };
     for (let i = 0; i < (def.pulses || 1); i++) later(i * (def.gap || 0.3), () => {
       trailAt();
       for (const [dx, dy] of ways) {
-        addFx(bigFx(fxid, (w * 2 + 1) * TILE * 1.2, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
+        addFx(fxTiles(fxid, w * 2 + 1, 'cw'), p.x + dx * 20, p.y - 16 + dy * 20, { mv: [dx * len, dy * len, def.depth * step + 0.1], scale: 1, alpha: 0.9 });
         const seen = new Set();
         for (let k = 1; k <= def.depth; k++) later(k * step, () => {
           const tiles = [];
@@ -8306,10 +8324,10 @@ const TIER_KINDS = {
       addFx(fxid, p.x, p.y - 24, { mv: [x - p.x, y - (p.y - 24), fly], scale: 0.7 });
       later(fly, () => {
         if (G !== run) return;
-        tkLoop(fxid, x, y, def.dur, { scale: 0.75, alpha: 0.9 });
+        tkLoop(fxTiles(fxid, (def.radius || 1) * 2 + 1, 'sb'), x, y, def.dur, { alpha: 0.9 });
         for (let k = 0; k < Math.round(def.dur / def.tick); k++) later(k * def.tick, () => {
           if (G !== run) return;
-          const hit = around(ex, ey, st.radius || 1);
+          const hit = around(ex, ey, def.radius || 1);
           if (hit.length && def.fx2 && k % 2 === 0) fxOn(def.fx2, hit[0], { scale: 0.5 });
           for (const e of hit) smite(e, st.dmg * def.k);
         });
@@ -8329,7 +8347,7 @@ const ECHO = {
         addFx(bigFx(def.fx2, def.shotSize || 70, 'es'), p.x, p.y - 60, { mv: [dx, dy, fl], flip: dx < 0, scale: 1 });
         later(fl, () => {
           if (e.hp <= 0) return;
-          if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.7 });
+          if (def.fxHit) fxOn(fxTiles(def.fxHit, def.splash ? 3 : 1.5, 'ew'), e);
           hurtEnemy(e, d);
           // (the sword goes through: those beside it take a share)
           if (def.splash) for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * def.splash);
@@ -8371,15 +8389,17 @@ const ECHO = {
     const p = G.player, pool = tkNear(p.tx, p.ty, def.range).slice(0, 8);
     if (!pool.length) return;
     const e = pool[Math.floor(Math.random() * pool.length)], tx = e.tx, ty = e.ty;
-    addFx(def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 10, { scale: 0.55 });
+    addFx(fxTiles(def.fx2, (def.radius || 1) * 2 + 1, 'er'), tx * TILE + TILE / 2, ty * TILE + TILE - 10);
     later(0.2, () => { for (const o of around(tx, ty, def.radius || 1)) hurtEnemy(o, d); });
   },
   // 기공십자광선'쾌: beams out of the hero's mirror in the four ways, every foe in the rows struck.
   cross(def, d, k) {
-    const p = G.player, len = def.depth || 6;
-    if (k % 2 === 1) addFx(bigFx(def.fx2, (len * 2 + 1) * TILE * 0.85, 'cq'), 0, -20, { follow: true, alpha: 0.85 });
+    const p = G.player, len = def.depth || 6, w = def.width === undefined ? 1 : def.width;
+    // (each beam drawn as long as it reaches, every tick it strikes; its arms `w` tiles to each side)
+    const pic = fxTiles(def.fx2, len * 2 + 1, 'cq');
+    addFx(pic, 0, -20, { follow: true, alpha: 0.85 });
     const tiles = [];
-    for (const [dx, dy] of DIRS) for (let i = 1; i <= len; i++) tiles.push([p.tx + dx * i, p.ty + dy * i]);
+    for (const [dx, dy] of DIRS) for (let i = 1; i <= len; i++) for (let o = -w; o <= w; o++) tiles.push([p.tx + dx * i + (dy ? o : 0), p.ty + dy * i + (dx ? o : 0)]);
     let got = 0;
     for (const e of onTiles(tiles)) {
       if (def.fxHit && got++ < 3) fxOn(def.fxHit, e, { scale: 0.5 });
@@ -8391,7 +8411,7 @@ const ECHO = {
     const p = G.player;
     tkNear(p.tx, p.ty, def.range).slice(0, def.shots || 2).forEach((e, i) => later(i * 0.07, () => {
       if (e.hp <= 0) return;
-      if (def.fxHit) fxOn(def.fxHit, e, { scale: 0.7 });
+      if (def.fxHit) addFx(fxTiles(def.fxHit, 3, 'sh'), e.x, e.y - 20);
       hurtEnemy(e, d);
       for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * (def.splash || 0.3));
     }));
@@ -8407,7 +8427,7 @@ const ECHO = {
         e.hex9 = false;
         if (pic) pic.life = pic.t;
         const tx = e.tx, ty = e.ty;
-        if (fxBudget('hex9', 4)) addFx(def.fxBurst || def.fx2, tx * TILE + TILE / 2, ty * TILE + TILE - 12, { scale: def.burstScale || 0.75 });
+        if (fxBudget('hex9', 4)) addFx(fxTiles(def.fxBurst || def.fx2, (def.radius || 1) * 2 + 1, 'hx'), tx * TILE + TILE / 2, ty * TILE + TILE - 12);
         for (const o of around(tx, ty, def.radius || 1)) { hurtEnemy(o, d); if (def.dot) applyStatus(o, def.dot, 3, 1); }
       });
     });
@@ -8908,7 +8928,7 @@ const ULT_GRAND = [
   { dark: 0.7, shake: 0.5 },
   { openW: 0.32, aura: 2.6, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.35, 1.5], lateN: 3, lateAt: 1.9, dark: 0.9, shake: 0.55 },
   { openW: 0.45, aura: 3.1, auraW: 160, echoN: 12, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.25, 1.6], lateN: 5, lateAt: 1.8, dark: 1.1, shake: 0.65 },
-  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8, cutT: 2.1 },
+  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8, cutT: 3.4 },
 ];
 // (ways that already hang their main or cast picture over the screen: no second call of it)
 const ULT_SCREEN_OWN = { rain: 'main', mark: 'cast', chain: 'cast' };
@@ -9235,7 +9255,12 @@ function castUlt() {
     // but its own big pictures give way to a small hit flash (they covered the cinematic)
     const cine = def.cutin && M.fx[def.cutin] && !G.war && ultBand(G.cls.id) === 3;
     const quiet = cine ? { ...def, main: 'h_ml_burst', cast: null, burst: null, ring: null, drop: 'h_ml_burst', shot: 'h_ml_burst', after: null, hit: 'h_ml_burst', hitScale: 0.6, mainScale: 0.6, castStages: false } : def;
-    if (seen.length || def.mech === 'sanctuary') run(quiet, seen, strike);
+    // 이펙트=판정: the cinematic covers the whole screen while it plays, so it strikes the whole screen while it
+    // plays — the way of striking keeps 60% of the blow, the rest comes in 8 beats over the cinematic's 3.4 s.
+    const CINE_N = 8, cineK = 0.4 / CINE_N;
+    const blow = cine ? (e, k) => strike(e, k * 0.6) : strike;
+    if (cine) for (let i = 0; i < CINE_N; i++) later(0.3 + i * 0.42, () => { if (!G.dead) for (const e of onScreen()) strike(e, cineK); });
+    if (seen.length || def.mech === 'sanctuary') run(quiet, seen, blow);
     if (seen.length || def.mech === 'sanctuary') ultGrand(def, ultBand(G.cls.id));
   }
   // What a tier brings besides the blow (헬파이어's 보호막 …).
@@ -16099,6 +16124,29 @@ window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // tes
 window.__ultGrand = () => ULT_GRAND; // test: the 필살기 단계 위엄 table (measuring what each layer costs)
 // Test (필살기 단계 위엄): what the effects up now cover of the view — the drawn part of each picture
 // (its trimmed box this frame, turned) on a grid of g×g/2 cells; n pictures, ids, the big ones.
+// Test (이펙트=판정): each effect up now as a box in tiles from the hero's tile [x0, y0, x1, y1] with its id.
+window.__fxBoxes = () => {
+  const p = G.player, out = [];
+  for (const f of G.fxs) {
+    if (f.t < 0 || !M.fx[f.id]) continue;
+    const d = M.fx[f.id], src = d.src ? M.fx[d.src] : d, k = f.scale * (d.k || 1);
+    let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
+    if (f.mv) { const q = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - q) * (1 - q); x += f.mv[0] * e; y += f.mv[1] * e; }
+    const i = fxFrame(durs(f.id), f.loop ? G.t : f.t, f.loop) + (d.f0 || 0), bb = src.bb, b4 = i * 4;
+    const w = d.w * k, h = d.h * k;
+    const dx = d.ax !== undefined && f.anchor !== 'mid' ? -d.ax * k : -w / 2;
+    const dy = d.ax !== undefined && f.anchor !== 'mid' ? -d.ay * k + (f.anchor === 'bottom' ? 0 : 14) : (f.anchor === 'bottom' ? -h : -h / 2);
+    let r = bb && b4 + 3 < bb.length ? [dx + bb[b4] * k, dy + bb[b4 + 1] * k, bb[b4 + 2] * k, bb[b4 + 3] * k] : [dx, dy, w, h];
+    if (!r[2]) continue;
+    if (f.flip) r = [-r[0] - r[2], r[1], r[2], r[3]];
+    let pts = [[r[0], r[1]], [r[0] + r[2], r[1]], [r[0], r[1] + r[3]], [r[0] + r[2], r[1] + r[3]]];
+    if (f.rot) { const c = Math.cos(f.rot), s = Math.sin(f.rot); pts = pts.map(([a, b]) => [a * c - b * s, a * s + b * c]); }
+    // (a body's tile: its feet are 6 px over the tile's foot, its middle about 24 px up)
+    const tx = q => (x + q[0]) / TILE - 0.5 - p.tx, ty = q => (y + q[1] + 30) / TILE - 1 - p.ty;
+    out.push([String(f.id).split('#')[0], Math.min(...pts.map(tx)), Math.min(...pts.map(ty)), Math.max(...pts.map(tx)), Math.max(...pts.map(ty))]);
+  }
+  return out;
+};
 window.__fxCover = (g = 48) => {
   if (!G || !G.camView) return null;
   const [cx, cy] = G.camView, p = G.player, gw = g, gh = Math.round(g * VH / VW), on = new Uint8Array(gw * gh);
