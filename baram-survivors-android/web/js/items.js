@@ -190,7 +190,7 @@ export const MATS = {
   // 주작혈안 and 백호광안 among its items, whose icons these are). Each from its 신수's own raid at
   // the end of the 대격변 (SINSU_GATE: 청룡 바루나 L15, 현무 해왕 L11 and 바루나, 주작 아그니 L17,
   // 백호 아이라바타 L18); the earlier raids of the same nature (산군, 삼두룡, 화령) only a taste, one
-  // now and then (sinsuCount), and the 길드대항전's only once the gate is down (war.js).
+  // now and then (sinsuCount), and the 문파대항전's only once the gate is down (war.js).
   sinsu_jujak: { name: '주작혈안', icon: 'st:mat_jujak', from: ['raid_fire', 'raid_agni'] },
   sinsu_baekho: { name: '백호광안', icon: 'st:mat_baekho', from: ['raid_tiger', 'raid_airavata'] },
   sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', yeon: 407101, from: ['raid_varuna', 'raid_hydra'] },
@@ -903,10 +903,10 @@ export const WEAPON_FAMILY = {
   craft: { name: '조합 장비', role: '재료 조합', best: '중반', text: '재료로 만드는 장비. 옵션과 격이 정해져 있음.' },
   dragon: { name: '용무기', role: '성장형 단일 화력', best: '보스·레이드 딜',
     text: '같은 단계 최고의 기본 공격력(제일 10 → 제십 17.2등급, 조합의 꼭대기). 용X제N격 고정 피해, 제구·제십은 핵심 기술 재사용 -35%/-50%, 제십은 사신수 하나(각인 격·신수 색 광채)와 선계의 기운으로 천상 각성(외형만). 광역·보조 효과는 없음.' },
-  cheong: { name: '사신수 · 청룡', role: '제어·저주 + 흡혈', best: '레이드·길드전 (저주 걸린 적은 아군에게 더 아픔)',
+  cheong: { name: '사신수 · 청룡', role: '제어·저주 + 흡혈', best: '레이드·문파전 (저주 걸린 적은 아군에게 더 아픔)',
     text: '청린수폭이 자주 터져 저주·둔화를 걸고 준 피해의 10%를 흡혈. 등급 16.4(용무기 제구와 같음, ★5 17). 성물은 바루나 레이드(L15)에서.' },
-  jujak: { name: '사신수 · 주작', role: '화상 광역 + 아군 공격력 오라', best: '레이드·길드전·동료 사냥',
-    text: '주작비상 격(넓은 화상, 내 공격 +30%)과 주작의 기운: 주변 4칸 안의 동료·공대원·길드원 공격력 +12%(★5 +15%). 혼자일 때는 오라가 쓸모없음.' },
+  jujak: { name: '사신수 · 주작', role: '화상 광역 + 아군 공격력 오라', best: '레이드·문파전·동료 사냥',
+    text: '주작비상 격(넓은 화상, 내 공격 +30%)과 주작의 기운: 주변 4칸 안의 동료·공대원·문파원 공격력 +12%(★5 +15%). 혼자일 때는 오라가 쓸모없음.' },
   baekho: { name: '사신수 · 백호', role: '공격·백호 덮치기', best: '사냥·보스 폭딜',
     text: '망토 자리. 백호가 따라다니며 덮치고, 백호의 맹렬 격이 공격을 올림. 무기 자리를 쓰지 않음.' },
   hyeonmu: { name: '사신수 · 현무', role: '방어·보호막', best: '생존·탱커',
@@ -915,12 +915,12 @@ export const WEAPON_FAMILY = {
     text: '일반 몬스터·챔피언에게 피해 +20%, 끝없는 지옥에서 +15% 더, 처치 시 20% 어둠 폭발(주변 피해). 보스·우두머리·대인전에는 이 힘이 없고 등급도 낮음(최대 11.5, 공격력 옵션 ×1.15).' },
   taecho: { name: '태초의 무기', role: '무리 사냥의 왕·첫 일격', best: '사냥 (끝없는 지옥 밖), 보스는 제십 바로 아래',
     text: '처음 맞는 적(체력이 가득한 적)에게 피해 +40%, 일반 몬스터에게 +15%. 태초광명 격: 넓은 금빛 일격과 기절. 등급 13.5(공격력 옵션 포함 보스 16.8)로 용무기 제십(17.2) 바로 아래. 끝없는 지옥 밖 사냥에서는 가장 강함. 어둠 폭발은 없음. 세계석 요새 군주(약 5%)·소 왕(12%)만 떨어뜨림.' },
-  gold: { name: '전설 · 금린', role: '제압(마비)·대인전', best: '길드전 PvP',
-    text: '화륜옥쇄 격: 주변 큰 피해와 마비(길드전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
+  gold: { name: '전설 · 금린', role: '제압(마비)·대인전', best: '문파전 PvP',
+    text: '화륜옥쇄 격: 주변 큰 피해와 마비(문파전의 적도 묶임). 옵션은 생존(체력·방어)이라 딜은 용무기보다 낮음.' },
   steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
     text: '사성격 출혈(일반 몬스터)과 이동·기술 재사용 옵션. 보스에게는 출혈이 듣지 않음.' },
-  judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·길드전)',
-    text: '모든 적에게 같은 피해 보너스(보스·길드전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
+  judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·문파전)',
+    text: '모든 적에게 같은 피해 보너스(보스·문파전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
 };
 const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
   cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge', cr_judge_weapon3: 'judge' };

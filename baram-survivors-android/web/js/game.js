@@ -692,7 +692,7 @@ function buildStages() {
     // 대항전 (war.js): the guild wars from the raid list too.
     const wb = document.createElement('button');
     wb.className = 'raid';
-    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_img_sinsu_4') ? '<img src="assets/hud/ui_img_sinsu_4.png" alt="">' : ''}<div><b>사신수 길드대항전</b><span>청룡·백호·주작·현무 — 25 대 25 길드전</span><span>역할을 골라 출전</span></div>`;
+    wb.innerHTML = `${M.hud && M.hud.ui && M.hud.ui.includes('ui_img_sinsu_4') ? '<img src="assets/hud/ui_img_sinsu_4.png" alt="">' : ''}<div><b>사신수 문파대항전</b><span>청룡·백호·주작·현무 — 25 대 25 문파전</span><span>역할을 골라 출전</span></div>`;
     wb.onclick = () => War.openBoard();
     map.append(wb);
     raidInfo(pickedStage);
@@ -2551,7 +2551,7 @@ function wornGyeok(cls, g) {
   const fam = weaponFamilyOf(cls, g.weapon, g.weaponSp);
   if (fam) lines.push(`<b>${familyLine(fam)}</b>`, WEAPON_FAMILY[fam].text);
   const aura = auraOf(cls, g);
-  if (aura) lines.push(`주작의 기운: 주변 ${JUJAK_AURA.r}칸 안의 아군(동료·공대원·길드원) 공격력 +${Math.round(aura * 100)}%`);
+  if (aura) lines.push(`주작의 기운: 주변 ${JUJAK_AURA.r}칸 안의 아군(동료·공대원·문파원) 공격력 +${Math.round(aura * 100)}%`);
   for (const k of ['weapon', 'armor', 'shield', 'helmet', 'cape']) {
     const sp = g[k + 'Sp'] && SPECIAL[g[k + 'Sp']];
     if (!sp) continue;
@@ -8468,7 +8468,7 @@ function utilOf(cls) {
   const id = ((progress.util || {})[cls.id]);
   return UTIL[id] ? id : 'chosang';
 }
-/** Not in a 길드대항전 (its own keys), nor in the 수련장. */
+/** Not in a 문파대항전 (its own keys), nor in the 수련장. */
 function utilHere() {
   return !!G && !G.training && !(G.war && !G.war.raid);
 }
@@ -9870,7 +9870,7 @@ const QUESTS = [
   { id: 'q_cos30', title: '멋쟁이', text: '코디 30벌 모으기', gold: 3000, cos: [1], need: 30, have: () => costumeOwned() },
   { id: 'q_cos120', title: '패션 리더', text: '코디 120벌 모으기', gold: 8000, cos: [2], need: 120, have: () => costumeOwned() },
   // 「쟁」 (war.js): first of the three guilds ten times, the boss's last blow ten times.
-  { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 길드 1위 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).won || 0 },
+  { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 문파 1위 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).won || 0 },
   { id: 'q_jaeng_last', title: '막타 장인', text: '쟁에서 보스 막타 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).last || 0 },
 ];
 function costumeOwned() { return Object.keys(((progress.costume || {}).own) || {}).length; }
@@ -15420,7 +15420,7 @@ window.__gather = (r = 4) => { // test: the field's foes set round the hero (for
 window.__skillAlias = () => SKILL_ALIAS; // test: skills merged into others (스킬 2차 개편)
 window.__ultAt = n => { G.ultPromo = n; return ultLook(G.cls.id).name; }; // test: the 필살기 of a 승급 band
 
-// ---------------------------------------------------------------- 사신수 길드대항전 (war.js)
+// ---------------------------------------------------------------- 사신수 문파대항전 (war.js)
 // The war lives in war.js; these are the hunt's own pieces it builds on (the hero, its spells,
 // the grid, the effects, the screens). Kept together here so the two files merge apart.
 const War = initWar({

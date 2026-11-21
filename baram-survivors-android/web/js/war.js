@@ -1,4 +1,4 @@
-// 사신수 길드대항전: two guilds of twenty, a war for each 사신수 (청룡전 거점 점령, 백호전 대장전,
+// 사신수 문파대항전: two guilds of twenty, a war for each 사신수 (청룡전 거점 점령, 백호전 대장전,
 // 주작전 호위, 현무전 수성/공성), fought on 바람의나라 연's own 사신수 공성전 castles and the 길림 field.
 //
 // The hunt runs as it always does — the hero, its skills, cards, 필살기, 격 and statuses — and this
@@ -82,7 +82,7 @@ export const WARS = {
   },
   jujak: {
     id: 'jujak', name: '주작전', mode: 'escort', title: '호위', mat: 'sinsu_jujak', sinsu: '주작', art: 'ui_sinsu_castlebattle_01', pic: 'ui_img_sinsu_3',
-    desc: '주작성 남문에서 본당까지 주작 불씨 수레를 호위한다. 2분씩 공수를 바꿔, 더 멀리 민 길드가 이긴다.',
+    desc: '주작성 남문에서 본당까지 주작 불씨 수레를 호위한다. 2분씩 공수를 바꿔, 더 멀리 민 문파가 이긴다.',
     time: 240, half: 120, path: [[15, 75], [15, 23]], spawnStart: [15, 76], spawnEnd: [15, 13], cmdStart: [8, 76], cmdEnd: [15, 6],
     crates: [[4, 66], [26, 66], [4, 43], [26, 25]], scouts: [[2, 52], [28, 52]],
   },
@@ -97,7 +97,11 @@ const GUILDS = [['청운', '#7cf08a'], ['흑월', '#ff7a6a']];
 const NAMES = ['바람', '달빛', '청운', '흑풍', '은월', '화랑', '검성', '설화', '무영', '천둥', '소나기', '별빛', '유성', '태양', '한울', '가람',
   '누리', '도담', '라온', '미르', '새벽', '아라', '온새', '하늘', '해솔', '초롱', '다온', '구름', '이슬', '바다', '청풍', '백야',
   '흑룡', '적토', '청솔', '단비', '보라', '나래', '여울', '하람', '서리', '모래', '돌개', '불꽃', '매화', '노을'];
-const TAGS = ['', '', '', '7', '01', '왕', '님', 'ㅇ', '짱', '99', '_', '군'];
+// 바람의나라 같은 이름: 순우리말 이름이거나 한 글자씩 짝지은 무협 이름(청룡·흑풍·설검 …); 기호 없이.
+const NAME_PRE = ['청', '흑', '백', '적', '은', '금', '설', '월', '풍', '화', '뇌', '현', '비', '천', '무', '혈', '야', '광', '운', '진'];
+const NAME_SUF = ['룡', '호', '풍', '월', '검', '랑', '령', '운', '영', '혼', '객', '협', '선', '도', '랑', '봉', '성', '휘'];
+const TAGS = ['', '', '', '', '', '', '이', '아', '2', '7'];
+const baseName = () => Math.random() < 0.55 ? pick(NAMES) + pick(TAGS) : pick(NAME_PRE) + pick(NAME_SUF) + (Math.random() < 0.25 ? pick(['', '이', '아']) : '');
 
 // What each class does on the field: its plain blow, its spread spell, its great one; ranged or not.
 // Classes another session adds fall back to their own spells by kind (kitFor).
@@ -281,6 +285,28 @@ function injectUi() {
   #war-result .wr-cols { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   #war-sb { position: fixed; inset: 6% 8%; background: rgba(10,8,6,0.93); border: 2px solid #5a4630; z-index: 40; overflow: auto; padding: 6px; }
   #war-sb .wr-cols { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  #war-sb .sb-head { display: flex; gap: 6px; align-items: center; position: sticky; top: -6px; background: rgba(10,8,6,0.97); padding: 2px 0 4px; z-index: 1; }
+  #war-sb .sb-head b { flex: 1; text-align: center; color: #ffd27a; font: 700 13px G11, sans-serif; }
+  #war-sb .sb-head button, #war-sb .sb-teams button, #war-sb .sb-stat button { font: 700 11px G11, monospace; padding: 2px 10px; color: #f4e2c0; background: #2a1606; border: 2px solid #5a4630; }
+  #war-sb .sb-head button.on, #war-sb .sb-teams button.on { border-color: #ffd040; color: #ffd040; }
+  #war-sb .sb-teams { display: flex; gap: 6px; justify-content: center; margin: 4px 0; }
+  #war-sb .sb-cards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  #war-sb .sb-card { width: 112px; border: 1px solid #5a4630; background: #1d140c; color: #e8dcc0; font: 10px G9, sans-serif; text-align: center; padding: 3px; cursor: pointer; }
+  #war-sb .sb-card.me { border-color: #ffd040; }
+  #war-sb .sb-card.dead { opacity: 0.5; }
+  #war-sb .sb-card img, #war-sb .sb-card i { display: block; height: 60px; margin: 0 auto; image-rendering: pixelated; object-fit: contain; max-width: 100px; }
+  #war-sb .sb-card .nm { font: 700 11px G11, sans-serif; color: #efe3c2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #war-sb .sb-card .hp { height: 3px; background: #000; margin: 2px 4px; } #war-sb .sb-card .hp span { display: block; height: 3px; background: #6ad86a; }
+  #war-sb .sb-card .st { color: #ffb070; min-height: 10px; }
+  #war-sb .sb-star { margin-left: 3px; text-shadow: 0 0 2px #000; }
+  #war-sb .sb-tip { text-align: center; color: #9a8a70; font: 10px G9, sans-serif; margin: 4px; }
+  #war-sb .sb-stat { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; color: #e8dcc0; font: 12px G11, sans-serif; margin-top: 6px; }
+  #war-sb .sb-stat .pic { text-align: center; } #war-sb .sb-stat .pic img { height: 150px; image-rendering: pixelated; display: block; margin: 0 auto; }
+  #war-sb .sb-stat .pic .nm { font: 700 14px G11, sans-serif; color: #ffd27a; }
+  #war-sb .sb-stat .info { max-width: 420px; } #war-sb .sb-stat th { color: #c8b48a; text-align: left; padding-right: 10px; } #war-sb .sb-stat td { text-align: left; }
+  #war-sb .sb-stat .kit { margin: 6px 0; } #war-sb .sb-stat .kit b, #war-sb .sb-stat .rec b { color: #c8b48a; margin-right: 6px; }
+  #war-sb .sb-stat .sk { display: inline-block; border: 1px solid #5a4630; padding: 1px 5px; margin: 2px; } #war-sb .sb-stat .sk small { color: #9a8a70; margin-left: 3px; }
+  #war-sb .sb-stat .rec { margin: 6px 0; font-size: 11px; }
   body.war #map-tab { display: none; }
   #jaeng-share { position: relative; height: 5px; margin-top: 2px; display: flex; background: rgba(0,0,0,0.6); }
   #jaeng-share i { display: block; height: 100%; }
@@ -315,7 +341,8 @@ function injectUi() {
   const sb = document.createElement('div');
   sb.id = 'war-sb';
   sb.hidden = true;
-  sb.onclick = () => { sb.hidden = true; };
+  // (Closed by its 닫기 key or a tap on its empty space; the tabs and cards inside keep it open.)
+  sb.onclick = e => { if (e.target === sb) sb.hidden = true; };
   document.body.append(sb);
   const keys = document.getElementById('keys');
   if (keys) {
@@ -342,7 +369,7 @@ function injectUi() {
     wc.id = 'war-cmd';
     wc.hidden = true;
     document.body.append(wc);
-    for (const [kind, label, tip] of [['boss', '보스', '보스 집중: 내 분대와 1분대가 20초 동안 보스를 친다'], ['pk', '견제', '견제: 보스를 가장 많이 치는 다른 길드의 딜러·힐러를 끊는다'], ['seal', '봉인', '봉인: 우리 것이 아닌 가장 가까운 봉인석을 차지한다']]) {
+    for (const [kind, label, tip] of [['boss', '보스', '보스 집중: 내 분대와 1분대가 20초 동안 보스를 친다'], ['pk', '견제', '견제: 보스를 가장 많이 치는 다른 문파의 딜러·힐러를 끊는다'], ['seal', '봉인', '봉인: 우리 것이 아닌 가장 가까운 봉인석을 차지한다']]) {
       const k = document.createElement('button');
       k.className = 'jaeng-cmd';
       k.dataset.cmd = kind;
@@ -377,10 +404,10 @@ export function openBoard() {
     return `<button class="btn wb-role${id === pickRole ? ' on' : ''}" data-role="${id}" title="${r.desc}">${r.name}${fit ? '' : ' (비주력)'}</button>`;
   }).join('');
   const side = w.mode === 'siege' ? `<div class="wb-row"><button class="btn wb-side${pickSide === 'atk' ? ' on' : ''}" data-side="atk">공성 (성문을 부순다)</button><button class="btn wb-side${pickSide === 'def' ? ' on' : ''}" data-side="def">수성 (성문을 지킨다)</button></div>` : '';
-  box.innerHTML = `<h2>사신수 길드대항전 · 쟁</h2>
+  box.innerHTML = `<h2>사신수 문파대항전 · 쟁</h2>
     <div class="wb-cards">${cards}</div>
     <div class="wb-info"><b>${w.name} · ${w.title}</b> — ${w.desc}<br>
-    ${w.jaeng ? w.more : '양 길드 25명씩 · 혼자 들어가도 전장이 꽉 찹니다 · 양 진영의 전력은 자동으로 맞춰집니다(전장 보정).'}</div>
+    ${w.jaeng ? w.more : '양 문파 25명씩 · 혼자 들어가도 전장이 꽉 찹니다 · 양 진영의 전력은 자동으로 맞춰집니다(전장 보정).'}</div>
     ${side}
     <div class="wb-row">${roleBtns}</div>
     <div class="wb-info"><b>${ROLES[pickRole].name}</b> — ${ROLES[pickRole].desc}<br>역할 보너스: ${ROLES[pickRole].bonus}</div>
@@ -593,7 +620,7 @@ function setup() {
   W.alive = [0, 1].map(t => W.bodies.filter(b => b.team === t));
   orders(W, 0, true);
   orders(W, 1, true);
-  A.say(`[${def.name}] ${W.teams[0].name} 길드 대 ${W.teams[1].name} 길드 — ${def.title}. 역할: ${ROLES[role].name}`, 'sys');
+  A.say(`[${def.name}] ${W.teams[0].name} 문파 대 ${W.teams[1].name} 문파 — ${def.title}. 역할: ${ROLES[role].name}`, 'sys');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
   if (pocket) A.say(`${pocket.name}(${pocket.cls.name})이(가) 당신을 전담 치유합니다`, 'sys');
   A.banner(`${def.name} · ${def.title}`);
@@ -651,7 +678,7 @@ function mkFighter(W, team, role, squad) {
   const own = Math.sqrt(lv / 30) * (0.85 + 0.3 * Math.random());
   const pw = (1 + (own - 1) * 0.35) * (team === 1 && !W.raid ? W.foeK || 1 : 1);
   const hpK = fighterHpK(role, cls);
-  const name = pick(NAMES) + pick(TAGS);
+  const name = baseName();
   const f = {
     war: true, id: W.nextId++, team, role, cls, kit: kitFor(cls), lv, gear, name, pw, squad,
     maxHp: W.refHp * hpK * pw, hp: 0, x: 0, y: 0, tx: 0, ty: 0, fx: 0, fy: 0, mt: 0, dur: 0.25, moving: false, phase: 0,
@@ -1567,7 +1594,7 @@ function leaderPick(W, b, order) {
       W.chatT = G.t;
       (W.chatK = W.chatK || {}).focus = G.t;
       const who = best.role === 'healer' ? '적 힐러' : best.carry ? '보급 든 놈' : best.hero ? best.name : best.cls ? `${best.cls.name} ${best.name}` : best.name;
-      A.say(`★${b.name}: ${who}부터 잡아요!`, 'party');
+      A.say(`[분대장] ${b.name}: ${who}부터 잡아요!`, 'party');
     }
   }
 }
@@ -2294,7 +2321,7 @@ function kill(W, f, killer) {
     if (W.mode === 'capture') W.score[1 - f.team] += 40;
     if (W.mode === 'escort' && W.cart && f.team !== W.attacker) W.cart.boost = G.t + 15;
   } else if (by && by.team === 0 && by.stats && by !== W.hero && Math.random() < 0.12) talk(W, by, ['하나 잡았다!', '처치!', 'ㅋㅋ 잡음', '나이스!']);
-  else if (f.team === 0 && f.squad && f.squad.leader === f && Math.random() < 0.5 && (f.squad === W.hero.squad || d2(f, W.hero) < 14) && G.t - (W.chatT || -99) >= 3) { W.chatT = G.t; A.say(`★${f.name}(${W.raid ? '파티장' : '분대장'}) 쓰러짐! 다시 모여요!`, 'warn'); }
+  else if (f.team === 0 && f.squad && f.squad.leader === f && Math.random() < 0.5 && (f.squad === W.hero.squad || d2(f, W.hero) < 14) && G.t - (W.chatT || -99) >= 3) { W.chatT = G.t; A.say(`${f.name}(${W.raid ? '파티장' : '분대장'}) 쓰러짐! 다시 모여요!`, 'warn'); }
 }
 
 function respawn(W, b) {
@@ -2477,7 +2504,7 @@ function objectives(W, dt) {
     const s = snap(W, ...pick(spots));
     if (!W.crates.some(c => c.x === s[0] && c.y === s[1])) {
       W.crates.push({ x: s[0], y: s[1], by: null, t: G.t });
-      if (Math.random() < 0.5) A.say('보급 상자가 놓였습니다. 진영(목표)으로 나르면 길드에 도움이 됩니다.', 'sys');
+      if (Math.random() < 0.5) A.say('보급 상자가 놓였습니다. 진영(목표)으로 나르면 문파에 도움이 됩니다.', 'sys');
     }
   }
   for (const c of W.crates) {
@@ -2585,7 +2612,7 @@ function capture(W, dt) {
     const who = push > 0 ? 0 : 1;
     for (const b of W.alive[who]) if (!b.gate && Math.hypot(b.tx - f.x, b.ty - f.y) <= 2.2) credit(b, 'obj', dt * 2.5);
     if (before !== f.owner && f.owner >= 0) {
-      A.say(`${W.teams[f.owner].name} 길드가 ${f.name} 거점을 점령했습니다!`, f.owner === 0 ? 'sys' : 'warn');
+      A.say(`${W.teams[f.owner].name} 문파가 ${f.name} 거점을 점령했습니다!`, f.owner === 0 ? 'sys' : 'warn');
       if (f.owner === 0) A.banner(`${f.name} 거점 점령!`);
       for (const b of W.alive[f.owner]) if (Math.hypot(b.tx - f.x, b.ty - f.y) <= 2.5) credit(b, 'obj', 25);
     }
@@ -2637,7 +2664,7 @@ function escort(W, dt) {
   if (W.round === 1 && (W.left <= W.def.time - W.def.half || done)) {
     W.round = 2;
     W.left = W.def.half;
-    A.say(`전반 종료: ${W.teams[att].name} 길드가 ${Math.round(c.best[att] / (W.path.length - 1) * 100)}%까지 밀었습니다. 공수 교대!`, 'sys');
+    A.say(`전반 종료: ${W.teams[att].name} 문파가 ${Math.round(c.best[att] / (W.path.length - 1) * 100)}%까지 밀었습니다. 공수 교대!`, 'sys');
     A.banner('공수 교대!');
     W.attacker = 1 - att;
     resetEscort(W);
@@ -2669,7 +2696,7 @@ function gateBreak(W, by) {
   if (pt >= 0) G.party.splice(pt, 1);
   credit(by, 'obj', 80);
   A.banner('현무 성문이 무너졌다!');
-  A.say(`${by ? by.name : '?'}의 일격에 성문이 무너졌습니다! ${W.teams[W.attacker].name} 길드가 성 안으로 들어갑니다.`, W.attacker === 0 ? 'sys' : 'warn');
+  A.say(`${by ? by.name : '?'}의 일격에 성문이 무너졌습니다! ${W.teams[W.attacker].name} 문파가 성 안으로 들어갑니다.`, W.attacker === 0 ? 'sys' : 'warn');
   if (A.M().fx.h_kill) A.addFx('h_kill', W.gate.x, W.gate.y - 40, { scale: 2 });
   A.audio().play('kill');
   G.shake = 0.4;
@@ -2795,7 +2822,7 @@ function spellFx(id, lv) {
 }
 
 // ================================================================ AI 동료: 급 · 성격 · 기술 (2차 피드백)
-// Each fighter is a player of its own. Its 급 (서버 최강급 · 상위 · 중간 · 약함 · 뉴비) is drawn round the
+// Each fighter is a player of its own. Its 급 (절정고수 · 고수 · 중수 · 하수 · 입문자) is drawn round the
 // hero's own 전투력 — one or two of the server's best on every side, some above the hero, most about
 // it, some below — and sets its level, 승급, skill 단, life and blows, and the gear it wears from the
 // game's own ladders (plain pieces for a 뉴비, raid sets and 전설 for the 상위, the 용무기·사신수·태초·
@@ -2808,15 +2835,17 @@ function spellFx(id, lv) {
 // gcd: the wait after any skill; n: skills in its kit; ult: its 필살기's wait; heal: a healer's 기원 wait;
 // dodge: how much better it reads a red floor; edge: its hand (how fast it acts on an order).
 const AI_TIERS = {
-  server: { name: '서버 최강급', short: '서버', col: '#ffd040', cp: 38000, lv: [46, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
-  high: { name: '상위', short: '상위', col: '#ff9a5a', cp: 22000, lv: [40, 46], promo: [5, 7], sl: [6, 7], g: [9, 13.5], gcd: 0.74, n: 5, ult: 16, heal: 2.7, dodge: 0.06, edge: 0.12, step: 2 },
-  mid: { name: '중간', short: '중간', col: '#a8d8ff', cp: 10000, lv: [30, 40], promo: [2, 4], sl: [4, 5], g: [4.5, 8.5], gcd: 0.88, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
-  low: { name: '약함', short: '약함', col: '#c0c0c0', cp: 4500, lv: [22, 30], promo: [1, 2], sl: [2, 3], g: [1.5, 4.5], gcd: 1.05, n: 3, ult: 23, heal: 3.6, dodge: -0.04, edge: -0.1, step: 0 },
-  newbie: { name: '뉴비', short: '뉴비', col: '#9fe08a', cp: 0, lv: [12, 22], promo: [0, 1], sl: [1, 2], g: [0, 1.5], gcd: 1.3, n: 2, ult: 28, heal: 4.3, dodge: -0.1, edge: -0.2, step: 0 },
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 38000, lv: [46, 50], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
+  high: { name: '고수', short: '고수', col: '#ff9a5a', cp: 22000, lv: [40, 46], promo: [5, 7], sl: [6, 7], g: [9, 13.5], gcd: 0.74, n: 5, ult: 16, heal: 2.7, dodge: 0.06, edge: 0.12, step: 2 },
+  mid: { name: '중수', short: '중수', col: '#a8d8ff', cp: 10000, lv: [30, 40], promo: [2, 4], sl: [4, 5], g: [4.5, 8.5], gcd: 0.88, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
+  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 4500, lv: [22, 30], promo: [1, 2], sl: [2, 3], g: [1.5, 4.5], gcd: 1.05, n: 3, ult: 23, heal: 3.6, dodge: -0.04, edge: -0.1, step: 0 },
+  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, lv: [12, 22], promo: [0, 1], sl: [1, 2], g: [0, 1.5], gcd: 1.3, n: 2, ult: 28, heal: 4.3, dodge: -0.1, edge: -0.2, step: 0 },
 };
 const TIER_ORDER = ['server', 'high', 'mid', 'low', 'newbie'];
 // The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
 const CP_TOP = 60000;
+// The server's people (aiPlan): 전투력 log-normal about POP_MID (e^±0.85: about 4천 to 2만 5천 for two in three).
+const POP_MID = 10000, POP_SPREAD = 0.85;
 // Its 전투력 as the game reckons a hero's (combatPower: the gear's ranks, the 승급, the level).
 const cpOf = (g, promo, lv) => Math.round((g * 1440 + promo * 800 + lv * 60) * (1 + 0.04 * promo));
 const tierByCp = cp => TIER_ORDER.find(k => cp >= AI_TIERS[k].cp) || 'newbie';
@@ -2855,19 +2884,25 @@ const P_LINES = {
 const P_EMO = { server: 'gains', high: 'ready', newbie: 'what', chatter: 'hehe', afk: 'gone', wander: 'look', suicide: 'rage', healbot: 'cute', greedy: 'godgame', aggro: 'rage', late: 'really', charger: 'ready', careful: 'look' };
 /** A name in its 급's style (the server's best wear theirs as a title; a 뉴비 a number). */
 function styledName(tier, base) {
-  if (tier === 'server') return pick([`絶${base}`, `${base}神`, `ㆍ${base}ㆍ`, `霸${base}`, `${base}★`]);
-  if (tier === 'high') return Math.random() < 0.5 ? pick([`${base}님`, `${base}x`, `천상${base}`, `${base}왕`]) : base;
-  if (tier === 'newbie') return pick([`초보${base}`, `${base}${100 + Math.floor(Math.random() * 900)}`, `뉴비${base}`, `${base}입문`]);
+  // 절정고수: 무림의 이름 (천하·무림 앞에, 검신·대협·천존·마제 뒤에); 고수: 검객·무사·협객이 붙기도.
+  if (tier === 'server') return pick([`${base}검신`, `천하${base}`, `${base}대협`, `무림${base}`, `${base}천존`, `${base}마제`, `${base}`]);
+  if (tier === 'high') return Math.random() < 0.5 ? pick([`${base}검객`, `${base}무사`, `${base}협객`, `${base}대장`]) : base;
+  // 입문자: 초보·꼬마·아기, 또는 뒤에 숫자 (이름이 먼저 잡혀 있던 새내기).
+  if (tier === 'newbie') return pick([`초보${base}`, `꼬마${base}`, `아기${base}`, `${base}${10 + Math.floor(Math.random() * 90)}`]);
   return base;
 }
 /** The 급 of every fighter of a side: one or two of the server's best and, in a big field, one of the
  *  상위 whatever the hero is; of the rest some above the hero (×1.5-4.5 its 전투력), most about it
  *  (×0.8-1.25), some below (×0.15-0.78: the 뉴비 among them). */
 function aiPlan(n) {
-  const out = [], ns = n >= 18 ? 2 : 1, nh = n >= 18 ? 1 : 0, left = n - ns - nh, up = Math.round(left * 0.12), lo = Math.round(left * 0.28);
+  const out = [], ns = n >= 18 ? 2 : 1, nh = n >= 18 ? 1 : 0, left = n - ns - nh;
   for (let i = 0; i < ns; i++) out.push({ server: true });
   for (let i = 0; i < nh; i++) out.push({ high: true });
-  for (let i = 0; i < left; i++) out.push({ r: i < up ? Math.exp(rnd(Math.log(1.5), Math.log(4.5))) : i < up + lo ? Math.exp(rnd(Math.log(0.15), Math.log(0.78))) : rnd(0.8, 1.25) });
+  // The rest from the server's own people, not from the hero: 전투력 spread about a middle of
+  // 1만 (중간's floor). A weak hero finds most of its 문파 above it, a middling one half and half,
+  // a top one nearly all below (but for the fixed 서버 최강급).
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+  for (let i = 0; i < left; i++) out.push({ cp: clamp(Math.exp(Math.log(POP_MID) + POP_SPREAD * gauss()), 600, AI_TIERS.server.cp * 0.97) });
   for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
   return out;
 }
@@ -2883,9 +2918,10 @@ function applyPersonas(W) {
     const own = list.filter(b => !b.alt);
     const plan = aiPlan(own.length);
     own.forEach((b, i) => setPersona(W, b, plan[i]));
-    // The side's strength on the whole as before (about the hero's): the spread is in who is strong.
+    // The side's strength on the whole toward the hero's: the spread is in who is strong.
     const mean = own.reduce((x, b) => x + b.pw, 0) / Math.max(1, own.length) / (team === 1 && !W.raid ? W.foeK || 1 : 1);
-    if (mean > 0) for (const b of own) { b.pw /= mean; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; }
+    // (Only half the way, by its square root: a 문파 stronger than the hero stays stronger, a weaker one weaker.)
+    if (mean > 0) for (const b of own) { b.pw /= Math.sqrt(mean); b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; }
     for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
     warmKitFx(W);
     for (const b of own) setPlay(W, b, defaultPlay(b));
@@ -2898,8 +2934,8 @@ function applyPersonas(W) {
   rankTitles(W);
 }
 // 칭호: each guild's five strongest by 전투력 (the hero among them) wear a star by the name, coloured
-// by rank (1 빨강, 2 은, 3 동, 4 보라, 5 하늘). In a raid the whole 공격대 is ranked as one.
-const RANK_COL = ['#ff3a3a', '#e8eef8', '#e0904a', '#d08aff', '#7fd0ff'];
+// by rank (1 금, 2 은, 3 동, 4 보라, 5 하늘). In a raid the whole 공격대 is ranked as one.
+const RANK_COL = ['#ffd040', '#e8eef8', '#e0904a', '#d08aff', '#7fd0ff'];
 function rankTitles(W) {
   for (const team of W.raid ? [0] : teamsOf(W)) {
     const list = W.bodies.filter(b => b.team === team && b.cls && !b.cmdr && !b.troop && b.cp);
@@ -2910,7 +2946,7 @@ function rankTitles(W) {
     list.slice(0, 5).forEach((b, i) => { b.rank = i + 1; });
   }
   const r = W.hero && W.hero.rank;
-  if (r) A.say(`칭호: ${W.raid ? '공격대' : '길드'} 전투력 ${r}위 ★`, 'sys');
+  if (r) A.say(`칭호: ${W.raid ? '공격대' : '문파'} 전투력 ${r}위 ★`, 'sys');
 }
 function setPersona(W, b, slot) {
   const heroCp = W.heroCp;
@@ -2923,7 +2959,7 @@ function setPersona(W, b, slot) {
     tier = tierByCp(cpOf(g, promo, lv));
   } else {
     const want = slot.server ? Math.min(CP_TOP * 0.95, Math.max(heroCp * rnd(1.3, 1.9), rnd(40000, 52000)))
-      : slot.high ? Math.min(CP_TOP * 0.6, Math.max(heroCp * rnd(1.1, 1.5), rnd(23000, 33000))) : clamp(heroCp * slot.r, 800, Math.max(heroCp * 1.25, AI_TIERS.server.cp * 0.97));
+      : slot.high ? Math.min(CP_TOP * 0.6, Math.max(heroCp * rnd(1.1, 1.5), rnd(23000, 33000))) : slot.cp;
     tier = slot.server ? 'server' : slot.high ? 'high' : tierByCp(want);
     const T = AI_TIERS[tier];
     promo = rint(T.promo);
@@ -3525,12 +3561,12 @@ function warCommands(W, dt) {
   const C = W.cmds || (W.cmds = { next: 20, ask: null, cur: null, log: [] });
   if ((W.countdown || 0) > 0 || W.over) return;
   if (C.cur && W.t >= C.cur.until) cmdEnd(W, C);
-  if (C.ask && W.t >= C.ask.until) { C.ask = null; cmdPanel(W); A.say('[지휘] 선택이 없어 길드 지휘관이 판단합니다', 'sys'); }
+  if (C.ask && W.t >= C.ask.until) { C.ask = null; cmdPanel(W); A.say('[지휘] 선택이 없어 문파 지휘관이 판단합니다', 'sys'); }
   if (!C.ask && !C.cur && W.t >= C.next && W.left > 25) {
     C.ask = { at: W.t, until: W.t + WAR_COMMAND_PICK };
     C.next = W.t + WAR_COMMAND_EVERY;
     cmdPanel(W);
-    A.say('[지휘] 다음 1분, 길드를 어떻게 움직일까요? (돌격 · 수비 · 우회 · 집결)', 'sys');
+    A.say('[지휘] 다음 1분, 문파를 어떻게 움직일까요? (돌격 · 수비 · 우회 · 집결)', 'sys');
   }
   if (C.ask) {
     const el = document.getElementById('wc-left');
@@ -4091,7 +4127,7 @@ function warPhase(W) {
       W.final = at;
       const where = at.name || '';
       if (W.mode !== 'siege') A.banner(`결전! ${where}`);
-      A.say(`[결전] ${where} — 양 길드가 모두 모입니다!`, 'warn');
+      A.say(`[결전] ${where} — 양 문파가 모두 모입니다!`, 'warn');
       const ld = W.teams[0].squads.map(q => q.leader).find(l => l && !l.dead);
       if (ld) A.later(1.2, () => chat(W, ld, 'final', [`결전입니다! 전원 ${where}로!`, `다 모여요! ${where} 총력전!`], { every: 5, must: true, gap: 0, emo: 'ready' }));
     }
@@ -4602,12 +4638,12 @@ function rowHtml(W, x, i) {
   // Its 급 as a badge; the spec on hover (전투력, level, 승급, 단, way, gear).
   const tip = sp ? `${T.name} · 전투력 ${sp.cp.toLocaleString()} · Lv${sp.lv} · ${sp.promo}차 승급${sp.sl ? ` · 기술 ${sp.sl}단` : ''}${sp.play ? ` · ${sp.play}` : ''}${sp.gear ? ` · ${sp.gear}` : ''}` : '';
   const badge = sp ? `<span class="ai-tier" style="color:${T.col};font-weight:bold" title="${tip}">${T.short}</span>` : '';
-  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}">${x.b.name}${x.b.rank ? `<b style="color:${RANK_COL[x.b.rank - 1]};text-shadow:0 0 2px #000" title="${W.raid ? '공격대' : '길드'} 전투력 ${x.b.rank}위">★${x.b.rank}</b>` : ''}${x.b.leader ? ' <small>(분대장)</small>' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
+  return `<tr class="t${x.b.team}${me ? ' me' : ''}"><td>${i + 1}</td><td title="${tip}" data-who="${me ? -1 : x.b.id}" style="cursor:pointer">${x.b.name}${x.b.rank ? `<b style="color:${RANK_COL[x.b.rank - 1]};text-shadow:0 0 2px #000" title="${W.raid ? '공격대' : '문파'} 전투력 ${x.b.rank}위">★${x.b.rank}</b>` : ''}${x.b.leader ? ' <small>(분대장)</small>' : ''}${x.b.alt ? ' <small>(부캐)</small>' : ''}</td><td>${badge}</td><td>${sp ? sp.cp.toLocaleString() : ''}</td><td>${sp ? sp.promo + '차' : ''}</td><td>${x.b.cls ? x.b.cls.name : ''}</td><td>${ROLES[x.b.role].name}</td>
     <td>${x.score}</td><td>${A.shownNum(s.dmg)}</td><td>${A.shownNum(s.heal)}</td><td>${A.shownNum(s.taken)}</td><td>${Math.round(s.obj)}</td><td>${Math.round(s.kills)}/${s.deaths}/${Math.round(s.assists)}</td><td>${s.revives}</td></tr>`;
 }
 function tables(W, rows) {
   const head = '<tr><th>#</th><th>이름</th><th>급</th><th>전투력</th><th>승급</th><th>직업</th><th>역할</th><th>기여</th><th>피해</th><th>회복</th><th>받은</th><th>목표</th><th>K/D/A</th><th>부활</th></tr>';
-  return `<div class="wr-cols">${(W.raid ? [0] : teamsOf(W)).map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 길드'}${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
+  return `<div class="wr-cols">${(W.raid ? [0] : teamsOf(W)).map(t => `<table><caption style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 문파'}${W.over ? (W.win === t ? ' · 승리' : ' · 패배') : ''}</caption>${head}${rows.filter(x => x.b.team === t).map((x, i) => rowHtml(W, x, i)).join('')}</table>`).join('')}</div>`;
 }
 
 /** The hero as it stood in the war, in 연's layers and its own gear, for the result's spotlight. */
@@ -4642,7 +4678,7 @@ function showResult(W) {
     <div class="wr-stage" style="${hud('ui_light02') ? `background-image:url(${hud('ui_light02')})` : ''}">
       <img class="wr-hero" src="${heroShot(G) || A.heroPicture(G.cls)}" alt="">
       ${art ? `<img class="wr-flag" src="${hud(won ? 'ui_attack_result_win' : 'ui_attack_result_lose')}" alt="">` : ''}</div>
-    <div class="wr-sub">${W.def.name} · ${W.def.title} — ${r.why}<br>내 기여: ${W.raid ? '공격대' : '길드'} ${r.rank}위 · ${ROLES[W.role].name} · 등급 <b class="wr-tier">${r.tier}</b> <small>(같은 역할 중간의 ×${r.tierK.toFixed(2)}${W.afkT > 1 ? ` · 자리비움 ${Math.round(W.afkT)}초` : ''})</small></div>
+    <div class="wr-sub">${W.def.name} · ${W.def.title} — ${r.why}<br>내 기여: ${W.raid ? '공격대' : '문파'} ${r.rank}위 · ${ROLES[W.role].name} · 등급 <b class="wr-tier">${r.tier}</b> <small>(같은 역할 중간의 ×${r.tierK.toFixed(2)}${W.afkT > 1 ? ` · 자리비움 ${Math.round(W.afkT)}초` : ''})</small></div>
     ${W.raid && r.tasks && r.tasks.n ? `<div class="wr-sub">역할 임무 <b>${r.tasks.ok}/${r.tasks.n}</b> 성공${(W.tasks.log || []).length ? ` <small>(${W.tasks.log.map(([k, ok]) => `${RAID_TASK_DEF[k].name} ${ok ? '○' : '×'}`).join(' · ')})</small>` : ''}</div>` : ''}
     ${!W.raid && W.cmds && W.cmds.log.length ? `<div class="wr-sub">지휘 선택 <b>${W.cmds.log.length}번</b> <small>(${W.cmds.log.map(c => `${WAR_COMMANDS[c.kind].name} ${c.gain >= 0 ? '+' : ''}${c.gain}`).join(' · ')})</small></div>` : ''}
     <div class="wr-medals">${medal(mat.name, '+' + (W.raid ? r.coins : r.mats), matIcon)}${medal('전', '+' + r.gold.toLocaleString(), '')}${medal('등급', r.tier, '')}</div>
@@ -4671,12 +4707,113 @@ function leaveWar(again) {
   else A.enterTown(cls);
 }
 
+// 현황 overlay: 현황 (the score tables), 문파원 (each guild's members as cards) and a member's 상태창.
+let sbTab = 'board', sbTeam = 0, sbWho = null;
 function toggleBoard() {
   const G = A.G(), sb = document.getElementById('war-sb');
   if (!G || !G.war) return;
   if (!sb.hidden) { sb.hidden = true; return; }
-  sb.innerHTML = `<h2 style="color:#ffd27a;text-align:center;margin:2px">현황 · ${G.war.def.name} <small>(누르면 닫힘)</small></h2>${tables(G.war, board(G.war))}`;
+  sbTab = 'board'; sbTeam = 0; sbWho = null;
+  renderBoard();
   sb.hidden = false;
+}
+function renderBoard() {
+  const G = A.G(), W = G && G.war, sb = document.getElementById('war-sb');
+  if (!W) return;
+  const mem = W.raid ? '공격대원' : '문파원';
+  const tab = (id, label) => `<button class="sb-tab${sbTab === id ? ' on' : ''}" data-tab="${id}">${label}</button>`;
+  let body;
+  if (sbWho) body = statusHtml(W, sbWho);
+  else if (sbTab === 'members') body = membersHtml(W);
+  else body = tables(W, board(W));
+  sb.innerHTML = `<div class="sb-head">${tab('board', '현황')}${tab('members', mem)}<b>${W.def.name}</b><button class="sb-x" data-x="1">닫기</button></div>${body}`;
+  sb.querySelectorAll('[data-tab]').forEach(b => { b.onclick = e => { e.stopPropagation(); sbTab = b.dataset.tab; sbWho = null; renderBoard(); }; });
+  sb.querySelectorAll('[data-team]').forEach(b => { b.onclick = e => { e.stopPropagation(); sbTeam = +b.dataset.team; renderBoard(); }; });
+  sb.querySelectorAll('[data-who]').forEach(b => {
+    b.onclick = e => { e.stopPropagation(); const id = +b.dataset.who; sbWho = id < 0 ? W.hero : W.bodies.find(x => x.id === id) || null; renderBoard(); };
+  });
+  sb.querySelectorAll('[data-back]').forEach(b => { b.onclick = e => { e.stopPropagation(); sbWho = null; renderBoard(); }; });
+  const x = sb.querySelector('[data-x]');
+  if (x) x.onclick = e => { e.stopPropagation(); sb.hidden = true; };
+}
+/** A member's picture: its first standing frame (the same picture the field draws), as a data URL. */
+const portraits = new Map();
+function portraitOf(W, b) {
+  const H = A.M().yhero2 && A.M().yhero2[b.cls.id];
+  if (!H) return '';
+  const body = b.hero ? { cls: b.cls, gear: A.savedGear(b.cls) } : b;
+  if (!body.yvKey) { body.yv2 = aiVariants(body.cls, body.gear || {}); if (!body.yv2) return ''; body.yvKey = body.cls.id + JSON.stringify(body.yv2); }
+  if (portraits.has(body.yvKey)) return portraits.get(body.yvKey);
+  const a = H.anims.idle_down || H.anims.walk_down;
+  const c = a && composeFrame(H, body, a, 0, false, true);
+  if (!c) return '';
+  // (A kept frame may be an ImageBitmap: copied onto a canvas for its picture.)
+  // (A kept frame is { pic, sx, sy, w, h }: its drawn box out of a canvas or bitmap.)
+  const cv = document.createElement('canvas');
+  const sw = c.w || c.width, sh = c.h || c.height;
+  cv.width = sw; cv.height = sh;
+  cv.getContext('2d').drawImage(c.pic || c, c.sx || 0, c.sy || 0, sw, sh, 0, 0, sw, sh);
+  const url = cv.toDataURL();
+  if (portraits.size > 200) portraits.clear();
+  portraits.set(body.yvKey, url);
+  return url;
+}
+function membersOf(W, team) {
+  const list = (W.raid ? W.bodies : W.bodies.filter(b => b.team === team && !b.troop && !b.cmdr)).filter(b => b.cls);
+  if (team === 0) list.push(W.hero);
+  const cp = b => { const sp = specOf(W, b); return sp ? sp.cp : 0; };
+  return list.sort((a, b) => (b.rank ? 6 - b.rank : 0) - (a.rank ? 6 - a.rank : 0) || cp(b) - cp(a));
+}
+function starHtml(W, b) {
+  return b.rank ? `<b class="sb-star" style="color:${RANK_COL[b.rank - 1]}" title="${W.raid ? '공격대' : '문파'} 전투력 ${b.rank}위">★${b.rank}</b>` : '';
+}
+function membersHtml(W) {
+  const teams = W.raid ? [0] : teamsOf(W);
+  if (!teams.includes(sbTeam)) sbTeam = 0;
+  const pick = teams.length > 1 ? `<div class="sb-teams">${teams.map(t => `<button data-team="${t}" class="${t === sbTeam ? 'on' : ''}" style="color:${W.teams[t].color}">${W.teams[t].name}${W.raid ? '' : ' 문파'}${t === 0 ? ' (우리)' : ''}</button>`).join('')}</div>` : '';
+  const cards = membersOf(W, sbTeam).map(b => {
+    const sp = specOf(W, b), T = sp && AI_TIERS[sp.tier], dead = b.hero ? A.G().dead : b.dead;
+    const hp = b.hero ? A.G().player.hp / A.G().player.maxHp : b.hp / b.maxHp;
+    const src = portraitOf(W, b);
+    return `<div class="sb-card${b.hero ? ' me' : ''}${dead ? ' dead' : ''}" data-who="${b.hero ? -1 : b.id}">
+      ${src ? `<img src="${src}">` : '<i></i>'}
+      <div class="nm">${b.name}${starHtml(W, b)}</div>
+      <div>${T ? `<span style="color:${T.col}">${T.short}</span> · ` : ''}${b.cls.name} · ${ROLES[b.role] ? ROLES[b.role].name : ''}</div>
+      <div>Lv${sp ? sp.lv : '?'} · ${sp ? sp.promo : 0}차 · ${sp ? sp.cp.toLocaleString() : ''}</div>
+      <div class="hp"><span style="width:${Math.round(clamp(hp, 0, 1) * 100)}%"></span></div>
+      <div class="st">${dead ? '전사' : b.leader ? '분대장' : ''}</div>
+    </div>`;
+  }).join('');
+  return `${pick}<div class="sb-cards">${cards}</div><div class="sb-tip">카드를 누르면 상태창이 열립니다.</div>`;
+}
+function statusHtml(W, b) {
+  const G = A.G(), sp = specOf(W, b), T = sp && AI_TIERS[sp.tier], s = scoreOf(W, b).s || {};
+  const hp = b.hero ? [G.player.hp, G.player.maxHp] : [b.hp, b.maxHp];
+  const dead = b.hero ? G.dead : b.dead;
+  const src = portraitOf(W, b);
+  const rows = [
+    ['등급', T ? `<span style="color:${T.col}">${T.name}</span>` : '-'],
+    ['칭호', b.rank ? `${W.raid ? '공격대' : (W.teams[b.team] ? W.teams[b.team].name + ' 문파' : '문파')} 전투력 ${b.rank}위 ${starHtml(W, b)}` : '-'],
+    ['직업', `${b.cls.name} · ${ROLES[b.role] ? ROLES[b.role].name : ''}${b.leader ? ' · 분대장' : ''}`],
+    ['레벨', `Lv${sp ? sp.lv : '?'} · ${sp ? sp.promo : 0}차 승급${sp && sp.sl ? ` · 기술 ${sp.sl}단` : ''}`],
+    ['전투력', sp ? sp.cp.toLocaleString() : '-'],
+    ['체력', dead ? '<span style="color:#ff7a6a">전사</span>' : `${A.shownNum(Math.max(0, hp[0]))} / ${A.shownNum(hp[1])}`],
+    ['성향', sp && sp.play ? sp.play : '-'],
+    ['장비', sp && sp.gear ? sp.gear : '-'],
+  ];
+  const kit = (b.hero ? [] : b.skills || []).map(k => {
+    const d = k.d || SKILLS[k.id] || {};
+    const kind = { aoe: '광역', single: '단일', buff: '강화', shield: '보호' }[k.kind] || '';
+    return `<span class="sk">${d.name || k.id}<small>${kind}</small></span>`;
+  }).join('');
+  const rec = `피해 ${A.shownNum(s.dmg || 0)} · 회복 ${A.shownNum(s.heal || 0)} · 받은 피해 ${A.shownNum(s.taken || 0)} · 처치/사망/도움 ${Math.round(s.kills || 0)}/${s.deaths || 0}/${Math.round(s.assists || 0)}`;
+  return `<div class="sb-stat">
+    <div class="pic">${src ? `<img src="${src}">` : ''}<div class="nm">${b.name}${starHtml(W, b)}</div></div>
+    <div class="info"><table>${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>
+      ${kit ? `<div class="kit"><b>쓰는 기술</b>${kit}</div>` : ''}
+      <div class="rec"><b>이번 전투</b> ${rec}</div>
+      <button data-back="1">← 목록</button></div>
+  </div>`;
 }
 
 /**
@@ -5781,7 +5918,7 @@ async function startJaeng(cls, role, opts = {}) {
   const boss = raid.boss || {};
   const stage = {
     ...raid, raid: false, jaeng: true, id: 'jaeng_' + raid.id, raidId: raid.id, name: `쟁 · ${boss.name || raid.name}`, war: def, terrain: 'war',
-    music: 'raid_' + raid.id, intro: `${def.name}에 ${boss.name || raid.name}이(가) 봉인되어 있다. 세 길드가 보스를 두고 다툰다.`, pages: raid.pages || [],
+    music: 'raid_' + raid.id, intro: `${def.name}에 ${boss.name || raid.name}이(가) 봉인되어 있다. 세 문파가 보스를 두고 다툰다.`, pages: raid.pages || [],
   };
   pendingWar = { def, role: ROLES[role] ? role : 'dps', side: 'atk', idle: !!opts.idle, looks: sessionLooks, jaeng: { wk, raid, practice: !!opts.practice, aiOnly: !!opts.aiOnly } };
   A.startRun(cls, stage);
@@ -6035,9 +6172,9 @@ function bossDown(W, e, team) {
   A.bossSay('death');
   A.audio().play('kill');
   const who = team >= 0 ? W.teams[team].name : '?';
-  W.feed.push({ t: G.t, a: who + ' 길드', at: team, b: G.boss.name, bt: -1, big: true, gold: true });
-  A.banner(`${who} 길드 막타! ${G.boss.name} 처치`);
-  A.say(`${who} 길드가 ${G.boss.name}에게 마지막 일격을 넣었습니다! (+${JAENG.pts.last})`, team === 0 ? 'sys' : 'warn');
+  W.feed.push({ t: G.t, a: who + ' 문파', at: team, b: G.boss.name, bt: -1, big: true, gold: true });
+  A.banner(`${who} 문파 막타! ${G.boss.name} 처치`);
+  A.say(`${who} 문파가 ${G.boss.name}에게 마지막 일격을 넣었습니다! (+${JAENG.pts.last})`, team === 0 ? 'sys' : 'warn');
   // The rest of the field falls with it.
   for (const o of G.enemies.slice()) if (!o.war && o.hp > 0) { o.hp = 0; mobDown(o); }
   A.later(2.4, () => jaengEnd(W, `${G.boss.name} 처치 · ${clock(W.killT)}`));
@@ -6494,7 +6631,7 @@ function finishJaeng(W, win, why) {
   document.getElementById('levelup').hidden = true;
   G.choosing = false;
   A.audio().play(place === 0 ? 'levelup' : 'lose');
-  A.say(`쟁 종료 — ${W.teams[win].name} 길드 1위 (${why}). 우리 길드 ${place + 1}위`, place === 0 ? 'sys' : 'warn');
+  A.say(`쟁 종료 — ${W.teams[win].name} 문파 1위 (${why}). 우리 문파 ${place + 1}위`, place === 0 ? 'sys' : 'warn');
   setTimeout(() => showResult(W), 1400);
 }
 
@@ -6611,7 +6748,7 @@ function jaengGoal(W) {
   const mine = W.seals.filter(s => s.owner === 0).length, lead = W.teamIds.filter(t => t !== 0).reduce((a, t) => (W.score[t] > W.score[a] ? t : a), 1);
   const pk = `PK ${Math.round(W.pts[0].pk)}점`;
   if (W.jphase === 'gather') return `목표: ${clockWords(Math.max(0, Math.ceil(JAENG.gather - W.t)))} 뒤 봉인석으로 · 봉인석 하나마다 보스 피해 +${Math.round(JAENG.sealBuff * 100)}%`;
-  if (W.jphase === 'seal') return `목표: 봉인석 차지 (우리 ${mine}/3, 초당 ${JAENG.pts.seal}점) · 다른 길드를 끊으면 처치 +${JAENG.pts.kill} · ${pk}`;
+  if (W.jphase === 'seal') return `목표: 봉인석 차지 (우리 ${mine}/3, 초당 ${JAENG.pts.seal}점) · 다른 문파를 끊으면 처치 +${JAENG.pts.kill} · ${pk}`;
   const share = Math.round(W.bossDmg[0] / (W.bossMax || 1) * 100);
   const ahead = W.score[lead] > W.score[0];
   return `목표: 보스 딜 몫 ${share}% (합 ${JAENG.pts.boss}점) · 막타 +${JAENG.pts.last}${ahead ? ` · ${W.teams[lead].name} 견제(앞섬 +${Math.round(W.score[lead] - W.score[0])})` : ''} · ${pk}`;
@@ -6650,9 +6787,9 @@ function jaengCard(cls, pr) {
   const gate = (A.SINSU_GATE[wk.sinsu] || [])[0], open = !gate || (pr.raids || {})[gate];
   return {
     jaeng: true, id: 'jaeng', name: '쟁', title: `월드 보스 · ${boss}`, locked, practice: !left, wk,
-    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 길드(${bigOn('jaeng') ? 16 : 12}명씩)가 다툰다. ${clockWords(JAENG.bossAt)} 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. ${clockWords(JAENG.time)}이면 보스가 달아난다.`,
+    desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 문파(${bigOn('jaeng') ? 16 : 12}명씩)가 다툰다. ${clockWords(JAENG.bossAt)} 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. ${clockWords(JAENG.time)}이면 보스가 달아난다.`,
     more: `이번 주 보상 ${left}/${JAENG_PAID}회 남음 (월요일 초기화) · 보상: 레이드주화 · ${open ? A.MATS[wk.sinsu].name : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[wk.sinsu].name})`} · 전 · 1위 보스 상자(${boss} 세트 한 부위 50%, 코디 30%) · 막타 상자`
-      + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 길드대항전에서 한 번 이기면 열린다</b>' : ''),
+      + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 문파대항전에서 한 번 이기면 열린다</b>' : ''),
   };
 }
 function jaengCardHtml(cls, pr) {
@@ -6763,8 +6900,8 @@ function showJaengResult(W) {
     <div class="wr-stage" style="${hud('ui_light02') ? `background-image:url(${hud('ui_light02')})` : ''}">
       <img class="wr-hero" src="${heroShot(G) || A.heroPicture(G.cls)}" alt="">
       ${hud(won ? 'ui_attack_result_win' : 'ui_attack_result_lose') ? `<img class="wr-flag" src="${hud(won ? 'ui_attack_result_win' : 'ui_attack_result_lose')}" alt="">` : ''}</div>
-    <div class="wr-sub">${W.def.title} — ${r.why}<br>내 기여: 길드 ${r.rank}위 · ${ROLES[W.role].name} · 등급 <b class="wr-tier">${r.tier}</b> <small>(같은 역할 중간의 ×${r.tierK.toFixed(2)}${W.afkT > 1 ? ` · 자리비움 ${Math.round(W.afkT)}초` : ''})</small></div>
-    <table class="jr-guilds"><tr><th>순위</th><th>길드</th><th>점수</th><th>보스 몫</th><th>보스</th><th>막타</th><th>봉인</th><th>PK</th><th>끊기</th><th>부하</th></tr>${rows}</table>
+    <div class="wr-sub">${W.def.title} — ${r.why}<br>내 기여: 문파 ${r.rank}위 · ${ROLES[W.role].name} · 등급 <b class="wr-tier">${r.tier}</b> <small>(같은 역할 중간의 ×${r.tierK.toFixed(2)}${W.afkT > 1 ? ` · 자리비움 ${Math.round(W.afkT)}초` : ''})</small></div>
+    <table class="jr-guilds"><tr><th>순위</th><th>문파</th><th>점수</th><th>보스 몫</th><th>보스</th><th>막타</th><th>봉인</th><th>PK</th><th>끊기</th><th>부하</th></tr>${rows}</table>
     ${medals}
     ${tables(W, r.rows)}
     <div class="row" style="justify-content:center;display:flex;gap:8px"><button class="btn" id="wr-again">다시 출전</button><button class="btn" id="wr-town">마을로</button></div>`;
