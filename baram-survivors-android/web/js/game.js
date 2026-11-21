@@ -7343,7 +7343,9 @@ function cast(skill, st) {
       // everywhere (in a war or a raid, and for the shared 누리의 기원, it was the small one, a ring
       // lost under the hero among the field's blows).
       const hfx = casterBig(fxReach, 'heal', skill.lv) || fxid;
-      if (hfx) addFx(hfx, 0, -26, { follow: true });
+      // (연's own big 기원 pictures — 운공체식's water sphere — drawn at their size were two and a half
+      // heroes high round a hero who heals every few seconds: about one and a half now.)
+      if (hfx) addFx(hfx, 0, -26, { follow: true, scale: hfx !== fxid && /^y_/.test(hfx) ? 0.65 : 1 });
       audio.play('skill_' + skill.id, def.kind, skill.lv);
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
@@ -13111,6 +13113,10 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   // The 용무기 제십 after its 천상 각성 (선계의 기운): 선계's light (items.js HEAVEN_DRESS).
   if (!window.__noDress && gear && !gear.weaponSp && gear.weapon >= 0 && gear.weapon === dragonTier(cls)
     && heavenOn(cls.id) && starOf(cls, `weapon:${gear.weapon}`) >= DRAGON_MAX) dz = HEAVEN_DRESS;
+  // A 코디 weapon look worn over it (costume.js) is that look's own colours: the weapon's dress
+  // (청룡신검's blue, an abyss's black and red) belongs to the weapon's own picture, not to the look
+  // put on in its place (a 진일염화검 look over 청룡신검 came out in the dragon's blue).
+  if (dz && gear.cos && gear.cos.weapon && want.weapon === 'c' + gear.cos.weapon) dz = null;
   // The original's own piece worn (an "s_" layer) is not recoloured as its stand-in would be.
   if (dz && dz.standIn && want.weapon && want.weapon.startsWith('s_')) dz = null;
   // The 창술사's long spear (laid or 연's own): fewer, smaller fire tongues, so its line still reads.
