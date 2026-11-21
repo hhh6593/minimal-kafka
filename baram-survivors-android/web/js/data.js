@@ -1474,7 +1474,7 @@ export const ULT_TIERS = {
   archer: [
     ult('archer', 'a_ult', '일환탄시', { mech: 'barrage', cast: 'k_a_ult', castSize: 200, shot: 'k_u_a_whip', shotScale: 2.4, hit: 'k_a_shot', n: 3, boss: 'a_aim', k: 1 }),
     ult('archer', 'a_allwhirl', '폭풍화우', { mech: 'vortex', main: 'k_a_allwhirl', burst: 'k_u_a_tornado', burstSize: 300, hit: 'h_hit_attack', hold: 1.2, boss: 'a_bomb', k: 1.15 }),
-    ult('archer', 'a_eagle', '독수리소환', { mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 1.6, lift: 70, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
+    ult('archer', 'a_eagle', '독수리소환', { mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 2.4, lift: 90, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
     ult('archer', 'a_blood5', '투혈오식', { mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
   ],
   lancer: [
@@ -1499,7 +1499,7 @@ export const ULT_TIERS = {
     ult('celestial', 'cl_ult', '전의상실', { mech: 'mark', cast: 'k_cl_ult', frac: 0.6, main: 'k_u_cl_loss', hit: 'k_u_cl_losshit', stun: 0.8, delay: 1.0, boss: 'cl_moment', k: 1 }),
     ult('celestial', 'cl_thunder', '뇌격룡', { mech: 'chain', cast: 'k_u_cl_dragon', castStages: false, frac: 0.95, main: 'k_x_cl_thunder_2', markScale: 0.5, shot: 'h_hit_light', stun: 0.4, boss: 'cl_acumen', k: 1.15 }),
     ult('celestial', 'cl_tiger', '범아귀', { mech: 'dash', cast: 'k_u_cl_speed', castSize: 150, main: 'k_cl_tiger', mainSize: 170, hit: 'h_hit_tiger', n: 8, boss: 'cl_ego', k: 1.3 }),
-    ult('celestial', 'cl_reindeer', "강림술'신록", { mech: 'totem', main: 'k_cl_reindeer', mainScale: 1.6, lift: 40, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
+    ult('celestial', 'cl_reindeer', "강림술'신록", { mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
   ],
   dokkaebi: [
     ult('dokkaebi', 'dk_ult', '금나와라,뚝딱', { mech: 'rain', cast: 'k_dk_ult', castSize: 200, drop: 'k_u_dk_gold', dropSize: 110, hit: 'k_dk_goldhit', boss: 'dk_punish', k: 1 }),
