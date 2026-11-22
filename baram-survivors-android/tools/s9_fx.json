@@ -1742,47 +1742,835 @@
  },
  "rp_lotus": {
   "src": "gif2662/IMG81.gif",
-  "mode": "diff",
+  "mode": "parts",
+  "key": "unmix",
   "bg": 0,
-  "frames": [
-   3,
-   45,
-   2
+  "k": 100,
+  "cell": [
+   116,
+   120
   ],
-  "box": [
-   312,
-   336,
-   410,
-   442
+  "origin": [
+   58,
+   66
   ],
-  "t0": 26,
-  "t1": 90,
+  "cells": [
+   [
+    {
+     "f": 3,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 7,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 9,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 11,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 13,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 15,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 17,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 19,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 21,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 23,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 25,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 27,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 29,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 31,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 33,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 35,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 37,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 39,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 41,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 43,
+     "at": [
+      355,
+      382
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -58,
+         -66,
+         58,
+         54
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ]
+  ],
+  "disc": 56,
+  "despeck": 4,
   "ms": 80,
-  "anchor": [
-   0.5,
-   0.85
-  ],
-  "why": "황천화's lotus, the lone one at the field's edge (2662 IMG81, still camera)"
+  "scale": 0.62,
+  "why": "황천화's lotus: the lone one at the field's lower right (2662 IMG81 frames 3-45, every other: the bud, the bloom, its blue ring pulses, sparkle ring and golden powder) — unmix over the clean first frame; the dummy's violet floor ring beside it turned in from the lotus's own round; only its own round (disc)"
  },
  "rp_lotusburst": {
   "src": "gif2662/IMG81.gif",
-  "mode": "diff",
+  "mode": "parts",
+  "key": "unmix",
   "bg": 0,
-  "frames": [
-   46,
-   56,
-   1
+  "k": 100,
+  "cell": [
+   180,
+   180
   ],
-  "box": [
-   262,
-   300,
-   462,
-   480
+  "origin": [
+   90,
+   96
   ],
-  "t0": 26,
-  "t1": 90,
-  "ms": 70,
-  "why": "황천화's lotus bursting (2662 IMG81 frames 46-55)"
+  "cells": [
+   [
+    {
+     "f": 46,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 47,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 48,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 49,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      },
+      {
+       "shift": {
+        "box": [
+         36,
+         -84,
+         64,
+         -6
+        ],
+        "d": [
+         -30,
+         0
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 50,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 51,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 52,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 53,
+     "at": [
+      355,
+      370
+     ],
+     "clip": [
+      -62,
+      -96,
+      90,
+      84
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -90,
+         -96,
+         90,
+         84
+        ]
+       ],
+       "where": [
+        "(b > g + 25) & (r > g + 8) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ]
+  ],
+  "disc": 84,
+  "feather": 18,
+  "despeck": 6,
+  "ms": 75,
+  "scale": 0.62,
+  "why": "황천화's lotus bursting (2662 IMG81 frames 46-53: the great blue bloom, the white rings, the dark-blue smoke, the petals flying, the lotus again) — the lone lotus at the lower right, unmix over the clean first frame; the bystander's heal arcs at its left cleared, the dummy's violet floor ring turned out, only its own round (disc)"
  },
  "cl_cheonsin": {
   "src": "gif2662/IMG54.gif",
@@ -4009,8 +4797,8 @@
   "mode": "cinema",
   "frames": [
    19,
-   45,
-   3
+   44,
+   1
   ],
   "box": [
    0,
@@ -4018,23 +4806,43 @@
    802,
    650
   ],
-  "t0": 45,
-  "t1": 110,
-  "ms": 140,
+  "t0": 22,
+  "t1": 70,
+  "ms": 215,
   "k": 1,
   "max": 420,
   "cap": 420,
-  "hero": [
-   401,
-   295,
-   34,
-   50
+  "bars": 1,
+  "stars": 1,
+  "grow": 13,
+  "white": 240,
+  "plate": [
+   15,
+   32
   ],
-  "field": [
-   401,
-   305,
-   208,
-   234
+  "holeexpr": [
+   "(r > g) & (g > bl) & (r - bl > 30) & (r - bl < 120) & (x > 190) & (x < 610) & (y > 130) & (y < 480)",
+   "(np.abs(r - g) < 14) & (np.abs(g - bl) < 16) & (np.maximum(r, bl) > 60) & (x > 190) & (x < 610) & (y > 150) & (y < 480)",
+   "(bl > 190) & (g > 160) & (r < 200) & (x > 190) & (x < 610) & (y > 120) & (y < 480)"
+  ],
+  "fillell": [
+   [
+    396,
+    505,
+    24,
+    48
+   ],
+   [
+    398,
+    228,
+    30,
+    30
+   ]
+  ],
+  "vignette": [
+   1.0,
+   0.99,
+   0.12
   ],
   "mask": [
    {
@@ -4051,18 +4859,53 @@
    },
    {
     "box": [
-     251,
      0,
-     551,
-     34
+     0,
+     1,
+     1
     ],
-    "from": [
+    "ellipse": [
+     112,
+     375,
+     42,
+     80,
+     0.4
+    ]
+   },
+   {
+    "box": [
      0,
-     36
+     0,
+     1,
+     1
+    ],
+    "ellipse": [
+     401,
+     330,
+     34,
+     52,
+     0.5
     ]
    }
   ],
-  "why": "명계의회랑: the 원작 궁극's full-screen art (2662 IMG84 frames 18-47); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+  "why": "명계의회랑: the 원작 궁극's art (2662 IMG84 frames 19-31 and 43 (eleven of them; the violet floods of 34-40 left out): the underworld corridor of grave-posts and signboards, the blue soul flames, and in its middle the great violet-white X of scythe strokes over the black void) — its black see-through; the damage numbers, hit stars and life bars over it taken from the other frames where that place was clear (the art stands still), the dummies' stakes, the hero and the bystander below filled from the art round them; the other player at the left and the COMBO label out, faded towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)",
+  "despeck": 60,
+  "skip": [
+   20,
+   24,
+   28,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42
+  ]
  },
  "l_ult9": {
   "src": "gif2662/IMG92.gif",
@@ -11586,5 +12429,174 @@
   "despeck": 25,
   "despeckfaint": 8,
   "why": "마력폭풍: the bolt of 마력 coming down (2662 IMG60 frames 30-33, the single blue bolt over the hero), unmix over the clean frame 39, kept along the bolt only; its foot faded where the hero's costume begins (the game stands it on the struck one)"
+ },
+ "rp_bisa": {
+  "src": "gif2662/IMG79.gif",
+  "mode": "parts",
+  "key": "unmix",
+  "bgmed": [
+   45,
+   22
+  ],
+  "k": 110,
+  "cell": [
+   160,
+   160
+  ],
+  "origin": [
+   80,
+   80
+  ],
+  "cells": [
+   [
+    {
+     "f": 63,
+     "at": [
+      362,
+      392
+     ],
+     "clip": [
+      -80,
+      -46,
+      80,
+      80
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         10,
+         -46,
+         80,
+         30
+        ]
+       ],
+       "where": [
+        "(np.abs(r - g) < 28) & (np.abs(g - b) < 25) & (d > 18) & (mx < 200)"
+       ],
+       "grow": 2
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 64,
+     "at": [
+      362,
+      392
+     ],
+     "clip": [
+      -80,
+      -80,
+      80,
+      80
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         22,
+         -70,
+         72,
+         12
+        ]
+       ],
+       "where": [
+        "(np.abs(r - g) < 28) & (np.abs(g - b) < 25) & (d > 18) & (mx < 200)"
+       ],
+       "grow": 2,
+       "angles": [
+        25,
+        -25,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "feather": 14,
+  "disc": 76,
+  "despeck": 8,
+  "ms": 110,
+  "scale": 0.62,
+  "why": "비사검: a crescent of 살극의 기 swinging round and closing into a red ring on the ground (2662 IMG79 frames 63-64, at the lower right where it passes over open ground — the one place of the scene where it is not under the caster, the red ghost, the dummies and the numbers) — unmix over the field put together from all the frames (each pixel's median where it looked like the floor); what is grey in it (a dummy's stake, the caster's scythe stroke) turned in from the ring's own round, the stroke above cut off (feathered), only its own round (disc)"
+ },
+ "rp_jeol": {
+  "src": "gif2662/IMG77.gif",
+  "mode": "parts",
+  "key": "bluediff",
+  "bgmed": [
+   45,
+   22
+  ],
+  "t0": 14,
+  "t1": 50,
+  "bt": [
+   4,
+   28
+  ],
+  "white": 165,
+  "cell": [
+   180,
+   150
+  ],
+  "origin": [
+   90,
+   75
+  ],
+  "cells": [
+   [
+    {
+     "f": 5,
+     "at": [
+      268,
+      248
+     ],
+     "clip": [
+      -62,
+      -70,
+      90,
+      0
+     ],
+     "feather": [
+      10,
+      10,
+      10,
+      0
+     ],
+     "ops": []
+    },
+    {
+     "f": 5,
+     "at": [
+      268,
+      248
+     ],
+     "flipv": true,
+     "clip": [
+      -62,
+      0,
+      90,
+      70
+     ],
+     "feather": [
+      10,
+      0,
+      10,
+      10
+     ],
+     "ops": []
+    }
+   ]
+  ],
+  "despeck": 8,
+  "ms": 70,
+  "scale": 0.62,
+  "why": "절섬: the great blue crescent swept out before the caster (2662 IMG77 frame 5) — unmix over the field put together from all the frames; its upper half (over open ground; the lower lies under the hit stars, the numbers and the bars of the two dummies it cuts) and the same half mirrored below its own axis: the crescent is that shape about it; the struck dummy's stake behind it out"
  }
 }

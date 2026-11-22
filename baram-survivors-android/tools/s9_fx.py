@@ -39,7 +39,12 @@ here: each frame is the client's own pixels, taken off their backdrop:
                   "bluediff" — a blue effect over a still field: moved from "bg" and blue over red ("bt").
                 A part's "unnum" [[x0, y0, x1, y1] …] (relative to "at"): the damage numbers there painted over from
                 the frame round them before keying.
-  mode "cinema" also takes "stars" (the hit stars' orange taken out with the numbers) and "vignette" [rx, ry, soft] (shares of the half width/height): the art faded out towards an
+  A part's or entry's "bgmed" [most saturation, most red over green]: the clean field put together from all the frames (each
+                pixel's median where it looked like the grey-brown floor) — for a scene with no clear frame round the caster
+                (비사검, 절섬). "feather" may be [left, top, right, bottom] (0 on a side that meets a mirrored half).
+  mode "cinema" also takes "plate" [f0, f1] (a pixel under a number, star or bar taken from those frames where it was clear —
+                the still art's own, not a blur), "holeexpr" (numpy exprs over r, g, bl, x, y: bodies standing in every frame),
+                "fillell" [[cx, cy, rx, ry] …] (bystanders), "despeck" (lone specks out), and "stars" (the hit stars' orange taken out with the numbers) and "vignette" [rx, ry, soft] (shares of the half width/height): the art faded out towards an
                 ellipse's edge, for a cinematic drawn smaller than the screen (no hard rectangle of art on the field).
 Each entry: src, mode, frames [start, end, step] (default all; "skip" [frame …] left out), box [x0, y0, x1, y1], bg (frame
 index, diff), t0/t1 (diff ramp), mask [[x0, y0, x1, y1] ...], half (halve the size: the client draws
@@ -164,6 +169,9 @@ def unnum(a, boxes, at):
     return out
 
 
+_BGMED = {}
+
+
 def keyed(frames, i, e, part=None):
     part = part or {}
     a = np.asarray(frames[i].convert("RGB")).astype(np.float32)
@@ -216,6 +224,21 @@ def keyed(frames, i, e, part=None):
         F[al <= 0] = 0
         return np.dstack([F, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    bm = part.get("bgmed", e.get("bgmed"))
+    if bm:
+        # (no frame of the scene is clear round the caster — 비사검's ring turns round it the whole time: the field put
+        # together as each pixel's median over all the frames where it looked like the floor, grey-brown — "bgmed"
+        # [most saturation, most red over green])
+        ck_ = (id(frames), tuple(bm))
+        if ck_ not in _BGMED:
+            import warnings
+            A_ = np.stack([np.asarray(f_.convert("RGB")) for f_ in frames]).astype(np.float32)
+            ok_ = ((A_.max(-1) - A_.min(-1)) < bm[0]) & ((A_[..., 0] - A_[..., 1]) < bm[1])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                med_ = np.nanmedian(np.where(ok_[..., None], A_, np.nan), axis=0)
+            _BGMED[ck_] = np.where(np.isnan(med_), np.median(A_, axis=0), med_).astype(np.float32)
+        bg = _BGMED[ck_]
     for fi, x0, y0, x1, y1 in part.get("bgpatch", e.get("bgpatch", [])):
         # (the clean field put together: a box of it from another frame of the same still camera, where someone stood
         # in "bg" — 순보선풍's caster before the leap)
@@ -750,6 +773,67 @@ def keyed(frames, i, e, part=None):
     return diffed(frames[i], frames[part.get("bg", e.get("bg", 0))], part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 70)))
 
 
+def cinema_hole(f, e):
+    """mode "cinema": the frame (turned where "turn" says) and its hole — what is not the art (numbers, stars, bars,
+    the hero, "holeexpr" bodies, "fillell" bystanders)."""
+    from PIL import ImageFilter
+    a = np.asarray(f.convert("RGB")).astype(np.float32)
+    if e.get("turn"):
+        # a vortex round the hero is the same turned half round: the part the damage numbers cover
+        # ("box") is the frame's own art from the other side of the hero ("at"), turned 180°
+        cx, cy = e["turn"]["at"]
+        x0, y0, x1, y1 = e["turn"]["box"]
+        a = a.copy()
+        a[y0:y1, x0:x1] = a[2 * cy - y1 + 1:2 * cy - y0 + 1, 2 * cx - x1 + 1:2 * cx - x0 + 1][::-1, ::-1]
+    r, g, bl = a[..., 0], a[..., 1], a[..., 2]
+    digit = (bl > 170) & (r < 120) & (bl - r > 90)
+    if e.get("cyan"):
+        # (천변지이's cyan lightning is as blue as the digits' highlights: out of the columns of numbers — the
+        # "cyan" box [x0, y0, x1, y1] they stand in — a green-blue is the lightning, not a number)
+        cx0, cy0, cx1, cy1 = e["cyan"]
+        yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+        cols = (xx0 >= cx0) & (xx0 < cx1) & (yy0 >= cy0) & (yy0 < cy1)
+        digit &= ~((g >= bl - 50) & ~cols)
+    hole = digit | (a.min(axis=2) > e.get("white", 225))
+    if e.get("bars"):  # the life bars' green and the DEAD labels' red over the field
+        hole |= ((g > 140) & (r < 110) & (bl < 110)) | ((r > 150) & (g < 40) & (bl < 40))
+    if e.get("stars"):  # the hit stars' orange round the damage numbers (질풍난무: not the bamboo's yellow)
+        hole |= (r > 190) & (g < 170) & (bl < 100) & (r - g > 60)
+        if e.get("stars") == 2 and e.get("field"):
+            # (and their darker rims, where the dummies stood: the golden bolts there are greener)
+            fcx, fcy, frx, fry = e["field"]
+            yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+            infield = ((xx0 - fcx) / frx) ** 2 + ((yy0 - fcy) / fry) ** 2 <= 1
+            if e.get("cyan"):
+                infield = infield | cols
+            hole |= (r > 90) & (g < 160) & (r - g > 35) & (bl < 120) & infield
+    if e.get("cyan"):
+        # (the numbers, stars and bars stand only in their columns: the waves' white crests and the lightning
+        # outside them are the art's own — filled with grey they made the art pale); "holebox": UI text
+        hole &= cols
+        for x0_, y0_, x1_, y1_ in e.get("holebox", []):
+            hole[y0_:y1_, x0_:x1_] |= a[y0_:y1_, x0_:x1_].min(axis=2) > 150
+    hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
+    if e.get("hero"):
+        cx, cy, rx, ry = e["hero"]
+        yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+        hole |= ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+    if e.get("holeexpr") or e.get("fillell"):
+        # (bodies that stand in every frame — the dummies' wooden stakes ("holeexpr" over r, g, bl, x, y) and
+        # bystanders ("fillell" [[cx, cy, rx, ry] …]) — filled from the art round them as the numbers are)
+        from scipy import ndimage
+        yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+        hm = np.zeros(hole.shape, bool)
+        for ex in e.get("holeexpr", []):
+            hm |= eval(ex, {}, {"r": r, "g": g, "bl": bl, "x": xx, "y": yy, "np": np})
+        hm = ndimage.binary_dilation(hm, iterations=e.get("holegrow", 2))
+        for cx, cy, rx, ry in e.get("fillell", []):
+            hm |= ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+        hole |= hm
+
+    return a, hole
+
+
 def parts_cells(frames, e):
     """mode "parts": each frame's cell put together from parts of the capture (see the module's notes)."""
     cw, ch = e["cell"]
@@ -1019,8 +1103,11 @@ def parts_cells(frames, e):
                 # (the part's own cut edges faded over fe px — a clip line inside the cell, not on its edge, ends softly)
                 src = src.copy()
                 hh, ww = src.shape[:2]
-                rx = np.minimum(np.arange(ww), np.arange(ww)[::-1]).clip(0, fe) / fe
-                ry = np.minimum(np.arange(hh), np.arange(hh)[::-1]).clip(0, fe) / fe
+                # (or [left, top, right, bottom], 0 for a side that meets another part — a mirrored half's axis)
+                fl, ft, fr, fb = fe if isinstance(fe, list) else (fe, fe, fe, fe)
+                ramp = lambda n, k: (np.arange(n).clip(0, k) / k) if k else np.ones(n)
+                rx = np.minimum(ramp(ww, fl), ramp(ww, fr)[::-1])
+                ry = np.minimum(ramp(hh, ft), ramp(hh, fb)[::-1])
                 src[..., 3] = (src[..., 3] * np.minimum(rx[None, :], ry[:, None])).astype(src.dtype)
             cx0, cy0 = fx0 - ax + ox, fy0 - ay + oy
             dst = cell[cy0:cy0 + src.shape[0], cx0:cx0 + src.shape[1]]
@@ -1139,47 +1226,28 @@ def build(spec, src_dir, out_dir, only=None):
                 # its black (the client's darkening) see-through; the damage numbers (blue digits) and the hero in
                 # the middle filled from the art round them (a normalised blur), not drawn over
                 from PIL import ImageFilter
-                a = np.asarray(f.convert("RGB")).astype(np.float32)
-                if e.get("turn"):
-                    # a vortex round the hero is the same turned half round: the part the damage numbers cover
-                    # ("box") is the frame's own art from the other side of the hero ("at"), turned 180°
-                    cx, cy = e["turn"]["at"]
-                    x0, y0, x1, y1 = e["turn"]["box"]
-                    a = a.copy()
-                    a[y0:y1, x0:x1] = a[2 * cy - y1 + 1:2 * cy - y0 + 1, 2 * cx - x1 + 1:2 * cx - x0 + 1][::-1, ::-1]
+                a, hole = cinema_hole(f, e)
                 r, g, bl = a[..., 0], a[..., 1], a[..., 2]
-                digit = (bl > 170) & (r < 120) & (bl - r > 90)
-                if e.get("cyan"):
-                    # (천변지이's cyan lightning is as blue as the digits' highlights: out of the columns of numbers — the
-                    # "cyan" box [x0, y0, x1, y1] they stand in — a green-blue is the lightning, not a number)
-                    cx0, cy0, cx1, cy1 = e["cyan"]
-                    yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
-                    cols = (xx0 >= cx0) & (xx0 < cx1) & (yy0 >= cy0) & (yy0 < cy1)
-                    digit &= ~((g >= bl - 50) & ~cols)
-                hole = digit | (a.min(axis=2) > e.get("white", 225))
-                if e.get("bars"):  # the life bars' green and the DEAD labels' red over the field
-                    hole |= ((g > 140) & (r < 110) & (bl < 110)) | ((r > 150) & (g < 40) & (bl < 40))
-                if e.get("stars"):  # the hit stars' orange round the damage numbers (질풍난무: not the bamboo's yellow)
-                    hole |= (r > 190) & (g < 170) & (bl < 100) & (r - g > 60)
-                    if e.get("stars") == 2 and e.get("field"):
-                        # (and their darker rims, where the dummies stood: the golden bolts there are greener)
-                        fcx, fcy, frx, fry = e["field"]
-                        yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
-                        infield = ((xx0 - fcx) / frx) ** 2 + ((yy0 - fcy) / fry) ** 2 <= 1
-                        if e.get("cyan"):
-                            infield = infield | cols
-                        hole |= (r > 90) & (g < 160) & (r - g > 35) & (bl < 120) & infield
-                if e.get("cyan"):
-                    # (the numbers, stars and bars stand only in their columns: the waves' white crests and the lightning
-                    # outside them are the art's own — filled with grey they made the art pale); "holebox": UI text
-                    hole &= cols
-                    for x0_, y0_, x1_, y1_ in e.get("holebox", []):
-                        hole[y0_:y1_, x0_:x1_] |= a[y0_:y1_, x0_:x1_].min(axis=2) > 150
-                hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
-                if e.get("hero"):
-                    cx, cy, rx, ry = e["hero"]
-                    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
-                    hole |= ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+                if e.get("plate"):
+                    # (the art stands still while the numbers rise over it: a covered pixel from the other frames of
+                    # "plate" [f0, f1] where it was clear — the median of those — the original's own art, not a blur;
+                    # what is covered in all of them (the hero, a bystander) still filled by the blur below)
+                    if "_plate" not in e:
+                        import warnings
+                        stack, okm = [], []
+                        for fi in range(*e["plate"]):
+                            a2, h2 = cinema_hole(frames[fi], e)
+                            stack.append(a2)
+                            okm.append(~h2)
+                        O = np.stack(okm)
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            med = np.nanmedian(np.where(O[..., None], np.stack(stack), np.nan), axis=0)
+                        e["_plate"] = (np.nan_to_num(med), O.sum(0))
+                    med, cnt = e["_plate"]
+                    use = hole & (cnt >= e.get("platemin", 1))
+                    a = np.where(use[..., None], med, a)
+                    hole = hole & ~use
                 keep = (~hole).astype(np.float32)
                 num = np.dstack([a[..., c] * keep for c in range(3)])
                 rad = e.get("blur", 14)
@@ -1279,6 +1347,13 @@ def build(spec, src_dir, out_dir, only=None):
                     tot = np.maximum(A1 + A2, 1e-3)
                     a = (a * A1[..., None] + o_ * A2[..., None]) / tot[..., None]
                     al = np.clip(A1 + A2, 0, 255)
+                if e.get("despeck"):
+                    # (a few dots left alone in the black where a dummy or a digit's rim stood: not the art — out)
+                    from scipy import ndimage
+                    lab, n = ndimage.label(al > 40)
+                    if n:
+                        sz = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
+                        al[np.isin(lab, 1 + np.nonzero(sz < e["despeck"])[0])] = 0
                 a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
                 # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the

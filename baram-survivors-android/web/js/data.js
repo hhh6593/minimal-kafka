@@ -1517,13 +1517,21 @@ const S9 = {
   md_gongjeon: { promo: 9, cls: 'magus', req: 33, name: '공간전도', kind: 'gong9', fx: 'o_md_gongjeon', fxArc: 'o_md_gongarc', dmg: 50, cd: 18, depth: 5, dur: 0.45, k: 0.5,
     endR: 1.5, stun: 3, ck: 'line', pre: 'md_frenetic', branch: 2,
     desc: '바라보는 쪽으로 광폭의 파장을 다섯 칸 내보낸다. 파장은 지나는 길의 몬스터를 밀어내며 진영을 흩뜨리고, 끝에 이르러 둘레의 몬스터를 3초 동안 기절시킨다' },
-  // 차사: 비사검 (아우라), 황천화 (광역·회복)
-  rp_bisa: { promo: 9, cls: 'reaper', req: 33, name: '비사검', kind: 'aura9', fx: 'k_rp_spiral', fxHit: 'h_ml_slash', hit: 16, cd: 12, duration: 4, radius: 1, tick: 0.25,
-    slow: 1, ck: 'nova', pre: 'rp_spiral', branch: 0,
-    desc: '차사의 혼력을 담아 4초 동안 몸 주변에 살극의 기를 내뿜는다. 둘레의 몬스터를 쉴 새 없이 베고 느리게 한다' },
-  rp_hwangcheon: { promo: 9, cls: 'reaper', req: 33, name: '황천화', kind: 'rain', at: 'self', fx: 'o_rp_lotus', noLoop: true, fxCast: 'k_u_rp_redeem', fx2: 'o_rp_lotus', fxBurst: 'o_rp_lotusburst', dmg: 40, cd: 9, radius: 3,
-    drops: 10, dur: 4, k: 0.6, curse: 4, heal: 0.8, mana: 0.01, dropScale: 0.7, ck: 'nova', pre: 'rp_chain', branch: 1,
-    desc: '둘레 일곱 칸 곳곳에 4초 동안 명계의 꽃 황천화를 피운다. 꽃이 터지며 몬스터를 치고 약하게 만들며, 그 기운으로 자신의 체력과 마력이 채워진다' },
+  // 차사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/reaper.md). 시전 2 + 기본공격 + 패시브 1 + 필살기:
+  //   절섬 (기본공격 rp_cut, IMG77: 9차부터 바라보는 쪽 앞 3×3을 푸른 초승달로 베고 곧바로 한 번 더 — jeol9),
+  //   비사검 (IMG79: 4초 동안 0.5초마다 둘레 세 칸 안의 몬스터 둘에게 살극의 기가 날아가 붉은 고리로 닫히며 그와 고리 안을 벤다),
+  //   황천화 (IMG81: 둘레 7×7 곳곳에 명계의 꽃 열 송이가 피어 3.4초 — 꽃가루에 닿은 몬스터는 약해지고(받는 피해 증가), 자신은
+  //     꽃 곁에서 체력·마력이 빠르게 찬다; 끝에 꽃마다 크게 피어 터져 둘레를 친다),
+  //   영혼갈무리 = 패시브, 그림 없음 (설명창 IMG82 [지속효과 마법]: 몬스터를 쓰러뜨릴 때마다 혼력(마력)이 차고 멸살 → 분쇄섬의
+  //     재사용 대기가 준다 — galmuri9).
+  // Pictures at the original's own size (o_rp_*: 0.62 game pixels a capture pixel).
+  rp_bisa: { promo: 9, cls: 'reaper', req: 33, name: '비사검', kind: 'bisa9', fx: 'o_rp_bisa', fxHit: undefined, hit: undefined, dmg: 30, cd: 10, duration: 4, every: 0.5,
+    shots: 2, range: 3, reach: 40, radius: undefined, tick: undefined, slow: undefined, ck: 'nova', pre: 'rp_spiral', branch: 0,
+    desc: '차사의 혼력을 담아 4초 동안 0.5초마다 둘레 세 칸 안의 몬스터 둘에게 살극의 기를 내뿜는다. 살극의 기는 붉은 고리로 닫히며 맞은 몬스터와 고리 안의 몬스터를 벤다' },
+  rp_hwangcheon: { promo: 9, cls: 'reaper', req: 33, name: '황천화', kind: 'hwang9', fx: 'o_rp_lotus', fxBurst: 'o_rp_lotusburst', fxCast: undefined, fx2: undefined,
+    dmg: 60, cd: 15, radius: 3, n: 10, dur: 3.4, touch: 40, tick: 0.5, k: 0.15, burstR: 62, curse: 4, slow: 1, heal: 1.2, mana: 0.012, drops: undefined,
+    dropScale: undefined, noLoop: undefined, ck: 'nova', pre: 'rp_chain', branch: 1,
+    desc: '둘레 일곱 칸 곳곳에 명계의 꽃 황천화 열 송이를 피운다. 꽃가루에 닿은 몬스터는 능력이 크게 떨어지고(받는 피해 증가·느려짐) 조금씩 베이며, 차사는 꽃 곁에서 체력과 마력이 빠르게 찬다. 3.4초 뒤 꽃마다 크게 피어 터지며 둘레를 친다' },
   // 무사·격투가·도깨비 (원작 바람에 없는 연 직업): 9차는 원작의 살수·흑화랑·영술사 9차를 이어받는다. 이들의 연 9차였던
   // 반탄강기·도깨비불 3성은 8차로 (아래), 그 밖의 8차(무형투창·점혈:통·권법의기원·마류귀체)는 그대로.
   // 무사 ← 살수 9차 (낫을 던지고 거두는 근접 암살자 → 창을 던지고 휘두르는 무사): 차원개방 (보조 공격), 이계의침식 (광역),
@@ -1564,10 +1572,11 @@ const S9 = {
   a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'cheon9', fx: 'o_a_cheongung', fxCast: undefined, fxHit: undefined, auraSize: undefined,
     dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
     desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 둘레 3×3의 몬스터를 태운다(화상)' },
-  rp_galmuri: { promo: 9, cls: 'reaper', req: 33, name: '영혼갈무리', kind: 'echo', echo: 'sword', fx: 'k_u_rp_redeem', fx2: 'k_u_rp_reshit', shotSize: 60, fxHit: 'k_u_rp_ring',
-    hit: 16, cd: 17, duration: 10, every: 0.5, shots: 2, range: 5, killCut: 0.125, power: 0.15, buff: 'power', ck: 'buff', pre: 'rp_eye', branch: 2,
-    desc: '10초 동안 혼을 거둔다. 거둔 혼이 가까운 몬스터 둘에게 거듭 날아가고, 몬스터를 쓰러뜨릴 때마다 다른 기술의 재사용 대기가 줄어든다. 그동안 피해가 15% 는다' },
-  rp_cut: { nine: { k: 0.8, at: 0.3 }, desc: '정면을 크게 벤다. 9차 승급부터는 원작 9차의 절섬처럼 곧이어 한 번 더 벤다' },
+  // 절섬 (기본공격, 원작 2662 IMG77; 설명창 IMG76: 쿨 0.75초, 범위 앞 5×5, 사용 후 곧바로 한 번 더 — 두 번째는 같은 피해):
+  // from the 9차 승급 (in 수련장 always) the cut goes only the way the hero faces, over the ground ahead its crescent sweeps (3×3: the scene's crescent passes over two rows of dummies three tiles deep), under the original's
+  // blue crescent (jeol9), and a second follows at once.
+  rp_cut: { nine: { k: 1, at: 0.3 }, jeol9: { fx: 'o_rp_jeol', depth: 3, half: 1, max: 9 },
+    desc: '정면을 크게 벤다. 9차 승급부터는 원작 9차의 절섬처럼 바라보는 쪽 앞 세 칸, 폭 세 칸을 푸른 초승달로 베고, 곧이어 한 번 더 벤다' },
   l_agong: { promo: 9, cls: 'lancer', req: 33, name: '아공간전개', kind: 'aura9', fx: 'o_l_agong', fxHit: 'h_ml_thrust', hit: 9, cd: 16, duration: 8, radius: 2, tick: 0.5,
     ward: 0.4, ck: 'buff', buff: 'shield', pre: 'l_reflect', branch: 2,
     desc: '자신의 자리에 아공간을 8초 동안 펼친다. 아공간 안에서는 몸을 피해 받는 피해가 40% 줄고, 든 몬스터는 공간에 베인다' },
@@ -1653,6 +1662,15 @@ SKILLS.cl_gongmyeong = { name: '천공의공명', kind: 'passive', retired: true
   gong9: { ids: ['cl_storm', 'cl_storm2', 'cl_thunder', 'cl_sunbo'], k: 0.5, reach: 20, max: 8, cut: 0.05, cutMax: 0.4, fx: 'h_hit_light' } };
 SKILL_ALIAS.cl_gongmyeong = 'cl_haeil';
 SKILLS.cl_haeil.desc += '. 9차 패시브 천공의공명: 선풍·뇌격 기술을 쓰면 풍랑의표식이 있는 몬스터에게 뇌우가 내리치고 그 기술이 빨리 돌아온다';
+// 영혼갈무리: a passive in the original ([지속효과 마법], 설명창 IMG82; no scene of it in 2662): every foe the 차사 fells gives back
+// 혼력 (0.2% of its most a foe; here 마력, 0.5% — this game's foes fall by the dozen and its 마력 is small) and brings 멸살 nearer
+// by 0.125 s (멸살 is not in this game: 분쇄섬, the 차사's great cut, in its place). No picture of its own. A saved slot of it is
+// 황천화.
+SKILLS.rp_galmuri = { name: '영혼갈무리', kind: 'passive', retired: true, was: 'reaper', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 몬스터를 쓰러뜨릴 때마다 마력이 최대치의 0.5%만큼 차고, 분쇄섬의 재사용 대기가 0.125초 준다',
+  galmuri9: { mana: 0.005, ids: ['rp_crush'], cut: 0.125 } };
+SKILL_ALIAS.rp_galmuri = 'rp_hwangcheon';
+SKILLS.rp_hwangcheon.desc += '. 9차 패시브 영혼갈무리: 몬스터를 쓰러뜨릴 때마다 마력이 차고 분쇄섬이 빨리 돌아온다';
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect', 'p_seongi']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
 
@@ -1781,7 +1799,7 @@ export const ULT_TIERS = {
     ult('reaper', 'rp_ult', '차사강림', { mech: 'cleaveWave', main: 'k_rp_ult', mainSize: 260, hit: 'k_rp_cut', hitScale: 0.6, after: 'k_u_rp_ring', boss: 'rp_flash', k: 1 }),
     ult('reaper', 'rp_madness', '나선광륜', { echo2: 'k_rp_spiral', auraW: 320, echoCap: 2, aura: 'k_rp_asura', mech: 'rings', main: 'k_rp_madness', mainSize: 260, hit: 'h_ml_slash', boss: 'rp_asura', k: 1.15 }),
     ult('reaper', 'rp_deadly', '살극', { echo2: 'k_rp_wind', aura: 'k_rp_crush', auraW: 220, open: 'k_rp_arrow', openW: 0.5, echoW: 220, mech: 'mark', main: 'k_rp_deadly', markScale: 1.4, hit: 'h_ml_wind', hitScale: 0.4, delay: 1.2, boss: 'rp_arrow', k: 1.3 }),
-    ult('reaper', 'rp_myeonggye', '명계의회랑', { cutin: 'o_rp_ult9', desc: '생과 사를 오가는 순간과 마주한 공포로 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', aura: 'k_x_rp_burst_cast', auraW: 260, echoN: 28, echoCap: 2.5, echoW: 200, fin: 'k_rp_gate', mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
+    ult('reaper', 'rp_myeonggye', '명계의회랑', { cine9: 0.75, cutin: 'o_rp_ult9', desc: '생과 사를 오가는 순간과 마주한 공포로 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', aura: 'k_x_rp_burst_cast', auraW: 260, echoN: 28, echoCap: 2.5, echoW: 200, fin: 'k_rp_gate', mech: 'vortex', main: 'k_rp_gate', cast: 'k_u_rp_redeem', burst: 'k_rp_gate', burstSize: 340, hit: 'h_ml_wind', hitScale: 0.4, hold: 1.3, boss: 'rp_burst', k: 1.5 }),
   ],
 };
 

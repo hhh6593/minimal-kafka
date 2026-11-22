@@ -6665,6 +6665,14 @@ function killEnemy(e) {
       note('죽음의희열: 수리검의 재사용 대기가 끝났습니다.');
     }
   }
+  // 영혼갈무리 (원작 9차 패시브, 설명창 IMG82; no picture): every foe the 차사 fells gives back a little 마력 (혼력) and brings
+  // 분쇄섬 (멸살's place) nearer (9차 승급부터, 수련장에서는 늘)
+  const gm9 = SKILLS.rp_galmuri && SKILLS.rp_galmuri.galmuri9;
+  if (gm9 && G.cls.id === 'reaper' && !G.allyHitting && (promoOf('reaper') >= 9 || G.training)) {
+    const p = G.player;
+    p.mp = Math.min(p.maxMp, p.mp + p.maxMp * gm9.mana);
+    for (const s of G.skills) if (gm9.ids.includes(s.id) && s.timer > 0) s.timer = Math.max(0, s.timer - gm9.cut);
+  }
   // 영혼갈무리·죽음의희열 (9차): a foe felled while it is up brings the other skills' waits nearer
   if (G.buffs.killCut > G.t) for (const s of G.skills) if (s.timer > 0.5 && SKILLS[s.id].kind !== 'ult') s.timer -= Math.min(s.timer * 0.25, G.buffs.killCutK || 0.125);
   gearProc('kill', e);
@@ -7436,6 +7444,33 @@ function cast(skill, st) {
       break;
     }
     case 'cleave': {
+      // 9차 절섬 (원작 2662 IMG77; 설명창 IMG76: 범위 앞 5×5): only the way the hero faces, the ground ahead struck under the
+      // original's blue crescent (o_rp_jeol at the original's own size — 1.6 tiles tall, its pivot its own middle — sweeping
+      // out from the hero to the far row and fading). 이펙트=판정: what it sweeps — `depth` tiles ahead, `half` to each side
+      // (the scene's crescent passes over two rows of dummies three tiles deep: 3×3 here, not the tooltip's 5×5).
+      const j9 = def.jeol9;
+      if (j9 && G.cls.id === 'reaper' && (promoOf('reaper') >= 9 || G.training) && M.fx[j9.fx]) {
+        const fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = fx ? 0 : p.fdy;
+        const ux = Math.sign(fx), uy = Math.sign(fy);
+        const tiles = [];
+        for (let a = 1; a <= j9.depth; a++) for (let s = -j9.half; s <= j9.half; s++) tiles.push([p.tx + ux * a + uy * s, p.ty + uy * a + ux * s]);
+        const hit = onTiles(tiles).sort((a, b) => Math.hypot(a.tx - p.tx, a.ty - p.ty) - Math.hypot(b.tx - p.tx, b.ty - p.ty));
+        if (!hit.length && !st.nine) return retry(0.2);
+        // (drawn going right: flipped going left, turned for up and down; out from a tile ahead to the square's far half)
+        const f = { id: j9.fx, x: p.x + ux * TILE * 0.8, y: p.y - 22 + uy * TILE * 0.8, t: 0, life: 0.3, scale: 1, rot: 0, anchor: 'bottom',
+          alpha: settings.calmFx ? 0.85 : 1, must: true, mv: [ux * TILE * (j9.depth - 1.4), uy * TILE * (j9.depth - 1.4), 0.3], fadeOut: 0.12 };
+        if (ux < 0) f.flip = true;
+        if (uy) f.rot = uy < 0 ? -Math.PI / 2 : Math.PI / 2;
+        G.fxs.push(f);
+        later(0.08, () => {
+          G.shake = Math.max(G.shake, 0.06);
+          meleeImpact(2);
+          G.quietHit = true; // (no hit marks of another's: the crescent is what strikes)
+          for (const e of hit.slice(0, j9.max || 99)) if (e.hp > 0) smite(e, st.dmg, [ux, uy]);
+          G.quietHit = false;
+        });
+        break;
+      }
       // Ahead of the hero in an inverted triangle, turning first to where most monsters stand.
       // The triangle deepens a row at 4단 and 8단 (1 → 4 → 9 tiles); grown spells count as 8단.
       const depth = def.depth || 1 + Math.floor((def.evolved ? 8 : skill.lv) / 4);
@@ -7774,7 +7809,7 @@ function cast(skill, st) {
     }
   }
   // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
-  if (used && def.nine && !st.nine && promoOf(G.cls.id) >= 9) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
+  if (used && def.nine && !st.nine && (promoOf(G.cls.id) >= 9 || (def.jeol9 && G.training))) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
   // 명천검파 (원작 9차; 2662에 장면이 없어 패시브, 그림 없음 — data.js mcheon9): every third cast of a 검기 skill goes
   // out once more a moment later, at most once in five seconds (원작: 검기 3회 발사 · 쿨타임 5초)
   if (used && def.mcheon9 && !st.nine && G.cls.id === 'warrior' && (promoOf(G.cls.id) >= 9 || G.training)) {
@@ -9547,6 +9582,93 @@ const TIER_KINDS = {
         e.mark9 = G.t + (def.mark || 8);
       }
       G.quietHit = false;
+    });
+  },
+  // 비사검 (원작 2662 IMG79; 설명창 IMG78: 차사 주변의 대상에게 살극의 기를 방출, 맞은 적과 그 주변에 피해): for `duration`, every
+  // `every`, the 살극의 기 goes out to `shots` foes within `range` tiles (the nearest first, each in turn) and swings shut on
+  // each as the red ring (o_rp_bisa at the original's own size, its middle on the foe's middle): that foe and whoever
+  // stands inside the ring (`reach` px of its middle) is cut. 이펙트=판정: the ring.
+  bisa9({ st, def, smite }) {
+    const p = G.player, r = st.range || def.range || 3;
+    if (!tkNear(p.tx, p.ty, r).length) return 0.3;
+    const run = G, n = Math.max(1, Math.round((st.duration || def.duration) / def.every)), used = new Map();
+    const life = fxLife(def.fx) || 0.22, alpha = settings.calmFx ? 0.85 : 1;
+    for (let i = 0; i < n; i++) later(i * def.every, () => {
+      if (G !== run || G.dead) return;
+      const pool = tkNear(p.tx, p.ty, r).slice(0, 10);
+      if (!pool.length) return;
+      // (the nearest, each in turn: the one struck least first)
+      pool.sort((a, b) => (used.get(a) || 0) - (used.get(b) || 0));
+      pool.slice(0, def.shots || 2).forEach((t, j) => later(j * 0.06, () => {
+        if (G !== run || G.dead) return;
+        used.set(t, (used.get(t) || 0) + 1);
+        const x = t.x, y = t.y - 24;
+        // (the crescent, then the ring held a moment: the original's two frames at their own pace, 0.11 s each)
+        G.fxs.push({ id: def.fx, x, y, t: 0, life: life + 0.1, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, flip: t.x < p.x });
+        later(life * 0.5, () => {
+          if (G !== run) return;
+          G.quietHit = true;
+          for (const e of G.enemies) if (tkFoe(e) && (e === t || Math.hypot(e.x - x, e.y - 24 - y) <= def.reach)) smite(e, e === t ? st.dmg : st.dmg * 0.7);
+          G.quietHit = false;
+        });
+      }));
+    });
+  },
+  // 황천화 (원작 2662 IMG81; 설명창 IMG80: 7×7 주변 무작위 위치에 명계의 꽃 황천화가 피고, 꽃가루에 닿은 적은 능력치가 대폭 감소,
+  // 시전한 차사는 황천화 주변에서 체력과 마력이 빠르게 회복): `n` lotuses come up at random spots within `radius` tiles of the
+  // hero (on the foes there first; o_rp_lotus at the original's own size, its pivot the flower's middle): bud, bloom, then
+  // its blue ring pulses and golden powder held for `dur`; every `tick` the foes within `touch` px of a flower are cursed
+  // and slowed (능력치 감소: they take more) and cut a little (k), and the 차사 standing within reach of one gains `heal`% of
+  // its life and `mana` of its 마력. At the end each flower bursts (o_rp_lotusburst: the great bloom, the white rings, the
+  // dark-blue smoke, the petals) striking what stands within `burstR` px. 이펙트=판정: the flowers and their bursts.
+  hwang9({ st, def, smite }) {
+    const p = G.player, R = st.radius || def.radius || 3;
+    if (!tkNear(p.tx, p.ty, R + 1).length) return 0.3;
+    const run = G, alpha = settings.calmFx ? 0.85 : 1;
+    // the flower's own frames: bud and bloom once, then the bloom held (its ring pulses and powder) — parts of the sheet
+    const src = M.fx[def.fx];
+    if (src && !M.fx[def.fx + '#bud']) {
+      const n = src.durs.length, cut = Math.min(4, n - 1);
+      M.fx[def.fx + '#bud'] = { ...src, src: src.src || def.fx, f0: 0, n: cut, durs: src.durs.slice(0, cut) };
+      M.fx[def.fx + '#held'] = { ...src, src: src.src || def.fx, f0: cut, n: n - cut, durs: src.durs.slice(cut) };
+    }
+    // the spots: the foes within reach first (a random few), the rest at random over the 7×7, none twice
+    const taken = new Set(), spots = [];
+    const foes = tkNear(p.tx, p.ty, R).filter(e => Math.abs(e.tx - p.tx) <= R && Math.abs(e.ty - p.ty) <= R).sort(() => Math.random() - 0.5);
+    for (const e of foes) { const k = e.tx + ',' + e.ty; if (spots.length < Math.ceil(def.n * 0.6) && !taken.has(k)) { taken.add(k); spots.push([e.tx, e.ty]); } }
+    for (let g = 0; spots.length < def.n && g < 200; g++) {
+      const tx = p.tx + Math.round(rand(-R, R)), ty = p.ty + Math.round(rand(-R, R)), k = tx + ',' + ty;
+      if ((tx !== p.tx || ty !== p.ty) && !taken.has(k)) { taken.add(k); spots.push([tx, ty]); }
+    }
+    const pts = spots.map(([tx, ty]) => [tx * TILE + TILE / 2, ty * TILE + TILE - 30]);
+    const bud = fxLife(def.fx + '#bud'), dur = def.dur || 3.4;
+    pts.forEach(([x, y], i) => later(i * 0.03, () => {
+      if (G !== run) return;
+      G.fxs.push({ id: def.fx + '#bud', x, y, t: 0, life: bud, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
+      later(bud, () => { if (G === run) tkLoop(def.fx + '#held', x, y, Math.max(0.3, dur - bud - i * 0.03), { anchor: 'bottom', alpha }); });
+    }));
+    const near = (e, r) => pts.some(([x, y]) => Math.hypot(e.x - x, e.y - 24 - y) <= r);
+    const ticks = Math.max(1, Math.round(dur / (def.tick || 0.5)));
+    for (let k = 1; k <= ticks; k++) later(k * (def.tick || 0.5), () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true;
+      for (const e of G.enemies) if (tkFoe(e) && near(e, def.touch || 40)) { tkAfflict(e, def); smite(e, st.dmg * (def.k || 0.15)); }
+      G.quietHit = false;
+      if (near(p, (def.touch || 40) + TILE)) {
+        if (def.heal) heal(p.maxHp * def.heal / 100, false, true);
+        if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
+      }
+    });
+    later(dur, () => {
+      if (G !== run || G.dead) return;
+      pts.forEach(([x, y]) => G.fxs.push({ id: def.fxBurst, x, y: y + 12, t: 0, life: fxLife(def.fxBurst), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true }));
+      later(0.1, () => {
+        if (G !== run) return;
+        G.shake = Math.max(G.shake, 0.08);
+        G.quietHit = true;
+        for (const e of G.enemies) if (tkFoe(e) && near(e, def.burstR || 62)) smite(e, st.dmg);
+        G.quietHit = false;
+      });
     });
   },
 };
@@ -16202,6 +16324,8 @@ function render(now) {
       if (trail && k < 1 && !f.trailFx && G.t >= (f.trailAt || 0) && puffs.length < 6) { f.trailAt = G.t + trail.cd; puffs.push([x, y]); }
     }
     if (f.alpha || f.fadeIn) ctx.globalAlpha = (f.alpha || 1) * (f.fadeIn ? Math.min(1, (f.t - f.skip) / f.fadeIn) : 1);
+    // (fadeOut: a held picture of one frame — 절섬's crescent — fading over its last fadeOut seconds)
+    if (f.fadeOut && f.life) ctx.globalAlpha *= Math.max(0, Math.min(1, (f.life - f.t) / f.fadeOut));
     drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
     ctx.globalAlpha = 1;
   }
@@ -17771,6 +17895,8 @@ window.__promoCeremony = (c, n) => promoCeremony([{ n, cls: CLASSES[c], ids: Obj
 // Test hooks (the career sim: a class played from an empty save, buying and making between hunts):
 // the save, wearing the best, the 전투력, the 필살기 key. Nothing calls these in play.
 window.__progress = () => progress;
+// test: a class's 승급 up to n (its grounds marked done in this session's progress, not saved)
+window.__promoTo = (cls, n) => { const d = progress.byClass[cls] || (progress.byClass[cls] = {}); PROMOS[cls].forEach((pr, i) => { if (i < n) d[pr.at] = true; }); return promoOf(cls); };
 window.__saveProgress = () => saveJson('bs_progress', progress);
 window.__wearBest = c => { chosenClass = CLASSES[c]; wearBest(CLASSES[c]); };
 window.__power = c => combatPower(CLASSES[c]);
