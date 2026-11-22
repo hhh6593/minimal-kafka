@@ -7587,6 +7587,18 @@ function cast(skill, st) {
   }
   // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
   if (used && def.nine && !st.nine && promoOf(G.cls.id) >= 9) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
+  // 명천검파 (원작 9차; 2662에 장면이 없어 패시브, 그림 없음 — data.js mcheon9): every third cast of a 검기 skill goes
+  // out once more a moment later, at most once in five seconds (원작: 검기 3회 발사 · 쿨타임 5초)
+  if (used && def.mcheon9 && !st.nine && G.cls.id === 'warrior' && (promoOf(G.cls.id) >= 9 || G.training)) {
+    const m = def.mcheon9;
+    G.mcheonN = (G.mcheonN || 0) + 1;
+    if (G.mcheonN >= m.every && G.t >= (G.mcheonAt || 0)) {
+      G.mcheonN = 0;
+      G.mcheonAt = G.t + m.cd;
+      later(m.at, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * m.k, nine: true }); });
+      note('명천검파: 검기가 한 번 더 나갑니다.');
+    }
+  }
   if (used && def.wind9 && (promoOf(G.cls.id) >= 9 || G.training || window.__windAlways)) heukWind(def.wind9, skill);
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
@@ -8554,6 +8566,46 @@ const TIER_KINDS = {
   // first) struck very hard: the hero dashes in (dash), a shot flies (shot), or a mark bursts after
   // `delay`; round it a share (splash) of the blow; a storm may stay (linger) or the blow leap on (chain).
   smite({ skill, st, def, fxid, smite, hitOn }) {
+    // 압도적진격 (원작 2662 IMG07; 사용자 결정: 돌진기): the hero charges `deep` tiles the way it faces (이동 기술은 바라보는
+    // 방향으로만; it stops at a wall), the wall of three rings of fire (o_w_apdo at the original's own size, its pivot
+    // the hero's feet where the charge began, turned that way) driven before it over the path for its third of a
+    // second; every foe on the path — wall[1] tiles to each side — is struck and stunned as it passes, not driven
+    // back (one on the tile the hero lands on steps aside). Nothing else is drawn: no flames, no hit sparks.
+    if (def.wall) {
+      const p = G.player, fx = p.fdx || 0, fy = fx ? 0 : p.fdy || 1, [deep, half] = def.wall, run = G, sx = p.tx, sy = p.ty;
+      const row = k => { const out = []; for (let o = -half; o <= half; o++) out.push([sx + fx * k + (fy ? o : 0), sy + fy * k + (fx ? o : 0)]); return out; };
+      let any = false;
+      for (let k = 1; k <= deep && !any; k++) any = onTiles(row(k)).length > 0;
+      if (!any) return 0.3;
+      const x0 = sx * TILE + TILE / 2, y0 = sy * TILE + TILE - 6;
+      addFx(fxid, x0, y0 - (fx ? 0 : 20), { anchor: 'bottom', must: true, flip: fx > 0, rot: fy < 0 ? Math.PI / 2 : fy > 0 ? -Math.PI / 2 : 0,
+        // (two tiles deep itself, it passes over all `deep` tiles of the path while it stands)
+        mv: deep > 2 ? [fx * (deep - 2) * TILE, fy * (deep - 2) * TILE, 0.3] : undefined });
+      // the charge: as far as the way is open (a wall, the ground's edge stop it), a foe on the last tile stepping aside
+      if (!steering()) {
+        let reach = 0;
+        for (let k = 1; k <= deep; k++) { if (G.arena && !Hunt.open(sx + fx * k, sy + fy * k)) break; reach = k; }
+        for (let k = reach; k >= 1; k--) {
+          const tx = sx + fx * k, ty = sy + fy * k;
+          for (const e of onTiles([[tx, ty]])) tkShove(e, tx + fy, ty + fx) || tkShove(e, tx - fy, ty - fx);
+          if (tkMoveHero(tx, ty)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
+        }
+      }
+      G.shake = Math.max(G.shake, 0.06);
+      const seen = new Set();
+      for (let k = 1; k <= deep; k++) later(0.04 + (k - 1) * (0.26 / deep), () => {
+        if (G !== run) return;
+        G.procHitting = true; // (no hit sparks of the blade's on them: the original shows none)
+        for (const o of onTiles(row(k))) {
+          if (seen.has(o)) continue;
+          seen.add(o);
+          smite(o, st.dmg);
+          tkAfflict(o, def);
+        }
+        G.procHitting = false;
+      });
+      return;
+    }
     const p = G.player, foes = tkNear(p.tx, p.ty, st.range);
     if (!foes.length) return 0.3;
     // (천신의심판: the thickest of them, where the 천신 comes down; the rest the strongest)
@@ -8565,29 +8617,6 @@ const TIER_KINDS = {
       const spot = DIRS.map(([dx, dy]) => [t.tx + dx, t.ty + dy]).filter(([x, y]) => free(x, y) && !holdGround(x, y))
         .sort((a, b) => Math.hypot(a[0] - p.tx, a[1] - p.ty) - Math.hypot(b[0] - p.tx, b[1] - p.ty))[0];
       if (spot) { tkMoveHero(spot[0], spot[1]); p.inv = Math.max(p.inv || 0, 0.3); }
-    }
-    // 압도적진격 (원작 2662 IMG07): after the lunge a wall of three rings of fire stands before the hero for a third
-    // of a second (o_w_apdo at the original's own size, its pivot the hero's feet, turned the way the hero faces);
-    // every foe under it — wall[0] tiles deep, wall[1] to each side — is struck, driven back and stunned. Nothing
-    // else is drawn: no flames, no hit pictures (the original has none).
-    if (def.wall) {
-      const fx = p.fdx || 0, fy = fx ? 0 : p.fdy || 1, [deep, half] = def.wall, run = G;
-      later(0.12, () => {
-        if (G !== run || G.dead) return;
-        addFx(fxid, p.tx * TILE + TILE / 2, p.ty * TILE + TILE - 6 - (fx ? 0 : 20), { anchor: 'bottom', must: true, flip: fx > 0, rot: fy < 0 ? Math.PI / 2 : fy > 0 ? -Math.PI / 2 : 0 });
-        const tiles = [];
-        for (let k = 1; k <= deep; k++) for (let o = -half; o <= half; o++) tiles.push([p.tx + fx * k + (fy ? o : 0), p.ty + fy * k + (fx ? o : 0)]);
-        later(0.08, () => {
-          if (G !== run) return;
-          G.shake = Math.max(G.shake, 0.06);
-          for (const o of onTiles(tiles)) {
-            smite(o, st.dmg, [fx, fy]);
-            tkAfflict(o, def);
-            if (def.push) for (let k = def.push; k >= 1; k--) if (tkShove(o, o.tx + fx * k, o.ty + fy * k)) break;
-          }
-        });
-      });
-      return;
     }
     let wait = def.delay || 0.18;
     if (def.shot) {
@@ -9693,26 +9722,27 @@ function castUlt() {
 /** 9차 필살기, 원작 연출 그대로 (만검귀종, 2662 IMG09; 사용자 결정 2026-11-22): the original's cinematic drawn centred on
  *  the hero at def.cine9 of the screen's height (test: window.__ultSize) — never stretched over the screen — under the
  *  dark; nothing else is drawn with it (no rain of swords, no rings, no hit pictures). 이펙트=판정: it strikes what
- *  stands inside the drawn art, in four beats while it plays (the original's "4 COMBO"), the hero untouchable
+ *  stands inside the drawn art, in two quick beats at its peak, the hero untouchable
  *  meanwhile (설명창: 시전 동안 무적). Not in a war or a raid (the old way there). True when it took the cast. */
 function ultCine9(def, strike) {
   const f = def.cine9 && M.fx[def.cutin];
   if (!f || G.war || G.stage.raid || ultBand(G.cls.id) !== 3) return false;
   const p = G.player, run = G, size = window.__ultSize || def.cine9, k = (VH * size) / f.h, id = `${def.cutin}#c${Math.round(size * 100)}`;
-  if (!M.fx[id]) M.fx[id] = { ...f, src: f.src || def.cutin, k, hold: true };
-  const life = durs(id).reduce((a, b) => a + b, 0), lead = 0.7; // (the dark alone first, as the original's 0.8 s)
-  G.darkUntil = Math.max(G.darkUntil || 0, G.t + lead + life + 0.25);
+  // (사용자 결정: 한 번에 휙 — the dark a blink, the whole cinematic in def.cineT (1.1 s), the blow at its peak)
+  if (!M.fx[id]) M.fx[id] = { ...f, src: f.src || def.cutin, k, durs: f.durs.map(() => Math.round(((def.cineT || 1.1) * 1000) / f.durs.length)) };
+  const life = durs(id).reduce((a, b) => a + b, 0), lead = 0.15;
+  G.darkUntil = G.t + lead + life + 0.1;
   p.inv = Math.max(p.inv || 0, lead + life);
   later(lead, () => {
     if (G !== run || G.dead) return;
     G.fxs.push({ id, x: 0, y: -12, t: 0, life, scale: 1, rot: 0, follow: true, anchor: 'mid', alpha: settings.calmFx ? 0.6 : 0.96, big: true, skip: 0, fadeIn: 0 });
   });
   // (the art's own ellipse: the cell's, less its faded edge)
-  const rx = (f.w * k) / 2 * 0.92, ry = (f.h * k) / 2 * 0.86, BEATS = 4;
+  const rx = (f.w * k) / 2 * 0.92, ry = (f.h * k) / 2 * 0.86, BEATS = 2;
   G.ultArea = { rx, ry, until: G.t + lead + life }; // test: what it strikes
-  for (let i = 0; i < BEATS; i++) later(lead + life * (0.12 + (0.76 * i) / (BEATS - 1)), () => {
+  for (let i = 0; i < BEATS; i++) later(lead + life * 0.4 + i * 0.25, () => {
     if (G !== run || G.dead) return;
-    G.shake = Math.max(G.shake, 0.12);
+    G.shake = Math.max(G.shake, 0.3);
     for (const e of G.enemies) if (tkFoe(e) && ((e.x - p.x) / rx) ** 2 + ((e.y - 24 - (p.y - 12)) / ry) ** 2 <= 1) strike(e, 1 / BEATS);
   });
   return true;

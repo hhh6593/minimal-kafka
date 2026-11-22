@@ -16,12 +16,12 @@ CFG = {
                  note='원작: 대검이 떨어질 때마다 화면이 따라가므로 영웅이 가운데. 우리: 시전 0.9초 뒤 첫 검'),
     'heuk': dict(name='흑룡검풍 (패시브)', img='05', crop=[400, 365, 440, 330], frames=[77, 80, 84, 90, 96, 102, 108, 112], start=77, skill='w_blackdragon', off=0.0, gif=5,
                  env={'PRE': 'window.__windAlways=true'}, note='원작: 흑룡참파(붉은 고리) 뒤 검풍이 일어 주위를 돈다. 우리: 흑룡광참 시 발동(시험은 100%)'),
-    'apdo': dict(name='압도적진격', img='07', crop=[262, 290, 440, 400], frames=[5, 6, 7, 8, 9, 10, 12, 16], start=5, skill='w_advance', off=0.05, gif=1.6,
-                 env={'GATHER': '5'}, note='원작: 돌진 → 불고리 벽 0.3초 → 적이 밀려나 기절'),
+    'apdo': dict(name='압도적진격', img='07', crop=[292, 290, 560, 400], frames=[5, 6, 7, 8, 9, 10, 12, 16], start=5, skill='w_advance', off=0.05, gif=1.6,
+                 env={'GATHER': '5'}, note='원작: 돌진 → 불고리 벽 0.3초 → 적이 밀려나 기절. 우리: 바라보는 쪽 4칸 돌진, 벽이 0.3초 동안 그 길 4칸을 덮음(밀치지 않고 2초 기절)'),
     'mcheon': dict(name='명천검파', img=None, tip='03', skill='w_mcheon', times=[0.08, 0.2, 0.32, 0.45, 0.6, 0.75, 0.95, 1.2], gif=1.8,
                    note='2662 IMG05에는 명천검파가 나오지 않음(161컷 전부 확인). 위: 설명창 / 아래: 우리(연 검기 그림, 사용자 확인 대상)'),
-    'ult': dict(name='만검귀종 (필살기)', img='09', crop=[396, 320, 793, 640], frames=[5, 12, 17, 20, 24, 30, 40, 48], start=3, skill='ult', off=0.0, gif=3.6, zoom=0.5,
-                note='원작: 어둠 → 베기 → 칼날 소용돌이 → 불 소용돌이(검 무덤) 2.6초. 우리: 영웅 중심 화면 높이 65%'),
+    'ult': dict(name='만검귀종 (필살기)', img='09', crop=[396, 320, 793, 640], frames=[5, 12, 17, 20, 24, 30, 40, 48], start=3, skill='ult', off=0.0, gif=2.2, zoom=0.5, ours=[0.05, 0.2, 0.33, 0.47, 0.62, 0.85, 1.1, 1.4],
+                note='원작: 어둠 → 베기 → 칼날 소용돌이 → 불 소용돌이(검 무덤) 2.6초. 우리: 영웅 중심 화면 높이 75%, 어둠 0.15초 + 연출 1.1초(사용자 결정: 빠르게), 타격 2박자'),
 }
 def times_of(img):
     return [int(x) / 1000 for x in open(f'{P}/w/f{img}/times.txt').read().split()]
@@ -37,7 +37,7 @@ def run(key, size=None, tag=''):
     if c['img']:
         tt = times_of(c['img'])
         rel = [round(tt[f] - tt[c['start']], 3) for f in c['frames']]
-        ours_t = [max(0.02, round(r + c['off'], 3)) for r in rel]
+        ours_t = c.get('ours') or [max(0.02, round(r + c['off'], 3)) for r in rel]
         cx, cy, w, h = c['crop']
     else:
         rel = ours_t = c['times']
