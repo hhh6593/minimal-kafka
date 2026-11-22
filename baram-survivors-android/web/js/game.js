@@ -7448,9 +7448,9 @@ function cast(skill, st) {
     }
     case 'cleave': {
       // 9차 절섬 (원작 2662 IMG77; 설명창 IMG76: 범위 앞 5×5): only the way the hero faces, the ground ahead struck under the
-      // original's blue crescent (o_rp_jeol at the original's own size — 1.6 tiles tall, its pivot its own middle — sweeping
-      // out from the hero to the far row and fading). 이펙트=판정: what it sweeps — `depth` tiles ahead, `half` to each side
-      // (the scene's crescent passes over two rows of dummies three tiles deep: 3×3 here, not the tooltip's 5×5).
+      // original's blue crescent (o_rp_jeol at the original's own size — 1.5 tiles tall, its pivot its own middle — sweeping
+      // out from the hero to the far row and fading, 0.39 s as in the scene). 이펙트=판정: what it sweeps — `depth` tiles
+      // ahead, `half` to each side (the crescent is 1.5 tiles tall: the hero's own row, half 0 — not the tooltip's 5×5).
       const j9 = def.jeol9;
       if (j9 && G.cls.id === 'reaper' && (promoOf('reaper') >= 9 || G.training) && M.fx[j9.fx]) {
         const fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = fx ? 0 : p.fdy;
@@ -7460,8 +7460,9 @@ function cast(skill, st) {
         const hit = onTiles(tiles).sort((a, b) => Math.hypot(a.tx - p.tx, a.ty - p.ty) - Math.hypot(b.tx - p.tx, b.ty - p.ty));
         if (!hit.length && !st.nine) return retry(0.2);
         // (drawn going right: flipped going left, turned for up and down; out from a tile ahead to the square's far half)
-        const f = { id: j9.fx, x: p.x + ux * TILE * 0.8, y: p.y - 22 + uy * TILE * 0.8, t: 0, life: 0.3, scale: 1, rot: 0, anchor: 'bottom',
-          alpha: settings.calmFx ? 0.85 : 1, must: true, mv: [ux * TILE * (j9.depth - 1.4), uy * TILE * (j9.depth - 1.4), 0.3], fadeOut: 0.12 };
+        const jl = j9.life || 0.39;
+        const f = { id: j9.fx, x: p.x + ux * TILE * 0.8, y: p.y - 22 + uy * TILE * 0.8, t: 0, life: jl, scale: 1, rot: 0, anchor: 'bottom',
+          alpha: settings.calmFx ? 0.85 : 1, must: true, mv: [ux * TILE * (j9.depth - 1.4), uy * TILE * (j9.depth - 1.4), jl * 0.8], fadeOut: 0.12 };
         if (ux < 0) f.flip = true;
         if (uy) f.rot = uy < 0 ? -Math.PI / 2 : Math.PI / 2;
         G.fxs.push(f);
@@ -8012,21 +8013,21 @@ function hwasalbi9(skill, st) {
 /** 극청룡참 (원작 2662 IMG86; 설명창 IMG85: 청룡의 힘을 빌려 전방에 크게 베어내 피해): the great blue crescent swung round
  *  before the hero, the way it faces (o_l_cheong at the original's own size, drawn facing left — flipped facing right, turned for up
  *  and down; its pivot the hero's feet): every foe it covers — `depth` tiles ahead, `half` to each side — is struck once.
- *  이펙트=판정: the crescent reaches 1.9 tiles ahead and 1.1 to each side. */
+ *  이펙트=판정: the crescent reaches 1.6 tiles ahead, 0.6 behind and 1.1 to each side of the hero's body (`cut`). */
 function cheong9(st, def, smite) {
-  const p = G.player, [ux, uy] = faceWay(), sx = p.tx, sy = p.ty, D = def.depth || 2, w = def.half || 1, run = G;
-  const tiles = [];
-  for (let k = 1; k <= D; k++) for (let o = -w; o <= w; o++) tiles.push([sx + ux * k + (uy ? o : 0), sy + uy * k + (ux ? o : 0)]);
-  // (and the two beside the hero, under the crescent's horns)
-  for (const o of [-1, 1]) tiles.push([sx + (uy ? o : 0), sy + (ux ? o : 0)]);
-  if (!onTiles(tiles).length) return 0.3;
-  const f = { id: def.fx, x: p.x, y: p.y - (uy ? 20 : 6), t: 0, life: fxLife(def.fx), scale: 1, rot: uy ? (uy < 0 ? Math.PI / 2 : -Math.PI / 2) : 0,
+  const p = G.player, [ux, uy] = faceWay(), run = G;
+  // (이펙트=판정: what the crescent covers, round the hero's body — `cut` [behind, ahead, to each side] px: it reaches 76 px
+  // ahead, 28 behind and 51 to each side, a body's half more — the tile ahead and the two beside, three rows; not two deep)
+  const [cb, ca, cs] = def.cut || [-34, 82, 57], cx = p.x, cy = p.y - 20;
+  const inCut = e => { const bx = e.x - cx, by = e.y - 20 - cy, a = bx * ux + by * uy, s = bx * uy - by * ux; return tkFoe(e) && a >= cb && a <= ca && Math.abs(s) <= cs; };
+  if (!G.enemies.some(inCut)) return 0.3;
+  const f = { id: def.fx, x: p.x, y: p.y - 20, t: 0, life: fxLife(def.fx), scale: 1, rot: uy ? (uy < 0 ? Math.PI / 2 : -Math.PI / 2) : 0,
     flip: ux > 0, anchor: 'bottom', alpha: 1, must: true };
   G.fxs.push(f);
   later(0.08, () => {
     if (G !== run || G.dead) return;
     G.quietHit = true;
-    for (const e of onTiles(tiles)) { smite(e, st.dmg); tkAfflict(e, def); }
+    for (const e of G.enemies.filter(inCut)) { smite(e, st.dmg); tkAfflict(e, def); }
     G.quietHit = false;
   });
 }
@@ -9828,10 +9829,11 @@ const TIER_KINDS = {
     const bud = fxLife(def.fx + '#bud'), dur = def.dur || 3.4;
     pts.forEach(([x, y], i) => later(i * 0.03, () => {
       if (G !== run) return;
-      G.fxs.push({ id: def.fx + '#bud', x, y, t: 0, life: bud, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
-      later(bud, () => { if (G === run) tkLoop(def.fx + '#held', x, y, Math.max(0.3, dur - bud - i * 0.03), { anchor: 'bottom', alpha }); });
+      // (top: over the crowd's other pictures — the blows' flashes and puffs hid all but a few flowers in a crowd)
+      G.fxs.push({ id: def.fx + '#bud', x, y, t: 0, life: bud, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, top: true });
+      later(bud, () => { if (G !== run) return; const h = tkLoop(def.fx + '#held', x, y, Math.max(0.3, dur - bud - i * 0.03), { anchor: 'bottom', alpha }); if (h) { h.top = true; h.must = true; } });
     }));
-    const near = (e, r) => pts.some(([x, y]) => Math.hypot(e.x - x, e.y - 24 - y) <= r);
+    const near = (e, r, o = [0, 0]) => pts.some(([x, y]) => Math.hypot(e.x - x - o[0], e.y - 24 - y - o[1]) <= r);
     const ticks = Math.max(1, Math.round(dur / (def.tick || 0.5)));
     for (let k = 1; k <= ticks; k++) later(k * (def.tick || 0.5), () => {
       if (G !== run || G.dead) return;
@@ -9845,12 +9847,14 @@ const TIER_KINDS = {
     });
     later(dur, () => {
       if (G !== run || G.dead) return;
-      pts.forEach(([x, y]) => G.fxs.push({ id: def.fxBurst, x, y: y + 12, t: 0, life: fxLife(def.fxBurst), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true }));
+      pts.forEach(([x, y]) => G.fxs.push({ id: def.fxBurst, x, y: y + 12, t: 0, life: fxLife(def.fxBurst), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, top: true }));
       later(0.1, () => {
         if (G !== run) return;
         G.shake = Math.max(G.shake, 0.08);
         G.quietHit = true;
-        for (const e of G.enemies) if (tkFoe(e) && near(e, def.burstR || 62)) smite(e, st.dmg);
+        // (이펙트=판정: the burst's own round — the bloom and its rings, about 46 px round a point a little right of and
+        // below the flower — not wider)
+        for (const e of G.enemies) if (tkFoe(e) && near(e, def.burstR || 46, def.burstAt || [8, 7])) smite(e, st.dmg);
         G.quietHit = false;
       });
     });
@@ -9859,7 +9863,7 @@ const TIER_KINDS = {
   // 적에게 유도 화살이 튀어나가 추가 피해 — 범위 앞 세 줄, 최대 7칸): only the way the hero faces. `shots` great arrows one after
   // another (`gap` s), each the original's own cone (o_mk_tugwi at its own size, its pivot the hero, drawn going left —
   // flipped going right, turned for up and down): it strikes every foe `depth` tiles ahead, `half` to each side (the cone
-  // reaches 1.3–4.4 tiles and is 2.7 tiles tall in the scene; the tooltip's three rows). From each struck foe (at most
+  // reaches 1.4–4.4 tiles and is 2.7 tiles tall in the scene; the tooltip's three rows — 이펙트=판정: tiles `from`..`depth` ahead, the cone's own reach). From each struck foe (at most
   // `homeFrom`) a homing arrow leaps to `chain` foes within `chainR` tiles of it, the golden swirl of the scene
   // (o_mk_tugwihit) on each, `chainK` of the blow. 이펙트=판정: the cone, then the swirls.
   tugwi9({ st, def, smite }) {
@@ -9867,7 +9871,7 @@ const TIER_KINDS = {
     const sx = p.tx, sy = p.ty, run = G;
     const inCone = e => {
       const a = (e.tx - sx) * dx + (e.ty - sy) * dy, s = Math.abs((e.tx - sx) * dy - (e.ty - sy) * dx);
-      return tkFoe(e) && a >= 1 && a <= def.depth && s <= (def.half || 1);
+      return tkFoe(e) && a >= (def.from || 1) && a <= def.depth && s <= (def.half || 1);
     };
     if (!G.enemies.some(inCone)) return 0.3;
     const alpha = settings.calmFx ? 0.85 : 1;
