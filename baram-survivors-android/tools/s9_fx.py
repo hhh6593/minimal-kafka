@@ -565,7 +565,7 @@ def parts_cells(frames, e):
     ox, oy = e["origin"]
     cache = {}
     out = []
-    for parts in e["cells"]:
+    for ci, parts in enumerate(e["cells"]):
         cell = np.zeros((ch, cw, 4), dtype=np.uint8)
         for part in parts:
             ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
@@ -620,6 +620,14 @@ def parts_cells(frames, e):
             if fx1 <= fx0 or fy1 <= fy0:
                 continue
             src = a[fy0:fy1, fx0:fx1]
+            fe = part.get("feather", e.get("feather"))
+            if fe:
+                # (the part's own cut edges faded over fe px — a clip line inside the cell, not on its edge, ends softly)
+                src = src.copy()
+                hh, ww = src.shape[:2]
+                rx = np.minimum(np.arange(ww), np.arange(ww)[::-1]).clip(0, fe) / fe
+                ry = np.minimum(np.arange(hh), np.arange(hh)[::-1]).clip(0, fe) / fe
+                src[..., 3] = (src[..., 3] * np.minimum(rx[None, :], ry[:, None])).astype(src.dtype)
             cx0, cy0 = fx0 - ax + ox, fy0 - ay + oy
             dst = cell[cy0:cy0 + src.shape[0], cx0:cx0 + src.shape[1]]
             # under what is there already (the first part on top)
@@ -629,6 +637,19 @@ def parts_cells(frames, e):
             rgb = (dst[..., :3] * da + src[..., :3] * sa * (1 - da)) / np.maximum(oa, 1e-3)
             dst[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
             dst[..., 3:4] = np.clip(oa * 255, 0, 255).astype(np.uint8)
+        if ci in e.get("dedither", []):
+            # (the original's see-through drawn as a checker of dots — 호기어검's fading ghost sword: the checker made the
+            # even half-light it stands for, each pixel the mean of its 2×2, colour weighted by opacity)
+            from scipy import ndimage
+            f_ = cell.astype(np.float32)
+            f_[..., 3] *= (f_[..., :3].min(axis=2) > 185)  # (only the light dots: the floor's dots between them are not it)
+            al_ = ndimage.uniform_filter(f_[..., 3], 2)
+            rgb_ = np.stack([ndimage.uniform_filter(f_[..., c] * f_[..., 3], 2) for c in range(3)], -1) / np.maximum(al_, 1)[..., None]
+            cell = np.dstack([rgb_, al_]).clip(0, 255).astype(np.uint8)
+        if e.get("nogray"):
+            # (a grey blade or post left in a coloured effect: dark and without colour — the effect's own pixels have it)
+            mx_, mn_ = cell[..., :3].max(axis=2).astype(int), cell[..., :3].min(axis=2).astype(int)
+            cell[(mx_ < e["nogray"]) & (mx_ - mn_ < 45), 3] = 0
         for x0, y0, x1, y1 in e.get("clearcell", []):
             cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
         if e.get("despeck"):

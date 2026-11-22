@@ -204,24 +204,14 @@
      "clip": [
       -192,
       -200,
-      -50,
+      -55,
       145
      ],
      "ops": [
       {
-       "clear": [
-        -72,
-        -58,
-        -22,
-        8
-       ]
-      },
-      {
-       "clear": [
-        -66,
-        -168,
-        -50,
-        -96
+       "hinterp": [
+        -156,
+        -153
        ]
       }
      ]
@@ -237,24 +227,14 @@
      "clip": [
       -192,
       -200,
-      -50,
+      -55,
       145
      ],
      "ops": [
       {
-       "clear": [
-        -72,
-        -58,
-        -22,
-        8
-       ]
-      },
-      {
-       "clear": [
-        -66,
-        -168,
-        -50,
-        -96
+       "hinterp": [
+        -156,
+        -153
        ]
       }
      ]
@@ -270,24 +250,14 @@
      "clip": [
       -192,
       -200,
-      -50,
+      -55,
       145
      ],
      "ops": [
       {
-       "clear": [
-        -72,
-        -58,
-        -22,
-        8
-       ]
-      },
-      {
-       "clear": [
-        -66,
-        -168,
-        -50,
-        -96
+       "hinterp": [
+        -156,
+        -153
        ]
       }
      ]
@@ -303,24 +273,14 @@
      "clip": [
       -192,
       -200,
-      -50,
+      -55,
       145
      ],
      "ops": [
       {
-       "clear": [
-        -72,
-        -58,
-        -22,
-        8
-       ]
-      },
-      {
-       "clear": [
-        -66,
-        -168,
-        -50,
-        -96
+       "hinterp": [
+        -156,
+        -153
        ]
       }
      ]
@@ -329,7 +289,9 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead"
+  "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead",
+  "feather": 18,
+  "nogray": 150
  },
  "r_mukdok": {
   "src": "gif2662/IMG17.gif",
@@ -3016,318 +2978,6 @@
    ],
    [
     {
-     "f": 54,
-     "at": [
-      311,
-      473
-     ],
-     "clip": [
-      -180,
-      -330,
-      180,
-      50
-     ],
-     "ops": [
-      {
-       "shift": {
-        "box": [
-         -13,
-         -25,
-         12,
-         4
-        ],
-        "d": [
-         0,
-         -27
-        ]
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -33,
-         -89,
-         32,
-         -52
-        ],
-        "d": [
-         0,
-         37
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         -62,
-         -103,
-         -19,
-         -58
-        ],
-        "ax": 0
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -18,
-         1,
-         28,
-         16
-        ],
-        "d": [
-         0,
-         -17
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         30,
-         -330,
-         180,
-         -114
-        ],
-        "ax": 0
-       }
-      }
-     ]
-    },
-    {
-     "f": 29,
-     "at": [
-      403,
-      122
-     ],
-     "clip": [
-      -180,
-      44,
-      180,
-      100
-     ],
-     "ops": [
-      {
-       "clear": [
-        -180,
-        -40,
-        -118,
-        100
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 55,
-     "at": [
-      311,
-      461
-     ],
-     "clip": [
-      -180,
-      -330,
-      180,
-      62
-     ],
-     "ops": [
-      {
-       "shift": {
-        "box": [
-         -13,
-         -25,
-         12,
-         4
-        ],
-        "d": [
-         0,
-         -27
-        ]
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -33,
-         -89,
-         32,
-         -52
-        ],
-        "d": [
-         0,
-         37
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         -62,
-         -103,
-         -19,
-         -58
-        ],
-        "ax": 0
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -18,
-         1,
-         28,
-         16
-        ],
-        "d": [
-         0,
-         -17
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         30,
-         -330,
-         180,
-         -106
-        ],
-        "ax": 0
-       }
-      }
-     ]
-    },
-    {
-     "f": 29,
-     "at": [
-      403,
-      122
-     ],
-     "clip": [
-      -180,
-      56,
-      180,
-      100
-     ],
-     "ops": [
-      {
-       "clear": [
-        -180,
-        -40,
-        -118,
-        100
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 56,
-     "at": [
-      311,
-      461
-     ],
-     "clip": [
-      -180,
-      -330,
-      180,
-      62
-     ],
-     "ops": [
-      {
-       "shift": {
-        "box": [
-         -13,
-         -25,
-         12,
-         4
-        ],
-        "d": [
-         0,
-         -27
-        ]
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -33,
-         -89,
-         32,
-         -52
-        ],
-        "d": [
-         0,
-         37
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         -62,
-         -103,
-         -19,
-         -58
-        ],
-        "ax": 0
-       }
-      },
-      {
-       "shift": {
-        "box": [
-         -18,
-         1,
-         28,
-         16
-        ],
-        "d": [
-         0,
-         -17
-        ]
-       }
-      },
-      {
-       "mirror": {
-        "box": [
-         30,
-         -330,
-         180,
-         -106
-        ],
-        "ax": 0
-       }
-      }
-     ]
-    },
-    {
-     "f": 30,
-     "at": [
-      403,
-      122
-     ],
-     "clip": [
-      -180,
-      56,
-      180,
-      100
-     ],
-     "ops": [
-      {
-       "clear": [
-        -180,
-        -40,
-        -118,
-        100
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
      "f": 57,
      "at": [
       311,
@@ -4510,7 +4160,13 @@
   "ms": 80,
   "scale": 0.62,
   "max": 360,
-  "why": "호기어검: the great sword that falls on a foe (2662 IMG02) — the ring of light and the bolt from the sky, the ice, the sword standing, its white ghost. Each art frame from the showings where it is whole and clean: the top from the one at frames 53-57 (the hero beside it: that corner from the other side, mirrored), the bottom from the one at 27-34 (the capture's top edge cuts it), the standing sword and its ghost from the one at 65-71 (its right half, and that mirrored for the left: the hero stands on the left); the damage number and the dead one's skull filled from the blade's own stripes beside them"
+  "why": "호기어검: the great sword that falls on a foe (2662 IMG02) — the ring of light and the bolt from the sky, the ice, the sword standing, its white ghost. Each art frame from the showings where it is whole and clean: the top from the one at frames 53-57 (the hero beside it: that corner from the other side, mirrored), the bottom from the one at 27-34 (the capture's top edge cuts it), the standing sword and its ghost from the one at 65-71 (its right half, and that mirrored for the left: the hero stands on the left); the damage number and the dead one's skull filled from the blade's own stripes beside them — the three cells whose numbers were painted over by shifted boxes left out (square patches), the fading ghost's checker of dots made the even half-light it stands for",
+  "dedither": [
+   6,
+   7,
+   8
+  ],
+  "nogray": 130
  },
  "w_hogisign": {
   "src": "gif2662/IMG02.gif",
@@ -4631,7 +4287,8 @@
   ],
   "ms": 90,
   "scale": 0.62,
-  "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand"
+  "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand",
+  "feather": 6
  },
  "r_swaestar": {
   "src": "gif2662/IMG13.gif",
