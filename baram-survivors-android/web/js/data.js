@@ -1545,16 +1545,26 @@ const S9 = {
   l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'smite', fx: 'o_l_sickle', fxShot: 'o_l_sickle', fxHit: 'h_ml_slash', dmg: 95, cd: 5, range: 4,
     radius: 1, splash: 0.45, shot: true, again: 0.6, ck: 'cleave', pre: 'l_annihil', branch: 0,
     desc: '청룡의 힘으로 앞의 가장 강한 몬스터를 크게 베어 내고, 던진 이계의낫이 되돌아오며 한 번 더 벤다. 둘레의 몬스터도 함께 베인다' },
-  // 격투가 ← 흑화랑 9차 (마력의 화살과 검무 → 기의 화살과 권무): 마궁폭사 (보조 공격), 연옥'만월 (몸 주변), 진'투귀살 (강한 일격).
-  mk_magung: { promo: 9, cls: 'monk', req: 33, name: '마궁폭사', kind: 'echo', echo: 'sword', fx: 'o_mk_magung', fx2: 'o_mk_magung', shotSize: 80, fxHit: 'h_hit_attack',
-    hit: 28, cd: 18, duration: 10, every: 0.6, shots: 3, range: 5, power: 0.15, buff: 'power', ck: 'buff', pre: 'mk_origin', branch: 2,
-    desc: '마력의 화살을 여럿 장전한다. 10초 동안 가장 가까운 몬스터들에게 셋씩 화살이 저절로 날아가고, 그동안 피해가 15% 는다' },
-  mk_yeonok: { promo: 9, cls: 'monk', req: 33, name: "연옥'만월", kind: 'aura9', fx: 'o_mk_yeonok', fxCast: 'k_u_mk_area', fxHit: 'k_u_mk_bodyhit', hit: 8, cd: 11, duration: 2.5, radius: 2, tick: 0.2,
-    ward: 0.5, auraSize: 1.1, ck: 'nova', pre: 'mk_stack', branch: 1,
-    desc: '둘레를 장악하는 화려한 권무를 펼친다. 2.5초 동안 둘레 두 칸의 몬스터를 쉴 새 없이 치고, 그동안 몸을 피해 받는 피해가 절반이 된다' },
-  mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'smite', fx: 'k_u_mk_palm', fxShot: 'k_u_mk_palm', fxHit: 'k_u_mk_energy', dmg: 110, cd: 4.5, range: 7,
-    radius: 0, shot: true, chain: 3, chainK: 0.45, ck: 'spell', pre: 'mk_kyokushin', branch: 0,
-    desc: '마력의 화살을 가장 강한 몬스터에게 쏘아 크게 친다. 맞은 자리에서 유도 화살이 튀어나가 곁의 몬스터 셋을 더 친다' },
+  // 격투가 ← 흑화랑 9차 (재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/monk.md). 시전 3 + 패시브 1 + 필살기:
+  //   진'투귀살 (IMG96; 설명창 IMG95: 앞으로 마력의 화살 2발, 맞은 적 둘레로 유도 화살 — 앞 세 줄, 7칸): 바라보는 쪽으로만,
+  //     원작의 거대한 화살 원뿔(o_mk_tugwi)이 두 번, 맞은 몬스터에게서 둘레로 유도 화살의 금빛 소용돌이(o_mk_tugwihit),
+  //   연옥'만월 (IMG98; 설명창 IMG97: 5×5, 2초, 명중·회피 크게 상승, 우두머리 피해 100% 증가): 붉은 달(o_mk_yeonok, s9_stamps)이
+  //     둘레 5×5를 2초 동안 거듭 베고, 그동안 받는 피해 절반, 우두머리에게는 두 배,
+  //   마궁폭사 (IMG100; 설명창 IMG99: 가장 가까운 적에게 3발씩, 5칸, 최대 24발): 몸 둘레 붉은 가시 원반(o_mk_magung) 속에서 가장
+  //     가까운 몬스터 셋에게 붉은 화살(o_mk_magungshot)이 0.3초마다 3발씩 여덟 번,
+  //   부조리 = 패시브, 그림 없음 (설명창 IMG101 [지속효과 마법]: 상태이상 공격을 받으면 잠시 보호막 — bujori9).
+  // Pictures at the original's own size (o_mk_*: 0.62 game pixels a capture pixel).
+  mk_magung: { promo: 9, cls: 'monk', req: 33, name: '마궁폭사', kind: 'magung9', echo: undefined, fx: 'o_mk_magungshot', fx2: undefined, fxCast: 'o_mk_magung', shotSize: undefined,
+    fxHit: undefined, dmg: 70, cd: 9, every: 0.3, volleys: 8, per: 3, range: 5, hit: undefined, duration: undefined, shots: undefined, power: undefined, buff: undefined,
+    ck: 'spell', pre: 'mk_origin', branch: 2,
+    desc: '마력의 화살 스물넷을 한꺼번에 장전한다. 몸 둘레의 붉은 원반에서 0.3초마다 다섯 칸 안의 가장 가까운 몬스터 셋에게 화살이 한 발씩, 여덟 번 날아간다' },
+  mk_yeonok: { promo: 9, cls: 'monk', req: 33, name: "연옥'만월", kind: 'aura9', fx: 'o_mk_yeonok', fxCast: undefined, fxHit: undefined, hit: 9, cd: 12, duration: 2, radius: 2, tick: 0.2,
+    ward: 0.5, bossK: 2, auraSize: 0.8, auraAlpha: 1, ck: 'nova', pre: 'mk_stack', branch: 1,
+    desc: '둘레 5×5를 장악하는 화려한 검무를 펼친다. 붉은 달이 2초 동안 그 안의 몬스터를 쉴 새 없이 베고(우두머리에게는 두 배), 그동안 몸을 피해 받는 피해가 절반이 된다' },
+  mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'tugwi9', fx: 'o_mk_tugwi', fxShot: undefined, fxHit: 'o_mk_tugwihit', dmg: 110, cd: 5,
+    depth: 5, half: 1, shots: 2, gap: 0.3, homeFrom: 3, chain: 3, chainR: 2, chainK: 0.45, range: undefined, radius: undefined, shot: undefined,
+    ck: 'line', pre: 'mk_kyokushin', branch: 0,
+    desc: '바라보는 쪽으로 마력의 거대한 화살을 두 발 잇달아 쏘아 앞 다섯 칸, 폭 세 칸의 몬스터를 친다. 맞은 몬스터에게서 유도 화살이 튀어나가 둘레의 몬스터를 더 친다' },
   // 도깨비 ← 영술사 9차 (혼과 불을 부리는 술사 → 도깨비불과 귀신의 도깨비): 불길한혼불 (보조 공격), 화혼돌파 (광역 돌진), 천신의심판 (강한 일격).
   dk_honbul: { promo: 9, cls: 'dokkaebi', req: 33, name: '불길한혼불', kind: 'echo', echo: 'hex', fx: 'o_dk_honbul', fx2: 'o_dk_honbul', markScale: 0.9, fxBurst: 'h_hit_fire', burstScale: 1.6, hit: 22, cd: 17, duration: 10,
     every: 0.8, shots: 2, range: 5, radius: 1, delay: 1.2, dot: 'burn', power: 0.1, buff: 'power', ck: 'buff', pre: 'dk_wisp3', branch: 2,
@@ -1580,9 +1590,6 @@ const S9 = {
   l_agong: { promo: 9, cls: 'lancer', req: 33, name: '아공간전개', kind: 'aura9', fx: 'o_l_agong', fxHit: 'h_ml_thrust', hit: 9, cd: 16, duration: 8, radius: 2, tick: 0.5,
     ward: 0.4, ck: 'buff', buff: 'shield', pre: 'l_reflect', branch: 2,
     desc: '자신의 자리에 아공간을 8초 동안 펼친다. 아공간 안에서는 몸을 피해 받는 피해가 40% 줄고, 든 몬스터는 공간에 베인다' },
-  mk_bujori: { promo: 9, cls: 'monk', req: 33, name: '부조리', kind: 'shieldburst', fx: 'k_mk_bujori', fx2: 'k_mk_bujori', fxCast: 'k_u_mk_energy', hit: 60, cd: 12, duration: 4,
-    radius: 3, stun: 0.8, pre: 'mk_focus', branch: 2,
-    desc: '부조리한 공격을 막아 4초 동안 받는 피해가 절반이 되고, 막이 풀릴 때 막아 둔 힘이 터져 둘레 세 칸을 치고 멈춘다' },
   dk_jangseung: { promo: 9, cls: 'dokkaebi', req: 33, name: '장승영역', kind: 'aura9', fx: 'o_dk_jangseung', fxHit: 'h_hit_fire', hit: 10, cd: 17, duration: 8, radius: 2,
     tick: 0.5, ward: 0.5, auraAlpha: 0.95, ck: 'buff', buff: 'shield', pre: 'dk_body', branch: 2,
     desc: '자신을 중심으로 장승이 둘러싼 영역을 8초 동안 세운다. 영역 밖의 공격은 반만 들어오고, 영역에 든 몬스터는 장승에게 거듭 맞는다' },
@@ -1671,6 +1678,15 @@ SKILLS.rp_galmuri = { name: '영혼갈무리', kind: 'passive', retired: true, w
   galmuri9: { mana: 0.005, ids: ['rp_crush'], cut: 0.125 } };
 SKILL_ALIAS.rp_galmuri = 'rp_hwangcheon';
 SKILLS.rp_hwangcheon.desc += '. 9차 패시브 영혼갈무리: 몬스터를 쓰러뜨릴 때마다 마력이 차고 분쇄섬이 빨리 돌아온다';
+// 부조리: a passive in the original ([지속효과 마법], 설명창 IMG101; no scene of it in 2662): a status attack (마비·절대마비·수면·
+// 기절·무장해제·회복불가·변이) on the 흑화랑 raises a barrier for a moment (보호막 20,000,000 for 5 s; again in 20 s). Here: a hard
+// status (기절·마비·빙결·침묵·저주) or a blow of a boss, a lieutenant or a champion (the monsters that strike in their nature) raises a
+// barrier of a quarter of the 격투가's life for 5 s, once in 20 s. No picture of its own. A saved slot of it is 마궁폭사.
+SKILLS.mk_bujori = { name: '부조리', kind: 'passive', retired: true, was: 'monk', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 기절·마비·빙결·침묵·저주에 걸리거나 우두머리·정예의 공격을 받으면 5초 동안 최대 체력의 25%만큼 피해를 막는 보호막이 씌워진다 (20초에 한 번)',
+  bujori9: { kinds: ['stun', 'para', 'freeze', 'silence', 'curse'], share: 0.25, dur: 5, cd: 20 } };
+SKILL_ALIAS.mk_bujori = 'mk_magung';
+SKILLS.mk_magung.desc += '. 9차 패시브 부조리: 상태이상이나 우두머리·정예의 공격을 받으면 잠시 보호막이 씌워진다';
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect', 'p_seongi']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
 
@@ -1775,7 +1791,7 @@ export const ULT_TIERS = {
     ult('monk', 'mk_ult', '필살권무', { mech: 'dash', main: 'k_mk_ult', mainSize: 190, hit: 'k_u_mk_bodyhit', hitScale: 0.7, n: 8, boss: 'mk_sudden', k: 1 }),
     ult('monk', 'mk_buddha', '여래신장', { mech: 'rain', main: 'k_mk_buddha', frac: 0.9, drop: 'k_u_mk_palm', dropSize: 150, hit: 'k_mk_bung', boss: 'mk_uppercut', k: 1.15 }),
     ult('monk', 'mk_rupture', '천지파열', { echoN: 28, echo2: 'k_mk_quake', aura: 'k_mk_rupture', mech: 'rings', main: 'k_x_mk_rupture_cast', mainSize: 260, hit: 'k_x_mk_rupture_hit', after: 'k_mk_rupture', boss: 'mk_muhan', k: 1.3 }),
-    ult('monk', 'mk_nakhwa', '낙화유영', { cutin: 'o_mk_ult9', desc: '흩날리는 꽃잎 속을 노닐듯 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다 (원작 흑화랑의 궁극)', openCap: 3.5, echoCap: 2, echoW: 240, fin: 'k_mk_aventhit', mech: 'totem', main: 'k_mk_advent', mainScale: 1.5, lift: 50, drop: 'k_u_mk_aventhit', dropSize: 180, hit: 'k_mk_aventhit', n: 5, life: 2.6, boss: 'mk_kyokushin', k: 1.5 }),
+    ult('monk', 'mk_nakhwa', '낙화유영', { cine9: 0.75, cutin: 'o_mk_ult9', desc: '흑화랑의 고귀함과 냉혹함이 공존하는 경계에서 흩날리는 꽃잎의 소용돌이로 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', guard: 3, openCap: 3.5, echoCap: 2, echoW: 240, fin: 'k_mk_aventhit', mech: 'totem', main: 'k_mk_advent', mainScale: 1.5, lift: 50, drop: 'k_u_mk_aventhit', dropSize: 180, hit: 'k_mk_aventhit', n: 5, life: 2.6, boss: 'mk_kyokushin', k: 1.5 }),
   ],
   magus: [
     ult('magus', 'md_ult', '광폭구회격', { mech: 'barrage', cast: 'k_md_ult', castSize: 220, shot: 'k_u_md_orb', hit: 'k_u_md_storm', n: 3, darken: 0.9, boss: 'md_arrow', k: 1 }),

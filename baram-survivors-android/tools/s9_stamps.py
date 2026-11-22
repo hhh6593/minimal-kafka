@@ -304,7 +304,106 @@ def ult9rain(src_dir, out_dir):
     return cells, e
 
 
-BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi}
+def yeonok(src_dir):
+    """연옥'만월 (흑화랑 9차, 2662 IMG98): the red moon of the sword dance over the 5×5 round the caster. In the capture its
+    upper half and the four dummies' columns lie under stacks of damage numbers, hit stars and bars in every frame (some
+    60% of it), the caster's own numbers in its middle. Cut whole with a turn-fill it came out as shards. So two layers:
+      the moon itself (its red disc, the swirling seal, its dark rim) stands still while the crescents of the slashes move
+      over it: each pixel the median, over the held frames 22-31, of the frames where that place was clear (unmix over the
+      clean frame 0) — the crescents, in few frames at a place, drop out of it; what no frame shows clear is taken from the
+      same place mirrored top↔bottom (the seal is drawn so), then left↔right, then from the nearest clear turn round the
+      middle at the same radius;
+      each frame then its own pixels wherever they are clear (the crescents, the moon as it was), the still moon under
+      the numbers, blended over 3 px. Its own round edge; its middle (where our hero stands) let fade.
+    Frames 22-30, held (looped by the game; it fades in and out)."""
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG98.gif"))
+    bg = fr[0].astype(np.float32)
+    CX, CY, R0, R1, E0, E1, K, LO = 282, 270, 138, 162, 26, 46, 80.0, 14
+    H, W = bg.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    rr = np.hypot(xx - CX, yy - CY)
+
+    def unmix(f):
+        a = fr[f].astype(np.float32)
+        D = a - bg
+        m = np.abs(D).max(2)
+        al = np.clip((m - LO) / (K - LO), 0, 1)
+        F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+        r, g, b, mn, mx = a[..., 0], a[..., 1], a[..., 2], a.min(2), a.max(2)
+        bad = ((b > 150) & (b - r > 80) & (r < 140))  # the digits' blue
+        bad |= (r > 190) & (g > 95) & (g < 225) & (b < 160) & (r - b > 70)  # the hit stars' orange rims, the markers
+        bad |= (g > r + 45) & (g > b + 25)  # life bars' green
+        bad |= (b > 120) & (r < 80) & (g < 110) & (b - g > 50)  # the blue bar, the digits' dark blue
+        bad |= (np.abs(r - g) < 28) & (g >= b - 4) & (r > 55) & (r < 215) & (r - b < 75) & (rr < 150)  # the dummies' wood
+        bad |= (m < 16) & (rr < 135)  # what stands unchanged over the solid moon (the stakes, their dark lines)
+        bad = ndimage.binary_dilation(bad, iterations=3)
+        # (the stars' white hearts and the digits' white faces: white only next to what was found)
+        bad |= (mn > 175) & ndimage.binary_dilation(bad, iterations=12)
+        bad = ndimage.binary_dilation(bad, iterations=1)
+        bad |= ((xx - 282) / 68) ** 2 + ((yy - 228) / 44) ** 2 <= 1  # (the caster's own numbers over its middle: 12만3천, 119만4천)
+        return al, F, bad
+
+    PL = list(range(22, 32))
+    U = {f: unmix(f) for f in [21] + PL}
+    import warnings
+    ok = np.stack([~U[f][2] for f in PL])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        bal = np.nanmedian(np.where(ok, np.stack([U[f][0] for f in PL]), np.nan), axis=0)
+        bF = np.nanmedian(np.where(ok[..., None], np.stack([U[f][1] for f in PL]), np.nan), axis=0)
+    hole = ok.sum(0) < 2
+    filled = hole.copy()
+    bal, bF = np.nan_to_num(bal), np.nan_to_num(bF)
+    # what no frame shows clear: mirrored about the middle, then the nearest clear turn at the same radius
+    for mx_, my_ in ((False, True), (True, False), (True, True)):
+        sx = np.rint(2 * CX - xx if mx_ else xx).astype(int).clip(0, W - 1)
+        sy = np.rint(2 * CY - yy if my_ else yy).astype(int).clip(0, H - 1)
+        o = hole & ~hole[sy, sx]
+        bal[o], bF[o] = bal[sy[o], sx[o]], bF[sy[o], sx[o]]
+        hole &= ~o
+    ang = np.arctan2(yy - CY, xx - CX)
+    for deg in (10, -10, 20, -20, 35, -35, 50, -50, 70, -70, 90, -90, 120, -120, 150, -150, 180):
+        if not hole.any():
+            break
+        t = ang + np.radians(deg)
+        sx = np.rint(CX + rr * np.cos(t)).astype(int).clip(0, W - 1)
+        sy = np.rint(CY + rr * np.sin(t)).astype(int).clip(0, H - 1)
+        o = hole & ~hole[sy, sx]
+        bal[o], bF[o] = bal[sy[o], sx[o]], bF[sy[o], sx[o]]
+        hole &= ~o
+    bal[hole] = 0
+    # (the seams where a mirrored or turned piece meets the moon round it: blended over a few px on both sides)
+    seam = ndimage.binary_dilation(filled, iterations=3) & ~ndimage.binary_erosion(filled, iterations=3)
+    sm_a = ndimage.gaussian_filter(bal, 1.6)
+    sm_F = np.stack([ndimage.gaussian_filter(bF[..., c] * bal, 1.6) for c in range(3)], -1) / np.maximum(sm_a, 1e-3)[..., None]
+    bal = np.where(seam, sm_a, bal)
+    bF = np.where(seam[..., None], sm_F, bF)
+    edge = np.clip((R1 - rr) / (R1 - R0), 0, 1) * np.clip((rr - E0) / (E1 - E0), 0, 1)
+    half = int(R1) + 2
+    cells = []
+    for f in PL[:-1]:
+        al, F, bad = U[f]
+        # each frame's own pixels only where they are not the still moon — its crescents, its lightning, where clear —
+        # over the still moon everywhere else (no seam round the numbers' places), blended over 3 px at their edge
+        mv = (np.abs(F * al[..., None] - bF * bal[..., None]).max(2) > 45) | (np.abs(al - bal) > 0.35)
+        mv = ndimage.binary_dilation(ndimage.binary_opening(mv & ~bad, iterations=1), iterations=2) & ~bad
+        w = np.clip(ndimage.distance_transform_edt(mv) / 3.0, 0, 1)
+        if f == 21:
+            w = np.clip(ndimage.distance_transform_edt(~bad) / 3.0, 0, 1)
+            # (the moon rising, see-through: the still moon under its numbers at its own strength there)
+            s = np.median(al[~bad & (rr < 120)]) / max(1e-3, np.median(bal[~bad & (rr < 120)]))
+            A, C = w * al + (1 - w) * bal * min(1.0, s), w[..., None] * F + (1 - w[..., None]) * bF
+        else:
+            A, C = w * al + (1 - w) * bal, w[..., None] * F + (1 - w[..., None]) * bF
+        A = A * edge
+        C[A <= 0] = 0
+        cell = np.dstack([C, A * 255]).clip(0, 255).astype(np.uint8)[CY - half:CY + half, CX - half:CX + half]
+        cells.append(Image.fromarray(cell))
+    return cells, {"cell": [2 * half, 2 * half], "n": len(cells), "ms": 90, "add": False, "anchor": [half, half],
+                   "src": "gif2662/IMG98.gif", "k": 0.62}
+
+
+BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi, "mk_yeonok": yeonok}
 POST = {"a_ult9": ult9rain}  # (re-drawing an s9_fx.py sheet: run after it)
 
 

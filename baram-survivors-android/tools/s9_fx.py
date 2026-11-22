@@ -224,6 +224,10 @@ def keyed(frames, i, e, part=None):
         F[al <= 0] = 0
         return np.dstack([F, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    if part.get("bgzero", e.get("bgzero")):
+        # (an 궁극's art over the client's own black — 낙화유영's vortex: unmix over pure black, so "rot" can carry the
+        # whirl's own pixels over the numbers and bodies standing in it)
+        bg = np.zeros_like(bg)
     bm = part.get("bgmed", e.get("bgmed"))
     if bm:
         # (no frame of the scene is clear round the caster — 비사검's ring turns round it the whole time: the field put
@@ -433,7 +437,52 @@ def keyed(frames, i, e, part=None):
                     hm |= eval(ex, {}, env)
                 for ex, px in part.get("holenear", e.get("holenear", [])):
                     hm |= eval(ex, {}, env) & ndimage.binary_dilation(hm, iterations=px)
-                hole |= ndimage.binary_fill_holes(ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3))))
+                hm = ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3)))
+                # ("fillholes" false: a ring of found things — a crescent's white circle near the numbers — does not
+                # make all inside it a hole)
+                hole |= ndimage.binary_fill_holes(hm) if part.get("fillholes", e.get("fillholes", True)) else hm
+            if part.get("_raw"):
+                return al, F, hole
+            pl = part.get("plate", e.get("plate"))
+            if pl and hole.any():
+                # (a drawing that stands still while the numbers stack over it — 연옥'만월's moon and its seal: a covered pixel
+                # from the other frames "plate" [f …] where that place was clear (the median of those, its own dots, no
+                # blur); what every one of them covers is left to the turn below)
+                ck_ = ("plate", id(frames), tuple(pl), tuple(part["at"]), json.dumps(part.get("holeexpr", e.get("holeexpr"))))
+                if ck_ not in _BGMED:
+                    import warnings
+                    As, Fs, Ok = [], [], []
+                    for fi in pl:
+                        a2, F2, h2 = keyed(frames, fi, e, {**part, "f": fi, "_raw": True})
+                        As.append(a2)
+                        Fs.append(F2)
+                        Ok.append(~h2)
+                    Ok = np.stack(Ok)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        mal = np.nanmedian(np.where(Ok, np.stack(As), np.nan), axis=0)
+                        mF = np.nanmedian(np.where(Ok[..., None], np.stack(Fs), np.nan), axis=0)
+                    _BGMED[ck_] = (np.nan_to_num(mal), np.nan_to_num(mF), Ok.sum(0))
+                mal, mF, cnt = _BGMED[ck_]
+                use = hole & (cnt >= part.get("platemin", e.get("platemin", 1)))
+                al = np.where(use, mal, al)
+                F = np.where(use[..., None], mF, F)
+                hole = hole & ~use
+            mf = part.get("mirrorfill", e.get("mirrorfill"))
+            if mf and hole.any():
+                # (a seal drawn the same about its own middle — 연옥'만월's moon: what is still covered taken from the same
+                # place mirrored about the middle ("at"): "v" top↔bottom, "h" left↔right, "p" both — the first that is
+                # clear; its own ornament goes on, not the shards of a turn)
+                src_al, src_F = al.copy(), F.copy()
+                for mode_ in mf:
+                    sx = np.rint(2 * cx - xx_ if mode_ in "hp" else xx_).astype(int)
+                    sy = np.rint(2 * cy - yy_ if mode_ in "vp" else yy_).astype(int)
+                    inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                    sxc, syc = sx.clip(0, W_ - 1), sy.clip(0, H_ - 1)
+                    ok = hole & inside & ~hole[syc, sxc]
+                    al[ok] = src_al[syc[ok], sxc[ok]]
+                    F[ok] = src_F[syc[ok], sxc[ok]]
+                    hole = hole & ~ok
             sf = part.get("shiftfill", e.get("shiftfill"))
             if sf:
                 # (a sheet of water over the field — 해일강타's wave — whose caustics run on to every side: a covered pixel
@@ -516,8 +565,19 @@ def keyed(frames, i, e, part=None):
                     al1 = A
                 al, F = al1, F1
                 hole = np.zeros_like(hole)
+            rmax = part.get("rotmax", e.get("rotmax"))
+            if rmax:
+                # (past "rotmax" from the middle a covered place is not made up from a turn — a spiral's arms do not
+                # line up turned, the patches came out as shards: it is left clear, softly over 4 px — the art's own black
+                # shows there, the game's dark under it)
+                far = hole & (rr > rmax)
+                keep_ = np.clip(ndimage.distance_transform_edt(~far) / 4.0, 0, 1)
+                hole = hole & ~far
+                src_hole_ = hole | far
             todo = hole.copy()
             src_al, src_F = al.copy(), F.copy()
+            if rmax:
+                hole = src_hole_  # (never a source: what lay over the far places)
             DEGS = part.get("rotdeg", e.get("rotdeg", (35, -35, 70, -70, 105, -105, 140, -140, 180)))
 
             def turned(deg, rs):
@@ -554,6 +614,8 @@ def keyed(frames, i, e, part=None):
                     F[ok] = src_F[syc[ok], sxc[ok]]
                     todo &= ~ok
             al[todo] = 0
+            if rmax:
+                al = al * keep_
             rd = part.get("radial", e.get("radial"))
             if rd:
                 # (its own round edge: what lies past it in the frame is not the whirl's)
@@ -1199,6 +1261,9 @@ def build(spec, src_dir, out_dir, only=None):
         index = {k: v for k, v in json.load(open(ipath, encoding="utf-8")).items() if k in spec}
     for sid, e in spec.items():
         if sid.startswith("_") or (only and sid not in only):
+            continue
+        if e.get("mode") == "stamps":
+            # (built by tools/s9_stamps.py: its sheet and index entry are kept here, not rebuilt)
             continue
         frames, durs = frames_of(os.path.join(src_dir, e["src"]))
         s, t, st = (e.get("frames") or [0, len(frames), 1])

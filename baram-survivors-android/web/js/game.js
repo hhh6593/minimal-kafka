@@ -2445,6 +2445,7 @@ function heroStatus(kind, from) {
   p.sts = p.sts || {};
   p.sts[kind] = { until: G.t + sec, tick: G.t };
   if (G.t - (G.stSaid || -9) > 2) { G.stSaid = G.t; floatText(p.x, p.y - 78, STATUS[kind].name, '#ff9a6a'); }
+  bujori9(kind); // (부조리, 격투가 9차 패시브: a hard status raises a barrier)
 }
 function heroStatusOn(kind) {
   const s = G.player.sts && G.player.sts[kind];
@@ -6026,6 +6027,8 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   }
   if (from && from.m) gyeokProc('hurt', from);
   if (from && from.m) gearProc('hurt', from);
+  // 부조리 (격투가 9차 패시브): a blow of one that strikes in its nature raises the barrier first
+  if (from && from.m && (from.kind === 'boss' || from.kind === 'mini' || from.kind === 'champ')) bujori9(null);
   // 보호막 (보조 기술 보호, 호신강기): takes the blow first, as far as it holds.
   if (p.barrier > 0 && G.t < (p.barrierUntil || Infinity)) {
     const a = Math.min(p.barrier, taken);
@@ -9097,7 +9100,7 @@ const TIER_KINDS = {
       let got = 0;
       for (const e of near) {
         if (def.fxHit && got < 2 && k % 2) fxOn(def.fxHit, e, { scale: 0.6 });
-        hurtEnemy(e, d);
+        hurtEnemy(e, def.bossK && (e.kind === 'boss' || e.kind === 'mini') ? d * def.bossK : d);
         tkAfflict(e, def, 0);
         if (def.shove && k % def.shove === 0) tkShove(e, e.tx + Math.sign(e.tx - p.tx), e.ty + Math.sign(e.ty - p.ty));
         got++;
@@ -9671,7 +9674,98 @@ const TIER_KINDS = {
       });
     });
   },
+  // 진'투귀살 (원작 2662 IMG96; 설명창 IMG95: 전방으로 마력의 화살을 2발 연속으로 쏜다, 적에게 피해를 주면 대상을 기준으로 주변
+  // 적에게 유도 화살이 튀어나가 추가 피해 — 범위 앞 세 줄, 최대 7칸): only the way the hero faces. `shots` great arrows one after
+  // another (`gap` s), each the original's own cone (o_mk_tugwi at its own size, its pivot the hero, drawn going left —
+  // flipped going right, turned for up and down): it strikes every foe `depth` tiles ahead, `half` to each side (the cone
+  // reaches 1.3–4.4 tiles and is 2.7 tiles tall in the scene; the tooltip's three rows). From each struck foe (at most
+  // `homeFrom`) a homing arrow leaps to `chain` foes within `chainR` tiles of it, the golden swirl of the scene
+  // (o_mk_tugwihit) on each, `chainK` of the blow. 이펙트=판정: the cone, then the swirls.
+  tugwi9({ st, def, smite }) {
+    const p = G.player, dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = dx ? 0 : p.fdy;
+    const sx = p.tx, sy = p.ty, run = G;
+    const inCone = e => {
+      const a = (e.tx - sx) * dx + (e.ty - sy) * dy, s = Math.abs((e.tx - sx) * dy - (e.ty - sy) * dx);
+      return tkFoe(e) && a >= 1 && a <= def.depth && s <= (def.half || 1);
+    };
+    if (!G.enemies.some(inCone)) return 0.3;
+    const alpha = settings.calmFx ? 0.85 : 1;
+    for (let k = 0; k < (def.shots || 2); k++) later(k * (def.gap || 0.3), () => {
+      if (G !== run || G.dead) return;
+      const f = { id: def.fx, x: p.x, y: p.y - 24, t: 0, life: fxLife(def.fx) + 0.05, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true };
+      if (dx > 0) f.flip = true;
+      if (dy) f.rot = dy < 0 ? Math.PI / 2 : -Math.PI / 2;
+      G.fxs.push(f);
+      later(0.07, () => {
+        if (G !== run || G.dead) return;
+        const hit = G.enemies.filter(inCone);
+        G.quietHit = true;
+        for (const e of hit) smite(e, st.dmg / (def.shots || 2), [dx, dy]);
+        G.quietHit = false;
+        // the homing arrows: from each struck one to the others round it
+        const used = new Set(hit);
+        hit.slice(0, def.homeFrom || 3).forEach((src, i) => later(0.12 + i * 0.04, () => {
+          if (G !== run || G.dead) return;
+          const near = tkNear(src.tx, src.ty, def.chainR || 2).filter(o => o !== src && !used.has(o)).slice(0, def.chain || 3);
+          for (const o of near.length ? near : [src]) {
+            used.add(o);
+            if (def.fxHit && M.fx[def.fxHit]) G.fxs.push({ id: def.fxHit, x: o.x, y: o.y - 24, t: 0, life: fxLife(def.fxHit), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
+            later(0.05, () => {
+              if (G !== run || !tkFoe(o)) return;
+              G.quietHit = true;
+              smite(o, st.dmg * (def.chainK || 0.45) / (def.shots || 2));
+              G.quietHit = false;
+            });
+          }
+        }));
+      });
+    });
+  },
+  // 마궁폭사 (원작 2662 IMG100; 설명창 IMG99: 마력의 화살을 동시에 여러발 장전하여 시전자 기준 가장 가까운 적에게 동시에 3발씩 화살을
+  // 발사 — 5칸 거리, 최대 24발): the crimson spiked disc of the loaded arrows round the hero (o_mk_magung at its own size, held
+  // while it shoots), and every `every` s a volley of `per` arrows at the nearest foes within `range` tiles (the nearest
+  // first, one arrow each), `volleys` in all (24 arrows). Each arrow is the scene's own spiked red bolt (o_mk_magungshot: its
+  // white head and the spikes fanning behind it) sent from the hero to its foe — its far end reaches the foe as it strikes.
+  magung9({ st, def, smite }) {
+    const p = G.player, R = st.range || def.range || 5;
+    if (!tkNear(p.tx, p.ty, R).length) return 0.3;
+    const run = G, alpha = settings.calmFx ? 0.85 : 1, n = def.volleys || 8, span = n * def.every;
+    tkLoop(def.fxCast, 0, -26, span + 0.2, { follow: true, anchor: 'mid', alpha });
+    const len = (M.fx[def.fx] ? M.fx[def.fx].w * (M.fx[def.fx].k || 1) : 80) * 0.9;
+    for (let v = 0; v < n; v++) later(0.1 + v * def.every, () => {
+      if (G !== run || G.dead) return;
+      const pool = tkNear(p.tx, p.ty, R).slice(0, def.per || 3);
+      pool.forEach((t, j) => {
+        // (the arrow's head starts at the hero, the spikes trailing it; it goes until its far end is on the foe)
+        const ux = t.x - p.x, uy = t.y - p.y, d = Math.hypot(ux, uy) || 1;
+        const go = Math.max(0, d - len);
+        G.fxs.push({ id: def.fx, x: p.x, y: p.y - 24, t: 0, life: 0.2, scale: 1, rot: Math.atan2(-uy, -ux), anchor: 'bottom', alpha, must: true,
+          mv: [(ux / d) * go, (uy / d) * go, 0.16], fadeOut: 0.06 });
+        later(0.12 + j * 0.02, () => {
+          if (G !== run || !tkFoe(t)) return;
+          G.quietHit = true;
+          smite(t, st.dmg / (n * (def.per || 3)) * 3);
+          G.quietHit = false;
+        });
+      });
+    });
+  },
 };
+/** 부조리 (원작 흑화랑 9차 패시브, 설명창 IMG101 [지속효과 마법]: 상태이상 공격 — 마비·절대마비·수면·기절·무장해제·회복불가·변이 — 을
+ *  받았을 경우 일시적으로 보호막이 씌워져 피해를 막는다, 보호막 (5초), 재발동 20초; data.js mk_bujori.bujori9): a hard status on the
+ *  격투가, or a blow of a boss, a lieutenant or a champion (this game's monsters that strike in their nature), raises a
+ *  barrier of `share` of its life for `dur` s, once in `cd` s. No picture of its own (no scene of it): the word only. */
+function bujori9(kind) {
+  const b = SKILLS.mk_bujori && SKILLS.mk_bujori.bujori9;
+  if (!b || G.cls.id !== 'monk' || G.dead || !(promoOf('monk') >= 9 || G.training)) return;
+  if (kind && !b.kinds.includes(kind)) return;
+  if (G.t < (G.bujoriAt || 0)) return;
+  const p = G.player;
+  G.bujoriAt = G.t + b.cd;
+  p.barrier = Math.max(p.barrier || 0, p.maxHp * b.share);
+  p.barrierUntil = G.t + b.dur;
+  floatText(p.x, p.y - 84, '부조리', '#ffb0b0');
+}
 /** 천공의공명 (원작 9차 패시브, 설명창 IMG52; data.js cl_gongmyeong.gong9): a 천기 skill cast sets the 풍랑의표식 ringing — on every
  *  marked foe within `reach` tiles (at most `max`) a bolt of the storm falls (the small light of a blow: the original shows
  *  no picture of it), and the skill's wait shrinks `cut` a foe (at most `cutMax`). */
