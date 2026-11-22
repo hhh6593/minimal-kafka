@@ -1518,7 +1518,7 @@ const S9 = {
     endR: 1.5, stun: 3, ck: 'line', pre: 'md_frenetic', branch: 2,
     desc: '바라보는 쪽으로 광폭의 파장을 다섯 칸 내보낸다. 파장은 지나는 길의 몬스터를 밀어내며 진영을 흩뜨리고, 끝에 이르러 둘레의 몬스터를 3초 동안 기절시킨다' },
   // 차사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/reaper.md). 시전 2 + 기본공격 + 패시브 1 + 필살기:
-  //   절섬 (기본공격 rp_cut, IMG77: 9차부터 바라보는 쪽 앞 3×3을 푸른 초승달로 베고 곧바로 한 번 더 — jeol9),
+  //   절섬 (기본공격 rp_cut, IMG77: 9차부터 바라보는 쪽 앞 세 칸(초승달이 1.5칸 높이라 그 줄만)을 푸른 초승달로 베고 곧바로 한 번 더 — jeol9),
   //   비사검 (IMG79: 4초 동안 0.5초마다 둘레 세 칸 안의 몬스터 둘에게 살극의 기가 날아가 붉은 고리로 닫히며 그와 고리 안을 벤다),
   //   황천화 (IMG81: 둘레 7×7 곳곳에 명계의 꽃 열 송이가 피어 3.4초 — 꽃가루에 닿은 몬스터는 약해지고(받는 피해 증가), 자신은
   //     꽃 곁에서 체력·마력이 빠르게 찬다; 끝에 꽃마다 크게 피어 터져 둘레를 친다),
@@ -1529,46 +1529,46 @@ const S9 = {
     shots: 2, range: 3, reach: 40, radius: undefined, tick: undefined, slow: undefined, ck: 'nova', pre: 'rp_spiral', branch: 0,
     desc: '차사의 혼력을 담아 4초 동안 0.5초마다 둘레 세 칸 안의 몬스터 둘에게 살극의 기를 내뿜는다. 살극의 기는 붉은 고리로 닫히며 맞은 몬스터와 고리 안의 몬스터를 벤다' },
   rp_hwangcheon: { promo: 9, cls: 'reaper', req: 33, name: '황천화', kind: 'hwang9', fx: 'o_rp_lotus', fxBurst: 'o_rp_lotusburst', fxCast: undefined, fx2: undefined,
-    dmg: 60, cd: 15, radius: 3, n: 10, dur: 3.4, touch: 40, tick: 0.5, k: 0.15, burstR: 62, curse: 4, slow: 1, heal: 1.2, mana: 0.012, drops: undefined,
+    dmg: 60, cd: 15, radius: 3, n: 10, dur: 3.4, touch: 40, tick: 0.5, k: 0.15, burstR: 46, burstAt: [8, 7], curse: 4, slow: 1, heal: 1.2, mana: 0.012, drops: undefined,
     dropScale: undefined, noLoop: undefined, ck: 'nova', pre: 'rp_chain', branch: 1,
     desc: '둘레 일곱 칸 곳곳에 명계의 꽃 황천화 열 송이를 피운다. 꽃가루에 닿은 몬스터는 능력이 크게 떨어지고(받는 피해 증가·느려짐) 조금씩 베이며, 차사는 꽃 곁에서 체력과 마력이 빠르게 찬다. 3.4초 뒤 꽃마다 크게 피어 터지며 둘레를 친다' },
   // 무사·격투가·도깨비 (원작 바람에 없는 연 직업): 9차는 원작의 살수·흑화랑·영술사 9차를 이어받는다. 이들의 연 9차였던
   // 반탄강기·도깨비불 3성은 8차로 (아래), 그 밖의 8차(무형투창·점혈:통·권법의기원·마류귀체)는 그대로.
   // 무사 ← 살수 9차 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/lancer.md). 시전 4 + 필살기 (원작에 패시브 없음):
-  //   극청룡참 (IMG86: 바라보는 쪽 앞을 푸른 초승달로 크게 벰 — 앞 두 칸, 폭 세 칸),
+  //   극청룡참 (IMG86: 바라보는 쪽 앞을 푸른 초승달로 크게 벰 — 그린 초승달이 덮는 곳: 앞 82px, 뒤 34px, 옆 57px — cut),
   //   이계의침식 (IMG88: 바라보는 쪽 아홉 칸으로 이계의 기운 — 흰 폭발·빛기둥·검은 잔해 세 줄; 맞은 적은 침식·옆으로 밀쳐짐),
   //   차원개방 (IMG90: 몸에 차원을 열고(검은 구체) 15초 동안 이계의낫 파편(푸른 원반)이 곁의 몬스터를 벰),
   //   아공간전개 (IMG94, PVP → 몬스터: 선 자리에 청룡 문양 영역과 결정 울타리 8초 — 아래 l_agong).
   // Pictures at the original's own size (o_l_*: 0.62 game pixels a capture pixel). 1320의 추정 그림(옛 o_l_sickle·erosion·dimension)은 뺌.
   l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'dim9', echo: undefined, fx: 'o_l_dimshard', fxCast: 'o_l_dimcast', fxLoop: undefined, loopSize: undefined,
-    fxHit: undefined, hit: 15, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [46, 34], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
+    fxHit: undefined, hit: 15, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
     desc: '이계의 차원을 몸에 연다. 15초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터 둘에게 푸른 원반으로 거듭 날아들어 그 몬스터와 원반 안의 몬스터를 벤다' },
   l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 8, depth: 9,
     width: undefined, ways: undefined, pulses: undefined, side: 36, sideV: 26, step: 0.06, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
     desc: '바라보는 쪽으로 이계에서 불러낸 기운을 아홉 칸 쏘아 보낸다. 지나는 자리마다 빛기둥이 솟고 검은 잔해가 세 줄로 남으며, 맞은 몬스터는 침식되어(받는 피해 증가) 옆으로 밀쳐진다' },
   l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 75, cd: 2.5, range: undefined,
-    radius: undefined, splash: undefined, shot: undefined, again: undefined, depth: 2, half: 1, ck: 'cleave', pre: 'l_annihil', branch: 0,
-    desc: '청룡의 힘을 빌려 바라보는 쪽 앞을 푸른 초승달로 크게 베어 낸다. 앞 두 칸, 폭 세 칸의 몬스터가 모두 베인다' },
+    radius: undefined, splash: undefined, shot: undefined, again: undefined, depth: 2, half: 1, cut: [-34, 82, 57], ck: 'cleave', pre: 'l_annihil', branch: 0,
+    desc: '청룡의 힘을 빌려 바라보는 쪽 앞을 푸른 초승달로 크게 베어 낸다. 초승달이 덮는 앞 한 칸, 폭 세 칸과 양옆의 몬스터가 모두 베인다' },
   // 격투가 ← 흑화랑 9차 (재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/monk.md). 시전 3 + 패시브 1 + 필살기:
   //   진'투귀살 (IMG96; 설명창 IMG95: 앞으로 마력의 화살 2발, 맞은 적 둘레로 유도 화살 — 앞 세 줄, 7칸): 바라보는 쪽으로만,
   //     원작의 거대한 화살 원뿔(o_mk_tugwi)이 두 번, 맞은 몬스터에게서 둘레로 유도 화살의 금빛 소용돌이(o_mk_tugwihit),
   //   연옥'만월 (IMG98; 설명창 IMG97: 5×5, 2초, 명중·회피 크게 상승, 우두머리 피해 100% 증가): 붉은 달(o_mk_yeonok, s9_stamps)이
-  //     둘레 5×5를 2초 동안 거듭 베고, 그동안 받는 피해 절반, 우두머리에게는 두 배,
+  //     그 둥근 자리(반지름 94px, half)를 2초 동안 거듭 베고, 그동안 받는 피해 절반, 우두머리에게는 두 배,
   //   마궁폭사 (IMG100; 설명창 IMG99: 가장 가까운 적에게 3발씩, 5칸, 최대 24발): 몸 둘레 붉은 가시 원반(o_mk_magung) 속에서 가장
-  //     가까운 몬스터 셋에게 붉은 화살(o_mk_magungshot)이 0.3초마다 3발씩 여덟 번,
+  //     가까운 몬스터 셋에게 붉은 화살(o_mk_magungshot)이 0.225초마다 3발씩 여덟 번 (원작 장면 2.0초),
   //   부조리 = 패시브, 그림 없음 (설명창 IMG101 [지속효과 마법]: 상태이상 공격을 받으면 잠시 보호막 — bujori9).
   // Pictures at the original's own size (o_mk_*: 0.62 game pixels a capture pixel).
   mk_magung: { promo: 9, cls: 'monk', req: 33, name: '마궁폭사', kind: 'magung9', echo: undefined, fx: 'o_mk_magungshot', fx2: undefined, fxCast: 'o_mk_magung', shotSize: undefined,
-    fxHit: undefined, dmg: 70, cd: 9, every: 0.3, volleys: 8, per: 3, range: 5, hit: undefined, duration: undefined, shots: undefined, power: undefined, buff: undefined,
+    fxHit: undefined, dmg: 70, cd: 9, every: 0.225, volleys: 8, per: 3, range: 5, hit: undefined, duration: undefined, shots: undefined, power: undefined, buff: undefined,
     ck: 'spell', pre: 'mk_origin', branch: 2,
-    desc: '마력의 화살 스물넷을 한꺼번에 장전한다. 몸 둘레의 붉은 원반에서 0.3초마다 다섯 칸 안의 가장 가까운 몬스터 셋에게 화살이 한 발씩, 여덟 번 날아간다' },
+    desc: '마력의 화살 스물넷을 한꺼번에 장전한다. 몸 둘레의 붉은 원반에서 0.2초 남짓마다 다섯 칸 안의 가장 가까운 몬스터 셋에게 화살이 한 발씩, 여덟 번 날아간다' },
   mk_yeonok: { promo: 9, cls: 'monk', req: 33, name: "연옥'만월", kind: 'aura9', fx: 'o_mk_yeonok', fxCast: undefined, fxHit: undefined, hit: 9, cd: 12, duration: 2, radius: 2, tick: 0.2,
-    ward: 0.5, bossK: 2, auraSize: 0.8, auraAlpha: 1, ck: 'nova', pre: 'mk_stack', branch: 1,
-    desc: '둘레 5×5를 장악하는 화려한 검무를 펼친다. 붉은 달이 2초 동안 그 안의 몬스터를 쉴 새 없이 베고(우두머리에게는 두 배), 그동안 몸을 피해 받는 피해가 절반이 된다' },
+    ward: 0.5, bossK: 2, half: [94, 94], auraSize: 0.8, auraAlpha: 1, ck: 'nova', pre: 'mk_stack', branch: 1,
+    desc: '둘레를 장악하는 화려한 검무를 펼친다. 붉은 달이 2초 동안 그 둥근 자리 안의 몬스터를 쉴 새 없이 베고(우두머리에게는 두 배), 그동안 몸을 피해 받는 피해가 절반이 된다' },
   mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'tugwi9', fx: 'o_mk_tugwi', fxShot: undefined, fxHit: 'o_mk_tugwihit', dmg: 110, cd: 5,
-    depth: 5, half: 1, shots: 2, gap: 0.3, homeFrom: 3, chain: 3, chainR: 2, chainK: 0.45, range: undefined, radius: undefined, shot: undefined,
+    from: 2, depth: 4, half: 1, shots: 2, gap: 0.3, homeFrom: 3, chain: 3, chainR: 2, chainK: 0.45, range: undefined, radius: undefined, shot: undefined,
     ck: 'line', pre: 'mk_kyokushin', branch: 0,
-    desc: '바라보는 쪽으로 마력의 거대한 화살을 두 발 잇달아 쏘아 앞 다섯 칸, 폭 세 칸의 몬스터를 친다. 맞은 몬스터에게서 유도 화살이 튀어나가 둘레의 몬스터를 더 친다' },
+    desc: '바라보는 쪽으로 마력의 거대한 화살을 두 발 잇달아 쏘아 화살 원뿔이 덮는 앞 둘째~넷째 칸, 폭 세 칸의 몬스터를 친다. 맞은 몬스터에게서 유도 화살이 튀어나가 둘레의 몬스터를 더 친다' },
   // 도깨비 ← 영술사 9차 (원작 2662 장면 그대로 — scratchpad plan9/spec/dokkaebi.md). 시전 3 + 패시브 1 + 필살기:
   //   화혼돌파 (IMG68, 이동공격: 바라보는 쪽으로만 여섯 칸 돌진, 지나온 길과 앞 두 칸 폭 세 칸을 친다; 푸른 혼불 휘두름 + 뒤로 흐르는 불꼬리 — hwahon9),
   //   천신의심판 (IMG71, 위치지정: 몬스터가 가장 많은 곳 둘레를 붉은 소용돌이로 끌어모은 뒤 천신의 주먹 = 분홍 빛기둥이 내리꽂힘 — smite own),
@@ -1589,10 +1589,10 @@ const S9 = {
     dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
     desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 그 불꽃 안의 몬스터를 태운다(화상)' },
   // 절섬 (기본공격, 원작 2662 IMG77; 설명창 IMG76: 쿨 0.75초, 범위 앞 5×5, 사용 후 곧바로 한 번 더 — 두 번째는 같은 피해):
-  // from the 9차 승급 (in 수련장 always) the cut goes only the way the hero faces, over the ground ahead its crescent sweeps (3×3: the scene's crescent passes over two rows of dummies three tiles deep), under the original's
+  // from the 9차 승급 (in 수련장 always) the cut goes only the way the hero faces, over the ground ahead its crescent sweeps (the hero's own row, three tiles deep: the crescent is 1.5 tiles tall — 이펙트=판정; shown 0.39 s as in the scene), under the original's
   // blue crescent (jeol9), and a second follows at once.
-  rp_cut: { nine: { k: 1, at: 0.3 }, jeol9: { fx: 'o_rp_jeol', depth: 3, half: 1, max: 9 },
-    desc: '정면을 크게 벤다. 9차 승급부터는 원작 9차의 절섬처럼 바라보는 쪽 앞 세 칸, 폭 세 칸을 푸른 초승달로 베고, 곧이어 한 번 더 벤다' },
+  rp_cut: { nine: { k: 1, at: 0.3 }, jeol9: { fx: 'o_rp_jeol', depth: 3, half: 0, max: 9, life: 0.39 },
+    desc: '정면을 크게 벤다. 9차 승급부터는 원작 9차의 절섬처럼 바라보는 쪽 앞 세 칸을 푸른 초승달로 베고, 곧이어 한 번 더 벤다' },
   // 아공간전개 (원작 2662 IMG94; 설명창 IMG93, PVP → 몬스터): 선 자리에 아공간 영역 8초 (그림 = 영역, 약 다섯 칸 사방). 안에 있는 동안 받는 피해가
   // 20%에서 50%까지 점점 더 줄고(명중회피 점차 증가), 든 몬스터는 느려짐. 벗어나면 즉시 풀림. 그 자체로는 치지 않음.
   l_agong: { promo: 9, cls: 'lancer', req: 33, name: '아공간전개', kind: 'zone9', fx: 'o_l_agong', fxHit: undefined, hit: undefined, cd: 30, duration: 8, radius: 2, reach: 104, tick: undefined,

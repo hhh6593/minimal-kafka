@@ -1016,7 +1016,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1041,7 +1045,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1066,7 +1074,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1091,7 +1103,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1116,7 +1132,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1141,7 +1161,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1166,7 +1190,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1191,7 +1219,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1216,7 +1248,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1241,7 +1277,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1266,7 +1306,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1291,7 +1335,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1316,7 +1364,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1341,7 +1393,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1366,7 +1422,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1391,7 +1451,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1416,7 +1480,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1441,7 +1509,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1466,7 +1538,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1491,7 +1567,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1516,7 +1596,11 @@
        "where": [
         "(b > g + 25) & (r > g + 8) & (mx < 200)"
        ],
-       "grow": 2
+       "grow": 2,
+       "rc": [
+        2,
+        7
+       ]
       }
      ]
     }
@@ -1526,7 +1610,7 @@
   "despeck": 4,
   "ms": 80,
   "scale": 0.62,
-  "why": "황천화's lotus: the lone one at the field's lower right (2662 IMG81 frames 3-45, every other: the bud, the bloom, its blue ring pulses, sparkle ring and golden powder) — unmix over the clean first frame; the dummy's violet floor ring beside it turned in from the lotus's own round; only its own round (disc)"
+  "why": "황천화's lotus: the lone one at the field's lower right (2662 IMG81 frames 3-45, every other: the bud, the bloom, its blue ring pulses, sparkle ring and golden powder) — unmix over the clean first frame; the dummy's violet floor ring beside it turned in from the lotus's own round; only its own round (disc) — fixC: the ring turned round its own middle (rc), not the flower's: no break where the dummy's floor ring lay."
  },
  "rp_lotusburst": {
   "src": "gif2662/IMG81.gif",
@@ -1806,12 +1890,13 @@
     }
    ]
   ],
-  "disc": 84,
+  "disc": 88,
   "feather": 18,
   "despeck": 6,
   "ms": 75,
   "scale": 0.62,
-  "why": "황천화's lotus bursting (2662 IMG81 frames 46-53: the great blue bloom, the white rings, the dark-blue smoke, the petals flying, the lotus again) — the lone lotus at the lower right, unmix over the clean first frame; the bystander's heal arcs at its left cleared, the dummy's violet floor ring turned out, only its own round (disc)"
+  "why": "황천화's lotus bursting (2662 IMG81 frames 46-53: the great blue bloom, the white rings, the dark-blue smoke, the petals flying, the lotus again) — the lone lotus at the lower right, unmix over the clean first frame; the bystander's heal arcs at its left cleared, the dummy's violet floor ring turned out, only its own round (disc) — fixC: the smoke faded softly towards the round (discsoft), not cut on a circle.",
+  "discsoft": 26
  },
  "cl_cheonsin": {
   "src": "gif2662/IMG54.gif",
@@ -2185,7 +2270,11 @@
   "ms": 80,
   "scale": 0.62,
   "max": 360,
-  "why": "마궁폭사 (흑화랑 9차, 2662 IMG100 frames 3-4): the crimson spiked disc of loaded magic arrows round the caster, its golden rings — unmix over the clean frame 0 (camera still), the caster's helm and horns over its top from its own spikes below (mirrored), the dummy's marker and stake from its own dots a turn on, its own round edge"
+  "why": "마궁폭사 (흑화랑 9차, 2662 IMG100 frames 3-4): the crimson spiked disc of loaded magic arrows round the caster, its golden rings — unmix over the clean frame 0 (camera still), the caster's helm and horns over its top from its own spikes below (mirrored), the dummy's marker and stake from its own dots a turn on, its own round edge — fixC: the grey residue (dropcell) and the red dotted hatching by the right horn out.",
+  "dropcell": [
+   "(mx - mn < 32) & (mx > 55)",
+   "(r > 120) & (g < 90) & (x >= 145) & (x < 166) & (y >= 38) & (y < 68)"
+  ]
  },
  "dk_hwahon": {
   "src": "gif2662/IMG68.gif",
@@ -7118,10 +7207,10 @@
     48
    ],
    [
-    398,
-    228,
-    30,
-    30
+    397,
+    250,
+    14,
+    16
    ]
   ],
   "vignette": [
@@ -7173,7 +7262,7 @@
     ]
    }
   ],
-  "why": "명계의회랑: the 원작 궁극's art (2662 IMG84 frames 19-31 and 43 (eleven of them; the violet floods of 34-40 left out): the underworld corridor of grave-posts and signboards, the blue soul flames, and in its middle the great violet-white X of scythe strokes over the black void) — its black see-through; the damage numbers, hit stars and life bars over it taken from the other frames where that place was clear (the art stands still), the dummies' stakes, the hero and the bystander below filled from the art round them; the other player at the left and the COMBO label out, faded towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)",
+  "why": "명계의회랑: the 원작 궁극's art (2662 IMG84 frames 19-31 and 43 (eleven of them; the violet floods of 34-40 left out): the underworld corridor of grave-posts and signboards, the blue soul flames, and in its middle the great violet-white X of scythe strokes over the black void) — its black see-through; the damage numbers, hit stars and life bars over it taken from the other frames where that place was clear (the art stands still), the dummies' stakes, the hero and the bystander below filled from the art round them; the other player at the left and the COMBO label out, faded towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9) — fixC: the bystander's ellipse at the top middle made small (the plate gives the art there): no blurred violet blot.",
   "despeck": 60,
   "skip": [
    20,
@@ -7253,7 +7342,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7282,6 +7373,24 @@
        463,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7296,7 +7405,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7348,7 +7459,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7371,6 +7484,24 @@
        335,
        48,
        78
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7385,7 +7516,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7437,7 +7570,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7460,6 +7595,24 @@
        335,
        48,
        78
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7474,7 +7627,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7526,7 +7681,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7555,6 +7712,24 @@
        328,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7569,7 +7744,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7621,7 +7798,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7644,6 +7823,24 @@
        335,
        48,
        78
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7658,7 +7855,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7710,7 +7909,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7739,6 +7940,24 @@
        326,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7753,7 +7972,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7805,7 +8026,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7834,6 +8057,24 @@
        326,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7848,7 +8089,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7900,7 +8143,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -7929,6 +8174,24 @@
        328,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -7943,7 +8206,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ],
    [
@@ -7995,7 +8260,9 @@
       "(np.abs(r - g) < 30) & (g >= b - 2) & (r > 60) & (r < 175) & (r - b < 80) & (r - b > 14) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(r > 110) & (r - b > 55) & (g < 0.78 * r) & (g > 0.35 * r) & (((x - 400) / 300) ** 2 + ((y - 280) / 290) ** 2 < 1)",
       "(mn > 150) & (x > 690) & (y > 205) & (y < 266)",
-      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)"
+      "(r > g + 35) & (((x - 400) ** 2 + (y - 350) ** 2) < 80 ** 2)",
+      "(r > 45) & (r - b > 28) & (g > 0.3 * r) & (g < 0.82 * r) & (x > 190) & (x < 600) & (y > 85) & (y < 330)",
+      "(np.abs(r - g) < 18) & (np.abs(g - b) < 22) & (mx > 120) & (mx < 240) & (x > 190) & (x < 600) & (y > 85) & (y < 330)"
      ],
      "holenear": [
       [
@@ -8030,6 +8297,24 @@
        463,
        22,
        20
+      ],
+      [
+       255,
+       453,
+       20,
+       22
+      ],
+      [
+       405,
+       456,
+       20,
+       22
+      ],
+      [
+       500,
+       453,
+       20,
+       22
       ]
      ],
      "eye": [
@@ -8044,7 +8329,9 @@
        ],
        "ry": 0.9
       }
-     ]
+     ],
+     "rotmax": 140,
+     "rotmaxfill": 8
     }
    ]
   ],
@@ -8053,7 +8340,7 @@
   "opaque": 1.6,
   "max": 420,
   "cap": 420,
-  "why": "낙화유영 (흑화랑 궁극, 2662 IMG103 frames [18, 21, 24, 27, 30, 33, 36, 39, 42]): the whole cinematic — the great vortex of pale iridescent petal-light turning round the caster, its blue-black galaxy core, the red petals, the painted frame of plum blossoms, birds and butterflies — unmix over the client's own black (bgzero); the damage numbers, hit stars, bars, the dummies and the two bystanders taken from the vortex's own pixels a turn on round its middle (rot; no blur), the COMBO label likewise; faded towards an ellipse at the screen's edge. Drawn centred on the hero (cine9)."
+  "why": "낙화유영 (흑화랑 궁극, 2662 IMG103 frames [18, 21, 24, 27, 30, 33, 36, 39, 42]): the whole cinematic — the great vortex of pale iridescent petal-light turning round the caster, its blue-black galaxy core, the red petals, the painted frame of plum blossoms, birds and butterflies — unmix over the client's own black (bgzero); the damage numbers, hit stars, bars, the dummies and the two bystanders taken from the vortex's own pixels a turn on round its middle (rot; no blur), the COMBO label likewise; faded towards an ellipse at the screen's edge. Drawn centred on the hero (cine9). — fixC: the hit stars' grey hearts and dark orange rims in the columns found too; past 140 px from the middle what they covered is not made from a turn (shards) but left to the vortex's own faint haze round it (rotmax, rotmaxfill); the DEAD skulls out."
  },
  "dk_ult9": {
   "src": "gif2662/IMG73.gif",
@@ -15368,7 +15655,7 @@
      ],
      "clip": [
       -80,
-      -46,
+      -70,
       80,
       80
      ],
@@ -15386,6 +15673,34 @@
         "(np.abs(r - g) < 28) & (np.abs(g - b) < 25) & (d > 18) & (mx < 200)"
        ],
        "grow": 2
+      },
+      {
+       "keep": [
+        [
+         -196,
+         45,
+         104,
+         141,
+         150
+        ]
+       ],
+       "soft": 6
+      },
+      {
+       "drop": [
+        "(mx < 105) & (y < 352) & (x < 400) & (r - g < 70)"
+       ],
+       "grow": 2,
+       "soft": 5
+      },
+      {
+       "fadebox": [
+        22,
+        -44,
+        38,
+        -26
+       ],
+       "soft": 3
       }
      ]
     }
@@ -15435,7 +15750,12 @@
   "despeck": 8,
   "ms": 110,
   "scale": 0.62,
-  "why": "비사검: a crescent of 살극의 기 swinging round and closing into a red ring on the ground (2662 IMG79 frames 63-64, at the lower right where it passes over open ground — the one place of the scene where it is not under the caster, the red ghost, the dummies and the numbers) — unmix over the field put together from all the frames (each pixel's median where it looked like the floor); what is grey in it (a dummy's stake, the caster's scythe stroke) turned in from the ring's own round, the stroke above cut off (feathered), only its own round (disc)"
+  "why": "비사검: a crescent of 살극의 기 swinging round and closing into a red ring on the ground (2662 IMG79 frames 63-64, at the lower right where it passes over open ground — the one place of the scene where it is not under the caster, the red ghost, the dummies and the numbers) — unmix over the field put together from all the frames (each pixel's median where it looked like the floor); what is grey in it (a dummy's stake, the caster's scythe stroke) turned in from the ring's own round, the stroke above cut off (feathered), only its own round (disc) — fixC: the faint glow's opacity and colour read off the grass carried the floor's pattern: smoothed where faint (alsmooth); the caster's black stroke above the crescent kept out by its own line (keep) and its dark (drop), the horn no longer cut by a straight clip.",
+  "bgsmooth": 10,
+  "alsmooth": [
+   2.5,
+   0.75
+  ]
  },
  "rp_jeol": {
   "src": "gif2662/IMG77.gif",
@@ -15549,12 +15869,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -15569,26 +15901,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -15643,12 +15978,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -15663,26 +16010,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -15738,12 +16088,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -15758,26 +16120,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -15832,12 +16197,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -15852,26 +16229,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -15927,12 +16307,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -15947,26 +16339,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -15997,15 +16392,6 @@
         26,
         44
        ]
-      },
-      {
-       "fadebox": [
-        -127,
-        -32,
-        -61,
-        14
-       ],
-       "soft": 7
       }
      ]
     },
@@ -16030,12 +16416,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -16050,26 +16448,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -16100,15 +16501,6 @@
         26,
         44
        ]
-      },
-      {
-       "fadebox": [
-        -127,
-        -32,
-        -61,
-        14
-       ],
-       "soft": 7
       }
      ]
     }
@@ -16134,12 +16526,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -16154,26 +16558,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -16204,15 +16611,6 @@
         26,
         44
        ]
-      },
-      {
-       "fadebox": [
-        -127,
-        -32,
-        -61,
-        14
-       ],
-       "soft": 7
       }
      ]
     },
@@ -16237,12 +16635,24 @@
      ],
      "ops": [
       {
+       "grow": 1,
+       "soft": 3,
+       "ldrop": [
+        "(r > b + 38)",
+        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
+        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
+        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
+        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
+        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
+       ]
+      },
+      {
        "rot": [
         [
-         -145,
-         -52,
-         -63,
-         1
+         -150,
+         -56,
+         -60,
+         70
         ]
        ],
        "rc": [
@@ -16257,26 +16667,29 @@
        "grow": 4,
        "angles": [
         10,
+        -10,
         14,
+        -14,
         18,
+        -18,
         22,
+        -22,
         26,
+        -26,
         30,
+        -30,
         36,
-        44
+        -36,
+        44,
+        -44
        ]
       },
       {
-       "grow": 1,
-       "soft": 3,
        "ldrop": [
-        "(r > b + 38)",
-        "(x > 448) & (y < 300) & ((mn > 100) | (r > b + 20))",
-        "(x < 362) & (y > 262) & (r > b + 12) & (mx < 140)",
-        "(y < 226) & (x > 316) & (x < 398) & (mx - mn < 24) & (mn > 80)",
-        "(x > 356) & (x < 386) & (y > 190) & (r > b + 12) & (mx > 55)",
-        "(mx - mn < 26) & (mx > 85) & (mn < 175)"
-       ]
+        "(b > 190) & (g > 140) & (r < 140) & (x > 318) & (x < 365) & (y > 268)"
+       ],
+       "grow": 2,
+       "soft": 3
       },
       {
        "radial": [
@@ -16307,15 +16720,6 @@
         26,
         44
        ]
-      },
-      {
-       "fadebox": [
-        -127,
-        -32,
-        -61,
-        14
-       ],
-       "soft": 7
       }
      ]
     }
@@ -16324,7 +16728,7 @@
   "despeck": 10,
   "ms": 80,
   "scale": 0.62,
-  "why": "극청룡참: the great blue crescent of 청룡's strength swung round before the caster (2662 IMG86 frames 2-6: the thin first arcs, the full crescent in its white flash, the crescent turning with its black streaks) — unmix over the field put together from all the frames; its upper half (over the hero's head and the open ground: the lower lies under two dummies' hit stars, numbers and bars) and the same half laid again below its own level axis at the caster's feet; the hit star at its left end over the axis filled from the arc just above it; the hero's gold rings and body, the floating white scythe, the struck dummy's stake and the scythe's grey trail out by colour"
+  "why": "극청룡참: the great blue crescent of 청룡's strength swung round before the caster (2662 IMG86 frames 2-6: the thin first arcs, the full crescent in its white flash, the crescent turning with its black streaks) — unmix over the field put together from all the frames; its upper half (over the hero's head and the open ground: the lower lies under two dummies' hit stars, numbers and bars) and the same half laid again below its own level axis at the caster's feet; the hit star at its left end over the axis filled from the arc just above it; the hero's gold rings and body, the floating white scythe, the struck dummy's stake and the scythe's grey trail out by colour — fixC: the numbers' and stars' dots taken out before the turn fills them (ldrop first), the fill box reaching past the axis: the crescent's front whole, no hollow and no smear at the seam."
  },
  "l_ero": {
   "src": "gif2662/IMG88.gif",
@@ -16444,10 +16848,10 @@
        "fadebox": [
         -46,
         -244,
-        -18,
+        -8,
         0
        ],
-       "soft": 10
+       "soft": 12
       }
      ]
     }
@@ -16487,10 +16891,10 @@
        "fadebox": [
         -46,
         -244,
-        -18,
+        -8,
         -50
        ],
-       "soft": 10
+       "soft": 12
       }
      ]
     }
@@ -16600,14 +17004,17 @@
   ],
   "despeck": 8,
   "feather": [
-   12,
+   18,
    0,
-   10,
+   16,
    0
   ],
-  "ms": 70,
+  "ms": 110,
   "scale": 0.62,
-  "why": "이계의침식: one stretch (a tile and a little) of the 이계 energy's path as the front passes over it (2662 IMG88 frames 7-14, x 98-182: the white-blue bursts at the head of its three rows, the tall light pillars, then the dark rubble of 침식 left in three rows; frame 10 left out: a hit star over its pillar) — unmix over the clean first frame (the dummies and the bystander stand still in both and drop out); the damage numbers and hit stars over the pillars' tops out by their colours (black and navy outlines, orange rims, the white hearts beside them) outside the pillars' own columns, the bars' green out; its sides faded: laid stretch by stretch along the way in the game, each a moment after the one before"
+  "why": "이계의침식: one stretch (a tile and a little) of the 이계 energy's path as the front passes over it (2662 IMG88 frames 7-14, x 98-182: the white-blue bursts at the head of its three rows, the tall light pillars, then the dark rubble of 침식 left in three rows; frame 10 left out: a hit star over its pillar) — unmix over the clean first frame (the dummies and the bystander stand still in both and drop out); the damage numbers and hit stars over the pillars' tops out by their colours (black and navy outlines, orange rims, the white hearts beside them) outside the pillars' own columns, the bars' green out; its sides faded: laid stretch by stretch along the way in the game, each a moment after the one before — fixC: wider soft sides (feather), the neighbour stretch faded out further; the bars' green dots out (dropcell); shown 0.77 s (ms 110) as in the scene.",
+  "dropcell": [
+   "(g > r + 8) & (g > b + 4)"
+  ]
  },
  "l_dimcast": {
   "src": "gif2662/IMG90.gif",
@@ -17184,7 +17591,11 @@
   "soft": 6,
   "ms": 80,
   "scale": 0.62,
-  "why": "차원개방 (이계의낫 파편): the blue whirling disc of a fragment of the 이계의낫 cutting a dummy (2662 IMG90 frames 52-58, on the right-hand dummy: white-blue crescent sweeping round a dark navy disc with a scythe glyph) — unmix over the clean first frame (the dummy stands still in both and drops out); its own ellipse only (the next dummy, the hero above out), the hit star orange and the bars green out by colour"
+  "why": "차원개방 (이계의낫 파편): the blue whirling disc of a fragment of the 이계의낫 cutting a dummy (2662 IMG90 frames 52-58, on the right-hand dummy: white-blue crescent sweeping round a dark navy disc with a scythe glyph) — unmix over the clean first frame (the dummy stands still in both and drops out); its own ellipse only (the next dummy, the hero above out), the hit star orange and the bars green out by colour — fixC: the floor's pattern in the disc's see-through middle smoothed out (alsmooth).",
+  "alsmooth": [
+   3,
+   0.7
+  ]
  },
  "l_agong": {
   "src": "gif2662/IMG94.gif",
@@ -17688,21 +18099,6 @@
      ]
     },
     {
-     "f": 3,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -17728,76 +18124,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 3,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 3,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 3,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -18287,21 +18615,6 @@
      ]
     },
     {
-     "f": 4,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -18327,76 +18640,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 4,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 4,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 4,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -18886,21 +19131,6 @@
      ]
     },
     {
-     "f": 5,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -18926,76 +19156,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 5,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 5,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 5,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -19485,21 +19647,6 @@
      ]
     },
     {
-     "f": 6,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -19525,76 +19672,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 6,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 6,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 6,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -20084,21 +20163,6 @@
      ]
     },
     {
-     "f": 7,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -20124,76 +20188,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 7,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 7,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 7,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -20683,21 +20679,6 @@
      ]
     },
     {
-     "f": 8,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -20723,76 +20704,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 8,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 8,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 8,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -21282,21 +21195,6 @@
      ]
     },
     {
-     "f": 9,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -21322,76 +21220,8 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 9,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 9,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 9,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ],
    [
@@ -21881,21 +21711,6 @@
      ]
     },
     {
-     "f": 10,
-     "at": [
-      186,
-      358
-     ],
-     "holeonly": true,
-     "clip": [
-      -42,
-      -6,
-      46,
-      36
-     ],
-     "ops": []
-    },
-    {
      "f": 30,
      "at": [
       234,
@@ -21921,85 +21736,29 @@
         "(y > 318) & (y < 348) & (x > 150) & (x < 225) & ((mx < 45) | ((b > 120) & (r < 120)))"
        ]
       }
-     ]
-    },
-    {
-     "f": 10,
-     "at": [
-      116,
-      318
      ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 10,
-     "at": [
-      256,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
-    },
-    {
-     "f": 10,
-     "at": [
-      76,
-      318
-     ],
-     "holeonly": true,
-     "clip": [
-      -60,
-      -170,
-      106,
-      38
-     ],
-     "ops": [
-      {
-       "grow": 2,
-       "ldrop": [
-        "(x > 128) & (x < 290) & (y > 150) & (y < 348) & ((d < 16) | (b < r + 12))",
-        "(y > 318) & (y < 348) & (x > 150) & (x < 225)"
-       ]
-      }
-     ]
+     "tonematch": true
     }
    ]
   ],
   "despeck": 8,
   "ms": 80,
   "scale": 0.62,
-  "max": 420,
-  "cap": 420,
-  "why": "아공간전개 (PVP → 몬스터): the domain laid where the caster stands (2662 IMG94 frames 3-10: the field of the blue dragon and the key-fret border, its lightning, the fence of ice crystals round it) — unmix over the clean first frame; the caster, its scythe and flag stand on it (drawn under them): their place filled from frame 30, where the camera had moved 48 px and the field lay clear there (the clean frame moved with it), what still stood in both from the field beside it in the same frame; the crystals of the right column (each foot under the next one's life bar) laid again from a top-row crystal, and the left column (off the capture's edge) the same at the mirrored place; the bars on the lower border from the border just above them"
+  "max": 360,
+  "why": "아공간전개 (PVP → 몬스터): the domain laid where the caster stands (2662 IMG94 frames 3-10: the field of the blue dragon and the key-fret border, its lightning, the fence of ice crystals round it) — unmix over the clean first frame; the caster, its scythe and flag stand on it (drawn under them): their place filled from frame 30, where the camera had moved 48 px and the field lay clear there (the clean frame moved with it), what still stood in both from the field beside it in the same frame; the crystals of the right column (each foot under the next one's life bar) laid again from a top-row crystal, and the left column (off the capture's edge) the same at the mirrored place; the bars on the lower border from the border just above them — fixC: the crystals' green-lit tiles out (dropcell); the caster's place filled only from frame 30, tone-matched to the frame (tonematch), its last dots from the field beside them (mendholes) — no patches of other places of the field; shrunk to the 360 rule (max 360).",
+  "dropcell": [
+   "(g > r + 14) & (g > b + 8)",
+   "(r > b + 8)",
+   "(mx < 75) & (x > 150) & (x < 340) & (y > 140) & (y < 340)"
+  ],
+  "mendholes": [
+   [
+    150,
+    140,
+    340,
+    340
+   ]
+  ]
  },
  "l_ult9": {
   "src": "gif2662/IMG92.gif",
@@ -22053,12 +21812,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22091,7 +21850,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22110,8 +21870,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22143,16 +21920,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -22223,12 +21992,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22261,7 +22030,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22280,8 +22050,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22313,16 +22100,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -22393,12 +22172,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22431,7 +22210,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22450,8 +22230,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22483,16 +22280,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -22563,12 +22352,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22601,7 +22390,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22620,8 +22410,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22653,16 +22460,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -22733,12 +22532,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22771,7 +22570,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22790,8 +22590,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22823,16 +22640,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -22903,12 +22712,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -22941,7 +22750,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -22960,8 +22770,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -22993,16 +22820,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -23073,12 +22892,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -23111,7 +22930,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -23130,8 +22950,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -23163,16 +23000,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -23243,12 +23072,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -23281,7 +23110,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -23300,8 +23130,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -23333,16 +23180,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -23413,12 +23252,12 @@
        ],
        "ys": 0.68,
        "where": [
-        "(r > b + 30)",
-        "(r > b + 12) & (mx > 150)",
-        "(b - r > 150)",
+        "((r > b + 30)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((r > b + 12) & (mx > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b - r > 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
         "(mx < 70) & (y < 290)",
-        "(g > r + 50)",
-        "(b > 200) & (r < 90) & (g < 150)"
+        "((g > r + 50)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)",
+        "((b > 200) & (r < 90) & (g < 150)) & (np.hypot(x - 398, (y - 352) / 0.8) > 95)"
        ],
        "grow": 4,
        "angles": [
@@ -23451,7 +23290,8 @@
          ],
          "where": [
           "(b < r + 12)",
-          "(g > b + 20)"
+          "(g > b + 20)",
+          "(np.abs(r - g) < 22) & (np.abs(g - b) < 28) & (mx > 100) & (y > 405) & (np.abs(x - 398) < 30)"
          ],
          "grow": 3
         },
@@ -23470,8 +23310,25 @@
           "(mn > 200) & (x > 690)"
          ],
          "grow": 3
+        },
+        {
+         "rot": [
+          [
+           296,
+           -150,
+           400,
+           -70
+          ]
+         ],
+         "where": [
+          "(mx < 60)",
+          "(mn > 190)",
+          "(r > b + 20)"
+         ],
+         "grow": 3
         }
-       ]
+       ],
+       "seam": 10
       },
       {
        "rot": [
@@ -23503,16 +23360,8 @@
         140,
         -140,
         180
-       ]
-      },
-      {
-       "fadebox": [
-        274,
-        -160,
-        422,
-        -74
        ],
-       "soft": 34
+       "seam": 4
       },
       {
        "radial": [
@@ -23549,7 +23398,7 @@
   "k": 1,
   "max": 420,
   "cap": 420,
-  "why": "청룡의격노 (살수): the 원작 궁극's art (2662 IMG92 frames 12-36, every third: the great whirlpool of the blue dragon's wrath — waves and clouds, the dragon's tail and claws and its pearl at the corners, the white streams spiralling into the dark eye where the hero stands) — whole, opaque (the art covers the screen); the three columns of dummies' numbers, hit stars and bars over its upper half taken from the whirl itself half a turn on (its lower half clean; the whirl's own dots, no blur), the stakes, the skull and the hero's bars below the eye likewise; the hero in the eye faded to the whirl's own dark middle; the window's edge faded: drawn centred on the hero at three quarters of the screen's height (cine9)"
+  "why": "청룡의격노 (살수): the 원작 궁극's art (2662 IMG92 frames 12-36, every third: the great whirlpool of the blue dragon's wrath — waves and clouds, the dragon's tail and claws and its pearl at the corners, the white streams spiralling into the dark eye where the hero stands) — whole, opaque (the art covers the screen); the three columns of dummies' numbers, hit stars and bars over its upper half taken from the whirl itself half a turn on (its lower half clean; the whirl's own dots, no blur), the stakes, the skull and the hero's bars below the eye likewise; the hero in the eye faded to the whirl's own dark middle; the window's edge faded: drawn centred on the hero at three quarters of the screen's height (cine9) — fixC: the fills laid past what they cover and blended into the whirl round them (seam): no square patch edges; the numbers inside the eye left to the hero's hole; the COMBO label from the whirl a turn on."
  },
  "mk_magungshot": {
   "src": "gif2662/IMG100.gif",
@@ -23804,7 +23653,7 @@
     }
    ]
   ],
-  "ms": 70,
+  "ms": 110,
   "scale": 0.62,
   "max": 360,
   "feather": [
@@ -23813,7 +23662,7 @@
    16,
    4
   ],
-  "why": "진'투귀살 (흑화랑 9차, 2662 IMG96 frames 2-5): the great magic arrow shot ahead (its white head, the ring it passes) and the cone of its burst with the violet rings — the caster faces left there; unmix over the clean frame 1 (camera still)"
+  "why": "진'투귀살 (흑화랑 9차, 2662 IMG96 frames 2-5): the great magic arrow shot ahead (its white head, the ring it passes) and the cone of its burst with the violet rings — the caster faces left there; unmix over the clean frame 1 (camera still) — fixC: shown 0.38 s as in the scene (ms 110)."
  },
  "mk_tugwihit": {
   "src": "gif2662/IMG96.gif",
@@ -23992,7 +23841,18 @@
   "scale": 0.62,
   "max": 360,
   "white": 170,
-  "why": "진'투귀살's homing arrows striking (2662 IMG96 frames 8-11, the top middle dummy): the golden swirl of light and its orange sparks — gold that moved from the clean frame 1, its white heart kept; the numbers above it out"
+  "why": "진'투귀살's homing arrows striking (2662 IMG96 frames 8-11, the top middle dummy): the golden swirl of light and its orange sparks — gold that moved from the clean frame 1, its white heart kept; the numbers above it out — fixC: the grey hatching out (dropcell), the holes inside the swirl mended from its own dots (mendholes).",
+  "dropcell": [
+   "(mx - mn < 34) & (mx < 210)"
+  ],
+  "mendholes": [
+   [
+    32,
+    30,
+    86,
+    82
+   ]
+  ]
  },
  "dk_jangseal": {
   "src": "gif2662/IMG75.gif",

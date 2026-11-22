@@ -431,6 +431,27 @@ def keyed(frames, i, e, part=None):
         m = np.abs(D).max(axis=2)
         al = np.clip((m - lo) / max(1.0, k - lo), 0, 1)
         F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+        bs_ = part.get("bgsmooth", e.get("bgsmooth"))
+        if bs_:
+            # (a glow the client adds over the floor — 비사검's red: O = B + L, not a·F + (1−a)·B — taken back out with
+            # the floor's own texture in F (bg + D/a) shows the floor's cracks through the faint glow over our ground:
+            # the floor under it the field's mean colour round it instead (a wide blur of the clean field), the light the
+            # same — no floor pattern)
+            from scipy import ndimage
+            Bs_ = np.stack([ndimage.gaussian_filter(bg[..., c], bs_) for c in range(3)], -1)
+            F = np.clip(Bs_ + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+        asm_ = part.get("alsmooth", e.get("alsmooth"))
+        if asm_:
+            # (the same glow's opacity read off a textured floor goes up and down with the floor's grass and cracks — a
+            # floor pattern in the faint glow: where it is faint (below asm_[1]), its opacity the mean round it (σ asm_[0]))
+            from scipy import ndimage
+            als_ = ndimage.gaussian_filter(al, asm_[0])
+            w_ = np.clip((asm_[1] - al) / 0.2, 0, 1)
+            # (and its colour there the opacity-weighted mean round it: the cracks' dark not carried in as the glow's own)
+            wa_ = ndimage.gaussian_filter(al, asm_[0]) + 1e-3
+            Fs_ = np.stack([ndimage.gaussian_filter(F[..., c] * al, asm_[0]) / wa_ for c in range(3)], -1)
+            F = F * (1 - w_[..., None]) + Fs_ * w_[..., None]
+            al = al * (1 - w_) + np.minimum(als_, asm_[1]) * w_
         if part.get("rot", e.get("rot")) or part.get("shiftfill", e.get("shiftfill")):
             # a whirl turning round its middle (순보선풍's gale, 천신의권역's vortex) over bodies, numbers, bars and a caster
             # standing in it: what lies over it ("badbox" boxes, "fill" ellipses [cx, cy, rx, ry] and "holeexpr" colours,
@@ -635,6 +656,18 @@ def keyed(frames, i, e, part=None):
             al[todo] = 0
             if rmax:
                 al = al * keep_
+                rmf = part.get("rotmaxfill", e.get("rotmaxfill"))
+                if rmf:
+                    # (and there the whirl's faint haze round it carried in — the mean of the clean dots round it, opacity
+                    # and colour — so a cleared place is not a hole darker than the haze it lies in: no star-shaped blot)
+                    kn_ = (~src_hole_).astype(np.float32)
+                    wa_ = ndimage.gaussian_filter(src_al * kn_, rmf)
+                    wk_ = np.maximum(ndimage.gaussian_filter(kn_, rmf), 1e-3)
+                    hz_ = np.minimum(wa_ / wk_, part.get("rotmaxcap", e.get("rotmaxcap", 0.35)))
+                    hF_ = np.stack([ndimage.gaussian_filter(src_F[..., c] * src_al * kn_, rmf) for c in range(3)], -1) / np.maximum(wa_, 1e-3)[..., None]
+                    t_ = 1 - keep_
+                    F = np.where(t_[..., None] > 0, (F * (al * (1 - t_))[..., None] + hF_ * (hz_ * t_)[..., None]) / np.maximum(al * (1 - t_) + hz_ * t_, 1e-3)[..., None], F)
+                    al = al + hz_ * t_
             rd = part.get("radial", e.get("radial"))
             if rd:
                 # (its own round edge: what lies past it in the frame is not the whirl's)
@@ -983,13 +1016,29 @@ def parts_cells(frames, e):
                                     if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) < 60:
                                         continue
                                     hit_[max(0, sl[0].start - T_):sl[0].stop + B_, max(0, sl[1].start - L_):sl[1].stop + R_] = True
-                            m_ &= ndimage.binary_fill_holes(hit_)
+                            # ("nofill": only what was found, not all it closes round — in a crowd of numbers over a whirl the
+                            # closed places took whole boxes of clean whirl out and laid a square patch in)
+                            if op.get("nofill"):
+                                # (a number's own inside, a star's white heart — small places — still taken)
+                                gap_ = ndimage.binary_fill_holes(hit_) & ~hit_
+                                gl_, gn_ = ndimage.label(gap_)
+                                if gn_:
+                                    hit_ = hit_ | np.isin(gl_, 1 + np.nonzero(ndimage.sum(gap_, gl_, range(1, gn_ + 1)) <= op["nofill"])[0])
+                                m_ &= hit_
+                            else:
+                                m_ &= ndimage.binary_fill_holes(hit_)
                         bad_ |= m_
                     yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
                     # ("ys": a whirl wider than tall — 청룡의격노's whirlpool — turned along its own ellipse: y squashed by ys
                     # before the turn and stretched back after)
                     ys_ = op.get("ys", 1.0)
                     dx_, dy_ = xx_ - rcx, (yy_ - rcy) / ys_
+                    bad0_ = bad_
+                    if op.get("seam"):
+                        # (the fill laid "seam" px past what it covers and blended there into the clean dots round it:
+                        # no hard rim, no square patch edge — nothing of what was covered blended back in)
+                        from scipy import ndimage
+                        bad_ = ndimage.binary_dilation(bad0_, iterations=op["seam"])
                     todo_ = bad_.copy()
                     src_ = a.copy()
                     if op.get("mirrorx"):
@@ -1035,6 +1084,11 @@ def parts_cells(frames, e):
                         from scipy import ndimage
                         _, (iy_, ix_) = ndimage.distance_transform_edt(todo_ | bad_, return_indices=True)
                         a[todo_] = src_[iy_[todo_], ix_[todo_]]
+                    if op.get("seam"):
+                        # (the filled places' edge blended over "seam" px into the dots round them: no hard rim)
+                        from scipy import ndimage
+                        w_ = np.clip(1 - ndimage.distance_transform_edt(~bad0_) / (op["seam"] + 1), 0, 1)[..., None]
+                        a[:] = (src_.astype(np.float32) * (1 - w_) + a.astype(np.float32) * w_).astype(a.dtype)
                     continue
                 if "vfade" in op:
                     # (a straight join softened: alpha ramped from 1 at y0 to `to` at y1, relative to "at")
@@ -1327,6 +1381,14 @@ def parts_cells(frames, e):
             # under what is there already (the first part on top)
             da = dst[..., 3:4].astype(np.float32) / 255
             sa = src[..., 3:4].astype(np.float32) / 255
+            if part.get("tonematch"):
+                # (a fill from another frame of a field that pulses — 아공간전개's dragon brighter in frame 30 than in 3-10:
+                # its colour and opacity scaled to the frame it fills, measured where both show the field — 색 맞춤)
+                both_ = (da[..., 0] > 0.8) & (sa[..., 0] > 0.8)
+                if both_.sum() > 50:
+                    src = src.copy()
+                    kr_ = dst[..., :3][both_].astype(np.float32).mean(0) / np.maximum(src[..., :3][both_].astype(np.float32).mean(0), 1)
+                    src[..., :3] = np.clip(src[..., :3] * kr_, 0, 255).astype(src.dtype)
             if part.get("holeonly"):
                 # (only into what those before left clear — a body's silhouette cut out of a see-through sheet, filled from
                 # another frame where the sheet lay clear there — not laid again over the sheet itself)
@@ -1344,6 +1406,38 @@ def parts_cells(frames, e):
             al_ = ndimage.uniform_filter(f_[..., 3], 2)
             rgb_ = np.stack([ndimage.uniform_filter(f_[..., c] * f_[..., 3], 2) for c in range(3)], -1) / np.maximum(al_, 1)[..., None]
             cell = np.dstack([rgb_, al_]).clip(0, 255).astype(np.uint8)
+        if e.get("dropcell"):
+            # (by the cell's own colours — 아공간전개's crystals each standing on a green-lit tile of the client's: the
+            # green out, the crystals' blue-grey and the field's cyan kept)
+            q_ = cell[..., :3].astype(np.float32)
+            env_ = {"r": q_[..., 0], "g": q_[..., 1], "b": q_[..., 2], "mn": q_.min(axis=2), "mx": q_.max(axis=2), "al": cell[..., 3].astype(np.float32), "np": np,
+                    "x": np.mgrid[0:ch, 0:cw][1], "y": np.mgrid[0:ch, 0:cw][0]}
+            for ex_ in e["dropcell"]:
+                cell[eval(ex_, {}, env_), 3] = 0
+        if e.get("mendcell"):
+            # (dots the expressions name over the cell's own colours — 차원개방's disc with the floor's beige showing in its
+            # see-through middle — each the colour and opacity of the nearest dot of the drawing they do not name)
+            from scipy import ndimage
+            q_ = cell[..., :3].astype(np.float32)
+            env_ = {"r": q_[..., 0], "g": q_[..., 1], "b": q_[..., 2], "mn": q_.min(axis=2), "mx": q_.max(axis=2), "al": cell[..., 3].astype(np.float32), "np": np}
+            mk_ = np.zeros(cell.shape[:2], bool)
+            for ex_ in e["mendcell"]:
+                mk_ |= eval(ex_, {}, env_)
+            mk_ &= cell[..., 3] > 0
+            src_ok_ = ~mk_ & (cell[..., 3] > 0)
+            if mk_.any() and src_ok_.any():
+                _, (iy_, ix_) = ndimage.distance_transform_edt(~src_ok_, return_indices=True)
+                cell[mk_, :3] = cell[iy_[mk_], ix_[mk_], :3]
+        for x0, y0, x1, y1 in e.get("mendholes", []):
+            # (a hole left in a solid field — where a body stood in every frame at hand — from the nearest dot of the field
+            # round it, its colour and opacity: the broken dots mended with the same colour beside them, no box)
+            from scipy import ndimage
+            sub_ = cell[y0:y1, x0:x1]
+            # (only holes the drawing closes round: its own clear outside is left clear)
+            h_ = (sub_[..., 3] < 40) & ndimage.binary_fill_holes(sub_[..., 3] >= 40)
+            if h_.any() and (~h_).any():
+                _, (iy_, ix_) = ndimage.distance_transform_edt(h_, return_indices=True)
+                sub_[h_] = sub_[iy_[h_], ix_[h_]]
         if e.get("nogray"):
             # (a grey blade or post left in a coloured effect: dark and without colour — the effect's own pixels have it)
             mx_, mn_ = cell[..., :3].max(axis=2).astype(int), cell[..., :3].min(axis=2).astype(int)
@@ -1414,7 +1508,9 @@ def parts_cells(frames, e):
             # (only what lies in the drawing's own round — 묵혈파광참's ring — the bystanders' markers and stars outside it)
             yy, xx = np.mgrid[0:ch, 0:cw]
             rr = np.hypot(xx - ox, yy - oy)
-            cell[..., 3] = (cell[..., 3] * np.clip((e["disc"] + 1.5 - rr) / 2.5, 0, 1)).astype(np.uint8)
+            # ("discsoft": faded over that many px inside its edge — 황천화's smoke, wider than the round: no cut circle)
+            ds_ = e.get("discsoft", 2.5)
+            cell[..., 3] = (cell[..., 3] * np.clip((e["disc"] + 1.5 - rr) / ds_, 0, 1)).astype(np.uint8)
         if e.get("soft"):
             # the cell's own edge faded (a part cut by the capture's edge ends softly, not on a line)
             n = e["soft"]
