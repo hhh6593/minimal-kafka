@@ -239,6 +239,10 @@ def keyed(frames, i, e, part=None):
                 med_ = np.nanmedian(np.where(ok_[..., None], A_, np.nan), axis=0)
             _BGMED[ck_] = np.where(np.isnan(med_), np.median(A_, axis=0), med_).astype(np.float32)
         bg = _BGMED[ck_]
+    if part.get("bgshift"):
+        # (the camera moved between the clean frame and this one — 아공간전개's later frames: the clean field moved with it)
+        sx_, sy_ = part["bgshift"]
+        bg = np.roll(np.roll(bg, sy_, 0), sx_, 1)
     for fi, x0, y0, x1, y1 in part.get("bgpatch", e.get("bgpatch", [])):
         # (the clean field put together: a box of it from another frame of the same still camera, where someone stood
         # in "bg" — 순보선풍's caster before the leap)
@@ -843,7 +847,7 @@ def parts_cells(frames, e):
     for ci, parts in enumerate(e["cells"]):
         cell = np.zeros((ch, cw, 4), dtype=np.uint8)
         for part in parts:
-            ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
+            ck = (part["f"], part.get("key"), part.get("bg"), json.dumps(part.get("bgshift")), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
             if ck not in cache:
                 cache[ck] = keyed(frames, part["f"], e, part)
             a = cache[ck].copy()
@@ -877,10 +881,13 @@ def parts_cells(frames, e):
                             # blue, the star's white — grown by "grow": the burst round them kept, no square seam)
                             from scipy import ndimage
                             o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                            if sub_.get("onres"):
+                                # (a second pass over what the first left: the expression over the part as it now is)
+                                o_ = a[..., :3].astype(np.float32)
                             b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
                             # ("d": how far it moved from the clean frame — a marker drawn over the effect has not moved)
                             env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
-                                    "d": np.abs(o_ - b_).max(axis=2)}
+                                    "d": np.abs(o_ - b_).max(axis=2), "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                             hit_ = np.zeros((H, W), bool)
                             for ex_ in sub_["where"]:
                                 hit_ |= eval(ex_, {}, env_)
@@ -888,7 +895,10 @@ def parts_cells(frames, e):
                             m_ &= ndimage.binary_fill_holes(hit_)
                         bad_ |= m_
                     yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
-                    dx_, dy_ = xx_ - rcx, yy_ - rcy
+                    # ("ys": a whirl wider than tall — 청룡의격노's whirlpool — turned along its own ellipse: y squashed by ys
+                    # before the turn and stretched back after)
+                    ys_ = op.get("ys", 1.0)
+                    dx_, dy_ = xx_ - rcx, (yy_ - rcy) / ys_
                     todo_ = bad_.copy()
                     src_ = a.copy()
                     for ang in op.get("angles", (35, -35, 60, -60, 90, -90, 120, -120, 150, -150, 180)):
@@ -896,7 +906,7 @@ def parts_cells(frames, e):
                             break
                         c_, s_ = np.cos(np.radians(ang)), np.sin(np.radians(ang))
                         sx_ = np.rint(rcx + dx_ * c_ - dy_ * s_).astype(int)
-                        sy_ = np.rint(rcy + dx_ * s_ + dy_ * c_).astype(int)
+                        sy_ = np.rint(rcy + (dx_ * s_ + dy_ * c_) * ys_).astype(int)
                         inb_ = (sx_ >= 0) & (sx_ < W) & (sy_ >= 0) & (sy_ < H)
                         sxc_, syc_ = sx_.clip(0, W - 1), sy_.clip(0, H - 1)
                         ok_ = todo_ & inb_ & ~bad_[syc_, sxc_]
@@ -993,13 +1003,43 @@ def parts_cells(frames, e):
                         k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
                     a[~k_, 3] = 0
                     continue
+                if "drop" in op:
+                    # (what the expressions name over the capture's own frame — a hero's gold and red, a weapon's white in a
+                    # box of it (x, y: the capture's own; d: moved from the clean frame) — cleared, "grow" px round it, its
+                    # edge faded over "soft" px: no hole with a hard rim)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+                    if part.get("bgshift"):
+                        b_ = np.roll(np.roll(b_, part["bgshift"][1], 0), part["bgshift"][0], 1)
+                    yy_, xx_ = np.mgrid[0:H, 0:W]
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "x": xx_, "y": yy_, "d": np.abs(o_ - b_).max(axis=2)}
+                    k_ = np.zeros((H, W), bool)
+                    for ex_ in op["drop"]:
+                        k_ |= eval(ex_, {}, env_)
+                    for ex_, px_ in op.get("near", []):
+                        # (a hit star's white heart, a digit's white face: only beside what was found)
+                        k_ |= eval(ex_, {}, env_) & ndimage.binary_dilation(k_, iterations=px_)
+                    if op.get("fillholes"):
+                        k_ = ndimage.binary_fill_holes(ndimage.binary_closing(k_, iterations=2))
+                    if op.get("grow"):
+                        k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
+                    sf_ = op.get("soft", 0)
+                    if sf_:
+                        dist_ = ndimage.distance_transform_edt(~k_)
+                        a[..., 3] = (a[..., 3] * np.clip(dist_ / sf_, 0, 1)).astype(np.uint8)
+                    else:
+                        a[k_, 3] = 0
+                    continue
                 if "patch" in op:
                     # (small marks of a body over the drawing — the hero's dark ornaments, a thin ring of its costume —
                     # each pixel the expressions name in the box (relative to "at") taken from the nearest pixel they do
                     # not name: the drawing's own dot beside it, no box seam; "grow" px round them too)
                     from scipy import ndimage
                     o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
-                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np}
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                     p_ = np.zeros((H, W), bool)
                     for ex_ in op["where"]:
                         p_ |= eval(ex_, {}, env_)
@@ -1021,7 +1061,7 @@ def parts_cells(frames, e):
                     o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
                     b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
                     env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
-                            "d": np.abs(o_ - b_).max(axis=2)}
+                            "d": np.abs(o_ - b_).max(axis=2), "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                     s_ = np.zeros((H, W), bool)
                     for ex_ in op["solid"]:
                         s_ |= eval(ex_, {}, env_)
@@ -1091,6 +1131,11 @@ def parts_cells(frames, e):
                 a = a[:, ::-1].copy()
                 ax = W - 1 - ax
                 box = lambda b: (max(0, ax + b[0]), max(0, ay + b[1]), min(W, ax + b[2]), min(H, ay + b[3]))
+            if part.get("flipv2"):
+                # (upside down round its own level line after the fills — they read the capture where it lies: 극청룡참's
+                # crescent, its clean upper half laid again below its axis)
+                a = a[::-1].copy()
+                ay = H - 1 - ay
             clip = part.get("clip", [-ox, -oy, cw - ox, ch - oy])
             # the part's kept box, in the frame and in the cell
             fx0, fy0 = max(0, ax + max(clip[0], -ox)), max(0, ay + max(clip[1], -oy))
@@ -1114,6 +1159,10 @@ def parts_cells(frames, e):
             # under what is there already (the first part on top)
             da = dst[..., 3:4].astype(np.float32) / 255
             sa = src[..., 3:4].astype(np.float32) / 255
+            if part.get("holeonly"):
+                # (only into what those before left clear — a body's silhouette cut out of a see-through sheet, filled from
+                # another frame where the sheet lay clear there — not laid again over the sheet itself)
+                sa = sa * (da < 0.04)
             oa = da + sa * (1 - da)
             rgb = (dst[..., :3] * da + src[..., :3] * sa * (1 - da)) / np.maximum(oa, 1e-3)
             dst[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
