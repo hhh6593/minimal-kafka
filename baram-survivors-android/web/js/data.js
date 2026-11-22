@@ -398,7 +398,7 @@ export const SKILLS = {
     stun: 1, desc: '거대한 나무뿌리로 대상과 주위의 몬스터를 묶고 피해를 준다' },
   p_bonghwang: { promo: 5, cls: 'poet', req: 21, name: '봉황신법', kind: 'line', fx: '150', dmg: 22, cd: 2.4, depth: 5,
     desc: '봉황 형태의 불꽃이 앞으로 날아가며 몬스터를 태운다' },
-  p_cheonseon: { promo: 6, cls: 'poet', req: 24, name: '천선의영역', kind: 'nova', fx: '135', dmg: 24, cd: 4, radius: 2,
+  p_cheonseon: { promo: 6, cls: 'poet', req: 24, name: '천선파동', kind: 'nova', fx: '135', dmg: 24, cd: 4, radius: 2,
     desc: '하늘의 이치를 담은 마법진을 펼쳐 주위의 몬스터를 공격한다' },
   p_daejijin: { promo: 7, cls: 'poet', req: 27, name: '대지진', kind: 'screen', fx: '134', dmg: 34, cd: 7,
     desc: '거대한 지진을 일으켜 화면의 몬스터 모두에게 피해를 준다' },
