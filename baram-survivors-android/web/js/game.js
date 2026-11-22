@@ -8963,13 +8963,36 @@ const TIER_KINDS = {
         G.quietHit = false;
       }
     });
-    // inside the ring, ground every tick while they stand
-    const ticks = Math.round(dur / def.tick);
+    // While they stand, the kunai fire (원작 2662 IMG13 #9~13, #21~25, #48~53: from the standing kunai, long white
+    // streaks shoot across the field at the monsters): each tick a few of them each send the throw's own streak
+    // (def.fxFly) from where it stands through the nearest monster and on past it; what lies on that line is struck.
+    // 이펙트=판정: the streak's drawn line is what it strikes (within 0.45 tile of it).
+    const ticks = Math.round(dur / def.tick), L = R * (def.shotLen || 1.8), per = def.shots || 3;
     for (let k = 1; k <= ticks; k++) later(0.2 + k * def.tick, () => {
       if (G !== run || G.dead) return;
-      G.quietHit = true; // (no hit marks: the original shows the ring and nothing else while it grinds)
-      for (const e of G.enemies) if (tkFoe(e) && inRing(e)) smite(e, st.dmg * def.k);
-      G.quietHit = false;
+      const order = spots.map((s, i) => [s, (i * 5 + k * 3) % n]).sort((a, b) => a[1] - b[1]).map(e => e[0]);
+      let fired = 0;
+      for (const [sx, sy] of order) {
+        if (fired >= per) break;
+        let best = null, bd = L * L;
+        for (const e of G.enemies) {
+          if (!tkFoe(e)) continue;
+          const d = (e.x - sx) ** 2 + (e.y - 20 - sy) ** 2;
+          if (d < bd && d > 16 * 16) { bd = d; best = e; }
+        }
+        if (!best) continue;
+        fired++;
+        const a = Math.atan2(best.y - 20 - sy, best.x - sx), ux = Math.cos(a), uy = Math.sin(a);
+        if (def.fxFly && M.fx[def.fxFly]) G.fxs.push({ id: def.fxFly, x: sx, y: sy, t: 0, life: fxLife(def.fxFly), scale: L / R, rot: a, anchor: 'bottom', alpha, must: true });
+        G.quietHit = true;
+        for (const e of G.enemies) {
+          if (!tkFoe(e)) continue;
+          const ex = e.x - sx, ey = e.y - 20 - sy, t = ex * ux + ey * uy;
+          if (t < 0 || t > L || Math.abs(ex * uy - ey * ux) > TILE * 0.45) continue;
+          smite(e, st.dmg * def.k);
+        }
+        G.quietHit = false;
+      }
     });
     // the end: each one a white glint and a burst of blue fire, striking what it covers (a tile and a bit round it)
     later(0.2 + dur, () => {
