@@ -1501,11 +1501,6 @@ const S9 = {
   cl_haeil: { promo: 9, cls: 'celestial', req: 33, name: '해일강타', kind: 'haeil9', fx: 'o_cl_haeil', fxHit: 'o_cl_haeilhit', dmg: 90, cd: 5, depth: 6, width: 1, ways: undefined, pulses: undefined,
     curse: 4, mark: 8, ck: 'line', pre: 'cl_ego', branch: 0,
     desc: '바라보는 쪽으로 해일을 일으켜 여섯 칸, 폭 세 칸의 몬스터에게 얼음 기둥을 세워 크게 치고 풍랑의표식을 남긴다(받는 피해 증가). 해일이 그 길을 휩쓸고 지나간다' },
-  // 마도사: 기공십자광선'쾌 (보조 공격), 광폭기사출 (광역), 광폭구슬'화 (그대로)
-  md_crossq: { promo: 9, cls: 'magus', req: 33, name: "기공십자광선'쾌", kind: 'echo', echo: 'cross', fx: 'k_md_cross', fxCast: 'k_u_md_wing', fx2: 'k_md_cross', fxHit: 'k_u_md_storm', hit: 24, cd: 18,
-    duration: 6, every: 0.5, range: 6, depth: 6, power: 0.2, buff: 'power', ck: 'buff', pre: 'md_cross', branch: 0,
-    desc: '6초 동안 몸 주변에 마력의 거울을 만들어 십자 방향으로 열광선을 빠르게 거듭 쏜다. 그동안 광폭기가 차올라 피해가 20% 는다' },
-  md_frenzyshot: { promo: 9, cls: 'magus', req: 33, name: '광폭기사출', kind: 'spell', fx: 'k_md_bust', fxHit: 'k_u_md_storm', dmg: 60, cd: 3.2, range: 6, count: 6,
   // 마도사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/magus.md). 시전 3 + 패시브 1 + 필살기:
   //   기공십자광선'쾌 (IMG58 #2-98: 6초 동안 몸 둘레 거울에서 십자 네 방향으로 열광선이 거듭 — 다섯 칸, 폭 한 칸; 맞히면 광폭기 흡수:
   //     피해 20%; 쿨 8초. 같은 장면 #111-201은 광폭화 상태 전용인 광폭십자광선'쾌(폭 세 칸) — 우리 기술 아님),
