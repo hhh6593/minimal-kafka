@@ -9300,7 +9300,8 @@ const TIER_KINDS = {
       // 폭렬천뢰탄: the orb discharges into the nearest few
       if (def.chain) tkNear(tx, ty, 3).filter(o => o !== t).slice(0, def.chain).forEach((o, i) => later(0.08 * (i + 1), () => {
         if (o.hp <= 0) return;
-        hitOn(o);
+        // (원작 2662 IMG31: the one it jumps to bursts with the same sphere, smaller — def.chainFx)
+        if (def.chainFx && M.fx[def.chainFx]) fxOn(def.chainFx, o, { scale: def.chainScale || 0.6 }); else hitOn(o);
         smite(o, st.dmg * (def.chainK || 0.5));
       }));
       // 회선격풍: the wind stays and cuts on

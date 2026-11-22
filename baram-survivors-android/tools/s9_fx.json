@@ -1728,18 +1728,6 @@
   "scale": 0.62,
   "why": "서리파편: the field of ice it leaves where it bursts — blue crystals and rings pulsing (2662 IMG23 frames 27-38, one pulse; the camera still) — its blue keyed off the grey ground and the dummies' wood, the damage numbers over the dummies painted over; the capture's right edge cuts it: that side from the left, mirrored"
  },
- "p_cheonroe": {
-  "src": "dl1320/21.gif",
-  "mode": "white",
-  "ms": 70,
-  "why": "폭렬천뢰탄's thunder orb (2662 IMG31)"
- },
- "p_cheonsin": {
-  "src": "dl1320/06.gif",
-  "mode": "white",
-  "ms": 90,
-  "why": "천신의기운's golden ring (2662 IMG33)"
- },
  "rp_lotus": {
   "src": "gif2662/IMG81.gif",
   "mode": "parts",
@@ -2993,12 +2981,6 @@
    ]
   ],
   "opaque": 1.5
- },
- "p_banhyang": {
-  "src": "dl1320/22.gif",
-  "mode": "white",
-  "ms": 70,
-  "why": "도사 9차 치유의반향: the echo of healing light (1320 #22, by its look)"
  },
  "a_cheongung": {
   "src": "gif2662/IMG42.gif",

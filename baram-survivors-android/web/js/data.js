@@ -1468,7 +1468,7 @@ const S9 = {
     desc: '6초 동안 천신의 기운이 자신과 동료에게 깃들어 매초 최대 체력의 5%를 채우고, 둘레에 퍼지는 금빛 고리(가로 다섯 칸 남짓) 안의 몬스터를 거듭 친다' },
   p_zone9: { promo: 9, cls: 'poet', req: 33, name: '천선의영역', kind: 'zone9', fx: 'o_p_cheonseon9', cd: 20, duration: 10, radius: 3, ward: 0.5, ck: 'buff', buff: 'shield', pre: 'p_cheonseon', branch: 2,
     desc: '시전한 자리에 천선의 영역을 10초 동안 펼친다. 영역 안에 있는 동안 받는 피해가 절반이 되고, 영역 밖으로 나가면 곧바로 사라진다' },
-  p_thunderbomb: { kind: 'smite', fx: 'o_p_cheonroe9', fxShot: 'o_p_cheonroe9', fx2: undefined, fxHit: 'o_p_cheonroe', dmg: 110, cd: 4, range: 7, radius: 0, chain: 2, chainK: 0.5, shot: true,
+  p_thunderbomb: { kind: 'smite', fx: 'o_p_cheonroe9', fxShot: 'o_p_cheonroe9', fx2: undefined, fxHit: undefined, chainFx: 'o_p_cheonroe9', chainScale: 0.6, dmg: 110, cd: 4, range: 7, radius: 0, chain: 2, chainK: 0.5, shot: true,
     fxAfter: null, fxs: null, tint: null, modern: null, ck: 'spell',
     desc: '벼락의 힘을 담은 구체를 가장 강한 몬스터에게 쏘아 크게 치고, 방전하여 곁의 몬스터 둘에게 번개가 옮겨 붙는다' },
   // 궁사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/archer.md). 시전 3 + 패시브 1 + 필살기:
