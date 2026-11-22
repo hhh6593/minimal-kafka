@@ -8893,7 +8893,7 @@ const TIER_KINDS = {
     const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
     if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
     const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 0.85, must: true };
-    if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom' }); // (its pivot its middle: on the hero's body)
+    if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 }); // (its pivot its middle: on the hero's body)
     G.fxs.push(fx);
     const end = G.t + life;
     G.ward9Hits = def.wardHits ? { n: 0, at: def.wardHits, until: end } : null;
@@ -9372,7 +9372,7 @@ const TIER_KINDS = {
     const fid = def.fx + '#hold';
     if (!M.fx[fid] && M.fx[def.fx]) M.fx[fid] = { ...M.fx[def.fx], src: M.fx[def.fx].src || def.fx, hold: true };
     const run = G, x = p.x, y = p.y - 22, [hx, hy] = def.half, life = fxLife(fid) || 2.8;
-    G.fxs.push({ id: fid, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.7 : 0.95, must: true });
+    G.fxs.push({ id: fid, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.7 : 1, must: true });
     const inWhirl = e => tkFoe(e) && ((e.x - x) / hx) ** 2 + ((e.y - 20 - y) / hy) ** 2 <= 1;
     const n = Math.max(1, Math.round((life - 0.2) / (def.tick || 0.5)));
     for (let k = 0; k <= n; k++) later(0.08 + k * (def.tick || 0.5), () => {
@@ -9382,24 +9382,21 @@ const TIER_KINDS = {
       G.quietHit = false;
     });
   },
-  // 해일강타 (원작 2662 IMG51): the 천인 raises a tidal wave the way with the most foes (the hero turned to it): every foe
+  // 해일강타 (원작 2662 IMG51): the 천인 raises a tidal wave the way it faces: every foe
   // `depth` tiles ahead and `width` to each side is struck at once, an ice pillar rising on it (o_cl_haeilhit, at most
   // twelve drawn) and 풍랑의표식 left on it for `mark` s (cursed: it takes more; 천공의공명 rings it); the sheet of water
   // (o_cl_haeil at the original's own size, its pivot the hero's feet; drawn going left — flipped going right, turned
   // for up and down) sweeps out over that ground in a second. 이펙트=판정: the water covers what was struck.
   haeil9({ skill, st, def, smite }) {
-    // (test: window.__faceOnly — only the way the hero faces, for a side-by-side with the original's leftward wave)
-    const p = G.player, best = tkBestRow(def.depth, window.__faceOnly ? [] : DIRS);
-    if (!best) return 0.3;
-    const [dx, dy] = best;
-    p.fdx = dx; p.fdy = dy;
-    if (dx) p.face = dx;
+    // (사용자 결정: only the way the hero faces — it waits while nothing stands in that row of `depth` × 3)
+    const p = G.player, dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = dx ? 0 : p.fdy;
     const sx = p.tx, sy = p.ty, w = def.width || 1, run = G;
     const inWave = e => {
       const a = (e.tx - sx) * dx + (e.ty - sy) * dy, s = Math.abs((e.tx - sx) * dy - (e.ty - sy) * dx);
       return tkFoe(e) && a >= 1 && a <= def.depth && s <= w;
     };
-    const f = { id: def.fx, x: p.x, y: p.y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.65 : 0.92, must: true };
+    if (!G.enemies.some(inWave)) return 0.3;
+    const f = { id: def.fx, x: p.x, y: p.y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.65 : 1, must: true };
     if (dx > 0) f.flip = true;
     if (dy) f.rot = dy < 0 ? Math.PI / 2 : -Math.PI / 2;
     G.fxs.push(f);

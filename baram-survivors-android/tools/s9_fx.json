@@ -1960,7 +1960,8 @@
      ]
     }
    ]
-  ]
+  ],
+  "opaque": 1.6
  },
  "l_sickle": {
   "src": "dl1320/25.gif",
@@ -3078,9 +3079,9 @@
   ],
   "field": [
    402,
-   293,
-   211,
-   227
+   290,
+   140,
+   165
   ],
   "mask": [
    {
@@ -3117,14 +3118,22 @@
    0.99,
    0.12
   ],
-  "grow": 13,
+  "grow": 17,
   "stars": 2,
   "bars": 1,
   "cyan": [
-   240,
-   90,
-   570,
-   480
+   175,
+   55,
+   635,
+   525
+  ],
+  "holebox": [
+   [
+    690,
+    200,
+    812,
+    270
+   ]
   ]
  },
  "md_ult9": {
@@ -7639,7 +7648,7 @@
    175,
    125
   ],
-  "ms": 150,
+  "ms": 158,
   "scale": 0.62,
   "badbox": [
    [
@@ -7667,7 +7676,7 @@
    "(r>165)&(g>150)&(b<r-18)",
    "(g>=b)&(g>215)&(r>120)"
   ],
-  "why": "순보선풍: the blue gale whirling where the 천인 landed (2662 IMG49 frames 4-44, the camera still from frame 2): unmixed off the clean field (frame 49); what lies over it — the caster's bars and the numbers, hit stars and sparks at its middle, the struck dummy's ice burst at its top, the bystander under its bottom — taken from the whirl's own pixels a turn on round its middle (rot); faded at its own round edge",
+  "why": "순보선풍: the blue gale whirling where the 천인 landed (2662 IMG49 frames 4-44, the camera still from frame 2): unmixed off the clean field (frame 49); what lies over it — the caster's bars and the numbers, hit stars and sparks at its middle, the struck dummy's ice burst at its top, the bystander under its bottom — taken from the whirl's own pixels a turn on round its middle (rot); faded at its own round edge; frame 34 (a faint flicker of the capture) left out",
   "cells": [
    [
     {
@@ -7797,15 +7806,6 @@
    ],
    [
     {
-     "f": 34,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
      "f": 36,
      "at": [
       280,
@@ -7875,7 +7875,8 @@
    116,
    140,
    7
-  ]
+  ],
+  "opaque": 2
  },
  "cl_haeil": {
   "src": "gif2662/IMG51.gif",
@@ -8199,7 +8200,9 @@
      ]
     }
    ]
-  ]
+  ],
+  "opaque": 1.8,
+  "keepraw": true
  },
  "cl_haeilhit": {
   "src": "gif2662/IMG51.gif",
