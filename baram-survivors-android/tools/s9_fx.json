@@ -3601,18 +3601,12 @@
    34,
    50
   ],
-  "field": [
-   398,
-   294,
-   206,
-   225
-  ],
   "vignette": [
    1.02,
    0.96,
    0.16
   ],
-  "grow": 19,
+  "grow": 3,
   "stars": 1,
   "mask": [
    {
@@ -3640,7 +3634,31 @@
     ]
    }
   ],
-  "why": "질풍난무: the 원작 궁극's art (2662 IMG19 frames 11-41, every third: the bamboo grove framing the screen, the great kunai at its foot, the green gale closing in round the hero) — its black see-through, the damage numbers and the hero filled from the art round them (no life-bar keying: the bamboo is that green), faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+  "why": "질풍난무: the 원작 궁극's art (2662 IMG19 frames 11-41, every third: the bamboo grove framing the screen, the great kunai at its foot, the green gale closing in round the hero) — its black see-through, the damage numbers and the hero filled from the art round them (no life-bar keying: the bamboo is that green), faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9) [가운데 복원: the number, star, bar and dummy columns filled from the same frame's gale a turn on round the hero (rotfill), no more vivid-only field]",
+  "rotfill": {
+   "at": [
+    398,
+    318
+   ],
+   "ys": 1.0,
+   "box": [
+    150,
+    0,
+    630,
+    420
+   ],
+   "grow": 8,
+   "fill": [
+    [
+     398,
+     312,
+     26,
+     44
+    ]
+   ],
+   "soft": 12
+  },
+  "white": 254
  },
  "m_ult9": {
   "src": "gif2662/IMG27.gif",
@@ -3667,12 +3685,6 @@
    289,
    34,
    50
-  ],
-  "field": [
-   401,
-   299,
-   208,
-   229
   ],
   "vignette": [
    0.97,
@@ -3705,7 +3717,38 @@
     ]
    }
   ],
-  "why": "겁화: the 원작 궁극's art (2662 IMG27 frames 14-47, every third: the cavern of lava and its fangs, the spiral of fire closing on the hero, the yellow blast, the red ring) — its black see-through, the damage numbers and the hero filled from the art round them, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+  "why": "겁화: the 원작 궁극's art (2662 IMG27 frames 14-47, every third: the cavern of lava and its fangs, the spiral of fire closing on the hero, the yellow blast, the red ring) — its black see-through, the damage numbers and the hero filled from the art round them, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9) [가운데 복원: the number, star, bar and dummy columns filled from the same frame's spiral of fire a turn on round the hero (rotfill), no more vivid-only field]",
+  "rotfill": {
+   "at": [
+    400,
+    300
+   ],
+   "ys": 1.0,
+   "box": [
+    150,
+    40,
+    640,
+    420
+   ],
+   "grow": 11,
+   "fill": [
+    [
+     400,
+     300,
+     26,
+     44
+    ]
+   ],
+   "soft": 12,
+   "bad": [
+    "(b > 150) & (b - r > 70) & (b - g > 25)",
+    "mn > 190",
+    "(g > r + 50) & (g > b + 50)",
+    "(mx - mn < 45) & (mx > 80)"
+   ]
+  },
+  "white": 254,
+  "grow": 3
  },
  "p_ult9": {
   "src": "gif2662/IMG38.gif",
@@ -3733,12 +3776,6 @@
    34,
    50
   ],
-  "field": [
-   403,
-   303,
-   209,
-   232
-  ],
   "mask": [
    {
     "box": [
@@ -3765,7 +3802,61 @@
     ]
    }
   ],
-  "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+  "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them [가운데 복원: the number, star, bar and dummy columns filled from the same frame's clouds and wind a turn on round the compass star (rotfill), no more vivid-only field]",
+  "rotfill": {
+   "at": [
+    396,
+    372
+   ],
+   "ys": 1.0,
+   "box": [
+    140,
+    50,
+    650,
+    470
+   ],
+   "srcbox": [
+    130,
+    40,
+    660,
+    480
+   ],
+   "grow": 9,
+   "degs": [
+    90,
+    -90,
+    180,
+    45,
+    -45,
+    135,
+    -135,
+    25,
+    -25,
+    65,
+    -65,
+    115,
+    -115,
+    155,
+    -155
+   ],
+   "fill": [
+    [
+     400,
+     320,
+     30,
+     48
+    ]
+   ],
+   "soft": 12,
+   "bad": [
+    "(b > 150) & (b - r > 70) & (b - g > 25)",
+    "(r > 170) & (r - g > 45) & (b < 140)",
+    "(g > r + 50) & (g > b + 50)",
+    "(r > 110) & (r - b > 50) & (g < 130)"
+   ]
+  },
+  "white": 254,
+  "grow": 3
  },
  "a_ult9": {
   "src": "gif2662/IMG47.gif",
@@ -3840,7 +3931,12 @@
   ],
   "wcomp": 1,
   "wmin": 25,
-  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, in the middle window only the arrows and wind lines' own pale light, nothing near a number, star, bar or body (no fill), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, in the middle window only the arrows and wind lines' own pale light, nothing near a number, star, bar or body (no fill), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9) [가운데 복원: the wind streaks that cross a number column faded out near it (wsoft) instead of dropped whole, and the dark teal whirl kept (wteal) — the rain of arrows laid over it after by s9_stamps.py POST a_ult9]",
+  "wsoft": 10,
+  "wteal": [
+   15,
+   45
+  ]
  },
  "cl_ult9": {
   "src": "gif2662/IMG56.gif",
@@ -3957,27 +4053,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -3985,21 +4060,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4022,27 +4082,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4050,21 +4089,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4087,27 +4111,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4115,21 +4118,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4152,27 +4140,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4180,21 +4147,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4217,27 +4169,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4245,21 +4176,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4282,27 +4198,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4310,21 +4205,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4347,27 +4227,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4375,21 +4234,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4412,27 +4256,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4440,21 +4263,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4477,27 +4285,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4505,21 +4292,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4542,27 +4314,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4570,21 +4321,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4607,27 +4343,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4635,21 +4350,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4672,27 +4372,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4700,21 +4379,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4737,27 +4401,6 @@
      ],
      "ops": [
       {
-       "vmirror": {
-        "box": [
-         -230,
-         -172,
-         222,
-         102
-        ],
-        "ay": 102,
-        "feather": 18
-       }
-      },
-      {
-       "fadebox": [
-        -252,
-        -390,
-        244,
-        -116
-       ],
-       "soft": 64
-      },
-      {
        "fadebox": [
         304,
         -130,
@@ -4765,21 +4408,6 @@
         -58
        ],
        "soft": 22
-      },
-      {
-       "radial": [
-        3000,
-        3100
-       ],
-       "rc": [
-        0,
-        65
-       ],
-       "ry": 3.0,
-       "hole": [
-        52,
-        66
-       ]
       }
      ]
     }
@@ -4790,7 +4418,105 @@
   "max": 420,
   "cap": 420,
   "soft": 40,
-  "why": "비전방진: the 원작 궁극's art (2662 IMG64 frames 13-44: the tomes in their wheels, the gears, the crystals, the orbs of 마력, the purple storm, the bolts) over the client's black; the dummies' columns with their numbers, the hero and the other characters taken again from the same frame's art turned round the hero's middle; faded at its edge"
+  "why": "비전방진: the 원작 궁극's art (2662 IMG64 frames 13-44: the tomes in their wheels, the gears, the crystals, the orbs of 마력, the purple storm, the bolts) over the client's black; the dummies' columns with their numbers, the hero and the other characters taken again from the same frame's art turned round the hero's middle; faded at its edge [가운데 복원: the vertically mirrored orb and the faded upper band replaced — the number, star, bar and dummy columns, the hero and the bystanders filled from the same frame's ring of eight orbs turned by 45° (rotfill), what none gives left soft]",
+  "rotfill": {
+   "at": [
+    400,
+    365
+   ],
+   "ys": 1.0,
+   "box": [
+    170,
+    0,
+    630,
+    590
+   ],
+   "srcbox": [
+    160,
+    0,
+    640,
+    640
+   ],
+   "grow": 7,
+   "soft": 14,
+   "pin": 600,
+   "degs": [
+    45,
+    -45,
+    90,
+    -90,
+    135,
+    -135,
+    180
+   ],
+   "starbox": [
+    6,
+    8,
+    56,
+    8
+   ],
+   "bad": [
+    "(r > 170) & (r - g > 55) & (b < 140)",
+    "(r > 110) & (r - b > 45) & (r - g > 30) & (y > 62) & (y < 345) & (x > 175) & (x < 625)",
+    "(g > r + 50) & (g > b + 50)"
+   ],
+   "fill": [
+    [
+     400,
+     335,
+     48,
+     72
+    ],
+    [
+     400,
+     500,
+     26,
+     52
+    ],
+    [
+     356,
+     95,
+     22,
+     40
+    ],
+    [
+     256,
+     215,
+     20,
+     30
+    ],
+    [
+     542,
+     215,
+     20,
+     30
+    ],
+    [
+     256,
+     372,
+     18,
+     40
+    ],
+    [
+     542,
+     372,
+     18,
+     40
+    ],
+    [
+     241,
+     298,
+     52,
+     52
+    ],
+    [
+     559,
+     298,
+     52,
+     52
+    ]
+   ]
+  }
  },
  "rp_ult9": {
   "src": "gif2662/IMG84.gif",
