@@ -1555,16 +1555,18 @@ const S9 = {
   mk_tugwi: { promo: 9, cls: 'monk', req: 33, name: "진'투귀살", kind: 'smite', fx: 'k_u_mk_palm', fxShot: 'k_u_mk_palm', fxHit: 'k_u_mk_energy', dmg: 110, cd: 4.5, range: 7,
     radius: 0, shot: true, chain: 3, chainK: 0.45, ck: 'spell', pre: 'mk_kyokushin', branch: 0,
     desc: '마력의 화살을 가장 강한 몬스터에게 쏘아 크게 친다. 맞은 자리에서 유도 화살이 튀어나가 곁의 몬스터 셋을 더 친다' },
-  // 도깨비 ← 영술사 9차 (혼과 불을 부리는 술사 → 도깨비불과 귀신의 도깨비): 불길한혼불 (보조 공격), 화혼돌파 (광역 돌진), 천신의심판 (강한 일격).
-  dk_honbul: { promo: 9, cls: 'dokkaebi', req: 33, name: '불길한혼불', kind: 'echo', echo: 'hex', fx: 'o_dk_honbul', fx2: 'o_dk_honbul', markScale: 0.9, fxBurst: 'h_hit_fire', burstScale: 1.6, hit: 22, cd: 17, duration: 10,
-    every: 0.8, shots: 2, range: 5, radius: 1, delay: 1.2, dot: 'burn', power: 0.1, buff: 'power', ck: 'buff', pre: 'dk_wisp3', branch: 2,
-    desc: '10초 동안 곁의 몬스터에게 불길한 혼불이 달라붙는다. 1.2초 뒤 혼불이 폭발하며 둘레를 태우고(화상), 그동안 피해가 10% 는다' },
-  dk_hwahon: { promo: 9, cls: 'dokkaebi', req: 33, name: '화혼돌파', kind: 'crosswave', fx: 'o_dk_hwahon', fxCast: 'k_x_dk_firebat_cast', fxHit: 'h_hit_fire', trail: 'o_dk_hwahon', trailStep: 1, trailSize: 90, dmg: 44, cd: 6, depth: 6, width: 1, ways: 1,
-    pulses: 1, dash: true, dot: 'burn', ck: 'line', pre: 'dk_firebat', branch: 2,
-    desc: '대장군의 힘으로 몬스터가 가장 많은 쪽으로 여섯 칸 돌진하며 지나는 길과 그 양옆을 치고, 요괴혼의 불길이 태운다(화상)' },
-  dk_simpan: { promo: 9, cls: 'dokkaebi', req: 33, name: '천신의심판', kind: 'smite', fx: 'o_dk_simpan', fxPull: 'o_dk_simpanpull', fxHit: 'h_hit_fire', dmg: 105, cd: 6,
-    range: 6, radius: 2, splash: 0.6, densest: true, pull: true, delay: 0.6, size: 220, ck: 'strike', pre: 'dk_nemesis', branch: 0,
-    desc: '몬스터가 가장 많은 곳의 둘레를 가운데로 끌어모은 뒤, 분노한 거대한 천신의 주먹이 내려와 짓이긴다' },
+  // 도깨비 ← 영술사 9차 (원작 2662 장면 그대로 — scratchpad plan9/spec/dokkaebi.md). 시전 3 + 패시브 1 + 필살기:
+  //   화혼돌파 (IMG68, 이동공격: 바라보는 쪽으로만 여섯 칸 돌진, 지나온 길과 앞 두 칸 폭 세 칸을 친다; 푸른 혼불 휘두름 + 뒤로 흐르는 불꼬리 — hwahon9),
+  //   천신의심판 (IMG71, 위치지정: 몬스터가 가장 많은 곳 둘레를 붉은 소용돌이로 끌어모은 뒤 천신의 주먹 = 분홍 빛기둥이 내리꽂힘 — smite own),
+  //   장승영역 (IMG75, PVP → 몬스터 상대로: 시전 자리에 금빛 인장과 장승 고리 8초, 안의 몬스터는 장승에게 거듭 맞고 느려지며 자신은 안에서 받는 피해 감소 — jang9),
+  //   불길한혼불 = 패시브, 그림 없음 (설명창 IMG69 [지속효과 마법]: 둘레의 몬스터에 혼불이 붙고, 불 기술로 치면 터져 둘레를 친다 — honbul9).
+  // Pictures at the original's own size (o_dk_*: 0.62 game pixels a capture pixel).
+  dk_hwahon: { promo: 9, cls: 'dokkaebi', req: 33, name: '화혼돌파', kind: 'hwahon9', fx: 'o_dk_hwahon', fxCast: undefined, fxHit: undefined, trail: undefined, trailStep: undefined,
+    trailSize: undefined, dmg: 44, cd: 3, depth: 6, ahead: 2, half: 1, width: undefined, ways: undefined, pulses: undefined, dash: undefined, dot: 'burn', ck: 'line', pre: 'dk_firebat', branch: 2,
+    desc: '대장군의 힘으로 바라보는 쪽으로 여섯 칸 돌진하며 지나온 길과 그 양옆, 앞 두 칸을 치고, 요괴혼의 푸른 불길이 태운다(화상)' },
+  dk_simpan: { promo: 9, cls: 'dokkaebi', req: 33, name: '천신의심판', kind: 'smite', fx: 'o_dk_simpan', fxPull: undefined, fxHit: undefined, own: true, dmg: 105, cd: 7,
+    range: 6, radius: 2, splash: 0.8, densest: true, pull: true, delay: 0.65, size: undefined, ck: 'strike', pre: 'dk_nemesis', branch: 0,
+    desc: '몬스터가 가장 많은 곳의 둘레(5×5)를 붉은 소용돌이로 가운데에 끌어모은 뒤, 분노한 거대한 천신의 주먹이 빛기둥으로 내리꽂혀 짓이긴다' },
   // ---- 네 번째 9차 (모든 직업 4개: 보조 공격·몸 주변·광역·강한 일격 하나씩). 원작의 패시브는 켜는 기술로, PVP 기술은 몬스터 상대로.
   m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,
     slow: 2, curse: 2, ck: 'strike', pre: 'm_seonsim', branch: 2,
@@ -1583,9 +1585,9 @@ const S9 = {
   mk_bujori: { promo: 9, cls: 'monk', req: 33, name: '부조리', kind: 'shieldburst', fx: 'k_mk_bujori', fx2: 'k_mk_bujori', fxCast: 'k_u_mk_energy', hit: 60, cd: 12, duration: 4,
     radius: 3, stun: 0.8, pre: 'mk_focus', branch: 2,
     desc: '부조리한 공격을 막아 4초 동안 받는 피해가 절반이 되고, 막이 풀릴 때 막아 둔 힘이 터져 둘레 세 칸을 치고 멈춘다' },
-  dk_jangseung: { promo: 9, cls: 'dokkaebi', req: 33, name: '장승영역', kind: 'aura9', fx: 'o_dk_jangseung', fxHit: 'h_hit_fire', hit: 10, cd: 17, duration: 8, radius: 2,
-    tick: 0.5, ward: 0.5, auraAlpha: 0.95, ck: 'buff', buff: 'shield', pre: 'dk_body', branch: 2,
-    desc: '자신을 중심으로 장승이 둘러싼 영역을 8초 동안 세운다. 영역 밖의 공격은 반만 들어오고, 영역에 든 몬스터는 장승에게 거듭 맞는다' },
+  dk_jangseung: { promo: 9, cls: 'dokkaebi', req: 33, name: '장승영역', kind: 'jang9', fx: 'o_dk_jangseal', fxPole: 'o_dk_jangpole', fxHit: undefined, hit: 12, cd: 20, duration: 8, radius: 2,
+    tick: 0.5, ward: 0.5, slow: 1, auraAlpha: undefined, ck: 'buff', buff: 'shield', pre: 'dk_body', branch: 2,
+    desc: '시전한 자리에 장승이 둘러싼 금빛 영역(5×5)을 8초 동안 편다. 영역 안에 있는 동안 밖의 공격은 반만 들어오고, 영역에 든 몬스터는 장승에게 거듭 맞으며 느려진다' },
 };
 for (const [id, o] of Object.entries(S9)) {
   const { pre, branch, ...rest } = o;
@@ -1671,6 +1673,15 @@ SKILLS.rp_galmuri = { name: '영혼갈무리', kind: 'passive', retired: true, w
   galmuri9: { mana: 0.005, ids: ['rp_crush'], cut: 0.125 } };
 SKILL_ALIAS.rp_galmuri = 'rp_hwangcheon';
 SKILLS.rp_hwangcheon.desc += '. 9차 패시브 영혼갈무리: 몬스터를 쓰러뜨릴 때마다 마력이 차고 분쇄섬이 빨리 돌아온다';
+// 불길한혼불: a passive in the original ([지속효과 마법], 설명창 IMG69; no scene of it in 2662): an ill-omened soul fire clings to the
+// foes round the 영술사, and striking one with a fire skill (화염쓸기·화염회격·화염정권·화염돌파·도깨비혈침·도깨비폭격·도리깨난타·
+// 천신의심판 there; here the 도깨비's fire — 도깨비불·폭살·뇌격·쥐불놀이·도깨비불 1~3성·화혼돌파·천신의심판) makes it burst on the
+// one it clings to and round it. No picture of its own (the small fire of a blow). A saved slot of it is 화혼돌파.
+SKILLS.dk_honbul = { name: '불길한혼불', kind: 'passive', retired: true, was: 'dokkaebi', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 둘레 세 칸의 몬스터 셋에게 불길한 혼불이 달라붙고, 도깨비불·폭살·뇌격·쥐불놀이·도깨비불 1~3성·화혼돌파·천신의심판을 쓰면 혼불이 붙은 몬스터(다섯 칸 안)마다 혼불이 터져 그와 둘레 한 칸에 그 기술 피해의 60%를 준다',
+  honbul9: { ids: ['dk_wisp', 'dk_wispexp', 'dk_shock', 'dk_firebat', 'dk_wisp1', 'dk_wisp2', 'dk_wisp3', 'dk_hwahon', 'dk_simpan'], k: 0.6, reach: 5, cling: 3, n: 3, life: 10, fx: 'h_hit_fire' } };
+SKILL_ALIAS.dk_honbul = 'dk_hwahon';
+SKILLS.dk_hwahon.desc += '. 9차 패시브 불길한혼불: 둘레의 몬스터에 혼불이 붙고, 불 기술을 쓰면 터져 둘레를 친다';
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect', 'p_seongi']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
 
@@ -1793,7 +1804,7 @@ export const ULT_TIERS = {
     ult('dokkaebi', 'dk_ult', '금나와라,뚝딱', { mech: 'rain', cast: 'k_dk_ult', castSize: 200, drop: 'k_u_dk_gold', dropSize: 110, hit: 'k_dk_goldhit', boss: 'dk_punish', k: 1 }),
     ult('dokkaebi', 'dk_super', "일격필살'괴력난신", { mech: 'execute', main: 'k_dk_super', mainSize: 340, hit: 'h_ml_burst', hitScale: 0.5, n: 3, boss: 'dk_judgment', k: 1.15 }),
     ult('dokkaebi', 'dk_storm', '도깨비폭풍', { openW: 0.5, echoW: 220, mech: 'vortex', main: 'k_dk_storm', burst: 'k_dk_storm', burstSize: 320, hit: 'h_hit_fire', hold: 1.2, boss: 'dk_hamstring', k: 1.3 }),
-    ult('dokkaebi', 'dk_akgwi', '악귀출몰', { cutin: 'o_dk_ult9', desc: '흐트러진 혼을 불러모아 화면의 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다 (원작 영술사의 궁극)', aura: 'k_dk_judgment', mech: 'rings', main: 'k_dk_rage', mainSize: 300, hit: 'h_hit_fire', boss: 'dk_nemesis', k: 1.5 }),
+    ult('dokkaebi', 'dk_akgwi', '악귀출몰', { cine9: 0.75, cutin: 'o_dk_ult9', guard: 3, desc: '흐트러진 혼을 불러모아 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다 (원작 영술사의 궁극)', aura: 'k_dk_judgment', mech: 'rings', main: 'k_dk_rage', mainSize: 300, hit: 'h_hit_fire', boss: 'dk_nemesis', k: 1.5 }),
   ],
   reaper: [
     ult('reaper', 'rp_ult', '차사강림', { mech: 'cleaveWave', main: 'k_rp_ult', mainSize: 260, hit: 'k_rp_cut', hitScale: 0.6, after: 'k_u_rp_ring', boss: 'rp_flash', k: 1 }),

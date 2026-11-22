@@ -7836,6 +7836,9 @@ function cast(skill, st) {
   // 천공의공명 (원작 9차 패시브): a 천기 skill rings the 풍랑의표식 (9차 승급부터, 수련장에서는 늘)
   const gm = SKILLS.cl_gongmyeong && SKILLS.cl_gongmyeong.gong9;
   if (used && gm && !st.nine && gm.ids.includes(skill.id) && G.cls.id === 'celestial' && (promoOf('celestial') >= 9 || G.training)) gongmyeong(gm, skill, st);
+  // 불길한혼불 (원작 9차 패시브): a fire skill bursts the soul fires clinging to the foes round (9차 승급부터, 수련장에서는 늘)
+  const hb = SKILLS.dk_honbul && SKILLS.dk_honbul.honbul9;
+  if (used && hb && !st.nine && hb.ids.includes(skill.id) && G.cls.id === 'dokkaebi' && (promoOf('dokkaebi') >= 9 || G.training)) honbul(hb, skill, st);
   // 묵혈독바르기: a striking skill cast while the blade is coated takes a charge — its blows for the next second leave 묵혈독
   if (used && G.coat9 && def.kind !== 'coat9' && (def.dmg || def.hit) && G.t < G.coat9.until && G.coat9.n > 0) {
     G.coat9.n--;
@@ -9185,7 +9188,10 @@ const TIER_KINDS = {
     // (압도적진격: its double ring of fire bursts at the front, between the hero and the one struck, facing the blow)
     // (drawn as wide as it strikes: the one struck and its splash round it, or one and a half tiles alone)
     const span = Math.max(1.5, (def.radius || 0) * 2 + 1);
-    if (def.front) later(wait, () => addFx(fxTiles(fxid, span, 'sm'), t.x, t.y - 24, { flip: t.x > p.x }));
+    // (천신의심판, 원작 2662 IMG71: the whirl drawing them in and the 천신's pillar of light, one picture at the original's own
+    // size, its pivot the middle of the ring — the spot struck; what it strikes the ring's round, radius tiles)
+    if (def.own) addFx(fxid, t.tx * TILE + TILE / 2, t.ty * TILE + TILE - 14, { anchor: 'bottom', must: true });
+    else if (def.front) later(wait, () => addFx(fxTiles(fxid, span, 'sm'), t.x, t.y - 24, { flip: t.x > p.x }));
     else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(fxTiles(fxid, span, 'sm'), t));
     const tx = t.tx, ty = t.ty;
     // 천신의심판: the foes round it drawn into the middle first
@@ -9200,6 +9206,9 @@ const TIER_KINDS = {
       if (def.fx2 && M.fx[def.fx2]) addFx(fxTiles(def.fx2, sr * 2 + 1, 'sm2'), tx * TILE + TILE / 2, ty * TILE + TILE - 16);
       G.shake = Math.max(G.shake, 0.08);
       meleeImpact(2);
+      // (천신의심판: no hit marks of another's — the pillar is what strikes; the original shows none)
+      if (def.own) G.quietHit = true;
+      later(0.01, () => { if (def.own) G.quietHit = false; });
       if (t.hp > 0) { smite(t, st.dmg, def.push ? [Math.sign(ex), Math.sign(ey)] : null); tkAfflict(t, def); tkBurstMark(t); }
       if (sr) for (const o of around(tx, ty, sr)) {
         if (o === t) continue;
@@ -9590,6 +9599,77 @@ const TIER_KINDS = {
       G.quietHit = false;
     });
   },
+  // 화혼돌파 (원작 2662 IMG68; 설명창 IMG67: 대장군의 힘으로 전방 6칸 앞으로 돌진하며 경로 내 적을 공격, 주변 적에게도 요괴혼이
+  // 날아가 공격; 이동 기술 → 바라보는 쪽으로만): the 도깨비 charges `depth` tiles the way it faces (stopping at the ground's edge;
+  // one on the last tile steps aside), and where it ends the blue soul fire (o_dk_hwahon at the original's own size, its pivot
+  // the hero's feet; drawn going left — flipped going right, turned for up and down) sweeps before it, `ahead` tiles more, while
+  // its cyan trails stream back over the path. 이펙트=판정: the path and the sweep ahead, `half` tiles to either side, burnt.
+  hwahon9({ st, def, smite }) {
+    const p = G.player, fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = fx ? 0 : p.fdy, run = G, sx = p.tx, sy = p.ty;
+    const deep = def.depth || 6, ahead = def.ahead || 2, half = def.half ?? 1;
+    const row = k => { const out = []; for (let o = -half; o <= half; o++) out.push([sx + fx * k + (fy ? o : 0), sy + fy * k + (fx ? o : 0)]); return out; };
+    let any = false;
+    for (let k = 1; k <= deep + ahead && !any; k++) any = onTiles(row(k)).length > 0;
+    if (!any) return 0.3;
+    let went = 0;
+    if (!steering()) {
+      let reach = 0;
+      for (let k = 1; k <= deep; k++) { if (G.arena && !Hunt.open(sx + fx * k, sy + fy * k)) break; reach = k; }
+      for (let k = reach; k >= 1 && !went; k--) {
+        const tx = sx + fx * k, ty = sy + fy * k;
+        for (const e of onTiles([[tx, ty]])) tkShove(e, tx + fy, ty + fx) || tkShove(e, tx - fy, ty - fx);
+        if (tkMoveHero(tx, ty)) { p.inv = Math.max(p.inv || 0, 0.4); went = k; }
+      }
+    }
+    const f = { id: def.fx, x: p.x, y: p.y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
+    if (fx > 0) f.flip = true;
+    if (fy) f.rot = fy < 0 ? Math.PI / 2 : -Math.PI / 2;
+    G.fxs.push(f);
+    const rows = went + ahead, seen = new Set();
+    for (let k = 1; k <= rows; k++) later(0.04 + (k - 1) * (0.3 / rows), () => {
+      if (G !== run) return;
+      G.quietHit = true;
+      for (const o of onTiles(row(k))) {
+        if (seen.has(o)) continue;
+        seen.add(o);
+        smite(o, st.dmg);
+        tkAfflict(o, def);
+      }
+      G.quietHit = false;
+    });
+  },
+  // 장승영역 (원작 2662 IMG75; PVP 기술 → 몬스터 상대로, 모습 그대로): where the 도깨비 stands, the golden seal (o_dk_jangseal: its
+  // first frames rising, then the rest looping) and round it the ring of 장승 on their green square (o_dk_jangpole), both at the
+  // original's own size, their pivot the hero's feet, for `duration` s. Every `tick` the foes inside the square (`radius` tiles
+  // each way: 5×5) are struck by the 장승 and slowed; while the hero is inside, what it takes is cut by `ward` (설명창: 영역 안에서
+  // 밖을 공격하거나 밖에서 안을 공격할 수 없다). It stays where it was laid. 이펙트=판정: the square.
+  jang9({ skill, st, def }) {
+    const p = G.player, R = def.radius || 2;
+    if (!tkNear(p.tx, p.ty, R + 2).length) return 0.4;
+    const run = G, life = def.duration || 8, x = p.x, y = p.y, tx0 = p.tx, ty0 = p.ty, d = tkHit(def, skill), calm = settings.calmFx ? 0.75 : 1;
+    const src = M.fx[def.fx];
+    if (src && !M.fx[def.fx + '#rise']) {
+      const cut = Math.min(3, src.n - 1);
+      M.fx[def.fx + '#rise'] = { ...src, src: src.src || def.fx, f0: 0, n: cut, durs: src.durs.slice(0, cut) };
+      M.fx[def.fx + '#held'] = { ...src, src: src.src || def.fx, f0: cut, n: src.n - cut, durs: src.durs.slice(cut) };
+    }
+    if (src) {
+      const rise = fxLife(def.fx + '#rise');
+      G.fxs.push({ id: def.fx + '#rise', x, y, t: 0, life: rise, scale: 1, rot: 0, anchor: 'bottom', alpha: calm, must: true });
+      G.fxs.push({ id: def.fx + '#held', x, y, t: -rise, life: life, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
+    }
+    if (M.fx[def.fxPole]) G.fxs.push({ id: def.fxPole, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
+    const inside = e => tkFoe(e) && Math.abs(e.tx - tx0) <= R && Math.abs(e.ty - ty0) <= R;
+    const n = Math.round(life / (def.tick || 0.5));
+    for (let k = 1; k <= n; k++) later(k * (def.tick || 0.5), () => {
+      if (G !== run || G.dead) return;
+      if (Math.abs(p.tx - tx0) <= R && Math.abs(p.ty - ty0) <= R) { G.buffs.ward9 = G.t + (def.tick || 0.5) + 0.1; G.buffs.ward9K = def.ward || 0.5; }
+      G.quietHit = true;
+      for (const e of G.enemies.filter(inside)) { hurtEnemy(e, d); tkAfflict(e, def, 0); }
+      G.quietHit = false;
+    });
+    note(`${skillName(skill.id, skill.lv)}: 장승이 영역을 둘러쌉니다.`);
+  },
   // 비사검 (원작 2662 IMG79; 설명창 IMG78: 차사 주변의 대상에게 살극의 기를 방출, 맞은 적과 그 주변에 피해): for `duration`, every
   // `every`, the 살극의 기 goes out to `shots` foes within `range` tiles (the nearest first, each in turn) and swings shut on
   // each as the red ring (o_rp_bisa at the original's own size, its middle on the foe's middle): that foe and whoever
@@ -9695,6 +9775,25 @@ function gongmyeong(gm, skill, st) {
   }));
   const cut = Math.min(gm.cutMax, marked.length * gm.cut);
   if (skill.timer > 0) skill.timer -= (skill.cdMax || skill.timer) * cut;
+}
+
+/** 불길한혼불 (원작 9차 패시브, 설명창 IMG69; data.js dk_honbul.honbul9): a fire skill cast bursts the soul fire on every foe it
+ *  clings to within `reach` tiles — that one and those a tile round it take `k` of the skill's blow (the small fire of a blow:
+ *  the original shows no picture of it) — and then it clings anew to the `n` nearest foes within `cling` tiles for `life` s. */
+function honbul(hb, skill, st) {
+  const p = G.player, run = G, blow = (st.dmg || st.hit || 30) * hb.k;
+  const lit = G.enemies.filter(e => tkFoe(e) && e.honbul9 > G.t && Math.hypot(e.tx - p.tx, e.ty - p.ty) <= hb.reach).slice(0, 8);
+  lit.forEach((e, i) => {
+    e.honbul9 = 0;
+    later(0.15 + i * 0.05, () => {
+      if (G !== run || e.hp <= 0) return;
+      if (M.fx[hb.fx]) fxOn(hb.fx, e, { scale: 0.8 });
+      G.procHitting = true;
+      for (const o of around(e.tx, e.ty, 1)) hurtEnemy(o, o === e ? blow : blow * 0.5);
+      G.procHitting = false;
+    });
+  });
+  tkNear(p.tx, p.ty, hb.cling).filter(e => !(e.honbul9 > G.t) && !lit.includes(e)).slice(0, hb.n).forEach(e => { e.honbul9 = G.t + hb.life; });
 }
 
 // The follow-up blows of the 9차 보조 공격 (echo): (def, blow, tick).

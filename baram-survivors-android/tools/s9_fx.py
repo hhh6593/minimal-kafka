@@ -603,7 +603,7 @@ def keyed(frames, i, e, part=None):
                 # (a hit star found by its orange rim, and the box from it over the number written beside it:
                 # [expression, [left, top, right, bottom] margins])
                 r_, g_, b_ = a[..., 0], a[..., 1], a[..., 2]
-                env = {"r": r_, "g": g_, "b": b_, "d": m, "mn": a.min(axis=2), "mx": a.max(axis=2), "np": np}
+                env = {"r": r_, "g": g_, "b": b_, "d": m, "mn": a.min(axis=2), "mx": a.max(axis=2), "np": np, "y": np.mgrid[0:m.shape[0], 0:m.shape[1]][0], "x": np.mgrid[0:m.shape[0], 0:m.shape[1]][1]}
                 st = ndimage.binary_opening(eval(sb[0], {}, env), iterations=1)
                 lab, n = ndimage.label(ndimage.binary_dilation(st, iterations=4))
                 L, T, R, B = sb[1]
@@ -892,17 +892,37 @@ def parts_cells(frames, e):
                             b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
                             # ("d": how far it moved from the clean frame — a marker drawn over the effect has not moved)
                             env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
-                                    "d": np.abs(o_ - b_).max(axis=2)}
+                                    "d": np.abs(o_ - b_).max(axis=2), "y": np.mgrid[0:H, 0:W][0], "x": np.mgrid[0:H, 0:W][1]}
                             hit_ = np.zeros((H, W), bool)
                             for ex_ in sub_["where"]:
                                 hit_ |= eval(ex_, {}, env_)
                             hit_ = ndimage.binary_dilation(hit_, iterations=sub_.get("grow", 3))
+                            if sub_.get("starbox"):
+                                # (each hit star found by its rim — [expression, [left, up, right, down] px] — and the box
+                                # from it over the number written beside it: a star's own glow and the digits' outline in it)
+                                st_ = ndimage.binary_opening(eval(sub_["starbox"][0], {}, env_), iterations=1)
+                                lab_, n_ = ndimage.label(ndimage.binary_dilation(st_, iterations=4))
+                                L_, T_, R_, B_ = sub_["starbox"][1]
+                                for sl in ndimage.find_objects(lab_):
+                                    if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) < 60:
+                                        continue
+                                    hit_[max(0, sl[0].start - T_):sl[0].stop + B_, max(0, sl[1].start - L_):sl[1].stop + R_] = True
                             m_ &= ndimage.binary_fill_holes(hit_)
                         bad_ |= m_
                     yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
                     dx_, dy_ = xx_ - rcx, yy_ - rcy
                     todo_ = bad_.copy()
                     src_ = a.copy()
+                    if op.get("mirrorx"):
+                        # (a drawing the same on either side of its upright axis x = rc — a pillar of light: a covered dot
+                        # from the dot across the axis first, where that one is clear)
+                        sx_ = np.rint(2 * rcx - xx_).astype(int)
+                        inb_ = (sx_ >= 0) & (sx_ < W)
+                        sxc_ = sx_.clip(0, W - 1)
+                        syc_ = yy_.astype(int)
+                        ok_ = todo_ & inb_ & ~bad_[syc_, sxc_]
+                        a[ok_] = src_[syc_[ok_], sxc_[ok_]]
+                        todo_ &= ~ok_
                     for ang in op.get("angles", (35, -35, 60, -60, 90, -90, 120, -120, 150, -150, 180)):
                         if not todo_.any():
                             break
@@ -914,6 +934,23 @@ def parts_cells(frames, e):
                         ok_ = todo_ & inb_ & ~bad_[syc_, sxc_]
                         a[ok_] = src_[syc_[ok_], sxc_[ok_]]
                         todo_ &= ~ok_
+                    if todo_.any() and op.get("vcarry"):
+                        # (a pillar of upright bands of colour: a covered dot from the nearest clear dot straight above or
+                        # below it in its own column — the band it lies in carried on, not a patch from beside it)
+                        for x in range(W):
+                            col_ = todo_[:, x]
+                            if not col_.any():
+                                continue
+                            clean_ = np.nonzero(~bad_[:, x])[0]
+                            if not len(clean_):
+                                continue
+                            ys_ = np.nonzero(col_)[0]
+                            j_ = np.searchsorted(clean_, ys_)
+                            up_ = clean_[np.clip(j_ - 1, 0, len(clean_) - 1)]
+                            dn_ = clean_[np.clip(j_, 0, len(clean_) - 1)]
+                            pick_ = np.where(np.abs(ys_ - up_) <= np.abs(dn_ - ys_), up_, dn_)
+                            a[ys_, x] = src_[pick_, x]
+                            todo_[ys_, x] = False
                     if todo_.any():
                         # (what no turn finds clean: the nearest clean pixel's own colour and alpha — a broken dot repaired)
                         from scipy import ndimage
@@ -992,6 +1029,48 @@ def parts_cells(frames, e):
                     dd_ = np.minimum(np.minimum(xx_ - x0, x1 - 1 - xx_), np.minimum(yy_ - y0, y1 - 1 - yy_))
                     a[..., 3] = (a[..., 3] * np.clip(1 - dd_ / n_, 0, 1)).astype(np.uint8)
                     continue
+                if "dropself" in op:
+                    # (by the part's own colours as they now stand — a bar's green carried in by a shift: out)
+                    q_ = a[..., :3].astype(np.float32)
+                    env_ = {"r": q_[..., 0], "g": q_[..., 1], "b": q_[..., 2], "mn": q_.min(axis=2), "mx": q_.max(axis=2), "np": np}
+                    for ex_ in op["dropself"]:
+                        a[eval(ex_, {}, env_), 3] = 0
+                    continue
+                if "drop" in op:
+                    # (what the expressions over the capture's own frame name — a number's digits and their dark outline,
+                    # a hit star — grown by "grow" px, and with "starbox" the box from each star over its number, made
+                    # clear: the splashes round a drawing end there, nothing filled in)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "y": np.mgrid[0:H, 0:W][0], "x": np.mgrid[0:H, 0:W][1]}
+                    k_ = np.zeros((H, W), bool)
+                    for ex_ in op["drop"]:
+                        k_ |= eval(ex_, {}, env_)
+                    k_ = ndimage.binary_dilation(k_, iterations=op.get("grow", 2))
+                    if op.get("fill"):
+                        # (and what they close round — a hit star's white heart inside its orange rim — small places only)
+                        gap_ = ndimage.binary_fill_holes(k_) & ~k_
+                        gl_, gn_ = ndimage.label(gap_)
+                        if gn_:
+                            k_ |= np.isin(gl_, 1 + np.nonzero(ndimage.sum(gap_, gl_, range(1, gn_ + 1)) <= op["fill"])[0])
+                    if op.get("starbox"):
+                        st_ = ndimage.binary_opening(eval(op["starbox"][0], {}, env_), iterations=1)
+                        lab_, n_ = ndimage.label(ndimage.binary_dilation(st_, iterations=4))
+                        L_, T_, R_, B_ = op["starbox"][1]
+                        for sl in ndimage.find_objects(lab_):
+                            if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) >= 60:
+                                k_[max(0, sl[0].start - T_):sl[0].stop + B_, max(0, sl[1].start - L_):sl[1].stop + R_] = True
+                    if op.get("mend"):
+                        # (or, inside the drawing, each such dot from the nearest dot outside them: the fire's own dots
+                        # carried in — a number over a solid flame leaves no hole; where they are wider than "mend" px
+                        # from any, left clear)
+                        dist_, (iy_, ix_) = ndimage.distance_transform_edt(k_, return_indices=True)
+                        m_ = k_ & (dist_ <= op["mend"])
+                        a[m_] = a[iy_[m_], ix_[m_]]
+                        k_ &= ~m_
+                    a[k_, 3] = 0
+                    continue
                 if "only" in op:
                     # (only the drawing's own colours — a blue bolt's blue and white — the rest cleared: the bodies under it
                     # are not its; "grow" px of their edge kept round them, the glow's fringe)
@@ -1011,7 +1090,7 @@ def parts_cells(frames, e):
                     # not name: the drawing's own dot beside it, no box seam; "grow" px round them too)
                     from scipy import ndimage
                     o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
-                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np}
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np, "y": np.mgrid[0:H, 0:W][0], "x": np.mgrid[0:H, 0:W][1]}
                     p_ = np.zeros((H, W), bool)
                     for ex_ in op["where"]:
                         p_ |= eval(ex_, {}, env_)

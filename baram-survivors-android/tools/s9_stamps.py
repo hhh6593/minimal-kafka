@@ -304,7 +304,214 @@ def ult9rain(src_dir, out_dir):
     return cells, e
 
 
-BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi}
+# ---------------------------------------------------------------------------------------------------------------------
+# 장승영역 (영술사 9차 → 도깨비, 2662 IMG75; PVP 기술 → 몬스터 상대로, 모습 그대로). The capture's camera is still from frame
+# 1 to the end, but its palette changes twice (frames 0-17, 18-20, 21-162: the floor's dots differ by ~15 between them), so
+# each part is taken against a clean frame of its own stretch:
+#  - the seal (the golden square of glyphs and the 태극, frames 5-17) against frame 2 (the 장승 and the green ring already
+#    there, no seal): unmix; where the caster (and its bar and flag) stands over it, the seal's own pixels half a turn (or a
+#    quarter turn) round its middle — the seal is the same turned (its square of glyphs four ways, its 태극 half a turn);
+#    where a 장승 stands over its lower edge, left clear (the 장승 are drawn over it).
+#  - the 장승 (frame 30, against frame 150 — the same stretch, the 장승 gone): every 장승 has its life bar written over its
+#    hat (and, down the two side columns, over the 장승 behind it). So none of the ring is lifted whole: the three kinds of
+#    장승 (A the round-faced one in the narrow 갓, B the grimacing one in the tall hat, C the tall laughing one in the
+#    broad-brimmed hat) are each cut once, clean, from the bottom row (only their own bar above them, taken off; the hat's
+#    top row under it carried up from the row below), and set back where each 장승 of the capture stands — found by its
+#    bar (bars are on a 48 px grid, x = 115 + 48k; the kind by the hat under the bar); the three B of the top row, whose
+#    bars are above the capture's edge, at their places in that row. Drawn top to bottom, as the capture overlaps them.
+#  - the green ring under them (the zone's own square, one tile wide): unmixed, its colour and opacity the median of its
+#    clear pixels, laid over the ring's own square (its straight edges are its own shape).
+#  (the end, frames 138-142 — the 장승 breaking into chunks — is not taken: the bars still float over the chunks there, and
+#  cut out they left straight gaps through them; the ring fades out instead.)
+# Two sheets: o_dk_jangseal (the seal: appearing 5-7, then 8-17 a loop) and o_dk_jangpole (the ring of 장승 standing on the
+# green ring). Both at the original's own size (0.62) with the same pivot: the seal's middle (the caster's place).
+JS_C = (329, 297)        # the seal's middle in the capture (the zone's middle)
+JS_REF = 30             # the frame the 장승 are cut from (set by js_ref: the seal glowing as in frame 150)
+JS_CAM = 48             # frames 1-17 (the seal): the camera that far left of frames 21-162 (the 장승, the end)
+JS_GRID = 115            # bars' left edge x = JS_GRID + 48k
+
+
+def _js_unmix(a, bg, k=90, lo=16):
+    D = a - bg
+    m = np.abs(D).max(2)
+    al = np.clip((m - lo) / (k - lo), 0, 1)
+    F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+    return F, al
+
+
+def _js_bars(a):
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    gr = (g > r + 50) & (g > b + 50)
+    lab, n = ndimage.label(gr)
+    out = []
+    for sl in ndimage.find_objects(lab):
+        w, h = sl[1].stop - sl[1].start, sl[0].stop - sl[0].start
+        if w >= 40 and 4 <= h <= 8:
+            out.append((sl[1].start, sl[0].start))
+    return out
+
+
+def js_seal(fr, f, polemask):
+    """the seal of frame f, as rgba over the whole capture (where a 장승 stands over it: clear — the 장승 are drawn over it)"""
+    a, bg = fr[f].astype(np.float32), fr[2].astype(np.float32)
+    # (k 80: the seal as solid gold over our darker ground as over the original's grey — at 110 it read orange and pale)
+    F, al = _js_unmix(a, bg, 80, 18)
+    H, W = al.shape
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    # (frames 1-17: the camera 48 px to the left of where it is from frame 21 on — these coordinates are that camera's)
+    cx, cy = JS_C[0] - JS_CAM, JS_C[1]
+    # (its own square, rounded at the corners, a little glow round it)
+    sq = np.clip((np.minimum(np.minimum(xx - 128, 434 - xx), np.minimum(yy - 142, 452 - yy))) / 8, 0, 1)
+    al = al * sq
+    # the caster over its middle: its body, its bars, its flag; the mouse pointer (a grey sword) and the ground's own grey
+    # specks round the 태극 (the seal has no grey but in the 태극's white)
+    # (the caster in the clean frame 2 too — its wings of light wider than in these: what either covers)
+    hole = (((xx - 262) / 92) ** 2 + ((yy - 236) / 106) ** 2 <= 1) | ((xx >= 248) & (xx < 312) & (yy >= 326) & (yy < 352))
+    hole |= (xx >= 258) & (xx < 304) & (yy >= 136) & (yy < 192)
+    # (the 장승's life bars over its lower edge: in both frames, so unmix reads them as clear — the seal's own pixels there)
+    for bx, by in _js_bars(a):
+        hole[max(0, by - 2):by + 9, max(0, bx - 2):bx + 49] = True
+    grey = (a.max(2) - a.min(2) < 40) & (np.hypot(xx - cx, yy - cy) > 120) & (al > 0.2)
+    hole |= ndimage.binary_dilation(grey, iterations=2)
+    out_F, out_al = F.copy(), al.copy()
+    todo = hole.copy()
+    dx, dy = xx - cx, yy - cy
+    # (half a turn first — the 태극 and the square both; then the square's own mirror and quarter turns)
+    for kind, ang in (("rot", 180), ("mir", 0), ("rot", 90), ("rot", -90)):
+        if not todo.any():
+            break
+        if kind == "mir":
+            sx, sy = np.rint(2 * cx - xx).astype(int).clip(0, W - 1), yy.astype(int)
+        else:
+            c, s = np.cos(np.radians(ang)), np.sin(np.radians(ang))
+            sx = np.rint(cx + dx * c - dy * s).astype(int).clip(0, W - 1)
+            sy = np.rint(cy + dx * s + dy * c).astype(int).clip(0, H - 1)
+        ok = todo & ~hole[sy, sx] & ~polemask[sy, sx]
+        out_F[ok], out_al[ok] = F[sy[ok], sx[ok]], al[sy[ok], sx[ok]]
+        todo &= ~ok
+    out_al[todo] = 0
+    # (what no turn gives — the 태극's middle, under the caster in every frame: our hero stands there — ends softly)
+    out_al *= np.clip(ndimage.distance_transform_edt(~todo) / 6, 0, 1)
+    return np.dstack([np.where(out_al[..., None] > 0, out_F, 0), out_al * 255]).astype(np.uint8)
+
+
+def js_kinds(fr):
+    """the three 장승, clean, from the bottom row of frame 30: {kind: (rgba, bar x, bar y)} (bar = its top left)"""
+    a, bg = fr[JS_REF].astype(np.float32), fr[150].astype(np.float32)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    d = np.abs(a - bg).max(2)
+    mx, mn = a.max(2), a.min(2)
+    # (only its own colours: the wood's brown and the hat's black — not the green ring under it, nor the seal's gold glow
+    # behind it)
+    # (each 장승 casts a grey shadow on the floor — the floor darkened, its own hue: not taken; a neighbour's bar end on a
+    # brim, green, out; the black only the hat's, at the top)
+    hat = (mx < 95) & (mx - mn < 34)
+    green = ndimage.binary_dilation((g > r + 30) & (g > b + 20), iterations=1)
+    sa, sb = a.sum(2) + 1, bg.sum(2) + 1
+    shadow = (sa < 0.92 * sb) & (np.abs(a / sa[..., None] - bg / sb[..., None]).max(2) < 0.035)
+    wood = ~shadow & ~hat & (r > b + 25)
+    body = (d > 24) & (wood | hat) & ~green
+    out = {}
+    for kind, bx, by in (("A", 163, 394), ("B", 259, 376), ("C", 355, 366)):
+        x0, x1, y0, y1 = bx - 10, bx + 56, by + 6, 512
+        m = body[y0:y1, x0:x1].copy()
+        hr = {"A": 22, "B": 30, "C": 34}[kind]
+        m[hr:] &= ~hat[y0 + hr:y1, x0:x1] | wood[y0 + hr:y1, x0:x1]
+        m = ndimage.binary_opening(m, iterations=1)
+        m = ndimage.binary_closing(m, iterations=2)
+        lab, n = ndimage.label(m)
+        # (the 장승 itself: the piece under the bar's middle; a neighbour's brim at the side left out)
+        mid = lab[:, 33]
+        ids = [v for v in np.unique(mid) if v]
+        m = np.isin(lab, ids)
+        m = ndimage.binary_fill_holes(m)
+        m &= ~green[y0:y1, x0:x1]
+        rgba = np.dstack([a[y0:y1, x0:x1], m * 255]).astype(np.uint8)
+        # (the hat's top row lay under the bar's lower rim: the row below carried up one)
+        top = np.nonzero(m.any(1))[0][0]
+        if top == 0:
+            rgba = np.vstack([rgba[1:2], rgba])
+            by -= 1
+        out[kind] = (Image.fromarray(rgba), bx - x0, 6)
+    return out
+
+
+def js_kind_of(by):
+    """which of the three stands under a bar: their feet are on the 48 px grid (the bar of A 10 px below a whole step, of B
+    18 px above that, of C 28 px above it — the taller hat's bar higher)"""
+    for k, lift in (("A", 0), ("B", 18), ("C", 28)):
+        if (by + lift - 10) % 48 == 0:
+            return k
+    raise ValueError("bar off the grid at y %d" % by)
+
+
+def dk_jang(src_dir, out_dir=None):
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG75.gif"))
+    # the box round the zone in the capture, room above for the top row's hats
+    X0, Y0, X1, Y1 = 100, -24, 560, 522
+    cw, ch = X1 - X0, Y1 - Y0
+    ox, oy = JS_C[0] - X0, JS_C[1] - Y0
+
+    def put(cell, rgba, x, y):
+        cell.alpha_composite(rgba if isinstance(rgba, Image.Image) else Image.fromarray(rgba), (int(x - X0), int(y - Y0)))
+
+    # --- the 장승 ring
+    global JS_REF
+    # (the seal pulses gold and red: the 장승 are cut from the frame whose seal glows as in frame 150, so its glow behind
+    # them cancels out)
+    reg = (slice(300, 372), slice(330, 470))
+    JS_REF = min(range(21, 136), key=lambda f: np.median(np.abs(fr[f][reg] - fr[150][reg]).max(2)))
+    print("장승 from frame", JS_REF)
+    kinds = js_kinds(fr)
+    a30 = fr[30].astype(np.float32)
+    spots = []
+    for bx, by in _js_bars(a30):
+        if bx < 110 or (bx - JS_GRID) % 48:
+            continue  # (the bystander's bar at the left)
+        spots.append((js_kind_of(by), bx, by))
+    # the top row's three B, their bars above the capture's edge: in the row with the A beside them (A's bar 10 → B's −8)
+    for bx in (163, 259, 307):
+        spots.append(("B", bx, -8))
+    lift = {"A": 0, "B": 18, "C": 28}  # (same feet: the taller hat's bar higher)
+    spots.sort(key=lambda s: s[2] + lift[s[0]])
+    print("장승:", " ".join("%s@%d,%d" % s for s in spots))
+    poles = Image.new("RGBA", (cw, ch))
+    # the green ring: its colour and opacity (the median of its clear pixels against the field without it)
+    F, al = _js_unmix(a30, fr[150].astype(np.float32), 90, 12)
+    r, g, b = a30[..., 0], a30[..., 1], a30[..., 2]
+    band = (g > r + 5) & (np.abs(a30 - fr[150]).max(2) > 20) & ~((g > r + 50) & (g > b + 50))
+    col = np.median(F[band & (al > 0.6)], axis=0)
+    alb = float(np.median(al[band]))
+    print("ring colour", col, "alpha", alb)
+    ring = np.zeros((ch, cw, 4), np.uint8)
+    yy, xx = np.mgrid[0:ch, 0:cw]
+    gx, gy = xx + X0, yy + Y0
+    outer = (gx >= 113) & (gx < 545) & (gy >= 82) & (gy < 514)
+    inner = (gx >= 161) & (gx < 497) & (gy >= 130) & (gy < 466)
+    rm = outer & ~inner
+    ring[rm, :3] = col.astype(np.uint8)
+    ring[rm, 3] = int(alb * 255)
+    poles.alpha_composite(Image.fromarray(ring))
+    for kind, bx, by in spots:
+        img, kx, ky = kinds[kind]
+        put(poles, img, bx - kx, by + ky)
+    # --- the seal (where a 장승 stands over it, clear: the ring is drawn over it)
+    pa = np.asarray(poles)[..., 3]
+    polemask = np.zeros(fr[0].shape[:2], bool)
+    polemask[0:Y1, X0 - JS_CAM:X1 - JS_CAM] = ndimage.binary_dilation(pa[-Y0:, :] > 200, iterations=1)
+    polemask[:, :162 - JS_CAM] = True
+    polemask[:, 497 - JS_CAM:] = True
+    seals = []
+    for f in range(5, 18):
+        sl = js_seal(fr, f, polemask)
+        cell = Image.new("RGBA", (cw, ch))
+        put(cell, sl[0:540, 160 - JS_CAM:500 - JS_CAM], 160, 0)
+        seals.append(cell)
+    base = {"cell": [cw, ch], "ms": 100, "add": False, "anchor": [ox, oy], "src": "gif2662/IMG75.gif", "k": 0.62, "cap": 420}
+    return {"dk_jangseal": (seals, {**base, "n": len(seals)}), "dk_jangpole": ([poles], {**base, "n": 1})}
+
+
+BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain}  # (re-drawing an s9_fx.py sheet: run after it)
 
 
@@ -315,14 +522,15 @@ def main():
     ipath = os.path.join(out_dir, "index.json")
     index = json.load(open(ipath, encoding="utf-8")) if os.path.isfile(ipath) else {}
     for sid in only:
-        cells, entry = POST[sid](src_dir, out_dir) if sid in POST else BUILDERS[sid](src_dir)
-        cw, ch = entry["cell"]
-        sheet = Image.new("RGBA", (cw * len(cells), ch))
-        for i, c in enumerate(cells):
-            sheet.paste(c, (i * cw, 0))
-        sheet.save(os.path.join(out_dir, sid + ".png"), optimize=True)
-        index[sid] = entry
-        print(sid, cw, ch, len(cells))
+        got = POST[sid](src_dir, out_dir) if sid in POST else BUILDERS[sid](src_dir)
+        for sid2, (cells, entry) in (got.items() if isinstance(got, dict) else [(sid, got)]):
+            cw, ch = entry["cell"]
+            sheet = Image.new("RGBA", (cw * len(cells), ch))
+            for i, c in enumerate(cells):
+                sheet.paste(c, (i * cw, 0))
+            sheet.save(os.path.join(out_dir, sid2 + ".png"), optimize=True)
+            index[sid2] = entry
+            print(sid2, cw, ch, len(cells))
     json.dump(index, open(ipath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
