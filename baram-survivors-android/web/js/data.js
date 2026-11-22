@@ -1410,36 +1410,54 @@ for (const id of ['w_dragon', 'w_sentence', 'w_advance', 'w_swords', 'w_stone', 
 // 순보선풍 불가살이선풍's gale, 기공십자광선'쾌 기공십자광선's cross, 광폭기사출 광폭기대방출's shaft, 비사검 나선회륜's
 // crescents) comes after that skill in its 계열 (pre): its growth, not a borrowed look.
 const S9 = {
-  // 전사: 호기어검 (보조 공격), 흑룡검풍 (아우라; 호기방출 as the original names it), 압도적진격 (강한 일격)
-  w_swords: { promo: 9, cls: 'warrior', req: 33, name: '호기어검', kind: 'echo', echo: 'sword', fx: 'k_w_bigeom', fxLoop: 'k_w_bigeom', loopSize: 120, fx2: 'k_w_fly', shotSize: 96, fxHit: 'k_w_jinseom',
-    hit: 26, cd: 18, duration: 10, every: 0.45, shots: 3, splash: 0.4, range: 5, power: 0.15, buff: 'power', ck: 'buff', pre: 'w_bigeom', branch: 0,
-    desc: '호기가 무형의 검이 되어 10초 동안 곁을 떠돈다. 다섯 칸 안의 몬스터를 찾아 검이 쉼 없이 날아가 꿰뚫고, 그동안 피해가 15% 는다' },
-  w_hogi: { name: '흑룡검풍', kind: 'aura9', fx: 'o_w_heukryong', fxCast: 'k_w_blackdragon', fxHit: 'k_w_fly', hit: 13, cd: 15, duration: 8, radius: 1, tick: 0.4,
-    ward: 0.25, buff: 'shield', ck: 'buff', fxs: null, tint: null, modern: null,
-    desc: '검은 용의 검풍이 8초 동안 몸 둘레를 돌며 곁의 몬스터를 거듭 베고 밀어내며, 그동안 받는 피해가 25% 준다' },
-  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', front: true, size: 300, dash: true,
-    fxHit: 'h_ml_slash', hitScale: 0.8, dmg: 95, cd: 5, range: 4, radius: 1, splash: 0.5, stun: 2, push: 1, ck: 'cleave', pre: 'w_sentence', branch: 2,
-    desc: '앞의 가장 강한 몬스터를 방패로 즉시 밀쳐 크게 치고, 그 둘레까지 밀어내며 2초 동안 기절시킨다' },
-  // 도적: 묵혈독바르기 (보조 공격), 묵마수리검'쇄 (몸 주변), 묵혈파광참 (강한 일격)
-  r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'echo', echo: 'venom', fx: 'o_r_mukdok', fx2: 'g_poison_purple', fxHit: 'k_u_r_backhit', hit: 30, cd: 16, duration: 8,
-    every: 0.6, shots: 3, range: 2, power: 0.15, curse: 4, burst: 0.8, buff: 'power', ck: 'buff', pre: 'r_budong', branch: 2,
-    desc: '무기에 묵혈독을 바른다. 8초 동안 칼날이 곁의 몬스터를 거듭 베어 묵혈독에 감염시키고(받는 피해 증가), 감염된 몬스터는 쓰러질 때 터져 둘레를 친다' },
-  r_chainstar: { promo: 9, cls: 'rogue', req: 33, name: "묵마수리검'쇄", kind: 'starburst', fx: 'k_r_shadowstar', fxCast: 'k_r_formless', fx2: 'k_u_r_backhit', dmg: 24, cd: 9, n: 8, reach: 3,
-    radius: 1, dur: 3, tick: 0.5, k: 0.4, ck: 'nova', pre: 'r_shuriken', branch: 1,
-    desc: '몸 주변 여덟 방향으로 수리검을 던진다. 세 칸 끝에 닿은 수리검은 3초 동안 그 자리에서 돌며 둘레의 몬스터를 분쇄한다' },
-  r_bloodslash: { promo: 9, cls: 'rogue', req: 33, name: '묵혈파광참', kind: 'smite', fx: 'o_r_shadow', fx2: 'o_r_mukhyeol', fxHit: 'k_u_r_backhit', dmg: 100, cd: 5, range: 4,
-    radius: 1, splash: 0.45, curse: 5, dash: true, ck: 'blink', pre: 'r_chamgan', branch: 0,
-    desc: '그림자 분신을 앞으로 보내 가장 강한 몬스터의 몸속에 강력한 내상을 입혀 크게 베고, 좌우로 갈라진 그림자가 둘레까지 베며 방어를 무너뜨린다' },
-  // 주술사: 전도체 (보조 공격), 서리파편 (광역), 회선격풍 (강한 일격)
-  m_jeondo: { promo: 9, cls: 'mage', req: 33, name: '전도체', kind: 'echo', echo: 'chain', fx: 'k_m_chain', fxCast: 'k_m_cheonggi', fxLoop: 'k_m_chain', loopSize: 90, fxHit: 'k_m_chain', hit: 45, cd: 18, duration: 10,
-    every: 0.5, shots: 4, range: 6, jump: 3, power: 0.1, buff: 'power', ck: 'buff', pre: 'm_chain', branch: 1,
-    desc: '10초 동안 과전류 상태가 된다. 몸에서 번개가 몬스터에게 튀어 셋까지 옮겨 다니며 지지고, 그동안 피해가 10% 는다' },
-  m_shards: { promo: 9, cls: 'mage', req: 33, name: '서리파편', kind: 'rain', fx: 'o_m_seori', noLoop: true, fx2: 'o_m_seori', fxHit: 'k_u_m_ice', dmg: 48, cd: 6, range: 7, radius: 3, drops: 12, dur: 2.4, k: 0.5,
-    slow: 2, dropScale: 0.9, ck: 'strike', pre: 'm_cross', branch: 1,
-    desc: '서리 파편을 쏘아 몬스터가 가장 많은 곳에 2.4초 동안 얼음 파편이 거듭 터지게 한다. 맞은 몬스터는 느려진다' },
-  m_gale: { promo: 9, cls: 'mage', req: 33, name: '회선격풍', kind: 'smite', fx: 'o_m_hoeseon', fxCast: 'k_u_m_seal', fxHit: 'h_hit_6', dmg: 90, cd: 4.5, range: 7, radius: 1, splash: 0.4,
-    linger: 3, lingerK: 0.12, ck: 'spell', pre: 'm_chain', branch: 1,
-    desc: '가장 강한 몬스터에게 회오리를 일으켜 크게 치고 그 둘레까지 휩쓴다. 응축된 바람이 3초 동안 그 자리에 남아 거듭 벤다' },
+  // 전사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/warrior.md). 시전 3 + 패시브 1 + 필살기:
+  //   호기어검 (IMG02: 15초 동안 11×11 안의 적 위로 푸른 대검이 연달아 내리꽂힌다; 쿨 25초),
+  //   압도적진격 (IMG07: 바라보는 쪽 4칸 돌진, 불고리 벽이 길을 덮고 2초 기절; 쿨 5초),
+  //   명천검파 = 패시브, 그림 없음 (2662에 장면이 없음: 검기 계열 기술 세 번째마다 한 번 더 — mcheon9),
+  //   흑룡검풍 = 패시브 (설명창 [지속효과 마법]: 흑룡광참으로 공격 시 30% 확률로 8초 동안 주위를 도는 검풍 — w_blackdragon.wind9).
+  // Pictures at the original's own size: o_w_* are drawn 0.62 game pixels a capture pixel (our hero's 47 over
+  // the original hero's 76), never fitted to tiles.
+  w_swords: { promo: 9, cls: 'warrior', req: 33, name: '호기어검', kind: 'echo', echo: 'drop', fx: 'o_w_hogisword', noCast: true, fxLoop: 'o_w_hogisign', loopSize: 1, loopY: -14,
+    fx2: undefined, fxHit: undefined, shotSize: undefined, shots: undefined, power: undefined,
+    hit: 100, cd: 25, duration: 15, every: 0.9, splash: 0.5, range: 5, buff: undefined, ck: 'spell', radius: 1, pre: 'w_bigeom', branch: 0,
+    desc: '호기가 무형의 검이 되어 15초 동안 곁에 떠 있는다. 둘레 11×11칸 안의 몬스터를 찾아 거대한 푸른 검이 하늘에서 연달아 내리꽂혀 그 자리와 둘레 한 칸을 꿰뚫는다' },
+  w_advance: { promo: 9, cls: 'warrior', req: 33, name: '압도적진격', kind: 'smite', fx: 'o_w_apdo', wall: [4, 2], front: undefined, size: undefined, dash: undefined,
+    fxHit: undefined, hitScale: undefined, dmg: 70, cd: 5, range: 4, radius: 1, splash: undefined, stun: 2, push: undefined, ck: 'cleave', pre: 'w_sentence', branch: 2,
+    desc: '바라보는 쪽으로 네 칸을 돌진하며 방패로 불고리 벽을 밀고 나간다. 지나는 길과 좌우 두 칸의 몬스터를 모두 치고 2초 동안 기절시킨다' },
+  // 도적 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/rogue.md). 시전 3 + 패시브 1 + 필살기:
+  //   묵마수리검'쇄 (IMG13: 여덟 방향으로 푸른 쿠나이를 던져 3칸 남짓 밖에 꽂아 5초 동안 세우고, 그 고리 안을 거듭 분쇄,
+  //     끝에 흰 섬광과 푸른 불꽃으로 터진다; 쿨 15초),
+  //   묵혈파광참 (IMG11: 앞의 적에게 그림자를 보내 붉은 斬 인장, 이어 좌우로 갈라진 인장 둘; 방어도 감소; 쿨 15초),
+  //   묵혈독바르기 (IMG17: 무기에 독을 바르고, 다음 공격 기술 5회가 친 적을 7초 동안 감염 — 받는 피해 +15%,
+  //     쓰러질 때 둘레에 폭발; 감염 순간 맞은 적 위로 푸른 보라 불꽃; 쿨 10초),
+  //   죽음의희열 = 패시브 (설명창 [지속효과 마법]: 적을 처치할 때마다 30% 확률로 수리검 계열 하나의 쿨타임 초기화 —
+  //     jugeum9; IMG15에는 따로 그림이 없고 묵마수리검'쇄가 다시 나갈 뿐이라 그림 없음).
+  // Pictures at the original's own size (o_r_*: 0.62 game pixels a capture pixel).
+  r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'coat9', fx: 'o_r_mukdok', fxCast: 'o_r_mukdokcast', fx2: undefined, fxHit: undefined,
+    hit: 30, cd: 10, duration: 10, charges: 5, infect: 7, taken: 0.15, burst: 1.2, every: undefined, shots: undefined, range: 2, power: undefined, curse: undefined, buff: undefined,
+    ck: 'buff', pre: 'r_budong', branch: 2,
+    desc: '무기에 묵혈독을 바른다. 다음 공격 기술 다섯 번이 친 몬스터는 7초 동안 묵혈독에 감염되어 받는 피해가 15% 늘고, 감염된 채 쓰러지면 둘레 한 칸에 독이 터진다' },
+  r_chainstar: { promo: 9, cls: 'rogue', req: 33, name: "묵마수리검'쇄", kind: 'swae9', fx: 'o_r_swaestar', fxFly: 'o_r_swaefly', fxEnd: 'o_r_swaeend', fxCast: undefined, fx2: undefined,
+    dmg: 60, cd: 15, n: 8, ring: 159, dur: 5, tick: 0.5, k: 0.25, endK: 0.8, reach: 3, radius: undefined, ck: 'nova', pre: 'r_shuriken', branch: 1,
+    desc: '몸 주변 여덟 방향으로 수리검을 던져 지나는 길의 몬스터를 벤다. 세 칸 남짓 밖에 꽂힌 수리검 여덟은 5초 동안 그 자리에 머물며 고리 안의 몬스터를 거듭 분쇄하고, 끝에 흰 섬광과 함께 터진다' },
+  r_bloodslash: { promo: 9, cls: 'rogue', req: 33, name: '묵혈파광참', kind: 'zan9', fx: 'o_r_zan', fx2: undefined, fxHit: undefined, dmg: 160, cd: 15, range: 4,
+    side: 118, back: 95, half: 59, splash: 0.6, curse: 5, radius: undefined, dash: undefined, ck: 'blink', pre: 'r_chamgan', branch: 0,
+    desc: '앞으로 네 칸 안의 몬스터에게 그림자 분신을 보내 붉은 斬 인장으로 몸속에 내상을 입히고(방어 약화), 닿은 그림자가 좌우로 갈라져 양옆(자신의 양옆 앞)에도 斬을 새긴다' },
+  // 주술사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/mage.md). 시전 3 + 패시브 1 + 필살기:
+  //   회선격풍 (IMG21: 대상 위에 큰 청록 회오리, 둘레 두 칸; 맞은 적 셋에 응축된 바람이 3초 동안 세 번 더 터짐;
+  //     5초 안에 이어 쓰면 10%씩 강해짐; 2회 충전),
+  //   서리파편 (IMG23: 앞으로 날아가는 서리 구슬, 끝에서 얼음 결정 밭이 3.5초 동안 거듭 친다),
+  //   환영안개 (IMG29, PVP → 몬스터: 앞에 보라 환영 안개 5초 — 든 몬스터는 길을 잃고 느려지며 받는 피해가 는다),
+  //   전도체 = 패시브 (설명창 [지속효과 마법]: 천뢰마옥쌍구·뇌격구를 쓸 때 50%로 10초 과전류 — 서리파편에 맞은 적에게
+  //     몸에서 번개가 흐름; IMG25의 번개 그림).
+  m_gale: { promo: 9, cls: 'mage', req: 33, name: '회선격풍', kind: 'gale9', fx: 'o_m_hoeseon', fxWind: 'o_m_hoeseonwind', fxCast: undefined, fxHit: undefined,
+    dmg: 70, cd: 3, range: 7, half: [100, 64], winds: 3, windN: 3, windK: 0.25, stack: 0.1, stackMax: 5, radius: undefined, splash: undefined, linger: undefined, lingerK: undefined,
+    count: undefined, hitAt: undefined, ck: 'strike', pre: 'm_chain', branch: 1,
+    desc: '가장 강한 몬스터에게 회오리를 일으켜 그와 둘레 두 칸을 친다. 맞은 몬스터 셋에는 응축된 바람이 3초 동안 세 번 더 터지고, 5초 안에 이어 쓰면 피해가 10%씩 는다(최대 50%)' },
+  m_shards: { promo: 9, cls: 'mage', req: 33, name: '서리파편', kind: 'shard9', fx: 'o_m_seori', fxShot: 'o_m_seorishot', fx2: undefined, fxHit: undefined, noLoop: undefined,
+    dmg: 40, cd: 6, depth: 6, dur: 3.5, tick: 0.5, k: 0.3, half: [85, 105], slow: 2, range: 6, count: undefined, radius: undefined, drops: undefined, dropScale: undefined,
+    ck: 'line', pre: 'm_cross', branch: 1,
+    desc: '서리 파편을 앞으로 쏘아 여섯 칸까지 날려 보낸다. 몬스터에 닿거나 끝에 이르면 터져 3.5초 동안 그 자리에 얼음 결정이 거듭 솟아 든 몬스터를 치고 느리게 한다' },
   // 도사: 천신의기운 (아우라·회복), 선기전도 (광역, 그대로), 폭렬천뢰탄 (강한 일격)
   p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'aura9', fx: 'o_p_cheonsin', fxCast: 'k_u_p_pillar_o', fxHit: 'k_u_p_sparkle', hit: 9, cd: 14, duration: 6, radius: 3,
     tick: 0.5, hot: 1.2, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0,
@@ -1514,15 +1532,9 @@ const S9 = {
     range: 6, radius: 2, splash: 0.6, densest: true, pull: true, delay: 0.6, size: 220, ck: 'strike', pre: 'dk_nemesis', branch: 0,
     desc: '몬스터가 가장 많은 곳의 둘레를 가운데로 끌어모은 뒤, 분노한 거대한 천신의 주먹이 내려와 짓이긴다' },
   // ---- 네 번째 9차 (모든 직업 4개: 보조 공격·몸 주변·광역·강한 일격 하나씩). 원작의 패시브는 켜는 기술로, PVP 기술은 몬스터 상대로.
-  w_mcheon: { promo: 9, cls: 'warrior', req: 33, name: '명천검파', kind: 'crosswave', fx: 'o_w_mcheon', fxCast: 'k_u_w_wave', fxHit: 'k_w_jinseom', trail: 'o_w_mcheon', trailStep: 1, trailRot: true, dmg: 30, cd: 6, depth: 5, width: 0,
-    ways: 4, pulses: 3, gap: 0.3, ck: 'nova', pre: 'w_blackdragon', branch: 1,
-    desc: '십자 방향으로 다섯 칸까지 나아가는 검기를 세 번에 걸쳐 내보내 지나는 길의 몬스터를 벤다' },
-  r_jugeum: { promo: 9, cls: 'rogue', req: 33, name: '죽음의희열', kind: 'rain', at: 'self', fx: 'o_r_jugeum', noLoop: true, fx2: 'k_r_shadowstar', fxCast: 'k_r_gimun',
-    dmg: 60, cd: 8, radius: 3, drops: 12, dur: 2, k: 0.6, dropScale: 0.8, killCut: 0.3, ck: 'nova', pre: 'r_chainstar', branch: 1,
-    desc: '죽음의 희열에 들떠 2초 동안 둘레 곳곳에 묵마수리검을 거듭 터뜨린다. 그동안 몬스터를 쓰러뜨릴 때마다 다른 기술의 재사용 대기가 줄어든다' },
-  m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'aura9', fx: 'o_m_hwanyeong', fxCast: 'k_m_chaos', fxHit: 'k_m_curse', hit: 10, cd: 16, duration: 5,
-    radius: 2, tick: 0.5, ward: 0.25, slow: 2, curse: 3, ck: 'buff', buff: 'shield', pre: 'm_seonsim', branch: 2,
-    desc: '둘레에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입으며, 자신은 받는 피해가 25% 준다' },
+  m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,
+    slow: 2, curse: 2, ck: 'strike', pre: 'm_seonsim', branch: 2,
+    desc: '앞에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입는다' },
   p_banhyang: { promo: 9, cls: 'poet', req: 33, name: '치유의반향', kind: 'echo', echo: 'mend', fx: 'o_p_banhyang', fxCast: 'k_u_p_pillar_b', fxLoop: 'o_p_banhyang', loopSize: 90, fxHit: 'k_u_p_sparkle',
     hit: 40, cd: 18, duration: 10, every: 0.6, shots: 2, range: 6, heal: 0.6, power: 0.3, buff: 'power', ck: 'buff', pre: 'p_saint', branch: 0,
     desc: '10초 동안 치유의 기운이 메아리쳐 피해가 30% 늘고, 가까운 몬스터 둘을 빛이 거듭 치며 칠 때마다 체력을 조금 되찾는다' },
@@ -1565,6 +1577,34 @@ for (const [id, o] of Object.entries(S9)) {
   if (['echo', 'aura9'].includes(SKILLS[id].kind)) SKILLS[id].aoe = true;
   if (branch !== undefined && !BRANCHES[SKILLS[id].cls][branch].ids.includes(id)) BRANCHES[SKILLS[id].cls][branch].ids.push(id);
 }
+// 흑룡검풍: a passive in the original ([지속효과 마법]) — not a spell of the bar: 흑룡광참 brings it (wind9), and a saved
+// slot of it is 흑룡광참.
+Object.assign(SKILLS.w_hogi, { retired: true, was: 'warrior', cls: '-', pre: undefined, up: undefined, name: '흑룡검풍' });
+SKILL_ALIAS.w_hogi = 'w_blackdragon';
+// 명천검파: no scene of it in 2662 (IMG05 shows none) — a passive without a picture (사용자 결정): the 검기 skills' every
+// third cast goes out once more at 60%, once in five seconds at most. A saved slot of it is 호기어검.
+SKILLS.w_mcheon = { name: '명천검파', kind: 'passive', retired: true, was: 'warrior', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 검기 계열 기술을 세 번 쓸 때마다 그 기술이 한 번 더 나간다 (60%, 5초에 한 번)' };
+SKILL_ALIAS.w_mcheon = 'w_swords';
+for (const id of BRANCHES.warrior[0].ids) if (SKILLS[id] && SKILLS[id].dmg && !SKILLS[id].retired) SKILLS[id].mcheon9 = { every: 3, k: 0.6, cd: 5, at: 0.3 };
+SKILLS.w_swords.desc += '. 9차 패시브 명천검파: 검기 계열 기술을 세 번 쓸 때마다 그 기술이 한 번 더 나간다';
+Object.assign(SKILLS.w_blackdragon, { wind9: { name: '흑룡검풍', fx: 'o_w_heukryong', chance: 0.3, duration: 8, tick: 0.5, hit: 12, reach: 1.3 },
+  desc: SKILLS.w_blackdragon.desc + '. 9차 승급부터는 패시브 흑룡검풍: 벨 때 30% 확률로 검붉은 검풍이 일어 8초 동안 주위를 돌며 닿는 몬스터를 거듭 벤다' });
+// 죽음의희열: a passive in the original ([지속효과 마법]: a kill brings, three times in ten, one of the 수리검 skills
+// ready at once) — 2662 IMG15 shows no picture of its own (묵마수리검'쇄 thrown again), so none here. A saved slot of it
+// is 묵마수리검'쇄. (In our game kills come thick: at most once in three seconds.)
+SKILLS.r_jugeum = { name: '죽음의희열', kind: 'passive', retired: true, was: 'rogue', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 몬스터를 쓰러뜨릴 때 30% 확률로 묵마십자수리검·묵마수리검\'쇄·그림자표창 중 하나의 재사용 대기가 끝난다 (3초에 한 번)' };
+SKILL_ALIAS.r_jugeum = 'r_chainstar';
+SKILLS.r_jugeum.proc9 = { chance: 0.3, ids: ['r_chainstar', 'r_shuriken', 'r_shadowstar'], cd: 3 };
+SKILLS.r_chainstar.desc += '. 9차 패시브 죽음의희열: 몬스터를 쓰러뜨릴 때 30% 확률로 수리검 계열 기술 하나의 재사용 대기가 끝난다';
+// 전도체: a passive in the original ([지속효과 마법]: 천뢰마옥쌍구 or 뇌격구 brings, one time in two, 10 s of 과전류, in which
+// the current runs into those 서리파편 strikes) — its picture the bolts of 2662 IMG25. A saved slot of it is 서리파편.
+SKILLS.m_jeondo = { name: '전도체', kind: 'passive', retired: true, was: 'mage', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 천뢰마옥쌍구·뇌격구를 쓸 때 50% 확률로 10초 동안 과전류 상태가 된다. 과전류 동안 서리파편에 맞은 몬스터에게 몸에서 번개가 흘러 피해를 준다',
+  proc9: { chance: 0.5, ids: ['m_twin', 'm_thunderball'], dur: 10, k: 0.5, fx: 'o_m_jeondo', reach: 200, every: 0.5 } };
+SKILL_ALIAS.m_jeondo = 'm_shards';
+SKILLS.m_shards.desc += '. 9차 패시브 전도체: 천뢰마옥쌍구·뇌격구를 쓰면 50% 확률로 10초 과전류 — 서리파편에 맞은 몬스터에게 번개가 흐른다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
@@ -1632,21 +1672,21 @@ export const ULT_TIERS = {
     ult('warrior', 'w_blood', '혈겁만파', { mech: 'rain', main: 'k_w_blood', frac: 0.85, hit: 'h_hit_tiger', dropSize: 90, boss: 'w_roar3', k: 1.15, hpCost: 0.3 }),
     ult('warrior', 'w_charge', '돌격명령', { open: 'k_w_tarok', openW: 0.6, echoW: 200, echoCap: 2.5, echoN: 26, openCap: 2.5, aura: 'k_w_charge', echo: 'k_w_tarok', echo2: 'k_u_w_wave', mech: 'dash', cast: 'k_w_charge', castSize: 220, main: 'k_u_w_wave', mainSize: 170, hit: 'h_ml_burst', hitScale: 0.5, n: 9, boss: 'w_gwangya', k: 1.3, hpCost: 0.3,
       desc: '돌격을 명하며 몬스터에서 몬스터로 아홉 번 돌진해 베고, 마지막에 칼바람을 일으켜 화면의 나머지를 벤다' }),
-    ult('warrior', 'w_myriad', '만검귀종', { cutin: 'o_w_ult9', open: null, mech: 'vortex', main: 'k_w_myriad', mainScale: 1.2, burst: 'k_w_myriad', burstSize: 260, ring: 'k_w_fly', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
+    ult('warrior', 'w_myriad', '만검귀종', { cine9: 0.75, cutin: 'o_w_ult9', open: null, mech: 'vortex', main: 'k_w_myriad', mainScale: 1.2, burst: 'k_w_myriad', burstSize: 260, ring: 'k_w_fly', hit: 'k_w_fly', hold: 1.0, boss: 'w_blackdragon', k: 1.5, hpCost: 0.3 }),
   ],
   rogue: [
     ult('rogue', 'r_ult', '필살검무', { mech: 'dash', main: 'k_u_r_ult0', mainSize: 180, hit: 'k_u_r_backhit', n: 8, gap: 0.09, boss: 'r_dance', k: 1 }),
     ult('rogue', 'r_bunhon', '분혼경천', { echo: 'k_r_suhyo', aura: 'k_r_flysword', mech: 'mark', cast: 'k_r_bunhon', frac: 0.6, main: 'h_ml_cross', markScale: 0.6, hit: 'h_ml_spark', stun: 0.6, delay: 1.1, boss: 'r_flysword', k: 1.15 }),
     ult('rogue', 'r_ult2', "필살검무'첨", { echoCap: 2, echoW: 220, open: 'k_r_amsal', mech: 'sweep', main: 'k_r_ult2', mainSize: 240, hit: 'h_ml_cross', hitScale: 0.5, steps: 6, boss: 'r_amsal', k: 1.3,
       desc: '필살검무의 극의. 검기의 벽이 화면을 가로지르며 지나는 몬스터를 모두 벤다' }),
-    ult('rogue', 'r_gale', '질풍난무', { cutin: 'o_r_ult9', echoN: 28, openW: 0.6, echoCap: 2, finCap: 3, open: 'k_r_gale', mech: 'chain', main: 'new_r_storm', shot: 'h_ml_cross', markScale: 1.3, gap: 0.04, boss: 'r_pilgeom', k: 1.5 }),
+    ult('rogue', 'r_gale', '질풍난무', { cine9: 0.75, cutin: 'o_r_ult9', echoN: 28, openW: 0.6, echoCap: 2, finCap: 3, open: 'k_r_gale', mech: 'chain', main: 'new_r_storm', shot: 'h_ml_cross', markScale: 1.3, gap: 0.04, boss: 'r_pilgeom', k: 1.5 }),
   ],
   mage: [
     ult('mage', 'm_ult', '헬파이어', { mech: 'meteor', main: 'k_m_ult', mainSize: 220, hit: 'k_x_m_ult_hit', n: 5, shield: 5, boss: 'm_seongryeo', k: 1 }),
     ult('mage', 'm_hell2', "헬파이어'첨", { echoCap: 2.5, mech: 'cross', main: 'k_m_hell2', mainSize: 120, hit: 'h_hit_fire', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
       desc: '헬파이어의 극의. 여덟 갈래로 뻗는 불기둥이 화면을 가르고, 남은 몬스터에게 불길이 번진다' }),
     ult('mage', 'm_fire3', '폭류유성', { mech: 'rain', main: 'k_m_fire3', frac: 0.95, drop: 'k_u_m_meteor', dropSize: 170, hit: 'h_hit_fire', span: 1.6, shield: 5, boss: 'm_jiokchak', k: 1.3 }),
-    ult('mage', 'm_kalpa', '겁화', { cutin: 'o_m_ult9', open: 'k_m_cross', echo: 'k_m_hyeongsang', fin: 'k_m_hyeongsang', mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
+    ult('mage', 'm_kalpa', '겁화', { cine9: 0.75, cutin: 'o_m_ult9', open: 'k_m_cross', echo: 'k_m_hyeongsang', fin: 'k_m_hyeongsang', mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
   ],
   poet: [
     ult('poet', 'p_ult', '태양의희원', { iconFx: '124', mech: 'sanctuary', cast: 'k_p_ult', main: 'k_u_p_pillar_o', hit: 'h_hit_light', guard: 3, boss: 'p_jiroe', k: 1 }),
