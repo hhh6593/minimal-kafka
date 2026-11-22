@@ -9148,10 +9148,12 @@ const TIER_KINDS = {
   // guarding only while the hero is; wardHits [n, k1, k2]: the first n blows taken in it cut by k1, the rest by k2
   // (설명창: 피격 10회까지 방어도 -80, 초과하면 -40).
   zone9({ skill, def, fxid }) {
-    const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
+    // (def.feet — 천선의영역: the seal's middle is where the hero's feet were, as in the original; R its drawn round)
+    const p = G.player, run = G, fy = def.feet ? 0 : 14, cx = p.x, cy = p.y - fy, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
     if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
     const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 1, must: true };
     if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 }); // (its pivot its middle: on the hero's body)
+    if (def.feet) fx.anchor = 'bottom'; // (its pivot, the seal's middle, exactly on the hero's feet)
     // (아공간전개: its pivot the hero's feet where it was laid, drawn whole — its own crystals and field, not see-through)
     if (def.atFeet) Object.assign(fx, { id: def.fx, y: p.y, anchor: 'bottom', alpha: 1, floor: true });
     G.fxs.push(fx);
@@ -9159,7 +9161,7 @@ const TIER_KINDS = {
     G.ward9Hits = def.wardHits ? { n: 0, at: def.wardHits, until: end } : null;
     const tick = () => {
       if (G !== run || G.dead || G.t >= end) return;
-      if (Math.hypot(p.x - cx, p.y - 14 - cy) > R) {
+      if (Math.hypot(p.x - cx, p.y - fy - cy) > R) {
         if (!def.stay) { fx.life = Math.min(fx.life, fx.t + 0.15); G.buffs.ward9 = 0; return; }
         if (G.ward9Hits) G.ward9Hits.inside = false;
         later(0.2, tick);
@@ -9190,7 +9192,9 @@ const TIER_KINDS = {
     const own = def.half && M.fx[def.fx];
     if (own) tkLoop(def.fx, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
     else tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
-    const inAura = own ? () => G.enemies.filter(e => tkFoe(e) && ((e.x - p.x) / def.half[0]) ** 2 + ((e.y - 20 - (p.y - 14)) / def.half[1]) ** 2 <= 1)
+    // (the ring lies on the ground round the hero's feet, its middle def.halfAt px below them as in the original: a foe's
+    // feet inside the ring drawn are struck — 이펙트=판정)
+    const inAura = own ? () => G.enemies.filter(e => tkFoe(e) && ((e.x - p.x) / def.half[0]) ** 2 + ((e.y - (p.y + (def.halfAt || 0))) / def.half[1]) ** 2 <= 1)
       : () => around(p.tx, p.ty, r);
     if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
     for (let k = 1; k <= n; k++) later(k * def.tick, () => {
@@ -9555,6 +9559,68 @@ const TIER_KINDS = {
           });
         });
       });
+    });
+  },
+  // 폭렬천뢰탄 (원작 2662 IMG31): the sphere of lightning flies ahead along the row the hero faces (the way it faces if a
+  // foe stands on it, else the row with the most, the hero turned to it) up to `range` tiles, to the strongest on that
+  // row; there it hangs crackling `hold` seconds and bursts (o_p_cheonroe9: forming, the sphere, the burst — at the
+  // original's own size). On its way the lightning leaps from it to `chain` foes round the one struck, the same sphere
+  // smaller on each (chainFx). Never laid on the hero's body: it forms a tile ahead, and bursts at least 1.6 tiles out.
+  // 이펙트=판정: the one under the sphere, and each under a smaller one.
+  orb9({ skill, st, def, smite }) {
+    const p = G.player, f = M.fx[def.fx], run = G, depth = st.range || def.range || 7;
+    if (!f) return 0.3;
+    let [dx, dy] = faceWay();
+    const row = (ux, uy) => { const t = []; for (let k = 1; k <= depth; k++) t.push([p.tx + ux * k, p.ty + uy * k]); return onTiles(t); };
+    let foes = row(dx, dy);
+    if (!foes.length) {
+      const best = tkBestRow(depth);
+      if (!best) return 0.3;
+      [dx, dy, foes] = best;
+    }
+    p.fdx = dx; p.fdy = dy;
+    if (dx) p.face = dx;
+    const t = foes.slice().sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp || (Math.abs(a.tx - p.tx) + Math.abs(a.ty - p.ty)) - (Math.abs(b.tx - p.tx) + Math.abs(b.ty - p.ty)))[0];
+    // (the sheet's lightning runs to the right, the way the original's sphere flew: turned to the way it goes)
+    const rot = dy ? (dy > 0 ? Math.PI / 2 : -Math.PI / 2) : 0, flip = dx < 0;
+    const part = (tag, a, b, o = {}) => {
+      const id = def.fx + '#' + tag;
+      if (!M.fx[id]) M.fx[id] = { ...f, src: f.src || def.fx, f0: (f.f0 || 0) + a, n: b - a, durs: f.durs.slice(a, b), ...o };
+      return id;
+    };
+    const form = part('form', 0, 1), ball = part('ball', 1, 3), burst = part('burst', 3, 4, { durs: [220], hold: true });
+    // where it goes: the one struck, but never nearer the hero than 1.6 tiles (its round would lie on the hero)
+    const bx = p.x, by = p.y - 26, along = (t.x - p.x) * dx + (t.y - 20 - by) * dy;
+    const pull = Math.max(0, TILE * 1.6 - along);
+    const ex = t.x + dx * pull, ey = t.y - 20 + dy * pull;
+    const sx = bx + dx * TILE, sy = by + dy * TILE, dist = Math.hypot(ex - sx, ey - sy), fly = 0.12 + dist / 900, hold = def.hold || 1.0;
+    const put = (id, x, y, life, o = {}) => G.fxs.push({ id, x, y, t: 0, life, scale: o.scale || 1, rot, flip, anchor: 'bottom', loop: o.loop, seenLoop: o.loop,
+      mv: o.mv, must: true, alpha: settings.calmFx ? 0.8 : 1 });
+    put(form, sx, sy, 0.09, { scale: 0.55 });
+    later(0.09, () => { if (G === run) put(ball, sx, sy, fly, { scale: 0.55, loop: true, mv: [ex - sx, ey - sy, fly] }); });
+    const at = 0.09 + fly;
+    later(at, () => {
+      if (G !== run) return;
+      put(ball, ex, ey, hold, { loop: true });
+      later(hold, () => { if (G === run) put(burst, ex, ey, 0.22); });
+      G.shake = Math.max(G.shake, 0.08);
+      // (no other picture's hit sparks on them: the sphere is what strikes, as in the original)
+      G.quietHit = true;
+      if (t.hp > 0) { smite(t, st.dmg); tkAfflict(t, def); }
+      G.quietHit = false;
+      // the lightning leaping on from it: the nearest round the one struck (not one at the hero's side)
+      // (its round, f.w·k/2 scaled, clear of the hero's body — half a hero, 26 px, round its middle)
+      const sc = def.chainScale || 0.6, clear = f.w * (f.k || 1) / 2 * sc + 26;
+      const near = tkNear(t.tx, t.ty, 3).filter(o => o !== t && Math.hypot(o.x - p.x, o.y - 20 - (p.y - 26)) >= clear).slice(0, def.chain || 2);
+      near.forEach((o, i) => later(0.25 * (i + 1), () => {
+        if (G !== run || o.hp <= 0) return;
+        const ox = o.x, oy = o.y - 20, life = Math.max(0.3, hold - 0.25 * (i + 1));
+        put(ball, ox, oy, life, { loop: true, scale: sc });
+        later(life, () => { if (G === run) put(burst, ox, oy, 0.22, { scale: sc }); });
+        G.quietHit = true;
+        smite(o, st.dmg * (def.chainK || 0.5));
+        G.quietHit = false;
+      }));
     });
   },
   // 서리파편 (원작 2662 IMG23): the orb of frost shards flies ahead (the way with the most foes, the hero turned to it) up
@@ -10184,9 +10250,17 @@ function venomBurst(e) {
   const v = e.venom9;
   if (!v || v.until < G.t) return;
   e.venom9 = null;
-  // (묵혈독's own flame, o_r_mukdok, drawn as wide as the burst strikes: three tiles)
-  if (fxBudget('venom9', 3)) addFx(M.fx.o_r_mukdok ? 'o_r_mukdok' : 'g_poison_purple', e.x, e.y - 10, { scale: M.fx.o_r_mukdok ? 1.3 : 0.9, anchor: 'bottom' });
-  later(0.05, () => { for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); });
+  // (묵혈독's own flame, o_r_mukdok, at the original's own size; 이펙트=판정: what stands in the flame drawn — the ellipse in
+  // its picture's box, measured from the sheet — is struck)
+  const f = M.fx.o_r_mukdok;
+  if (!f) {
+    if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 10, { scale: 0.9, anchor: 'bottom' });
+    later(0.05, () => { for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); });
+    return;
+  }
+  if (fxBudget('venom9', 3)) addFx('o_r_mukdok', e.x, e.y - 10, { anchor: 'bottom' });
+  const k = f.k || 1, hx = f.w * k / 2, hy = f.h * k / 2, cx = e.x + (f.w / 2 - f.ax) * k, cy = e.y - 10 + (f.h / 2 - f.ay) * k;
+  later(0.05, () => { for (const o of G.enemies) if (o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1) hurtEnemy(o, v.burst); });
 }
 
 /** A companion's view of a 차수별 기술: the plain kind it casts it as (def.ck), or the skill as it is. */
