@@ -9068,7 +9068,7 @@ const TIER_KINDS = {
       }
     });
   },
-  // 묵혈독바르기 (원작 2662 IMG17): the dark violet poison wells up round the hero and its blades (o_r_mukdokcast);
+  // 묵혈독바르기 (원작 2662 IMG17): (the cast — only the hero's own body tinted violet in the original — is not drawn: it would carry the hero's outline);
   // the next `charges` casts of a striking skill (within `duration`) leave 묵혈독 on every foe they strike for `infect`
   // seconds — the blue-violet flame bursting on it as it takes hold (o_r_mukdok) — under which it takes `taken` more,
   // and falling with it on, it bursts (venomBurst). Nothing struck by itself (설명창: no blow of its own).

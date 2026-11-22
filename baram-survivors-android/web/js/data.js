@@ -1433,7 +1433,7 @@ const S9 = {
   //   죽음의희열 = 패시브 (설명창 [지속효과 마법]: 적을 처치할 때마다 30% 확률로 수리검 계열 하나의 쿨타임 초기화 —
   //     jugeum9; IMG15에는 따로 그림이 없고 묵마수리검'쇄가 다시 나갈 뿐이라 그림 없음).
   // Pictures at the original's own size (o_r_*: 0.62 game pixels a capture pixel).
-  r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'coat9', fx: 'o_r_mukdok', fxCast: 'o_r_mukdokcast', fx2: undefined, fxHit: undefined,
+  r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'coat9', fx: 'o_r_mukdok', fxCast: undefined, fx2: undefined, fxHit: undefined,
     hit: 30, cd: 10, duration: 10, charges: 5, infect: 7, taken: 0.15, burst: 1.2, every: undefined, shots: undefined, range: 2, power: undefined, curse: undefined, buff: undefined,
     ck: 'buff', pre: 'r_budong', branch: 2,
     desc: '무기에 묵혈독을 바른다. 다음 공격 기술 다섯 번이 친 몬스터는 7초 동안 묵혈독에 감염되어 받는 피해가 15% 늘고, 감염된 채 쓰러지면 둘레 한 칸에 독이 터진다' },

@@ -334,93 +334,29 @@
  "r_mukdok": {
   "src": "gif2662/IMG17.gif",
   "mode": "parts",
-  "key": "blue",
-  "bt": [
-   25,
-   60
-  ],
+  "key": "unmix",
   "cell": [
-   180,
+   118,
    150
   ],
   "origin": [
-   65,
+   45,
    115
   ],
-  "soft": 5,
+  "soft": 14,
   "cells": [
-   [
-    {
-     "f": 80,
-     "at": [
-      370,
-      310
-     ],
-     "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 81,
-     "at": [
-      370,
-      310
-     ],
-     "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
-     ]
-    }
-   ],
    [
     {
      "f": 82,
      "at": [
-      370,
+      407,
       310
      ],
      "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
+      -45,
+      -115,
+      73,
+      35
      ]
     }
    ],
@@ -428,24 +364,14 @@
     {
      "f": 83,
      "at": [
-      370,
+      407,
       310
      ],
      "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
+      -45,
+      -115,
+      73,
+      35
      ]
     }
    ],
@@ -453,24 +379,14 @@
     {
      "f": 84,
      "at": [
-      370,
+      407,
       310
      ],
      "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
+      -45,
+      -115,
+      73,
+      35
      ]
     }
    ],
@@ -478,24 +394,14 @@
     {
      "f": 85,
      "at": [
-      370,
+      407,
       310
      ],
      "clip": [
-      -60,
-      -110,
-      110,
-      30
-     ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
+      -45,
+      -115,
+      73,
+      35
      ]
     }
    ],
@@ -503,31 +409,108 @@
     {
      "f": 86,
      "at": [
-      370,
+      407,
       310
      ],
      "clip": [
-      -60,
-      -110,
-      110,
-      30
+      -45,
+      -115,
+      73,
+      35
+     ]
+    }
+   ],
+   [
+    {
+     "f": 87,
+     "at": [
+      407,
+      310
      ],
-     "ops": [
-      {
-       "clear": [
-        -60,
-        -110,
-        -12,
-        -90
-       ]
-      }
+     "clip": [
+      -45,
+      -115,
+      73,
+      35
+     ]
+    }
+   ],
+   [
+    {
+     "f": 88,
+     "at": [
+      407,
+      310
+     ],
+     "clip": [
+      -45,
+      -115,
+      73,
+      35
+     ]
+    }
+   ],
+   [
+    {
+     "f": 89,
+     "at": [
+      407,
+      310
+     ],
+     "clip": [
+      -45,
+      -115,
+      73,
+      35
+     ]
+    }
+   ],
+   [
+    {
+     "f": 90,
+     "at": [
+      407,
+      310
+     ],
+     "clip": [
+      -45,
+      -115,
+      73,
+      35
+     ]
+    }
+   ],
+   [
+    {
+     "f": 92,
+     "at": [
+      407,
+      310
+     ],
+     "clip": [
+      -45,
+      -115,
+      73,
+      35
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 80-86: no damage number over it, the skill's call label above left out), its blue keyed off the grey ground, the hero's red and the dummy's wood. (1320 #05, used before, is not it: thin dark rings)"
+  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 82-92: no damage number over it) — unmixed from the clean field (frame 0): the dummy under it stands still and drops out, the hero beside it on the left left out (the cell starts at its right shoulder and fades in), the dummy's bar and marker filled from the flame round them. (1320 #05 is not it.) The cast (frames 2-6) is only the hero's own body tinted violet — not used: it would carry the hero's outline",
+  "bg": 0,
+  "k": 110,
+  "smooth": 3,
+  "grain": false,
+  "badbox": [
+   [
+    350,
+    208,
+    396,
+    246
+   ]
+  ]
  },
  "m_hoeseon": {
   "src": "gif2662/IMG21.gif",
