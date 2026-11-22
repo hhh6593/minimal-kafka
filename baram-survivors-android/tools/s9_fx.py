@@ -1159,7 +1159,7 @@ def parts_cells(frames, e):
                         k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
                     a[~k_, 3] = 0
                     continue
-                if "drop" in op:
+                if "ldrop" in op:
                     # (what the expressions name over the capture's own frame — a hero's gold and red, a weapon's white in a
                     # box of it (x, y: the capture's own; d: moved from the clean frame) — cleared, "grow" px round it, its
                     # edge faded over "soft" px: no hole with a hard rim)
@@ -1172,7 +1172,7 @@ def parts_cells(frames, e):
                     env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
                             "x": xx_, "y": yy_, "d": np.abs(o_ - b_).max(axis=2)}
                     k_ = np.zeros((H, W), bool)
-                    for ex_ in op["drop"]:
+                    for ex_ in op["ldrop"]:
                         k_ |= eval(ex_, {}, env_)
                     for ex_, px_ in op.get("near", []):
                         # (a hit star's white heart, a digit's white face: only beside what was found)

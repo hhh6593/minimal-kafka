@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Packs an APK from an already prepared www (tools/repack_from_apk.py) with build.sh's own packaging steps.
+#   tools/repack_apk.sh PREPARED_WWW [IMAGES_DIR for the launcher icon]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+WWW="${1:?usage: tools/repack_apk.sh PREPARED_WWW [IMAGES_DIR]}"
+IMAGES="${2:-/nonexistent}"
+SDK="${ANDROID_HOME:-/opt/android-sdk}"
+BT="$SDK/build-tools/35.0.0"
+JAR="$SDK/platforms/android-35/android.jar"
+OUT="$HERE/build"
+APK="$HERE/BaramSurvivors.apk"
+rm -rf "$OUT"
+mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/compiled" "$OUT/assets"
+cp -r "$WWW" "$OUT/assets/www"
+cp -r "$HERE/res" "$OUT/res"
+
+# Each build gets a higher version code (minutes since 2026-01-01) so Android installs it as an
+# update, and the title screen shows which build is running.
+VERSION_CODE=$(( ($(date +%s) - 1767225600) / 60 ))
+VERSION_NAME="$(date +%Y.%m.%d-%H%M)"
+sed -e "s/android:versionCode=\"[0-9]*\"/android:versionCode=\"$VERSION_CODE\"/" \
+    -e "s/android:versionName=\"[^\"]*\"/android:versionName=\"$VERSION_NAME\"/" \
+    "$HERE/AndroidManifest.xml" > "$OUT/AndroidManifest.xml"
+python3 -I - "$OUT/assets/www/assets/manifest.json" "$VERSION_NAME" <<'PY'
+import json, sys
+p, v = sys.argv[1], sys.argv[2]
+m = json.load(open(p, encoding="utf-8"))
+m["version"] = v
+json.dump(m, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+PY
+
+# Launcher icon: the old client's own icon, the light-blue cloud of WinBaram.exe (baram.png in
+# the image download, from the old site's front page). Its black backdrop is made see-through;
+# without it, the four classes' faces on a wooden tile as before.
+python3 -I - "$OUT/assets/www/assets/hero" "$OUT/res" "$IMAGES/baram.png" <<'PY'
+import sys, os
+from PIL import Image, ImageDraw
+heroes, res, cloud = sys.argv[1], sys.argv[2], sys.argv[3]
+if os.path.exists(cloud):
+    im = Image.open(cloud).convert("RGBA")
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, _ = px[x, y]
+            v = max(r, g, b)
+            # Pure black is the backdrop; the dark fringe around the cloud fades out with it.
+            px[x, y] = (r, g, b, 0 if v < 24 else min(255, (v - 24) * 4))
+    im = im.crop(im.getbbox())
+    s = 176 / max(im.size)
+    im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    base = Image.new("RGBA", (192, 192), (0, 0, 0, 0))
+    base.alpha_composite(im, ((192 - im.width) // 2, (192 - im.height) // 2))
+    smooth = Image.LANCZOS
+else:
+    base = Image.new("RGBA", (192, 192), (43, 29, 18, 255))
+    d = ImageDraw.Draw(base)
+    d.rectangle([0, 0, 191, 191], outline=(160, 122, 70, 255), width=6)
+    hero = Image.open(os.path.join(heroes, "1003.png")).convert("RGBA")
+    s = min(150 / hero.width, 150 / hero.height)
+    hero = hero.resize((int(hero.width * s), int(hero.height * s)), Image.NEAREST)
+    base.alpha_composite(hero, ((192 - hero.width) // 2, 180 - hero.height))
+    smooth = Image.NEAREST
+for name, size in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
+    os.makedirs(f"{res}/mipmap-{name}", exist_ok=True)
+    base.resize((size, size), smooth).save(f"{res}/mipmap-{name}/ic_launcher.png")
+PY
+
+"$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/compiled/res.zip"
+"$BT/aapt2" link -o "$OUT/unsigned.apk" -I "$JAR" \
+  --manifest "$OUT/AndroidManifest.xml" -A "$OUT/assets" \
+  --java "$OUT/gen" --min-sdk-version 24 --target-sdk-version 35 \
+  "$OUT/compiled/res.zip"
+
+javac -source 8 -target 8 -Xlint:-options -encoding UTF-8 -bootclasspath "$JAR" -classpath "$JAR:$BT/core-lambda-stubs.jar" \
+  -d "$OUT/classes" $(find "$HERE/src" "$OUT/gen" -name '*.java')
+"$BT/d8" --release --min-api 24 --lib "$JAR" --output "$OUT" $(find "$OUT/classes" -name '*.class')
+(cd "$OUT" && zip -q -j unsigned.apk classes.dex)
+
+"$BT/zipalign" -f -p 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
+
+# Keep this key: an update installs over the old app (keeping records) only when signed with it.
+KS="$HERE/keystore/baram-survivors.jks"
+if [ ! -f "$KS" ]; then
+  mkdir -p "$(dirname "$KS")"
+  keytool -genkeypair -keystore "$KS" -storepass baramsurvivors -keypass baramsurvivors \
+    -alias baram -keyalg RSA -keysize 2048 -validity 10000 \
+    -dname "CN=Baram Survivors (personal build)" >/dev/null
+fi
+"$BT/apksigner" sign --ks "$KS" --ks-pass pass:baramsurvivors --key-pass pass:baramsurvivors \
+  --ks-key-alias baram --out "$APK" "$OUT/aligned.apk"
+"$BT/apksigner" verify "$APK"
+echo "built $APK ($(du -h "$APK" | cut -f1))"
