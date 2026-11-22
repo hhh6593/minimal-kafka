@@ -26,6 +26,8 @@ here: each frame is the client's own pixels, taken off their backdrop:
                   "cool" — a blue-white effect over a warm (brown, tan, red) floor: alpha by how far red stands
                            over blue ("warm" [lo, hi]: opaque up to lo, clear from hi), green bars out; with
                            "floor" [r, g, b] the floor's colour is taken back out of the half-clear pixels;
+                  "blue" — a blue-violet effect over a grey or brown floor: alpha by how far blue stands over red and
+                           green ("bt" [lo, hi]);
                   "fire" — mode "key"'s gate (a fiery effect over a red-and-tan floor);
                   "dark" — a dark red effect (흑룡검풍's wind) over a light floor in a still camera: alpha by how
                            far the pixel moved from the field ("bg": a clean frame; t0/t1), kept only where it
@@ -139,6 +141,11 @@ def keyed(frames, i, e, part=None):
         return key_cool(a, e)
     if key == "fire":
         return key_fire(a, e)
+    if key == "blue":
+        # a blue-violet effect (묵혈독's flame) over a grey or brown floor: alpha by how far blue stands over red and green
+        t0, t1 = part.get("bt", e.get("bt", [30, 70]))
+        al = np.clip((a[..., 2] - np.maximum(a[..., 0], a[..., 1]) - t0) / max(1.0, t1 - t0), 0, 1)
+        return np.dstack([a, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
     if key == "dark":
         return key_dark(a, bg, e)
