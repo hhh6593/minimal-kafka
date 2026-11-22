@@ -1474,15 +1474,15 @@ const S9 = {
   // 궁사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/archer.md). 시전 3 + 패시브 1 + 필살기:
   //   이기뇌멸시 (IMG40: 가까운 적 다섯에 뇌전시가 하늘에서 내리꽂히고, 맞은 자리 둘레로 뇌기가 웅덩이처럼 퍼진다; 경직 2초; 쿨 10초),
   //   천궁난사 (IMG42: 1.25초 동안 앞의 적들에게 천궁의 불화살 — 맞은 적마다 큰 불꽃 폭발, 3×3; 쿨 2초 → 4초),
-  //   응축뇌전시 (IMG44 앞부분: 거대한 뇌전시가 8칸까지 날아가며 끌어당기고, 끝에서 푸른 진이 열려 둘레를 모아 터진다; 쿨 12초),
+  //   응축뇌전시 (IMG44 앞부분: 거대한 뇌전시가 바라보는 쪽으로 8칸까지 날아가며 끌어당기고, 끝에서 푸른 진이 열려 둘레를 모아 터진다; 쿨 12초),
   //   화살비폭격 = 패시브 (설명창 [지속효과 마법]: 투염시·응축뇌전시·폭발사격을 쓸 때 앞에 화살비 폭격 — IMG44 뒷부분의 흰 화살비).
   // Pictures at the original's own size (o_a_*: 0.62 game pixels a capture pixel).
   a_air: { name: '이기뇌멸시', kind: 'igi9', fx: 'o_a_igibolt', fxPool: 'o_a_igipool', fx2: undefined, fxCast: undefined, fxHit: undefined,
-    dmg: 60, cd: 10, range: 7, n: 5, k: undefined, poolK: 0.5, stun: 2, radius: undefined, count: undefined, depth: undefined, ck: 'spell',
-    desc: '뇌 기운을 담은 뇌전시 다섯 발을 가까운 몬스터 다섯에게 쏜다. 하늘에서 내리꽂힌 뇌전시가 폭발하며 그 자리와 상하좌우 한 칸으로 뇌기가 퍼져 섬멸하고, 맞은 몬스터는 2초 동안 경직된다' },
+    dmg: 60, cd: 10, range: 7, n: 5, k: undefined, poolK: 0.5, waves: 3, waveGap: 0.6, poolEnd: 4.2, poolTick: 0.8, stun: 2, radius: undefined, count: undefined, depth: undefined, ck: 'spell',
+    desc: '뇌 기운을 담은 뇌전시 다섯 발을 가까운 몬스터 다섯에게 쏜다. 하늘에서 뇌전시가 세 번 거듭 내리꽂혀 폭발하고, 그 자리와 상하좌우 한 칸으로 퍼진 뇌기가 4초 남짓 바닥에 깔려 거듭 치며, 맞은 몬스터는 2초 동안 경직된다' },
   a_eungchuk: { promo: 9, cls: 'archer', req: 33, name: '응축뇌전시', kind: 'vortex', fx: 'o_a_eungbolt', fxEnd: 'o_a_eungvortex', fx2: undefined, fxHit: undefined, dmg: 60, cd: 12,
     depth: 8, dur: 0.6, k: 0.5, endBurst: 2.2, endR: 92, fxCast: undefined, ck: 'line', pre: 'a_chain', branch: 0,
-    desc: '거대한 뇌 기운을 담은 뇌전시를 쏜다. 뇌전시는 여덟 칸까지 날아가며 지나는 길의 몬스터를 끌어당기고, 끝에서 뇌기의 진이 열려 둘레의 몬스터를 모아 크게 폭발한다' },
+    desc: '거대한 뇌 기운을 담은 뇌전시를 바라보는 쪽으로 쏜다. 뇌전시는 여덟 칸까지(위아래로는 화면 안까지) 날아가며 지나는 길의 몬스터를 끌어당기고, 끝에서 뇌기의 진이 열려 둘레의 몬스터를 모아 크게 폭발한다' },
   // 천인 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/celestial.md). 시전 3 + 패시브 1 + 필살기:
   //   순보선풍 (IMG49: 바라보는 쪽 앞의 몬스터 무리로 순식간에 도약해 치고, 내려선 자리에 푸른 돌풍이 3초 동안 휘몰아친다;
   //     이동 기술이라 바라보는 쪽으로만; 내려서는 순간 받는 피해가 준다 — 설명창: 순간적으로 방어에 최적화),
@@ -1587,7 +1587,7 @@ const S9 = {
     desc: '앞에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입는다' },
   a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'cheon9', fx: 'o_a_cheongung', fxCast: undefined, fxHit: undefined, auraSize: undefined,
     dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
-    desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 둘레 3×3의 몬스터를 태운다(화상)' },
+    desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 그 불꽃 안의 몬스터를 태운다(화상)' },
   // 절섬 (기본공격, 원작 2662 IMG77; 설명창 IMG76: 쿨 0.75초, 범위 앞 5×5, 사용 후 곧바로 한 번 더 — 두 번째는 같은 피해):
   // from the 9차 승급 (in 수련장 always) the cut goes only the way the hero faces, over the ground ahead its crescent sweeps (3×3: the scene's crescent passes over two rows of dummies three tiles deep), under the original's
   // blue crescent (jeol9), and a second follows at once.

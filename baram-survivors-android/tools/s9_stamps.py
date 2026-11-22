@@ -160,6 +160,50 @@ def white_pieces(fr, bg, frames, x_max=682):
     return out
 
 
+def clean_streak(img):
+    """a streak piece of 화살비폭격, or None: one straight stroke only — a piece with a hit marker's dark bars across it
+    (the "‖" written on a dummy it fell past) or two strokes joined in an "×" is left out; what lies off its own line
+    (a marker's or a digit's end beside it) taken off."""
+    a = np.asarray(img).astype(np.float32)
+    al = a[..., 3] / 255
+    if ((al > 0.4) & (a[..., :3].max(2) < 120)).sum() > 3:
+        return None  # (dark bars across it: a marker)
+    ys, xs = np.nonzero(al > 0.5)
+    if len(xs) < 12:
+        return None
+    w = al[ys, xs]
+    mx_, my_ = np.average(xs, weights=w), np.average(ys, weights=w)
+    cov = np.cov(np.vstack([xs - mx_, ys - my_]), aweights=w)
+    ev, evec = np.linalg.eigh(cov)
+    nx, ny = evec[:, 0]  # (the axis across the stroke)
+    if np.sqrt(ev[0]) > 1.1:
+        return None  # (thick across for its glow: a marker's bars written across it, as on the one at frame 12's dummy)
+    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+    dist = np.abs((xx - mx_) * nx + (yy - my_) * ny)
+    if (al * (dist > 4.5)).sum() > 0.12 * al.sum():
+        return None  # (not one straight stroke: an "×")
+    a[..., 3] *= np.clip((6.5 - dist) / 2, 0, 1)
+    return Image.fromarray(a.astype(np.uint8))
+
+
+def solid_puff(img):
+    """a dust piece of 화살비폭격 made whole: the capture's floor shows through its grey shading as dark dots and holes
+    (unmix reads a grey near the floor's as see-through) — closed, inside its own outline, in the colour of the nearest
+    solid dust pixel; its edge kept as it is."""
+    a = np.asarray(img).astype(np.float32).copy()
+    al = a[..., 3] / 255
+    solid = (al > 0.45) & (a[..., :3].max(2) > 150)
+    body = ndimage.binary_fill_holes(ndimage.binary_closing(solid, iterations=3, border_value=0))
+    body = ndimage.binary_erosion(body, iterations=1) | solid
+    gap = body & ~solid
+    if gap.any() and solid.any():
+        _, (iy, ix) = ndimage.distance_transform_edt(~solid, return_indices=True)
+        a[gap, :3] = a[iy[gap], ix[gap], :3]
+        a[gap, 3] = 255
+    a[solid, 3] = np.maximum(a[solid, 3], 235)
+    return Image.fromarray(a.astype(np.uint8))
+
+
 def hwasalbi(src_dir):
     """화살비폭격 (궁사 9차 패시브; 2662 IMG44 frames 10-22, after 응축뇌전시): white arrows streak down out of the sky onto the
     ground ahead and burst into white dust. The capture's field is thick with numbers and stars over the dummies, so only the
@@ -174,8 +218,14 @@ def hwasalbi(src_dir):
         if key not in seen:
             seen.add(key)
             uniq.append(p)
-    streaks = sorted([p for p in uniq if p[0] == 'streak'], key=lambda p: -p[1].height)
-    puffs = sorted([p for p in uniq if p[0] == 'puff'], key=lambda p: -(p[1].width * p[1].height))
+    # (the streaks: one straight stroke each, no marker on it; the dust: a filled round piece — a slanted streak passes the
+    # puff test by its box, not by its fill — made whole)
+    streaks = sorted([(k, c, x, y) for k, i, x, y in uniq if k == 'streak' for c in [clean_streak(i)] if c is not None], key=lambda p: -p[1].height)
+    def fill_of(img):
+        al = np.asarray(img)[..., 3] > 100
+        return al.sum() / float(al.size)
+    puffs = sorted([(k, solid_puff(i), x, y) for k, i, x, y in uniq if k == 'puff' and fill_of(i) > 0.3], key=lambda p: -(p[1].width * p[1].height))
+    print("화살비폭격: %d streaks, %d dust" % (len(streaks), len(puffs)))
     cw, ch, ox, oy, hx, hy = 330, 300, 165, 190, 130, 80  # (room above for the streaks coming down)
     spots = []
     for j in range(4):
@@ -208,6 +258,40 @@ def hwasalbi(src_dir):
                     img, bx, by = sk[1], sk[2], sk[3]
                     cells[t].alpha_composite(img, (int(round(x - bx)), int(round(y - by))))
     return cells, {"cell": [cw, ch], "n": N, "ms": 80, "add": False, "cap": 420, "anchor": [ox, oy], "src": "gif2662/IMG44.gif", "k": 0.62}
+
+
+def igibolt(src_dir):
+    """이기뇌멸시 (궁사 9차; 2662 IMG40 frame 1): one 뇌전시 striking, whole. The bolt at x 414 runs from y 108 down to its
+    arrowhead at 312, but a hit marker and a "10" are written over it at y 168-208. Cut there, it came out half as tall as the
+    original's (its lower part only). Here its two clean parts, unmixed off the clean frame 0 (O = a·F + (1−a)·B), are joined
+    where the zigzag turns — the upper (y 106-168: its zigzag and a diamond of the lattice) straight onto the lower (y 210-324:
+    the next diamond, the arrowhead, its fan of light), crossfaded over 6 rows: the covered 42 rows left out, nothing drawn.
+    Its top fades in; the left bolt's strip and its number's red beside the fan taken out. Pivot: the arrowhead's point."""
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG40.gif"))
+    a, bg = fr[1].astype(np.float32), fr[0].astype(np.float32)
+    D = a - bg
+    al = np.clip((np.abs(D).max(2) - 12) / 98.0, 0, 1)
+    F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+    rgba = np.dstack([F, al * 255])
+    X0, X1 = 380, 446
+    up, lw = rgba[106:169, X0:X1].copy(), rgba[210:325, X0:X1].copy()
+    lw[:82, :10, 3] = 0  # (the left bolt, above the fan)
+    r, g = lw[..., 0], lw[..., 1]
+    lw[..., 3] *= np.clip(1 - (r - g - 20) / 30, 0, 1)  # (its number's red)
+    n = 6
+    up[-n:, :, 3] *= np.linspace(1, 0, n)[:, None]
+    lw[:n, :, 3] *= np.linspace(0, 1, n)[:, None]
+    o = up.shape[0] - n
+    out = np.zeros((o + lw.shape[0], X1 - X0, 4), np.float32)
+    out[:up.shape[0]] = up
+    A, B = out[o:], lw
+    ab, aa_ = B[..., 3:] / 255, A[..., 3:] / 255
+    al2 = ab + aa_ * (1 - ab)
+    out[o:] = np.dstack([(B[..., :3] * ab + A[..., :3] * aa_ * (1 - ab)) / np.maximum(al2, 1e-3), al2 * 255])
+    out[:14, :, 3] *= np.linspace(0, 1, 14)[:, None]
+    cell = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    return [cell], {"cell": [cell.width, cell.height], "n": 1, "ms": 200, "add": False, "anchor": [414 - X0, o + 312 - 210],
+                    "src": "gif2662/IMG40.gif", "k": 0.62}
 
 
 def rain_pieces(fr, frames, box):
@@ -280,8 +364,9 @@ def ult9rain(src_dir, out_dir):
                 pts.append((cx + x * rx, cy + y * ry))
         return pts
     # cells: frames 14, 17, … 44 — streaks from frame 29 (cell 5), arrows from frame 35 (cell 7) to the end, fading in the last
-    plan = {5: (20, 0, 1.0), 6: (24, 14, 1.0), 7: (14, 30, 1.0), 8: (6, 36, 1.0), 9: (0, 36, 1.0), 10: (0, 22, 0.55)}
-    arrow_spots = spots(36)
+    # (the rain the heart of it — 사용자: kept strong: from cell 5 to the end, thickest over cells 7-9)
+    plan = {5: (20, 10, 1.0), 6: (24, 24, 1.0), 7: (14, 40, 1.0), 8: (8, 46, 1.0), 9: (4, 46, 1.0), 10: (0, 34, 0.75)}
+    arrow_spots = spots(46)
     for ci, (ns, na, fade) in plan.items():
         if ci >= n:
             continue
@@ -303,6 +388,179 @@ def ult9rain(src_dir, out_dir):
         layer = Image.fromarray(arr.astype(np.uint8)).resize((cw, ch), Image.LANCZOS)
         cells[ci] = Image.alpha_composite(cells[ci], layer)
     print("rain pieces: %d arrows, %d streaks" % (len(arrows), len(streaks)))
+    return cells, e
+
+
+def haeil9(src_dir, out_dir):
+    """해일강타 (천인 9차; 2662 IMG51): s9_fx.py's cl_haeil (frames 4-14) and cl_haeilhit made clean.
+      - cl_haeil: in frames 4-7 an ice pillar, a hit star and a number stand over every dummy in the water; filled from the
+        water's smoothed colour they came out as pale bands with straight seams. Those four cells are frame 9's clean water
+        (its cell 5) opened from the caster's side (the right, its pivot) towards the left over them — 55, 70, 85, 100 % of
+        its length, a soft 40 px edge — the water the original sends out ahead; nothing drawn, only cut. In every cell what is
+        warmer than the water (the caster's and the bystanders' brown and red streaks: red over blue) is taken out; the white
+        foam (as blue as red) kept.
+      - cl_haeilhit: the ice pillar is cut under the hit star over it — its top a straight line; faded instead into a dome
+        over its own middle, like a crystal's own crown."""
+    idx = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))
+    out = {}
+    e = idx["cl_haeil"]
+    cw, ch = e["cell"]
+    n = e["n"]
+    sheet = Image.open(os.path.join(out_dir, "cl_haeil.png")).convert("RGBA")
+    cells = [np.asarray(sheet.crop((i * cw, 0, (i + 1) * cw, ch))).astype(np.float32) for i in range(n)]
+    for c in cells:
+        r, b = c[..., 0], c[..., 2]
+        c[..., 3] *= np.clip((b - r + 25) / 25, 0, 1)
+    src = cells[5]
+    al = src[..., 3]
+    xs = np.nonzero(al.max(0) > 20)[0]
+    x0, x1 = xs.min(), xs.max()
+    xx = np.arange(cw, dtype=np.float32)[None, :]
+    for i, frac in enumerate((0.55, 0.7, 0.85, 1.0)):
+        edge = x1 - frac * (x1 - x0)
+        m = np.clip((xx - edge) / 40 + 0.5, 0, 1)
+        c = src.copy()
+        c[..., 3] = c[..., 3] * m
+        cells[i] = c
+    out["cl_haeil"] = ([Image.fromarray(c.astype(np.uint8)) for c in cells], e)
+    e2 = idx["cl_haeilhit"]
+    cw2, ch2 = e2["cell"]
+    sh2 = Image.open(os.path.join(out_dir, "cl_haeilhit.png")).convert("RGBA")
+    yy, xx2 = np.mgrid[0:ch2, 0:cw2].astype(np.float32)
+    cx = e2["anchor"][0]
+    rr = np.sqrt(((xx2 - cx) / (cw2 / 2 + 2)) ** 2 + ((yy - ch2) / ch2) ** 2)
+    dome = np.clip((1.02 - rr) / 0.3, 0, 1)
+    cells2 = []
+    for i in range(e2["n"]):
+        c = np.asarray(sh2.crop((i * cw2, 0, (i + 1) * cw2, ch2))).astype(np.float32)
+        c[..., 3] *= dome
+        cells2.append(Image.fromarray(c.astype(np.uint8)))
+    out["cl_haeilhit"] = (cells2, e2)
+    return out
+
+
+def cheongung9(src_dir, out_dir):
+    """천궁난사 (궁사 9차; 2662 IMG42 frames 21-27): s9_fx.py's a_cheongung made clean. Its first cell (the white sphere) had a
+    bite out of its upper right and a seam across it where the number and star over it were taken out: its upper half
+    is its own clean lower half, mirrored (the sphere is round). Its last two (the embers dying, frames 26-27) were mostly what the number
+    columns' fill left — smooth orange marks: they are the fifth cell (frame 25, clean) fading out (60 %, 30 %) instead."""
+    idx = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))
+    e = idx["a_cheongung"]
+    cw, ch = e["cell"]
+    n = e["n"]
+    sheet = Image.open(os.path.join(out_dir, "a_cheongung.png")).convert("RGBA")
+    cells = [np.asarray(sheet.crop((i * cw, 0, (i + 1) * cw, ch))).astype(np.float32) for i in range(n)]
+    c0 = cells[0]
+    ay = int(round(e["anchor"][1]))
+    h = min(ay, ch - ay)
+    c0[ay - h:ay] = c0[ay:ay + h][::-1]
+    cells[0] = c0
+    for i, k in ((5, 0.6), (6, 0.3)):
+        if i < n and n > 4:
+            c = cells[4].copy()
+            c[..., 3] *= k
+            cells[i] = c
+    return [Image.fromarray(c.astype(np.uint8)) for c in cells], e
+
+
+def mdult9edge(src_dir, out_dir):
+    """비전방진 (마도사 9차 필살기; 2662 IMG64): s9_fx.py's md_ult9 keeps the art to the capture's own box, and the tomes, gears
+    and bursts that run to its edge ended there on a straight line. Faded out instead towards a rounded box (a
+    super-ellipse of power 6: the corners' tomes mostly kept) over its last 10 % — the art's own pixels, only faded."""
+    idx = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))
+    e = idx["md_ult9"]
+    cw, ch = e["cell"]
+    sheet = Image.open(os.path.join(out_dir, "md_ult9.png")).convert("RGBA")
+    yy, xx = np.mgrid[0:ch, 0:cw].astype(np.float32)
+    rr = (np.abs((xx - (cw - 1) / 2) / (cw / 2)) ** 6 + np.abs((yy - (ch - 1) / 2) / (ch / 2)) ** 6) ** (1 / 6)
+    fade = np.clip((1 - rr) / 0.1, 0, 1)
+    cells = []
+    for i in range(e["n"]):
+        c = np.asarray(sheet.crop((i * cw, 0, (i + 1) * cw, ch))).astype(np.float32)
+        c[..., 3] *= fade
+        cells.append(Image.fromarray(c.astype(np.uint8)))
+    return cells, e
+
+
+def clult9orb(src_dir, out_dir):
+    """천변지이 (천인 9차 필살기; 2662 IMG56): s9_fx.py's cl_ult9 keeps the storm round the screen but its middle, where the
+    numbers' columns stand, only by its vivid colour — the white orb round the hero and the cyan lightning whirling round it
+    were lost with the numbers. Here they are laid back over each cell from the cell's own frame (8, 11, … 38):
+      - the orb: its ring (r 50-106 round (408, 354)) where it is the orb's own cream, white and pale blue — not a digit's
+        blue, a hit star's orange, a bar or the hero's red armour; what of the ring those cover is the ring's own pixel a turn
+        on round its middle (the nearest clean turn: the orb is a whirl); inside it, where the hero stands, faded out;
+      - the lightning: the frame's cyan (green as high as blue, far over red), each stroke whole when no digit, star or bar
+        lies on or beside it, strokes of under 40 px left out (a digit's light edge).
+    Its black see-through (alpha by brightness), at the cell's scale, under the cell's own vignette. Runs after s9_fx.py."""
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG56.gif"))
+    idx = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))
+    e = idx["cl_ult9"]
+    cw, ch = e["cell"]
+    n = e["n"]
+    sheet = Image.open(os.path.join(out_dir, "cl_ult9.png")).convert("RGBA")
+    cells = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+    bx0, by0, bx1, by1 = 4, 4, 808, 632
+    H, W = fr[0].shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    ocx, ocy = 408, 354
+    dx, dy = xx - ocx, yy - ocy
+    rr, ang = np.hypot(dx, dy), np.arctan2(dy, dx)
+    ring = (rr >= 50) & (rr <= 106)
+    vr = np.sqrt(((xx - (bx0 + bx1) / 2) / ((bx1 - bx0) / 2)) ** 2 + ((yy - (by0 + by1) / 2) / ((by1 - by0) / 2 * 0.99)) ** 2)
+    vig = np.clip((1 - vr) / 0.12, 0, 1)
+    for ci in range(n):
+        f = 8 + 3 * ci
+        a = fr[f].astype(np.float32)
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        mn, mx = a.min(2), a.max(2)
+        digit = (b > 150) & (b - r > 70) & (b - g > 40)
+        star = (r > 170) & (r - g > 80) & (b < 120)  # (the hit stars' orange rim: not the orb's cream gold)
+        bar = ((g > r + 50) & (g > b + 50)) | ((b > 180) & (r < 110) & (b - g > 60))
+        armour = (r - g > 70) & (r - b > 80) & (r > 90)
+        bad = ndimage.binary_dilation(digit | star | bar, iterations=4) | ndimage.binary_dilation(armour, iterations=2)
+        # (each number written right of its hit star: the box over it)
+        lab, _ = ndimage.label(ndimage.binary_dilation(star, iterations=2))
+        for sl in ndimage.find_objects(lab):
+            if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) >= 30:
+                bad[max(0, sl[0].start - 8):sl[0].stop + 12, max(0, sl[1].start - 8):sl[1].stop + 80] = True
+        layer = np.zeros((H, W, 4), np.float32)
+        # the orb: is it there (its pale ring bright enough round its clean part)?
+        orbpx = ring & ~bad & (mn > 120) & (r >= b - 40)
+        if orbpx.sum() > 600:
+            src = a.copy()
+            ok = ring & ~bad
+            todo = ring & bad
+            for deg in (30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180):
+                if not todo.any():
+                    break
+                t = ang + np.radians(deg)
+                sx = np.rint(ocx + rr * np.cos(t)).astype(int).clip(0, W - 1)
+                sy = np.rint(ocy + rr * np.sin(t)).astype(int).clip(0, H - 1)
+                take = todo & ok[sy, sx]
+                src[take] = a[sy[take], sx[take]]
+                todo &= ~take
+            al = np.clip((src.max(2) - 14) / 30, 0, 1) * (ring & ~todo)
+            al *= np.clip((rr - 50) / 12, 0, 1) * np.clip((106 - rr) / 6, 0, 1)
+            layer[..., :3] = src
+            layer[..., 3] = al
+        # the lightning
+        cyan = (g > 150) & (b > 160) & (r < g - 30) & (np.abs(b - g) < 60)
+        lab, nl = ndimage.label(ndimage.binary_dilation(cyan, iterations=1))
+        if nl:
+            sz = ndimage.sum(np.ones_like(lab), lab, range(1, nl + 1))
+            keep = (lab > 0) & np.isin(lab, 1 + np.nonzero(sz >= 40)[0])
+            # (a stroke crossing a column of numbers: not dropped whole — the middle went bare so — but faded out over
+            # 8 px as it comes near a digit, a star or a bar, like a stroke's own end)
+            near = np.clip((ndimage.distance_transform_edt(~bad) - 2) / 8, 0, 1)
+            # (its glow: the dark blue round each stroke, as far as 3 px)
+            glow = ndimage.binary_dilation(keep, iterations=3)
+            alc = np.where(keep, np.clip((np.minimum(g, b) - 60) / 80, 0, 1), np.where(glow, np.clip((b - 30) / 120, 0, 1) * 0.8, 0)) * near
+            put = alc > layer[..., 3]
+            layer[put, :3] = a[put]
+            layer[..., 3] = np.maximum(layer[..., 3], alc)
+        layer[..., 3] *= vig
+        L = Image.fromarray(np.dstack([layer[..., :3], layer[..., 3:] * 255]).astype(np.uint8)).crop((bx0, by0, bx1, by1)).resize((cw, ch), Image.LANCZOS)
+        cells[ci] = Image.alpha_composite(cells[ci], L)
     return cells, e
 
 
@@ -613,19 +871,29 @@ def yeonok(src_dir):
                    "src": "gif2662/IMG98.gif", "k": 0.62}
 
 
-BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
-POST = {"a_ult9": ult9rain}  # (re-drawing an s9_fx.py sheet: run after it)
+BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
+POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
 
 
 def main():
     src_dir, out_dir = sys.argv[1], sys.argv[2]
-    only = sys.argv[3].split(",") if len(sys.argv) > 3 else list(BUILDERS)
+    # (with no ids: every builder, then every post-pass whose s9_fx.py sheet is in the index and not yet re-drawn — a
+    # post-pass marks the entry "post"; s9_fx.py writes it afresh, without the mark, when it rebuilds that sheet. So a
+    # second run never lays the rain, the orb or a fade over twice)
+    only = sys.argv[3].split(",") if len(sys.argv) > 3 else list(BUILDERS) + list(POST)
     os.makedirs(out_dir, exist_ok=True)
     ipath = os.path.join(out_dir, "index.json")
     index = json.load(open(ipath, encoding="utf-8")) if os.path.isfile(ipath) else {}
     for sid in only:
+        if sid in POST:
+            if sid not in index or index[sid].get("post"):
+                print(sid, "(post-pass: %s)" % ("already done" if sid in index else "no sheet"))
+                continue
+            json.dump(index, open(ipath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         got = POST[sid](src_dir, out_dir) if sid in POST else BUILDERS[sid](src_dir)
         for sid2, (cells, entry) in (got.items() if isinstance(got, dict) else [(sid, got)]):
+            if sid in POST:
+                entry["post"] = 1
             cw, ch = entry["cell"]
             sheet = Image.new("RGBA", (cw * len(cells), ch))
             for i, c in enumerate(cells):
