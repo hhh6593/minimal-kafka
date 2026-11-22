@@ -574,6 +574,10 @@ def parts_cells(frames, e):
             a = cache[ck].copy()
             H, W = a.shape[:2]
             ax, ay = part["at"]
+            if part.get("flipv"):
+                # (the same piece upside down round its own line: another bolt of the same drawing)
+                a = a[::-1].copy()
+                ay = H - 1 - ay
             box = lambda b: (max(0, ax + b[0]), max(0, ay + b[1]), min(W, ax + b[2]), min(H, ay + b[3]))
             # the fills, one after another, each reading what those before left (a number filled first, then that side
             # mirrored): "ops" [{"shift": …} | {"mirror": …} | {"clear": [box]} …], or the three lists in that order
@@ -591,6 +595,14 @@ def parts_cells(frames, e):
                             a[y0:y1, x] = src[y0:y1, sx]
                         else:
                             a[y0:y1, x, 3] = 0
+                elif "hinterp" in op:
+                    # (a still post's faint edge the light crossed: its columns re-drawn as the blend of either side)
+                    x0, x1 = ax + op["hinterp"][0], ax + op["hinterp"][1]
+                    if 0 < x0 < x1 < W:
+                        L, R = a[:, x0 - 1].astype(np.float32), a[:, x1].astype(np.float32)
+                        for j, x in enumerate(range(x0, x1)):
+                            t = (j + 1) / (x1 - x0 + 1)
+                            a[:, x] = (L * (1 - t) + R * t).astype(a.dtype)
                 elif "shift" in op:
                     m = op["shift"]
                     x0, y0, x1, y1 = box(m["box"])

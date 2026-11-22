@@ -5471,132 +5471,39 @@
  "m_jeondo": {
   "src": "gif2662/IMG25.gif",
   "mode": "parts",
-  "key": "cool",
-  "warm": [
-   2,
-   20
-  ],
-  "gray": [
-   45,
-   185
-  ],
+  "key": "sub",
+  "add": true,
+  "bg": 0,
+  "noorange": true,
+  "floor": 18,
   "cell": [
-   400,
-   200
+   305,
+   64
   ],
   "origin": [
-   40,
-   90
+   10,
+   32
   ],
-  "soft": 6,
+  "soft": 10,
   "cells": [
    [
     {
-     "f": 100,
-     "at": [
-      250,
-      310
-     ],
-     "clip": [
-      35,
-      -60,
-      360,
-      14
-     ],
-     "ops": [
-      {
-       "clear": [
-        150,
-        2,
-        232,
-        14
-       ]
-      },
-      {
-       "clear": [
-        300,
-        2,
-        360,
-        14
-       ]
-      }
-     ]
-    },
-    {
-     "f": 101,
-     "at": [
-      250,
-      234
-     ],
-     "clip": [
-      35,
-      16,
-      360,
-      90
-     ],
-     "ops": [
-      {
-       "clear": [
-        140,
-        66,
-        360,
-        90
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 101,
-     "at": [
-      250,
-      310
-     ],
-     "clip": [
-      35,
-      -60,
-      360,
-      14
-     ],
-     "ops": [
-      {
-       "clear": [
-        150,
-        2,
-        232,
-        14
-       ]
-      },
-      {
-       "clear": [
-        300,
-        2,
-        360,
-        14
-       ]
-      }
-     ]
-    },
-    {
      "f": 102,
      "at": [
-      250,
-      234
+      310,
+      398
      ],
      "clip": [
-      35,
-      16,
-      360,
-      90
+      -10,
+      -32,
+      295,
+      32
      ],
      "ops": [
       {
-       "clear": [
-        140,
-        66,
-        360,
-        90
+       "hinterp": [
+        133,
+        143
        ]
       }
      ]
@@ -5606,53 +5513,44 @@
     {
      "f": 102,
      "at": [
-      250,
-      310
+      310,
+      398
      ],
      "clip": [
-      35,
-      -60,
-      360,
-      14
+      -10,
+      -32,
+      295,
+      32
      ],
+     "flipv": true,
      "ops": [
       {
-       "clear": [
-        150,
-        2,
-        232,
-        14
-       ]
-      },
-      {
-       "clear": [
-        300,
-        2,
-        360,
-        14
+       "hinterp": [
+        133,
+        143
        ]
       }
      ]
-    },
+    }
+   ],
+   [
     {
-     "f": 100,
+     "f": 102,
      "at": [
-      250,
-      234
+      310,
+      398
      ],
      "clip": [
-      35,
-      16,
-      360,
-      90
+      -10,
+      -32,
+      295,
+      32
      ],
      "ops": [
       {
-       "clear": [
-        140,
-        66,
-        360,
-        90
+       "hinterp": [
+        133,
+        143
        ]
       }
      ]
@@ -5661,7 +5559,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "전도체: the current of 과전류 running from the hero to the frost-struck — two forked blue-white bolts going out (2662 IMG25 frames 100-102), keyed off the brown ground (blue over red); the lower bolt (under the damage numbers) is the next frame's upper one set 75 px under. Drawn from the hero, turned to the one it strikes"
+  "why": "전도체: the current of 과전류 running from the hero to the one struck — the forked blue-white bolt (2662 IMG25 frame 102, the lower bolt: the only one not under the damage numbers), the light it adds to the clean field (frame 0; the dummies' posts it crosses stand still and drop out); the flicker its own bolt turned over. Drawn from the hero (its left end), turned to the one it strikes"
  },
  "_icons": {
   "w_swords": "tips/IMG01.png",
