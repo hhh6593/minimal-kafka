@@ -175,9 +175,29 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks) [재검증: 바닥 기둥 줄의 검은색이 남아 생긴 가운데 세로 이음매 — 줄 픽셀의 색을 옆 픽셀에서(stripecol); 얇은 가장자리 불투명도 올림(opaque)]",
+  "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks) [재검증: 바닥 기둥 줄의 검은색이 남아 생긴 가운데 세로 이음매 — 줄 픽셀의 색을 옆 픽셀에서(stripecol); 얇은 가장자리 불투명도 올림(opaque)] [밝기: 원작의 밝은 바닥에서보다 어두운 갈색 바닥에서 어두워 보여 사용자 요청으로 1.5배(gain), 불투명도 1.8; 표식 조각은 despeck]",
   "stripecol": true,
-  "opaque": 1.4
+  "opaque": 1.8,
+  "gain": [
+   1.5,
+   1.5,
+   1.5
+  ],
+  "despeck": 40,
+  "clearcell": [
+   [
+    205,
+    0,
+    260,
+    40
+   ],
+   [
+    0,
+    130,
+    30,
+    170
+   ]
+  ]
  },
  "w_apdo": {
   "src": "gif2662/IMG07.gif",
