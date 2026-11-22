@@ -7614,6 +7614,12 @@ function cast(skill, st) {
     }
   }
   if (used && def.wind9 && (promoOf(G.cls.id) >= 9 || G.training || window.__windAlways)) heukWind(def.wind9, skill);
+  // 전도체 (원작 9차 패시브): 천뢰마옥쌍구 or 뇌격구 brings 과전류, one time in two (9차 승급부터, 수련장에서는 늘)
+  const oc = SKILLS.m_jeondo && SKILLS.m_jeondo.proc9;
+  if (used && oc && oc.ids.includes(skill.id) && G.cls.id === 'mage' && (promoOf('mage') >= 9 || G.training) && (window.__overAlways || Math.random() < oc.chance)) {
+    if (!(G.overcur > G.t)) note('전도체: 과전류 상태가 됩니다.');
+    G.overcur = G.t + oc.dur;
+  }
   // 묵혈독바르기: a striking skill cast while the blade is coated takes a charge — its blows for the next second leave 묵혈독
   if (used && G.coat9 && def.kind !== 'coat9' && (def.dmg || def.hit) && G.t < G.coat9.until && G.coat9.n > 0) {
     G.coat9.n--;
@@ -8862,6 +8868,100 @@ const TIER_KINDS = {
     if (def.fxCast && M.fx[def.fxCast]) addFx(def.fxCast, 0, 0, { follow: true, anchor: 'bottom', must: true });
     note(`${skillName(skill.id, skill.lv)}: 다음 공격 기술 ${G.coat9.n}번이 묵혈독을 남깁니다.`);
   },
+  // 회선격풍 (원작 2662 IMG21): the great teal whirlwind raised on the strongest foe in reach (o_m_hoeseon at the original's
+  // own size, its pivot the struck one's feet): it strikes what it covers (def.half: the whirl's half width and depth);
+  // on up to `winds` of those struck the gathered wind stays — `windN` times in three seconds a small swirl bursts
+  // green on it (o_m_hoeseonwind), striking it. Cast again within five seconds, it strikes `stack` harder (up to
+  // stackMax times). 이펙트=판정: the whirl, and each burst on the one it is on.
+  gale9({ skill, st, def, smite }) {
+    const p = G.player, foes = tkNear(p.tx, p.ty, st.range);
+    if (!foes.length) return 0.3;
+    const t = foes.slice(0, 16).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp)[0];
+    G.galeN = G.t - (G.galeAt || -9) <= 5 ? Math.min(def.stackMax || 5, (G.galeN || 0) + 1) : 0;
+    G.galeAt = G.t;
+    const run = G, x = t.x, y = t.y, [hx, hy] = def.half, dmg = st.dmg * (1 + (def.stack || 0) * G.galeN);
+    if (Math.abs(t.x - p.x) > 2) p.face = Math.sign(t.x - p.x);
+    G.fxs.push({ id: def.fx, x, y: y + 4, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.75 : 1, must: true });
+    later(0.15, () => {
+      if (G !== run) return;
+      const hit = G.enemies.filter(e => tkFoe(e) && Math.abs(e.x - x) <= hx && Math.abs(e.y - y) <= hy);
+      G.quietHit = true;
+      for (const e of hit) smite(e, e === t ? dmg : dmg * 0.8);
+      G.quietHit = false;
+      // the gathered wind on the first few struck (the one under the whirl first)
+      hit.sort((a, b) => (b === t) - (a === t)).slice(0, def.winds || 3).forEach((e, i) => {
+        for (let k = 0; k < (def.windN || 3); k++) later(0.85 + k * 0.85 + i * 0.07, () => {
+          if (G !== run || e.hp <= 0) return;
+          if (def.fxWind && M.fx[def.fxWind]) addFx(def.fxWind, 0, 4, { on: e, anchor: 'bottom' });
+          later(0.17, () => {
+            if (G !== run || e.hp <= 0) return;
+            G.quietHit = true;
+            smite(e, dmg * (def.windK || 0.25));
+            G.quietHit = false;
+          });
+        });
+      });
+    });
+  },
+  // 서리파편 (원작 2662 IMG23): the orb of frost shards flies ahead (the way with the most foes, the hero turned to it) up
+  // to `depth` tiles, and bursts on the first foe it meets or at its end: a field of ice crystals (o_m_seori at the
+  // original's own size, centred where it burst) stays `dur` seconds, every `tick` striking and slowing what stands in
+  // it (def.half: the field's half width and depth). In 과전류 (전도체) the current runs from the hero into those struck.
+  shard9({ skill, st, def, smite }) {
+    const p = G.player, best = tkBestRow(def.depth);
+    if (!best) return 0.3;
+    const [dx, dy, foes] = best;
+    p.fdx = dx; p.fdy = dy;
+    if (dx) p.face = dx;
+    // (it bursts on the first foe two tiles out or more — what is nearer it strikes as it passes — or else on the nearest)
+    const far = foes.map(e => Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty)).filter(n => n >= 2).sort((a, b) => a - b)[0];
+    const k = far || Math.max(1, Math.min(...foes.map(e => Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty))));
+    const sx = p.x, sy = p.y - 20, ex = sx + dx * k * TILE, ey = sy + dy * k * TILE, fly = 0.08 * k, run = G;
+    if (def.fxShot && M.fx[def.fxShot]) addFx(def.fxShot, sx, sy, { mv: [ex - sx, ey - sy, fly], anchor: 'mid', must: true });
+    const passed = new Set();
+    for (let i = 1; i < k; i++) later(0.08 * i, () => {
+      if (G !== run) return;
+      G.quietHit = true;
+      for (const e of onTiles([[p.tx + dx * i, p.ty + dy * i]])) if (!passed.has(e)) { passed.add(e); smite(e, st.dmg * 0.5); }
+      G.quietHit = false;
+    });
+    later(fly, () => {
+      if (G !== run) return;
+      const [hx, hy] = def.half, life = def.dur;
+      tkLoop(def.fx, ex, ey, life, { alpha: settings.calmFx ? 0.7 : 0.95, anchor: 'bottom' }); // (its pivot the field's middle)
+      const n = Math.round(life / def.tick);
+      for (let i = 0; i < n; i++) later(i * def.tick, () => {
+        if (G !== run || G.dead) return;
+        const hit = G.enemies.filter(e => tkFoe(e) && Math.abs(e.x - ex) <= hx && Math.abs(e.y - 20 - ey) <= hy);
+        G.quietHit = true;
+        for (const e of hit) { smite(e, st.dmg * (i ? def.k : 1)); tkAfflict(e, def); }
+        G.quietHit = false;
+        overcurrent(hit, st.dmg);
+      });
+    });
+  },
+  // 환영안개 (원작 2662 IMG29; PVP 기술 → 몬스터 상대): the purple fog of phantoms rolled out ahead of the hero (the way it
+  // faces) for `duration` (o_m_hwanyeong at the original's own size, its pivot the hero's feet where it was cast); every
+  // `tick` the foes in it (reach: from and to how far ahead, side: how far to each side) lose their way — slowed,
+  // cursed (they take more) — and are struck a little.
+  fog9({ skill, st, def }) {
+    const p = G.player, fx = p.fdx || (p.face || -1), fy = p.fdx ? 0 : p.fdy || 0;
+    const ux = fy ? 0 : Math.sign(fx) || -1, uy = fy, [r0, r1] = def.reach, side = def.side;
+    const ox = p.x, oy = p.y - 20, run = G;
+    const inFog = e => { const ax = (e.x - ox) * ux + (e.y - 20 - oy) * uy, sd = Math.abs((e.x - ox) * uy - (e.y - 20 - oy) * ux); return ax >= r0 && ax <= r1 && sd <= side; };
+    if (!G.enemies.some(e => tkFoe(e) && inFog(e))) return 0.4;
+    const life = st.duration || def.duration, d = tkHit(def, skill);
+    // (drawn going left: flipped when the hero faces right, turned for up and down)
+    const f = tkLoop(def.fx, ox, p.y, life, { alpha: settings.calmFx ? 0.6 : 0.9, anchor: 'bottom' });
+    if (f) { if (ux > 0) f.flip = true; if (uy) f.rot = uy < 0 ? Math.PI / 2 : -Math.PI / 2; }
+    for (let k = 1; k <= Math.round(life / def.tick); k++) later(k * def.tick, () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true;
+      for (const e of G.enemies) if (tkFoe(e) && inFog(e)) { tkAfflict(e, def); hurtEnemy(e, d); }
+      G.quietHit = false;
+    });
+    note(`${skillName(skill.id, skill.lv)}: 환영 안개가 퍼집니다.`);
+  },
 };
 
 // The follow-up blows of the 9차 보조 공격 (echo): (def, blow, tick).
@@ -9034,6 +9134,21 @@ function heukWind(w, skill) {
     for (const e of G.enemies) if (tkFoe(e) && Math.abs(e.tx - wx) <= w.reach + 0.4 && Math.abs(e.ty - wy) <= w.reach - 0.3) hurtEnemy(e, d);
   });
   note(`${w.name}이 일어납니다.`);
+}
+/** 전도체 (원작 9차 패시브, 2662 IMG24·IMG25): in 과전류 the current runs from the hero into those 서리파편 strikes — the
+ *  forked bolts (o_m_jeondo at the original's own size, from the hero, turned to it) to the nearest two within the bolts'
+ *  length, striking them. */
+function overcurrent(hit, dmg) {
+  const c = SKILLS.m_jeondo && SKILLS.m_jeondo.proc9;
+  if (!c || !(G.overcur > G.t) || !hit.length || G.t < (G.overcurAt || 0)) return;
+  G.overcurAt = G.t + c.every - 0.05;
+  // (the farthest two within the bolts' length: the bolts are drawn near their own length, not shrunk to a stub)
+  const p = G.player, near = hit.filter(e => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) <= c.reach).sort((a, b) => Math.hypot(b.x - p.x, b.y - p.y) - Math.hypot(a.x - p.x, a.y - p.y)).slice(0, 2);
+  for (const e of near) {
+    const a = Math.atan2(e.y - p.y, e.x - p.x), len = Math.hypot(e.x - p.x, e.y - p.y), f = M.fx[c.fx];
+    if (f) addFx(c.fx, 0, -20, { follow: true, rot: a, must: true, anchor: 'bottom', scale: Math.max(0.6, Math.min(1, len / (f.w * (f.k || 1) * 0.9))) });
+    later(0.05, () => { if (e.hp > 0) { G.quietHit = true; hurtEnemy(e, dmg * c.k); G.quietHit = false; } });
+  }
 }
 /** 묵혈독바르기 (원작 9차, 2662 IMG17): 묵혈독 takes hold on a foe struck by a skill cast while the blade is coated — the
  *  blue-violet flame bursting on it (o_r_mukdok, at the original's own size), its weakness for `infect` seconds. */

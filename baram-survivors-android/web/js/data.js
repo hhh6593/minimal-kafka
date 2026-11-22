@@ -1443,16 +1443,21 @@ const S9 = {
   r_bloodslash: { promo: 9, cls: 'rogue', req: 33, name: '묵혈파광참', kind: 'zan9', fx: 'o_r_zan', fx2: undefined, fxHit: undefined, dmg: 160, cd: 15, range: 4,
     side: 118, back: 95, half: 59, splash: 0.6, curse: 5, radius: undefined, dash: undefined, ck: 'blink', pre: 'r_chamgan', branch: 0,
     desc: '앞으로 네 칸 안의 몬스터에게 그림자 분신을 보내 붉은 斬 인장으로 몸속에 내상을 입히고(방어 약화), 닿은 그림자가 좌우로 갈라져 양옆(자신의 양옆 앞)에도 斬을 새긴다' },
-  // 주술사: 전도체 (보조 공격), 서리파편 (광역), 회선격풍 (강한 일격)
-  m_jeondo: { promo: 9, cls: 'mage', req: 33, name: '전도체', kind: 'echo', echo: 'chain', fx: 'k_m_chain', fxCast: 'k_m_cheonggi', fxLoop: 'k_m_chain', loopSize: 90, fxHit: 'k_m_chain', hit: 45, cd: 18, duration: 10,
-    every: 0.5, shots: 4, range: 6, jump: 3, power: 0.1, buff: 'power', ck: 'buff', pre: 'm_chain', branch: 1,
-    desc: '10초 동안 과전류 상태가 된다. 몸에서 번개가 몬스터에게 튀어 셋까지 옮겨 다니며 지지고, 그동안 피해가 10% 는다' },
-  m_shards: { promo: 9, cls: 'mage', req: 33, name: '서리파편', kind: 'rain', fx: 'o_m_seori', noLoop: true, fx2: 'o_m_seori', fxHit: 'k_u_m_ice', dmg: 48, cd: 6, range: 7, radius: 3, drops: 12, dur: 2.4, k: 0.5,
-    slow: 2, dropScale: 0.9, ck: 'strike', pre: 'm_cross', branch: 1,
-    desc: '서리 파편을 쏘아 몬스터가 가장 많은 곳에 2.4초 동안 얼음 파편이 거듭 터지게 한다. 맞은 몬스터는 느려진다' },
-  m_gale: { promo: 9, cls: 'mage', req: 33, name: '회선격풍', kind: 'smite', fx: 'o_m_hoeseon', fxCast: 'k_u_m_seal', fxHit: 'h_hit_6', dmg: 90, cd: 4.5, range: 7, radius: 1, splash: 0.4,
-    linger: 3, lingerK: 0.12, ck: 'spell', pre: 'm_chain', branch: 1,
-    desc: '가장 강한 몬스터에게 회오리를 일으켜 크게 치고 그 둘레까지 휩쓴다. 응축된 바람이 3초 동안 그 자리에 남아 거듭 벤다' },
+  // 주술사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/mage.md). 시전 3 + 패시브 1 + 필살기:
+  //   회선격풍 (IMG21: 대상 위에 큰 청록 회오리, 둘레 두 칸; 맞은 적 셋에 응축된 바람이 3초 동안 세 번 더 터짐;
+  //     5초 안에 이어 쓰면 10%씩 강해짐; 2회 충전),
+  //   서리파편 (IMG23: 앞으로 날아가는 서리 구슬, 끝에서 얼음 결정 밭이 3.5초 동안 거듭 친다),
+  //   환영안개 (IMG29, PVP → 몬스터: 앞에 보라 환영 안개 5초 — 든 몬스터는 길을 잃고 느려지며 받는 피해가 는다),
+  //   전도체 = 패시브 (설명창 [지속효과 마법]: 천뢰마옥쌍구·뇌격구를 쓸 때 50%로 10초 과전류 — 서리파편에 맞은 적에게
+  //     몸에서 번개가 흐름; IMG25의 번개 그림).
+  m_gale: { promo: 9, cls: 'mage', req: 33, name: '회선격풍', kind: 'gale9', fx: 'o_m_hoeseon', fxWind: 'o_m_hoeseonwind', fxCast: undefined, fxHit: undefined,
+    dmg: 70, cd: 3, range: 7, half: [100, 64], winds: 3, windN: 3, windK: 0.25, stack: 0.1, stackMax: 5, radius: undefined, splash: undefined, linger: undefined, lingerK: undefined,
+    count: undefined, hitAt: undefined, ck: 'strike', pre: 'm_chain', branch: 1,
+    desc: '가장 강한 몬스터에게 회오리를 일으켜 그와 둘레 두 칸을 친다. 맞은 몬스터 셋에는 응축된 바람이 3초 동안 세 번 더 터지고, 5초 안에 이어 쓰면 피해가 10%씩 는다(최대 50%)' },
+  m_shards: { promo: 9, cls: 'mage', req: 33, name: '서리파편', kind: 'shard9', fx: 'o_m_seori', fxShot: 'o_m_seorishot', fx2: undefined, fxHit: undefined, noLoop: undefined,
+    dmg: 40, cd: 6, depth: 6, dur: 3.5, tick: 0.5, k: 0.3, half: [85, 105], slow: 2, range: 6, count: undefined, radius: undefined, drops: undefined, dropScale: undefined,
+    ck: 'line', pre: 'm_cross', branch: 1,
+    desc: '서리 파편을 앞으로 쏘아 여섯 칸까지 날려 보낸다. 몬스터에 닿거나 끝에 이르면 터져 3.5초 동안 그 자리에 얼음 결정이 거듭 솟아 든 몬스터를 치고 느리게 한다' },
   // 도사: 천신의기운 (아우라·회복), 선기전도 (광역, 그대로), 폭렬천뢰탄 (강한 일격)
   p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'aura9', fx: 'o_p_cheonsin', fxCast: 'k_u_p_pillar_o', fxHit: 'k_u_p_sparkle', hit: 9, cd: 14, duration: 6, radius: 3,
     tick: 0.5, hot: 1.2, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0,
@@ -1527,9 +1532,9 @@ const S9 = {
     range: 6, radius: 2, splash: 0.6, densest: true, pull: true, delay: 0.6, size: 220, ck: 'strike', pre: 'dk_nemesis', branch: 0,
     desc: '몬스터가 가장 많은 곳의 둘레를 가운데로 끌어모은 뒤, 분노한 거대한 천신의 주먹이 내려와 짓이긴다' },
   // ---- 네 번째 9차 (모든 직업 4개: 보조 공격·몸 주변·광역·강한 일격 하나씩). 원작의 패시브는 켜는 기술로, PVP 기술은 몬스터 상대로.
-  m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'aura9', fx: 'o_m_hwanyeong', fxCast: 'k_m_chaos', fxHit: 'k_m_curse', hit: 10, cd: 16, duration: 5,
-    radius: 2, tick: 0.5, ward: 0.25, slow: 2, curse: 3, ck: 'buff', buff: 'shield', pre: 'm_seonsim', branch: 2,
-    desc: '둘레에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입으며, 자신은 받는 피해가 25% 준다' },
+  m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,
+    slow: 2, curse: 2, ck: 'strike', pre: 'm_seonsim', branch: 2,
+    desc: '앞에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입는다' },
   p_banhyang: { promo: 9, cls: 'poet', req: 33, name: '치유의반향', kind: 'echo', echo: 'mend', fx: 'o_p_banhyang', fxCast: 'k_u_p_pillar_b', fxLoop: 'o_p_banhyang', loopSize: 90, fxHit: 'k_u_p_sparkle',
     hit: 40, cd: 18, duration: 10, every: 0.6, shots: 2, range: 6, heal: 0.6, power: 0.3, buff: 'power', ck: 'buff', pre: 'p_saint', branch: 0,
     desc: '10초 동안 치유의 기운이 메아리쳐 피해가 30% 늘고, 가까운 몬스터 둘을 빛이 거듭 치며 칠 때마다 체력을 조금 되찾는다' },
@@ -1593,6 +1598,13 @@ SKILLS.r_jugeum = { name: '죽음의희열', kind: 'passive', retired: true, was
 SKILL_ALIAS.r_jugeum = 'r_chainstar';
 SKILLS.r_jugeum.proc9 = { chance: 0.3, ids: ['r_chainstar', 'r_shuriken', 'r_shadowstar'], cd: 3 };
 SKILLS.r_chainstar.desc += '. 9차 패시브 죽음의희열: 몬스터를 쓰러뜨릴 때 30% 확률로 수리검 계열 기술 하나의 재사용 대기가 끝난다';
+// 전도체: a passive in the original ([지속효과 마법]: 천뢰마옥쌍구 or 뇌격구 brings, one time in two, 10 s of 과전류, in which
+// the current runs into those 서리파편 strikes) — its picture the bolts of 2662 IMG25. A saved slot of it is 서리파편.
+SKILLS.m_jeondo = { name: '전도체', kind: 'passive', retired: true, was: 'mage', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 천뢰마옥쌍구·뇌격구를 쓸 때 50% 확률로 10초 동안 과전류 상태가 된다. 과전류 동안 서리파편에 맞은 몬스터에게 몸에서 번개가 흘러 피해를 준다',
+  proc9: { chance: 0.5, ids: ['m_twin', 'm_thunderball'], dur: 10, k: 0.5, fx: 'o_m_jeondo', reach: 200, every: 0.5 } };
+SKILL_ALIAS.m_jeondo = 'm_shards';
+SKILLS.m_shards.desc += '. 9차 패시브 전도체: 천뢰마옥쌍구·뇌격구를 쓰면 50% 확률로 10초 과전류 — 서리파편에 맞은 몬스터에게 번개가 흐른다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
@@ -1674,7 +1686,7 @@ export const ULT_TIERS = {
     ult('mage', 'm_hell2', "헬파이어'첨", { echoCap: 2.5, mech: 'cross', main: 'k_m_hell2', mainSize: 120, hit: 'h_hit_fire', len: 4, diag: true, shield: 5, boss: 'm_cheonggi', k: 1.15,
       desc: '헬파이어의 극의. 여덟 갈래로 뻗는 불기둥이 화면을 가르고, 남은 몬스터에게 불길이 번진다' }),
     ult('mage', 'm_fire3', '폭류유성', { mech: 'rain', main: 'k_m_fire3', frac: 0.95, drop: 'k_u_m_meteor', dropSize: 170, hit: 'h_hit_fire', span: 1.6, shield: 5, boss: 'm_jiokchak', k: 1.3 }),
-    ult('mage', 'm_kalpa', '겁화', { cutin: 'o_m_ult9', open: 'k_m_cross', echo: 'k_m_hyeongsang', fin: 'k_m_hyeongsang', mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
+    ult('mage', 'm_kalpa', '겁화', { cine9: 0.75, cutin: 'o_m_ult9', open: 'k_m_cross', echo: 'k_m_hyeongsang', fin: 'k_m_hyeongsang', mech: 'rings', main: 'new_raid_fire', mainSize: 240, hit: 'h_hit_fire', shield: 6, boss: 'm_cross', k: 1.5 }),
   ],
   poet: [
     ult('poet', 'p_ult', '태양의희원', { iconFx: '124', mech: 'sanctuary', cast: 'k_p_ult', main: 'k_u_p_pillar_o', hit: 'h_hit_light', guard: 3, boss: 'p_jiroe', k: 1 }),

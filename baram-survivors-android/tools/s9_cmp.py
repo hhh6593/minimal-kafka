@@ -42,6 +42,24 @@ CFG.update({
                  ours=[0.05, 0.2, 0.33, 0.47, 0.62, 0.85, 1.1, 1.4],
                  note='원작: 어둠 → 대숲·큰 쿠나이 → 초록 바람이 조여듦 2.6초. 우리: 영웅 중심 화면 높이 75%, 어둠 0.15초 + 연출 1.1초, 타격 2박자'),
 })
+M_WARM = 'o_m_hoeseon,o_m_hoeseonwind,o_m_seori,o_m_seorishot,o_m_jeondo,o_m_hwanyeong,o_m_ult9'
+CFG.update({
+    'hoe': dict(cls='mage', warm=M_WARM, name='회선격풍', img='21', crop=[440, 300, 560, 440], zoom=0.75, frames=[11, 13, 15, 18, 21, 26, 28, 31], start=10, skill='m_gale',
+                ours=[0.05, 0.2, 0.35, 0.6, 0.85, 1.05, 1.25, 1.45], gif=3.6,
+                note='원작: 대상 위 청록 회오리(1초) → 맞은 적에 응축된 바람이 거듭 터짐. 우리: 가장 강한 적 위 회오리, 덮는 곳만 맞음, 맞은 셋에 바람 세 번'),
+    'seori': dict(cls='mage', warm=M_WARM, name='서리파편', img='23', crop=[400, 280, 600, 460], zoom=0.75, frames=[5, 8, 11, 16, 18, 24, 30, 44], start=3, skill='m_shards',
+                  ours=[0.08, 0.2, 0.3, 0.5, 0.65, 1.1, 1.6, 2.6], gif=4.2,
+                  note='원작: 서리 구슬이 날아가 터지고 얼음 결정 밭이 3.5초 동안 맥동. 우리: 몬스터가 가장 많은 줄로 쏴서 두 칸 밖 첫 몬스터(최대 6칸)에서 터짐, 지나는 길도 침, 밭 3.5초 0.5초마다'),
+    'jeondo': dict(cls='mage', warm=M_WARM, name='전도체 (패시브)', img='25', crop=[380, 330, 560, 300], frames=[98, 99, 100, 101, 102, 103, 104, 106], start=98, skill='m_shards',
+                   ours=[0.18, 0.22, 0.26, 0.68, 0.72, 0.76, 1.18, 1.22], gif=3, env={'GATHER': '6', 'PRE': '__game().overcur = 1e9; __game().overcurAt = 0'},
+                   note='원작: 과전류 중 서리파편 맞은 적에게 몸에서 번개 두 줄기. 우리: 같은 번개, 서리 밭이 칠 때마다(0.5초) 가까운 둘에게 (시험: 과전류 켬)'),
+    'hwan': dict(cls='mage', warm=M_WARM, name='환영안개', img='29', crop=[250, 280, 600, 420], zoom=0.75, frames=[10, 12, 14, 16, 18, 21, 23, 26], start=9, skill='m_hwanyeong',
+                 ours=[0.08, 0.24, 0.38, 0.55, 0.7, 0.95, 1.1, 1.35], gif=3,
+                 note='원작(PVP): 앞으로 보라 환영 안개. 우리: 바라보는 쪽 앞 4칸 남짓 5초 — 든 몬스터 느려짐·받는 피해 증가·작은 피해'),
+    'mult': dict(cls='mage', warm=M_WARM, name='겁화 (필살기)', img='27', crop=[401, 300, 802, 637], frames=[8, 14, 20, 24, 28, 35, 41, 47], start=6, skill='ult', off=0.0, gif=2.2, zoom=0.5,
+                 ours=[0.05, 0.2, 0.33, 0.47, 0.62, 0.85, 1.1, 1.4],
+                 note='원작: 어둠 → 용암 동굴, 불 소용돌이, 노란 폭발, 붉은 고리 2.6초. 우리: 영웅 중심 화면 높이 75%, 어둠 0.15초 + 연출 1.1초, 타격 2박자'),
+})
 def times_of(img):
     return [int(x) / 1000 for x in open(f'{P}/w/f{img}/times.txt').read().split()]
 def label(im, text, color='yellow'):

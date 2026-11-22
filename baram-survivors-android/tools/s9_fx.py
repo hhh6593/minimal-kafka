@@ -32,7 +32,12 @@ here: each frame is the client's own pixels, taken off their backdrop:
                   "dark" — a dark red effect (흑룡검풍's wind) over a light floor in a still camera: alpha by how
                            far the pixel moved from the field ("bg": a clean frame; t0/t1), kept only where it
                            went darker and redder ("red": least red over blue);
-                  "diff" — mode "diff" with the part's own "bg".
+                  "diff" — mode "diff" with the part's own "bg";
+                  "teal" — a teal-green wind (회선격풍) over a sandy floor: green over red, not a number's blue ("gt"
+                           [lo, hi]; "white": its white heart kept where the green is near).
+                  "bluediff" — a blue effect over a still field: moved from "bg" and blue over red ("bt").
+                A part's "unnum" [[x0, y0, x1, y1] …] (relative to "at"): the damage numbers there painted over from
+                the frame round them before keying.
   mode "cinema" also takes "stars" (the hit stars' orange taken out with the numbers) and "vignette" [rx, ry, soft] (shares of the half width/height): the art faded out towards an
                 ellipse's edge, for a cinematic drawn smaller than the screen (no hard rectangle of art on the field).
 Each entry: src, mode, frames [start, end, step] (default all; "skip" [frame …] left out), box [x0, y0, x1, y1], bg (frame
@@ -133,10 +138,49 @@ def key_dark(a, b, e):
     return np.dstack([a, al * 255]).astype(np.uint8)
 
 
+def unnum(a, boxes, at):
+    """The damage numbers (blue digits, their white and orange stars) in the given boxes (relative to `at`) painted
+    over from the frame round them (a normalised blur of what is not a number), before keying."""
+    from PIL import ImageFilter
+    H, W = a.shape[:2]
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    num = ((b > 140) & (b - r > 70) & (b - g > 25)) | (a.min(axis=2) > 205) | ((r > 200) & (g > 90) & (g < 215) & (b < 140) & (r - b > 90)) \
+        | ((b - r > 25) & (b - g > 10) & (a.max(axis=2) < 130))  # (the digits' dark blue rims)
+    inb = np.zeros((H, W), bool)
+    for bx in boxes:
+        x0, y0, x1, y1 = max(0, at[0] + bx[0]), max(0, at[1] + bx[1]), min(W, at[0] + bx[2]), min(H, at[1] + bx[3])
+        inb[y0:y1, x0:x1] = True
+    hole = num & inb
+    hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7))) > 0
+    hole &= inb
+    keep = (~hole).astype(np.float32)
+    blur = lambda x: np.asarray(Image.fromarray(np.clip(x, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(16))).astype(np.float32)
+    bk = blur(keep * 255) / 255
+    out = a.copy()
+    for c in range(3):
+        f = blur(a[..., c] * keep) / np.maximum(bk, 0.05)
+        out[..., c] = np.where(hole, f, a[..., c])
+    return out
+
+
 def keyed(frames, i, e, part=None):
     part = part or {}
     a = np.asarray(frames[i].convert("RGB")).astype(np.float32)
+    if part.get("unnum"):
+        a = unnum(a, part["unnum"], part["at"])
     key = part.get("key", e.get("key", "cool"))
+    if key == "teal":
+        # a teal-green wind (회선격풍) over a sandy floor and a red grid: green over red, and not the blue of a number
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        lo, hi = part.get("gt", e.get("gt", [30, 90]))
+        al = np.clip((g - r - lo) / max(1.0, hi - lo), 0, 1) * np.clip((g - b + 40) / 30, 0, 1) * np.clip((b - r - 10) / 30, 0, 1)
+        # its white heart (a flash inside the wind): kept where the green round it is
+        wt = e.get("white")
+        if wt:
+            from PIL import ImageFilter
+            near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(9))).astype(np.float32) / 255
+            al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near)
+        return np.dstack([a, al * 255]).astype(np.uint8)
     if key == "cool":
         return key_cool(a, e)
     if key == "fire":
@@ -147,6 +191,14 @@ def keyed(frames, i, e, part=None):
         al = np.clip((a[..., 2] - np.maximum(a[..., 0], a[..., 1]) - t0) / max(1.0, t1 - t0), 0, 1)
         return np.dstack([a, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    if key == "bluediff":
+        # a blue effect (서리파편's ice) over a still field: what moved from the clean field ("bg"), and only where it is
+        # blue ("bt" [lo, hi] of blue over red) — the dummies, their stakes and bars stay out
+        d = np.abs(a - bg).max(axis=2)
+        t0, t1 = part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 60))
+        lo, hi = part.get("bt", e.get("bt", [5, 35]))
+        al = np.clip((d - t0) / max(1.0, t1 - t0), 0, 1) * np.clip((a[..., 2] - a[..., 0] - lo) / max(1.0, hi - lo), 0, 1)
+        return np.dstack([a, al * 255]).astype(np.uint8)
     if key == "dark":
         return key_dark(a, bg, e)
     return diffed(frames[i], frames[part.get("bg", e.get("bg", 0))], part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 70)))
@@ -161,7 +213,7 @@ def parts_cells(frames, e):
     for parts in e["cells"]:
         cell = np.zeros((ch, cw, 4), dtype=np.uint8)
         for part in parts:
-            ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"))
+            ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
             if ck not in cache:
                 cache[ck] = keyed(frames, part["f"], e, part)
             a = cache[ck].copy()
