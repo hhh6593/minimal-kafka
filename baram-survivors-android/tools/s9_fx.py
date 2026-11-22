@@ -35,6 +35,7 @@ here: each frame is the client's own pixels, taken off their backdrop:
                   "diff" — mode "diff" with the part's own "bg";
                   "teal" — a teal-green wind (회선격풍) over a sandy floor: green over red, not a number's blue ("gt"
                            [lo, hi]; "white": its white heart kept where the green is near).
+                  "gold" — a golden light over a grey floor: red and green over blue ("gb" [lo, hi]; "white" as teal).
                   "bluediff" — a blue effect over a still field: moved from "bg" and blue over red ("bt").
                 A part's "unnum" [[x0, y0, x1, y1] …] (relative to "at"): the damage numbers there painted over from
                 the frame round them before keying.
@@ -190,7 +191,120 @@ def keyed(frames, i, e, part=None):
         t0, t1 = part.get("bt", e.get("bt", [30, 70]))
         al = np.clip((a[..., 2] - np.maximum(a[..., 0], a[..., 1]) - t0) / max(1.0, t1 - t0), 0, 1)
         return np.dstack([a, al * 255]).astype(np.uint8)
+    if key == "gold":
+        # a golden light (천선의영역's seal, 천신의기운's rings) over a grey floor: alpha by how far red and green stand
+        # over blue ("gb" [lo, hi]); its white-hot heart kept where gold is near ("white": the floor of the min channel)
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        lo, hi = part.get("gb", e.get("gb", [25, 80]))
+        al = np.clip(((r + g) / 2 - b - lo) / max(1.0, hi - lo), 0, 1) * np.clip((g - b + 10) / 30, 0, 1) * np.clip((r - 0.75 * g) / 25, 0, 1) * np.clip((g - part.get("gmin", e.get("gmin", 0))) / 40, 0, 1)
+        if e.get("noorange"):
+            al = al * np.clip((g - 0.72 * r) / 18, 0, 1)  # (the hit stars' orange rims out: gold keeps green near red)
+        wt = e.get("white")
+        if wt:
+            from PIL import ImageFilter
+            near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(11))).astype(np.float32) / 255
+            al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near)
+        return np.dstack([a, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    if key == "sub":
+        # a glow over a still field (천선의영역's seal, 천신의기운's rings, 폭렬천뢰탄's sphere): the light it adds, what is
+        # brighter than the clean field ("bg") — drawn added (the entry's "add": true). The bodies standing still drop out
+        # whole (no silhouettes, no faces); "noblue" leaves the damage numbers' blue out, "noorange" the hit stars' rims.
+        d = np.clip(a - bg, 0, 255)
+        if e.get("noblue"):
+            d[(a[..., 2] > (a[..., 0] + a[..., 1]) / 2 + 25)] = 0
+        if e.get("noorange"):
+            d[(a[..., 1] < 0.72 * a[..., 0]) & (a[..., 0] > 150)] = 0
+        lo = part.get("floor", e.get("floor", 14))
+        d[d.max(axis=2) < lo] = 0
+        # The bodies standing in front of it (the dummies, the hero, their bars) hide its light: where it lies under one
+        # ("fill": [[cx, cy, rx, ry] …] ellipses in the frame, or "fillzone" [cx, cy, rx, ry]: every unlit pixel inside that
+        # ellipse), the light round it flows in (a few hundred steps of averaging the neighbours): no hole, no silhouette.
+        h, w = d.shape[:2]
+        yy, xx = np.mgrid[0:h, 0:w]
+        hole = np.zeros((h, w), bool)
+        fz = part.get("fillzone", e.get("fillzone"))
+        if fz:
+            cx, cy, rx, ry = fz
+            inz = ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+            hole |= inz & (d.max(axis=2) < part.get("fzlo", e.get("fzlo", lo)))
+        for cx, cy, rx, ry in part.get("fill", e.get("fill", [])):
+            hole |= ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 <= 1
+        # (the bars and numbers that came with the cast: their green, blue and white text)
+        g_ = a[..., 1]; r_ = a[..., 0]; b_ = a[..., 2]
+        bars = ((g_ > r_ + 50) & (g_ > b_ + 50)) | ((b_ > r_ + 60) & (b_ > g_ + 30))
+        if e.get("nobars"):
+            from PIL import ImageFilter
+            bars = np.asarray(Image.fromarray((bars * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))) > 0
+            hole |= bars
+        if hole.any():
+            if e.get("fillmode") == "nearest":
+                # (the neighbours' own dots carried inward ring by ring: the art's colours continued, no blur — 사용자: 깨진
+                # 곳은 같은 색 도트로 보수)
+                known = ~hole
+                out = d.copy()
+                for _ in range(200):
+                    if known.all():
+                        break
+                    kp = np.pad(known, 1)
+                    op = np.pad(out, ((1, 1), (1, 1), (0, 0)))
+                    cnt = np.zeros(known.shape, np.float32)
+                    acc = np.zeros(out.shape, np.float32)
+                    for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)):
+                        k = kp[1 + dy:1 + dy + known.shape[0], 1 + dx:1 + dx + known.shape[1]]
+                        acc += op[1 + dy:1 + dy + known.shape[0], 1 + dx:1 + dx + known.shape[1]] * k[..., None]
+                        cnt += k
+                    front = (~known) & (cnt > 0)
+                    if not front.any():
+                        break
+                    # the brightest-leaning neighbour mix, quantized back to the art's own dots
+                    out[front] = np.round(acc[front] / cnt[front][:, None] / 8) * 8
+                    known = known | front
+                d = out
+                hole = np.zeros_like(hole)
+            # (normalized convolution at growing radii: each hole pixel the weighted mean of the known light round it)
+            from PIL import ImageFilter
+            d[hole] = 0
+            known = (~hole).astype(np.float32)
+            out = d.copy()
+            todo = hole.copy()
+            for rad in (6, 14, 30, 60):
+                if not todo.any():
+                    break
+                m = np.asarray(Image.fromarray((known * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) / 255
+                ch = [np.asarray(Image.fromarray(np.clip(d[..., c] * known, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) for c in range(3)]
+                ok = todo & (m > 0.15)
+                for c in range(3):
+                    out[..., c][ok] = (ch[c] / np.maximum(m, 1e-3))[ok]
+                todo &= ~ok
+            d = out
+        sec = part.get("sector", e.get("sector"))
+        if sec:
+            # a ring round the hero, bodies standing all round it: one clean slice of it (angles a0..a1, in the ellipse
+            # squashed by "ys" vertically) carried round the circle — the original's own dots, turned copies, no fill
+            cx, cy, ys, a0, a1 = sec[:5]
+            yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+            dx, dy = xx - cx, (yy - cy) * ys
+            r = np.hypot(dx, dy)
+            ang = np.degrees(np.arctan2(dy, dx)) % 360
+            span = a1 - a0
+            src = np.radians(a0 + ((ang - a0) % span))
+            sx = np.clip(np.round(cx + r * np.cos(src)).astype(int), 0, w - 1)
+            sy = np.clip(np.round(cy + r * np.sin(src) / ys).astype(int), 0, h - 1)
+            d = d[sy, sx]
+            if len(sec) > 5:
+                d[r < sec[5]] = 0  # (the hero's own spot: our hero stands there)
+        return np.dstack([d, np.where(d.max(axis=2) > 0, 255, 0)]).astype(np.uint8)
+    if key == "golddiff":
+        # "gold", and only what moved from the clean field ("bg"): the bodies standing in a still camera (the hero, the
+        # dummies, their bars) stay out though their colours are warm
+        g0 = keyed(frames, i, {**part, "key": "gold"})
+        d = np.abs(a - bg).max(axis=2)
+        t0, t1 = part.get("t0", e.get("t0", 20)), part.get("t1", e.get("t1", 60))
+        m = np.clip((d - t0) / max(1.0, t1 - t0), 0, 1)
+        g0 = g0.astype(np.float32)
+        g0[..., 3] *= m
+        return g0.astype(np.uint8)
     if key == "bluediff":
         # a blue effect (서리파편's ice) over a still field: what moved from the clean field ("bg"), and only where it is
         # blue ("bt" [lo, hi] of blue over red) — the dummies, their stakes and bars stay out
@@ -198,7 +312,53 @@ def keyed(frames, i, e, part=None):
         t0, t1 = part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 60))
         lo, hi = part.get("bt", e.get("bt", [5, 35]))
         al = np.clip((d - t0) / max(1.0, t1 - t0), 0, 1) * np.clip((a[..., 2] - a[..., 0] - lo) / max(1.0, hi - lo), 0, 1)
+        wt = e.get("white")
+        if wt:
+            # its white-hot heart (폭렬천뢰탄's core): kept where it moved and blue is near
+            from PIL import ImageFilter
+            near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(15))).astype(np.float32) / 255
+            al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near * np.clip((d - t0) / max(1.0, t1 - t0), 0, 1))
         return np.dstack([a, al * 255]).astype(np.uint8)
+    if key == "orb":
+        # a solid sphere over the hero, a number and a bar (폭렬천뢰탄): inside the circle "orb" [cx, cy, R] the frame's
+        # own pixels, but those that are not the sphere's — warm (the hero, the dummy's marker), green (a bar) or in
+        # "boxes" (the number, the bar) — taken again from the same radius a quarter, three quarters or half a turn on;
+        # outside it the lightning as bluediff (with "boxes" cleared and nothing left of the sphere: another lies there)
+        cx, cy, R = part["orb"]
+        H, W = a.shape[:2]
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        dx, dy = xx - cx, yy - cy
+        r = np.hypot(dx, dy)
+        inside = r <= R
+        bad = (a[..., 0] > a[..., 2] + 10) | ((a[..., 1] > a[..., 2] + 20) & (a[..., 1] > a[..., 0] + 20))
+        for b in part.get("boxes", []):
+            bad[max(0, b[1]):b[3], max(0, b[0]):b[2]] = True
+        # their dark outlines too (the marker's, the number's)
+        from PIL import ImageFilter
+        bad = np.asarray(Image.fromarray(bad.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(5))) > 0
+        rgb = a.copy()
+        fix = inside & bad
+        todo = fix.copy()
+        for ang in (30, -30, 45, -45, 60, -60, 90, -90, 120, -120, 150, -150, 180):
+            if not todo.any():
+                break
+            c, s = np.cos(np.radians(ang)), np.sin(np.radians(ang))
+            sx = np.rint(cx + dx * c - dy * s).astype(int).clip(0, W - 1)
+            sy = np.rint(cy + dx * s + dy * c).astype(int).clip(0, H - 1)
+            ok = todo & ~bad[sy, sx] & inside[sy, sx]
+            rgb[ok] = a[sy[ok], sx[ok]]
+            todo &= ~ok
+        out = {**part, "key": "bluediff"}
+        lt = keyed(frames, i, e, out)
+        al = lt[..., 3].astype(np.float32)
+        for b in part.get("boxes", []):
+            al[max(0, b[1]):b[3], max(0, b[0]):b[2]] = 0
+        # the lightning leaves to the right and below; on the left and above lie the hero, another sphere, the number
+        al[(dx < 0) & (dy < R * 0.6)] = 0
+        edge = np.clip(R + 1.5 - r, 0, 1.5) / 1.5
+        al = np.where(inside, 255 * edge, al * (1 - edge))
+        al[inside & todo] = 0
+        return np.dstack([np.where(inside[..., None], rgb, a), al]).astype(np.uint8)
     if key == "dark":
         return key_dark(a, bg, e)
     return diffed(frames[i], frames[part.get("bg", e.get("bg", 0))], part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 70)))

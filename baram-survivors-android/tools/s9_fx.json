@@ -1,51 +1,6516 @@
 {
  "_about": "tools/s9_fx.py: the original 바람의나라's 9차 effects. src paths under the source folder: dl1320/NN.gif = xoxd.tistory.com/1320's Nth GIF (effect sprites on white); gif2662/IMGnn.gif = xoxd.tistory.com/2662's image nn (9차 skills in play); tips/IMGnn.png = its tooltip captures. 전사 (9차 재작업): every picture from its own 2662 scene at the original's size (\"scale\" 0.62); 명천검파 has no picture here — it is not in its scene (IMG05, all 161 frames) and 1320 #09, used before, is another skill's (cherry petals).",
- "w_heukryong": {"src": "gif2662/IMG05.gif", "mode": "parts", "key": "dark", "bg": 158, "t0": 14, "t1": 44, "red": 4, "stripes": [110, 5], "cell": [260, 170], "origin": [130, 85], "soft": 8, "cells": [[{"f": 103, "at": [324, 453], "clip": [-138, -75, 101, 76], "ops": [{"clear": [-6, -75, 101, -59]}]}], [{"f": 104, "at": [323, 455], "clip": [-137, -77, 102, 74], "ops": [{"clear": [-5, -77, 102, -61]}]}], [{"f": 105, "at": [320, 458], "clip": [-134, -80, 105, 71], "ops": [{"clear": [-2, -80, 105, -64]}]}], [{"f": 106, "at": [296, 459], "clip": [-110, -81, 129, 70], "ops": [{"clear": [22, -81, 129, -65]}]}], [{"f": 107, "at": [295, 456], "clip": [-109, -78, 130, 73], "ops": [{"clear": [23, -78, 130, -62]}]}], [{"f": 108, "at": [294, 457], "clip": [-108, -79, 131, 72], "ops": [{"clear": [24, -79, 131, -63]}]}]], "ms": 80, "scale": 0.62, "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks)"},
- "w_apdo": {"src": "gif2662/IMG07.gif", "mode": "parts", "key": "diff", "bg": 22, "t0": 22, "t1": 80, "cell": [200, 360], "origin": [196, 205], "soft": 6, "cells": [[{"f": 9, "at": [292, 305], "clip": [-192, -200, -50, 145], "ops": [{"clear": [-72, -58, -22, 8]}, {"clear": [-66, -168, -50, -96]}]}], [{"f": 7, "at": [292, 305], "clip": [-192, -200, -50, 145], "ops": [{"clear": [-72, -58, -22, 8]}, {"clear": [-66, -168, -50, -96]}]}], [{"f": 8, "at": [292, 305], "clip": [-192, -200, -50, 145], "ops": [{"clear": [-72, -58, -22, 8]}, {"clear": [-66, -168, -50, -96]}]}], [{"f": 9, "at": [292, 305], "clip": [-192, -200, -50, 145], "ops": [{"clear": [-72, -58, -22, 8]}, {"clear": [-66, -168, -50, -96]}]}]], "ms": 80, "scale": 0.62, "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead"},
- "r_mukdok": {"src": "gif2662/IMG17.gif", "mode": "parts", "key": "blue", "bt": [25, 60], "cell": [180, 150], "origin": [65, 115], "soft": 5, "cells": [[{"f": 80, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 81, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 82, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 83, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 84, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 85, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}], [{"f": 86, "at": [370, 310], "clip": [-60, -110, 110, 30], "ops": [{"clear": [-60, -110, -12, -90]}]}]], "ms": 80, "scale": 0.62, "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 80-86: no damage number over it, the skill's call label above left out), its blue keyed off the grey ground, the hero's red and the dummy's wood. (1320 #05, used before, is not it: thin dark rings)"},
- "m_hoeseon": {"src": "gif2662/IMG21.gif", "mode": "parts", "key": "teal", "gt": [25, 85], "white": 200, "cell": [330, 325], "origin": [150, 285], "soft": 8, "cells": [[{"f": 11, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 12, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 13, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 14, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 15, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 16, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 17, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 18, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 19, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 20, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 21, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}], [{"f": 22, "at": [460, 375], "clip": [-150, -285, 180, 40], "unnum": [[-90, -185, 80, -20]]}]], "ms": 80, "scale": 0.62, "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 11-22; the camera still) — its green keyed off the sand and the client's red range grid, the damage numbers stacked over it painted over from the wind round them"},
- "m_seori": {"src": "gif2662/IMG23.gif", "mode": "parts", "key": "bluediff", "bg": 0, "t0": 20, "t1": 60, "bt": [5, 35], "cell": [330, 360], "origin": [165, 185], "soft": 10, "cells": [[{"f": 27, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 28, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 29, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 30, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 31, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 32, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 33, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 34, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 35, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 36, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 37, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}], [{"f": 38, "at": [540, 290], "clip": [-165, -185, 165, 175], "ops": [{"shift": {"box": [-128, -118, -48, -50], "d": [0, 74]}}, {"shift": {"box": [8, -118, 88, -50], "d": [0, 74]}}, {"shift": {"box": [-128, 27, -48, 95], "d": [0, -74]}}, {"shift": {"box": [8, 27, 88, 95], "d": [0, -74]}}, {"mirror": {"box": [108, -185, 165, 175], "ax": 0}}]}]], "ms": 80, "scale": 0.62, "why": "서리파편: the field of ice it leaves where it bursts — blue crystals and rings pulsing (2662 IMG23 frames 27-38, one pulse; the camera still) — its blue keyed off the grey ground and the dummies' wood, the damage numbers over the dummies painted over; the capture's right edge cuts it: that side from the left, mirrored"},
- "p_cheonroe": {"src": "dl1320/21.gif", "mode": "white", "ms": 70, "why": "폭렬천뢰탄's thunder orb (2662 IMG31)"},
- "p_cheonsin": {"src": "dl1320/06.gif", "mode": "white", "ms": 90, "why": "천신의기운's golden ring (2662 IMG33)"},
- "a_eungchuk": {"src": "dl1320/11.gif", "mode": "white", "ms": 70, "why": "응축뇌전시's lightning arrow (2662 IMG44)"},
- "rp_lotus": {"src": "gif2662/IMG81.gif", "mode": "diff", "bg": 0, "frames": [3, 45, 2], "box": [312, 336, 410, 442], "t0": 26, "t1": 90, "ms": 80, "anchor": [0.5, 0.85], "why": "황천화's lotus, the lone one at the field's edge (2662 IMG81, still camera)"},
- "rp_lotusburst": {"src": "gif2662/IMG81.gif", "mode": "diff", "bg": 0, "frames": [46, 56, 1], "box": [262, 300, 462, 480], "t0": 26, "t1": 90, "ms": 70, "why": "황천화's lotus bursting (2662 IMG81 frames 46-55)"},
- "cl_cheonsin": {"src": "gif2662/IMG54.gif", "mode": "diff", "bg": 0, "frames": [8, 112, 4], "box": [20, 50, 330, 275], "t0": 30, "t1": 100, "ms": 90, "mask": [{"box": [0, 0, 1, 1], "ellipse": [172, 140, 58, 62, 0.35]}, [135, 213, 207, 246]], "why": "천신의권역's blue vortex round the hero (2662 IMG54, still camera; the hero masked out)"},
- "l_sickle": {"src": "dl1320/25.gif", "mode": "white", "ms": 70, "why": "살수 9차 극청룡참: its 이계의낫 thrown on its chain (1320 #25; 2662 IMG86)"},
- "l_erosion": {"src": "dl1320/16.gif", "mode": "white", "ms": 80, "anchor": [0.5, 0.8], "why": "살수 9차 이계의침식: the dark crystals it raises along its way (1320 #16; 2662 IMG88)"},
- "l_dimension": {"src": "dl1320/03.gif", "mode": "white", "ms": 70, "why": "살수 9차 차원개방: the opened dimension's rings (1320 #03, by its look; 2662 IMG90)"},
- "mk_yeonok": {"src": "dl1320/19.gif", "mode": "white", "ms": 60, "why": "흑화랑 9차 연옥'만월: the red moon of its sword dance (1320 #19, by its look; 2662 IMG98)"},
- "mk_magung": {"src": "dl1320/07.gif", "mode": "white", "ms": 80, "why": "흑화랑 9차 마궁폭사: the dark star where its magic arrows strike (1320 #07, by its look; 2662 IMG100)"},
- "dk_hwahon": {"src": "dl1320/15.gif", "mode": "white", "ms": 70, "why": "영술사 9차 화혼돌파: the fire spirits' claws (1320 #15; 2662 IMG68)"},
- "dk_honbul": {"src": "dl1320/14.gif", "mode": "white", "ms": 70, "anchor": [0.5, 0.75], "why": "영술사 9차 불길한혼불: the ill-omened fire clinging to a foe and bursting (1320 #14)"},
- "dk_simpan": {"src": "dl1320/27.gif", "mode": "white", "ms": 70, "anchor": [0.5, 0.92], "why": "영술사 9차 천신의심판: the 천신's crushing pillar (1320 #27; 2662 IMG71)"},
- "dk_simpanpull": {"src": "dl1320/17.gif", "mode": "white", "ms": 60, "why": "영술사 9차 천신의심판: the whirl of rocks drawing the foes in (1320 #17; 2662 IMG71 frames 12-16)"},
- "m_hwanyeong": {"src": "gif2662/IMG29.gif", "mode": "parts", "key": "blue", "bt": [8, 45], "cell": [360, 310], "origin": [350, 155], "soft": 12, "cells": [[{"f": 10, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 12, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 14, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 16, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 18, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 20, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 21, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 23, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 25, "at": [345, 275], "clip": [-345, -150, -30, 150]}], [{"f": 26, "at": [345, 275], "clip": [-345, -150, -30, 150]}]], "ms": 120, "scale": 0.62, "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded)"},
- "p_banhyang": {"src": "dl1320/22.gif", "mode": "white", "ms": 70, "why": "도사 9차 치유의반향: the echo of healing light (1320 #22, by its look)"},
- "a_cheongung": {"src": "dl1320/12.gif", "mode": "white", "ms": 60, "why": "궁사 9차 천궁난사: its fire arrows (1320 #12; 2662 IMG42)"},
- "cl_gongmyeong": {"src": "dl1320/23.gif", "mode": "white", "ms": 70, "why": "천인 9차 천공의공명: the resonance striking down (1320 #23, by its look)"},
- "l_agong": {"src": "dl1320/26.gif", "mode": "white", "ms": 60, "why": "살수 9차 아공간전개 (→ 무사): the sub-space circle (1320 #26, by its look)"},
- "dk_jangseung": {"src": "gif2662/IMG75.gif", "mode": "diff", "bg": 0, "frames": [12, 140, 6], "box": [100, 0, 506, 520], "t0": 34, "t1": 100, "ms": 90, "gold": [205, 215], "mask": [{"box": [0, 0, 1, 1], "ellipse": [263, 250, 52, 62, 0.4]}, [205, 222, 252, 246]], "why": "영술사 9차 장승영역 (→ 도깨비): the zone's bright gold glyphs and 태극 (2662 IMG75, still camera; the pre-cast frame subtracted, the flat floor, the 장승 units and the dummies left out)"},
- "w_ult9": {"src": "gif2662/IMG09.gif", "mode": "cinema", "frames": [18, 42, 2], "box": [0, 0, 793, 653], "t0": 45, "t1": 110, "ms": 215, "k": 1, "max": 420, "cap": 420, "hero": [396, 296, 34, 50], "field": [396, 306, 206, 235], "vignette": [0.97, 0.89, 0.22], "bars": 1, "mask": [{"box": [683, 212, 793, 266], "from": [0, -60]}, {"box": [246, 0, 546, 34], "from": [0, 36]}], "why": "만검귀종: the 원작 궁극's art (2662 IMG09 frames 18-40, every other: the slashes, the spiral of blades, the vortex of fire in its graveyard of swords, 2.6 s) — the frame kept whole, its black see-through, the damage numbers and the hero filled from the art round them, and the art faded out towards an ellipse's edge: it is drawn centred on the hero at about two thirds of the screen's height, not stretched over the screen (사용자 결정)"},
- "r_ult9": {"src": "gif2662/IMG19.gif", "mode": "cinema", "frames": [11, 44, 3], "skip": [32], "box": [0, 0, 796, 627], "t0": 45, "t1": 110, "ms": 215, "k": 1, "max": 420, "cap": 420, "hero": [398, 284, 34, 50], "field": [398, 294, 206, 225], "vignette": [1.02, 0.96, 0.16], "grow": 19, "stars": 1, "mask": [{"box": [686, 212, 796, 266], "from": [0, -60]}, {"box": [248, 0, 548, 34], "from": [0, 36]}], "why": "질풍난무: the 원작 궁극's art (2662 IMG19 frames 11-41, every third: the bamboo grove framing the screen, the great kunai at its foot, the green gale closing in round the hero) — its black see-through, the damage numbers and the hero filled from the art round them (no life-bar keying: the bamboo is that green), faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"},
- "m_ult9": {"src": "gif2662/IMG27.gif", "mode": "cinema", "frames": [14, 48, 3], "box": [0, 0, 802, 637], "t0": 45, "t1": 110, "ms": 215, "k": 1, "max": 420, "cap": 420, "hero": [401, 289, 34, 50], "field": [401, 299, 208, 229], "vignette": [0.97, 0.89, 0.22], "mask": [{"box": [692, 212, 802, 266], "from": [0, -60]}, {"box": [251, 0, 551, 34], "from": [0, 36]}], "why": "겁화: the 원작 궁극's art (2662 IMG27 frames 14-47, every third: the cavern of lava and its fangs, the spiral of fire closing on the hero, the yellow blast, the red ring) — its black see-through, the damage numbers and the hero filled from the art round them, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"},
- "p_ult9": {"src": "gif2662/IMG38.gif", "mode": "cinema", "frames": [14, 38, 3], "box": [0, 0, 806, 646], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [403, 293, 34, 50], "field": [403, 303, 209, 232], "mask": [{"box": [696, 212, 806, 266], "from": [0, -60]}, {"box": [253, 0, 553, 34], "from": [0, 36]}], "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "a_ult9": {"src": "gif2662/IMG47.gif", "mode": "cinema", "frames": [17, 43, 3], "box": [0, 0, 796, 644], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [398, 292, 34, 50], "field": [398, 302, 206, 231], "mask": [{"box": [686, 212, 796, 266], "from": [0, -60]}, {"box": [248, 0, 548, 34], "from": [0, 36]}], "why": "만시창공: the 원작 궁극's full-screen art (2662 IMG47 frames 16-45); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "cl_ult9": {"src": "gif2662/IMG56.gif", "mode": "cinema", "frames": [11, 37, 3], "box": [0, 0, 812, 632], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [406, 287, 34, 50], "field": [406, 297, 211, 227], "mask": [{"box": [702, 212, 812, 266], "from": [0, -60]}, {"box": [256, 0, 556, 34], "from": [0, 36]}], "why": "천변지이: the 원작 궁극's full-screen art (2662 IMG56 frames 10-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "md_ult9": {"src": "gif2662/IMG64.gif", "mode": "cinema", "frames": [17, 42, 3], "box": [0, 0, 805, 640], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [402, 290, 34, 50], "field": [402, 300, 209, 230], "mask": [{"box": [695, 212, 805, 266], "from": [0, -60]}, {"box": [252, 0, 552, 34], "from": [0, 36]}], "why": "비전방진: the 원작 궁극's full-screen art (2662 IMG64 frames 16-44); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "rp_ult9": {"src": "gif2662/IMG84.gif", "mode": "cinema", "frames": [19, 45, 3], "box": [0, 0, 802, 650], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [401, 295, 34, 50], "field": [401, 305, 208, 234], "mask": [{"box": [692, 212, 802, 266], "from": [0, -60]}, {"box": [251, 0, 551, 34], "from": [0, 36]}], "why": "명계의회랑: the 원작 궁극's full-screen art (2662 IMG84 frames 18-47); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "l_ult9": {"src": "gif2662/IMG92.gif", "mode": "cinema", "frames": [10, 37, 3], "box": [0, 0, 799, 651], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [399, 295, 34, 50], "field": [399, 305, 207, 234], "mask": [{"box": [689, 212, 799, 266], "from": [0, -60]}, {"box": [249, 0, 549, 34], "from": [0, 36]}], "why": "청룡의격노 (살수): the 원작 궁극's full-screen art (2662 IMG92 frames 9-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "mk_ult9": {"src": "gif2662/IMG103.gif", "mode": "cinema", "frames": [21, 40, 3], "box": [0, 0, 803, 652], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [401, 296, 34, 50], "field": [401, 306, 208, 234], "mask": [{"box": [693, 212, 803, 266], "from": [0, -60]}, {"box": [251, 0, 551, 34], "from": [0, 36]}], "why": "낙화유영 (흑화랑): the 원작 궁극's full-screen art (2662 IMG103 frames 20-42); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "dk_ult9": {"src": "gif2662/IMG73.gif", "mode": "cinema", "frames": [9, 37, 3], "box": [0, 0, 812, 646], "t0": 45, "t1": 110, "ms": 140, "k": 1, "max": 420, "cap": 420, "hero": [406, 293, 34, 50], "field": [406, 303, 211, 232], "mask": [{"box": [702, 212, 812, 266], "from": [0, -60]}, {"box": [256, 0, 556, 34], "from": [0, 36]}], "why": "악귀출몰 (영술사): the 원작 궁극's full-screen art (2662 IMG73 frames 8-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"},
- "w_hogisword": {"src": "gif2662/IMG02.gif", "mode": "parts", "key": "cool", "warm": [15, 60], "floor": [186, 142, 92], "gray": [6, 175], "cell": [360, 430], "origin": [180, 330], "soft": 10, "cells": [[{"f": 53, "at": [311, 488], "clip": [-180, -330, 180, 36], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-33, -89, 32, -52], "d": [0, 37]}}, {"mirror": {"box": [-62, -103, -19, -58], "ax": 0}}, {"shift": {"box": [-18, 1, 28, 16], "d": [0, -17]}}, {"mirror": {"box": [42, -330, 180, -131], "ax": 0}}]}, {"f": 27, "at": [403, 122], "clip": [-180, 30, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 54, "at": [311, 473], "clip": [-180, -330, 180, 50], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-33, -89, 32, -52], "d": [0, 37]}}, {"mirror": {"box": [-62, -103, -19, -58], "ax": 0}}, {"shift": {"box": [-18, 1, 28, 16], "d": [0, -17]}}, {"mirror": {"box": [30, -330, 180, -114], "ax": 0}}]}, {"f": 29, "at": [403, 122], "clip": [-180, 44, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 55, "at": [311, 461], "clip": [-180, -330, 180, 62], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-33, -89, 32, -52], "d": [0, 37]}}, {"mirror": {"box": [-62, -103, -19, -58], "ax": 0}}, {"shift": {"box": [-18, 1, 28, 16], "d": [0, -17]}}, {"mirror": {"box": [30, -330, 180, -106], "ax": 0}}]}, {"f": 29, "at": [403, 122], "clip": [-180, 56, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 56, "at": [311, 461], "clip": [-180, -330, 180, 62], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-33, -89, 32, -52], "d": [0, 37]}}, {"mirror": {"box": [-62, -103, -19, -58], "ax": 0}}, {"shift": {"box": [-18, 1, 28, 16], "d": [0, -17]}}, {"mirror": {"box": [30, -330, 180, -106], "ax": 0}}]}, {"f": 30, "at": [403, 122], "clip": [-180, 56, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 57, "at": [311, 440], "clip": [-180, -330, 180, 84], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-33, -89, 32, -52], "d": [0, 37]}}, {"mirror": {"box": [-62, -103, -19, -58], "ax": 0}}, {"shift": {"box": [-18, 1, 28, 16], "d": [0, -17]}}, {"mirror": {"box": [30, -330, 180, -84], "ax": 0}}]}, {"f": 31, "at": [403, 122], "clip": [-180, 78, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 65, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 65, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}, {"f": 58, "at": [311, 422], "clip": [-180, -330, -129, 100]}, {"f": 58, "at": [311, 422], "clip": [129, -330, 180, 100], "ops": [{"mirror": {"box": [0, -330, 180, 100], "ax": 0}}]}, {"f": 58, "at": [311, 422], "clip": [-180, 25, 180, 100]}], [{"f": 66, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 66, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}, {"f": 34, "at": [403, 122], "clip": [-180, 25, 180, 100], "ops": [{"clear": [-180, -40, -118, 100]}]}], [{"f": 67, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 67, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -86, 23, -54], "d": [0, 32]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}], [{"f": 68, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 68, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}], [{"f": 69, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 69, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}], [{"f": 70, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 70, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}], [{"f": 71, "at": [455, 503], "clip": [0, -330, 129, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}]}, {"f": 71, "at": [455, 503], "clip": [-129, -330, 0, 25], "ops": [{"shift": {"box": [-13, -25, 12, 4], "d": [0, -27]}}, {"shift": {"box": [-24, -110, 23, -70], "d": [0, 42]}}, {"shift": {"box": [-13, 1, 12, 15], "d": [0, -16]}}, {"clear": [-129, -330, 129, -256]}, {"mirror": {"box": [-180, -330, 0, 100], "ax": 0}}]}]], "ms": 80, "scale": 0.62, "max": 360, "why": "호기어검: the great sword that falls on a foe (2662 IMG02) — the ring of light and the bolt from the sky, the ice, the sword standing, its white ghost. Each art frame from the showings where it is whole and clean: the top from the one at frames 53-57 (the hero beside it: that corner from the other side, mirrored), the bottom from the one at 27-34 (the capture's top edge cuts it), the standing sword and its ghost from the one at 65-71 (its right half, and that mirrored for the left: the hero stands on the left); the damage number and the dead one's skull filled from the blade's own stripes beside them"},
- "w_hogisign": {"src": "gif2662/IMG02.gif", "mode": "parts", "key": "cool", "warm": [15, 60], "floor": [186, 142, 92], "gray": [10, 215], "cell": [100, 180], "origin": [90, 170], "cells": [[{"f": 37, "at": [285, 212], "clip": [-80, -158, -44, -12]}], [{"f": 38, "at": [285, 212], "clip": [-80, -158, -44, -12]}], [{"f": 39, "at": [285, 212], "clip": [-80, -158, -44, -12]}], [{"f": 40, "at": [325, 212], "clip": [-80, -158, -44, -12]}], [{"f": 41, "at": [325, 212], "clip": [-80, -158, -44, -12]}], [{"f": 42, "at": [325, 212], "clip": [-80, -158, -44, -12]}]], "ms": 90, "scale": 0.62, "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand"},
- "r_swaestar": {"src": "gif2662/IMG13.gif", "mode": "parts", "key": "diff", "bg": 87, "t0": 24, "t1": 70, "cell": [130, 80], "origin": [65, 40], "cells": [[{"f": 60, "at": [545, 328], "clip": [-62, -36, 62, 36]}], [{"f": 62, "at": [545, 328], "clip": [-62, -36, 62, 36]}], [{"f": 64, "at": [545, 328], "clip": [-62, -36, 62, 36]}], [{"f": 66, "at": [545, 328], "clip": [-62, -36, 62, 36]}], [{"f": 68, "at": [545, 328], "clip": [-62, -36, 62, 36]}], [{"f": 70, "at": [545, 328], "clip": [-62, -36, 62, 36]}]], "ms": 90, "scale": 0.62, "why": "묵마수리검'쇄: the blue shuriken (a kunai in blue fire) standing at the end of its throw (2662 IMG13, the one at the hero's right, frames 60-70: the camera still, nothing near it) — what moved from the clean field of frame 87. It points at the hero: drawn turned for each of the eight ways"},
- "r_swaeend": {"src": "gif2662/IMG13.gif", "mode": "parts", "key": "diff", "bg": 87, "t0": 24, "t1": 70, "cell": [200, 170], "origin": [100, 85], "cells": [[{"f": 79, "at": [545, 328], "clip": [-98, -83, 98, 83]}], [{"f": 80, "at": [545, 328], "clip": [-98, -83, 98, 83]}], [{"f": 81, "at": [545, 328], "clip": [-98, -83, 98, 83]}], [{"f": 82, "at": [545, 328], "clip": [-98, -83, 98, 83]}], [{"f": 83, "at": [545, 328], "clip": [-98, -83, 98, 83]}], [{"f": 84, "at": [545, 328], "clip": [-98, -83, 98, 83]}]], "ms": 80, "scale": 0.62, "why": "묵마수리검'쇄: its end — the white glint and the burst of blue fire as each shuriken goes (2662 IMG13 frames 79-84, the same one)"},
- "r_zan": {"src": "gif2662/IMG11.gif", "mode": "parts", "key": "diff", "bg": 25, "t0": 34, "t1": 80, "cell": [190, 190], "origin": [95, 95], "soft": 6, "cells": [[{"f": 1, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}], "t0": 60, "t1": 110}], [{"f": 4, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 5, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 6, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 7, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 8, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 9, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}], [{"f": 10, "at": [514, 502], "clip": [-95, -95, 95, 95], "ops": [{"clear": [-95, -95, -70, -38]}, {"clear": [-95, -95, -40, -64]}]}]], "ms": 80, "scale": 0.62, "why": "묵혈파광참: the shadow's red slashes and the great seal 斬 it leaves — red, then pale with its ring, then gone (2662 IMG11 frames 1-10, the lowest of the three: no one stands under it; frames 2-3, where the client darkens the screen, left out) — what moved from the clean floor of frame 25; the dummy at its top-left corner cleared, frame 1 (the screen starting to darken) keyed harder"},
- "r_swaefly": {"src": "gif2662/IMG13.gif", "mode": "parts", "key": "diff", "bg": 87, "t0": 24, "t1": 70, "cell": [260, 44], "origin": [10, 22], "soft": 4, "cells": [[{"f": 4, "at": [285, 327], "clip": [80, -12, 250, 13]}], [{"f": 5, "at": [285, 327], "clip": [80, -12, 250, 13]}], [{"f": 6, "at": [285, 327], "clip": [80, -12, 250, 13]}]], "ms": 80, "scale": 0.62, "why": "묵마수리검'쇄: the shuriken's flight out — the long white-blue streak it draws (2662 IMG13 frames 4-6, the one going right: its outer part, clear of the damage numbers round the hero)"},
- "r_mukdokcast": {"src": "gif2662/IMG17.gif", "mode": "parts", "key": "blue", "bt": [20, 55], "cell": [160, 175], "origin": [80, 160], "soft": 4, "cells": [[{"f": 2, "at": [315, 335], "clip": [-75, -150, 75, 15]}], [{"f": 3, "at": [315, 335], "clip": [-75, -150, 75, 15]}], [{"f": 4, "at": [315, 335], "clip": [-75, -150, 75, 15]}], [{"f": 5, "at": [315, 335], "clip": [-75, -150, 75, 15]}]], "ms": 80, "scale": 0.62, "why": "묵혈독바르기: the cast — the dark violet poison welling up round the hero and its blades (2662 IMG17 frames 2-6), its violet keyed off the ground and the hero's own red"},
- "m_hoeseonwind": {"src": "gif2662/IMG21.gif", "mode": "parts", "key": "teal", "gt": [25, 85], "white": 200, "cell": [220, 175], "origin": [110, 90], "soft": 6, "cells": [[{"f": 26, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 27, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 28, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 29, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 30, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 31, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}], [{"f": 32, "at": [460, 390], "clip": [-110, -90, 110, 85], "unnum": [[-105, -100, 45, -45]]}]], "ms": 80, "scale": 0.62, "why": "회선격풍: the gathered wind left on each one struck — a small teal swirl, then a green burst with a white heart (2662 IMG21 frames 26-32, the lower dummy), the damage number over it painted over"},
- "m_seorishot": {"src": "gif2662/IMG23.gif", "mode": "parts", "key": "bluediff", "bg": 0, "t0": 20, "t1": 60, "bt": [5, 35], "cell": [150, 145], "origin": [75, 75], "soft": 6, "cells": [[{"f": 6, "at": [366, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}], [{"f": 7, "at": [381, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}], [{"f": 8, "at": [396, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}], [{"f": 9, "at": [412, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}], [{"f": 10, "at": [428, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}], [{"f": 11, "at": [443, 278], "clip": [-64, -46, 64, 62], "ops": [{"clear": [-20, 38, 64, 52]}]}]], "ms": 80, "scale": 0.62, "why": "서리파편: the orb of frost shards flying ahead (2662 IMG23 frames 6-11, followed as it goes), the damage number over it painted over"},
- "m_jeondo": {"src": "gif2662/IMG25.gif", "mode": "parts", "key": "cool", "warm": [2, 20], "gray": [45, 185], "cell": [400, 200], "origin": [40, 90], "soft": 6, "cells": [[{"f": 100, "at": [250, 310], "clip": [35, -60, 360, 14], "ops": [{"clear": [150, 2, 232, 14]}, {"clear": [300, 2, 360, 14]}]}, {"f": 101, "at": [250, 234], "clip": [35, 16, 360, 90], "ops": [{"clear": [140, 66, 360, 90]}]}], [{"f": 101, "at": [250, 310], "clip": [35, -60, 360, 14], "ops": [{"clear": [150, 2, 232, 14]}, {"clear": [300, 2, 360, 14]}]}, {"f": 102, "at": [250, 234], "clip": [35, 16, 360, 90], "ops": [{"clear": [140, 66, 360, 90]}]}], [{"f": 102, "at": [250, 310], "clip": [35, -60, 360, 14], "ops": [{"clear": [150, 2, 232, 14]}, {"clear": [300, 2, 360, 14]}]}, {"f": 100, "at": [250, 234], "clip": [35, 16, 360, 90], "ops": [{"clear": [140, 66, 360, 90]}]}]], "ms": 80, "scale": 0.62, "why": "전도체: the current of 과전류 running from the hero to the frost-struck — two forked blue-white bolts going out (2662 IMG25 frames 100-102), keyed off the brown ground (blue over red); the lower bolt (under the damage numbers) is the next frame's upper one set 75 px under. Drawn from the hero, turned to the one it strikes"},
- "_icons": {"w_swords": "tips/IMG01.png", "w_advance": "tips/IMG06.png", "w_hogi": "tips/IMG04.png", "r_bloodslash": "tips/IMG10.png", "r_chainstar": "tips/IMG12.png", "r_mukdok": "tips/IMG16.png", "m_gale": "tips/IMG20.png", "m_shards": "tips/IMG22.png", "m_jeondo": "tips/IMG24.png", "p_thunderbomb": "tips/IMG30.png", "p_skyspirit": "tips/IMG32.png", "a_eungchuk": "tips/IMG43.png", "a_hwasalbi": "tips/IMG45.png", "a_air": "tips/IMG39.png", "cl_sunbo": "tips/IMG48.png", "cl_haeil": "tips/IMG50.png", "cl_cheonsin": "tips/IMG53.png", "md_crossq": "tips/IMG57.png", "md_frenzyshot": "tips/IMG61.png", "rp_bisa": "tips/IMG78.png", "rp_hwangcheon": "tips/IMG80.png", "l_cheongryong": "tips/IMG85.png", "l_erosion": "tips/IMG87.png", "l_dimension": "tips/IMG89.png", "mk_tugwi": "tips/IMG95.png", "mk_yeonok": "tips/IMG97.png", "mk_magung": "tips/IMG99.png", "dk_hwahon": "tips/IMG67.png", "dk_honbul": "tips/IMG69.png", "dk_simpan": "tips/IMG70.png", "w_mcheon": "tips/IMG03.png", "r_jugeum": "tips/IMG14.png", "m_hwanyeong": "tips/IMG28.png", "p_banhyang": "tips/IMG36.png", "a_cheongung": "tips/IMG41.png", "cl_gongmyeong": "tips/IMG52.png", "md_mstorm": "tips/IMG59.png", "rp_galmuri": "tips/IMG82.png", "rp_cut": "tips/IMG76.png", "l_agong": "tips/IMG93.png", "mk_bujori": "tips/IMG101.png", "dk_jangseung": "tips/IMG74.png", "w_myriad": "tips/IMG08.png", "r_gale": "tips/IMG18.png", "m_kalpa": "tips/IMG26.png", "p_taiji": "tips/IMG37.png", "a_mansi": "tips/IMG46.png", "cl_cheonbyeon": "tips/IMG55.png", "md_bijeon": "tips/IMG63.png", "rp_myeonggye": "tips/IMG83.png", "l_rage9": "tips/IMG91.png", "mk_nakhwa": "tips/IMG102.png", "dk_akgwi": "tips/IMG72.png"}
+ "w_heukryong": {
+  "src": "gif2662/IMG05.gif",
+  "mode": "parts",
+  "key": "dark",
+  "bg": 158,
+  "t0": 14,
+  "t1": 44,
+  "red": 4,
+  "stripes": [
+   110,
+   5
+  ],
+  "cell": [
+   260,
+   170
+  ],
+  "origin": [
+   130,
+   85
+  ],
+  "soft": 8,
+  "cells": [
+   [
+    {
+     "f": 103,
+     "at": [
+      324,
+      453
+     ],
+     "clip": [
+      -138,
+      -75,
+      101,
+      76
+     ],
+     "ops": [
+      {
+       "clear": [
+        -6,
+        -75,
+        101,
+        -59
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 104,
+     "at": [
+      323,
+      455
+     ],
+     "clip": [
+      -137,
+      -77,
+      102,
+      74
+     ],
+     "ops": [
+      {
+       "clear": [
+        -5,
+        -77,
+        102,
+        -61
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 105,
+     "at": [
+      320,
+      458
+     ],
+     "clip": [
+      -134,
+      -80,
+      105,
+      71
+     ],
+     "ops": [
+      {
+       "clear": [
+        -2,
+        -80,
+        105,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 106,
+     "at": [
+      296,
+      459
+     ],
+     "clip": [
+      -110,
+      -81,
+      129,
+      70
+     ],
+     "ops": [
+      {
+       "clear": [
+        22,
+        -81,
+        129,
+        -65
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 107,
+     "at": [
+      295,
+      456
+     ],
+     "clip": [
+      -109,
+      -78,
+      130,
+      73
+     ],
+     "ops": [
+      {
+       "clear": [
+        23,
+        -78,
+        130,
+        -62
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 108,
+     "at": [
+      294,
+      457
+     ],
+     "clip": [
+      -108,
+      -79,
+      131,
+      72
+     ],
+     "ops": [
+      {
+       "clear": [
+        24,
+        -79,
+        131,
+        -63
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks)"
+ },
+ "w_apdo": {
+  "src": "gif2662/IMG07.gif",
+  "mode": "parts",
+  "key": "diff",
+  "bg": 22,
+  "t0": 22,
+  "t1": 80,
+  "cell": [
+   200,
+   360
+  ],
+  "origin": [
+   196,
+   205
+  ],
+  "soft": 6,
+  "cells": [
+   [
+    {
+     "f": 9,
+     "at": [
+      292,
+      305
+     ],
+     "clip": [
+      -192,
+      -200,
+      -50,
+      145
+     ],
+     "ops": [
+      {
+       "clear": [
+        -72,
+        -58,
+        -22,
+        8
+       ]
+      },
+      {
+       "clear": [
+        -66,
+        -168,
+        -50,
+        -96
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 7,
+     "at": [
+      292,
+      305
+     ],
+     "clip": [
+      -192,
+      -200,
+      -50,
+      145
+     ],
+     "ops": [
+      {
+       "clear": [
+        -72,
+        -58,
+        -22,
+        8
+       ]
+      },
+      {
+       "clear": [
+        -66,
+        -168,
+        -50,
+        -96
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 8,
+     "at": [
+      292,
+      305
+     ],
+     "clip": [
+      -192,
+      -200,
+      -50,
+      145
+     ],
+     "ops": [
+      {
+       "clear": [
+        -72,
+        -58,
+        -22,
+        8
+       ]
+      },
+      {
+       "clear": [
+        -66,
+        -168,
+        -50,
+        -96
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 9,
+     "at": [
+      292,
+      305
+     ],
+     "clip": [
+      -192,
+      -200,
+      -50,
+      145
+     ],
+     "ops": [
+      {
+       "clear": [
+        -72,
+        -58,
+        -22,
+        8
+       ]
+      },
+      {
+       "clear": [
+        -66,
+        -168,
+        -50,
+        -96
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead"
+ },
+ "r_mukdok": {
+  "src": "gif2662/IMG17.gif",
+  "mode": "parts",
+  "key": "blue",
+  "bt": [
+   25,
+   60
+  ],
+  "cell": [
+   180,
+   150
+  ],
+  "origin": [
+   65,
+   115
+  ],
+  "soft": 5,
+  "cells": [
+   [
+    {
+     "f": 80,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 81,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 82,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 83,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 84,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 85,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 86,
+     "at": [
+      370,
+      310
+     ],
+     "clip": [
+      -60,
+      -110,
+      110,
+      30
+     ],
+     "ops": [
+      {
+       "clear": [
+        -60,
+        -110,
+        -12,
+        -90
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 80-86: no damage number over it, the skill's call label above left out), its blue keyed off the grey ground, the hero's red and the dummy's wood. (1320 #05, used before, is not it: thin dark rings)"
+ },
+ "m_hoeseon": {
+  "src": "gif2662/IMG21.gif",
+  "mode": "parts",
+  "key": "teal",
+  "gt": [
+   25,
+   85
+  ],
+  "white": 200,
+  "cell": [
+   330,
+   325
+  ],
+  "origin": [
+   150,
+   285
+  ],
+  "soft": 8,
+  "cells": [
+   [
+    {
+     "f": 11,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 12,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 13,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 14,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 15,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 16,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 17,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 18,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 19,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 20,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 21,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 22,
+     "at": [
+      460,
+      375
+     ],
+     "clip": [
+      -150,
+      -285,
+      180,
+      40
+     ],
+     "unnum": [
+      [
+       -90,
+       -185,
+       80,
+       -20
+      ]
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 11-22; the camera still) — its green keyed off the sand and the client's red range grid, the damage numbers stacked over it painted over from the wind round them"
+ },
+ "m_seori": {
+  "src": "gif2662/IMG23.gif",
+  "mode": "parts",
+  "key": "bluediff",
+  "bg": 0,
+  "t0": 20,
+  "t1": 60,
+  "bt": [
+   5,
+   35
+  ],
+  "cell": [
+   330,
+   360
+  ],
+  "origin": [
+   165,
+   185
+  ],
+  "soft": 10,
+  "cells": [
+   [
+    {
+     "f": 27,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 28,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 29,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 30,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 31,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 32,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 33,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 34,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 35,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 36,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 37,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 38,
+     "at": [
+      540,
+      290
+     ],
+     "clip": [
+      -165,
+      -185,
+      165,
+      175
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -128,
+         -118,
+         -48,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         -118,
+         88,
+         -50
+        ],
+        "d": [
+         0,
+         74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -128,
+         27,
+         -48,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         8,
+         27,
+         88,
+         95
+        ],
+        "d": [
+         0,
+         -74
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         108,
+         -185,
+         165,
+         175
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "서리파편: the field of ice it leaves where it bursts — blue crystals and rings pulsing (2662 IMG23 frames 27-38, one pulse; the camera still) — its blue keyed off the grey ground and the dummies' wood, the damage numbers over the dummies painted over; the capture's right edge cuts it: that side from the left, mirrored"
+ },
+ "p_cheonroe": {
+  "src": "dl1320/21.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "폭렬천뢰탄's thunder orb (2662 IMG31)"
+ },
+ "p_cheonsin": {
+  "src": "dl1320/06.gif",
+  "mode": "white",
+  "ms": 90,
+  "why": "천신의기운's golden ring (2662 IMG33)"
+ },
+ "a_eungchuk": {
+  "src": "dl1320/11.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "응축뇌전시's lightning arrow (2662 IMG44)"
+ },
+ "rp_lotus": {
+  "src": "gif2662/IMG81.gif",
+  "mode": "diff",
+  "bg": 0,
+  "frames": [
+   3,
+   45,
+   2
+  ],
+  "box": [
+   312,
+   336,
+   410,
+   442
+  ],
+  "t0": 26,
+  "t1": 90,
+  "ms": 80,
+  "anchor": [
+   0.5,
+   0.85
+  ],
+  "why": "황천화's lotus, the lone one at the field's edge (2662 IMG81, still camera)"
+ },
+ "rp_lotusburst": {
+  "src": "gif2662/IMG81.gif",
+  "mode": "diff",
+  "bg": 0,
+  "frames": [
+   46,
+   56,
+   1
+  ],
+  "box": [
+   262,
+   300,
+   462,
+   480
+  ],
+  "t0": 26,
+  "t1": 90,
+  "ms": 70,
+  "why": "황천화's lotus bursting (2662 IMG81 frames 46-55)"
+ },
+ "cl_cheonsin": {
+  "src": "gif2662/IMG54.gif",
+  "mode": "diff",
+  "bg": 0,
+  "frames": [
+   8,
+   112,
+   4
+  ],
+  "box": [
+   20,
+   50,
+   330,
+   275
+  ],
+  "t0": 30,
+  "t1": 100,
+  "ms": 90,
+  "mask": [
+   {
+    "box": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "ellipse": [
+     172,
+     140,
+     58,
+     62,
+     0.35
+    ]
+   },
+   [
+    135,
+    213,
+    207,
+    246
+   ]
+  ],
+  "why": "천신의권역's blue vortex round the hero (2662 IMG54, still camera; the hero masked out)"
+ },
+ "l_sickle": {
+  "src": "dl1320/25.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "살수 9차 극청룡참: its 이계의낫 thrown on its chain (1320 #25; 2662 IMG86)"
+ },
+ "l_erosion": {
+  "src": "dl1320/16.gif",
+  "mode": "white",
+  "ms": 80,
+  "anchor": [
+   0.5,
+   0.8
+  ],
+  "why": "살수 9차 이계의침식: the dark crystals it raises along its way (1320 #16; 2662 IMG88)"
+ },
+ "l_dimension": {
+  "src": "dl1320/03.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "살수 9차 차원개방: the opened dimension's rings (1320 #03, by its look; 2662 IMG90)"
+ },
+ "mk_yeonok": {
+  "src": "dl1320/19.gif",
+  "mode": "white",
+  "ms": 60,
+  "why": "흑화랑 9차 연옥'만월: the red moon of its sword dance (1320 #19, by its look; 2662 IMG98)"
+ },
+ "mk_magung": {
+  "src": "dl1320/07.gif",
+  "mode": "white",
+  "ms": 80,
+  "why": "흑화랑 9차 마궁폭사: the dark star where its magic arrows strike (1320 #07, by its look; 2662 IMG100)"
+ },
+ "dk_hwahon": {
+  "src": "dl1320/15.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "영술사 9차 화혼돌파: the fire spirits' claws (1320 #15; 2662 IMG68)"
+ },
+ "dk_honbul": {
+  "src": "dl1320/14.gif",
+  "mode": "white",
+  "ms": 70,
+  "anchor": [
+   0.5,
+   0.75
+  ],
+  "why": "영술사 9차 불길한혼불: the ill-omened fire clinging to a foe and bursting (1320 #14)"
+ },
+ "dk_simpan": {
+  "src": "dl1320/27.gif",
+  "mode": "white",
+  "ms": 70,
+  "anchor": [
+   0.5,
+   0.92
+  ],
+  "why": "영술사 9차 천신의심판: the 천신's crushing pillar (1320 #27; 2662 IMG71)"
+ },
+ "dk_simpanpull": {
+  "src": "dl1320/17.gif",
+  "mode": "white",
+  "ms": 60,
+  "why": "영술사 9차 천신의심판: the whirl of rocks drawing the foes in (1320 #17; 2662 IMG71 frames 12-16)"
+ },
+ "m_hwanyeong": {
+  "src": "gif2662/IMG29.gif",
+  "mode": "parts",
+  "key": "blue",
+  "bt": [
+   8,
+   45
+  ],
+  "cell": [
+   360,
+   310
+  ],
+  "origin": [
+   350,
+   155
+  ],
+  "soft": 12,
+  "cells": [
+   [
+    {
+     "f": 10,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 12,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 14,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 16,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 18,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 20,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 21,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 23,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 25,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ],
+   [
+    {
+     "f": 26,
+     "at": [
+      345,
+      275
+     ],
+     "clip": [
+      -345,
+      -150,
+      -30,
+      150
+     ]
+    }
+   ]
+  ],
+  "ms": 120,
+  "scale": 0.62,
+  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded)"
+ },
+ "p_banhyang": {
+  "src": "dl1320/22.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "도사 9차 치유의반향: the echo of healing light (1320 #22, by its look)"
+ },
+ "a_cheongung": {
+  "src": "dl1320/12.gif",
+  "mode": "white",
+  "ms": 60,
+  "why": "궁사 9차 천궁난사: its fire arrows (1320 #12; 2662 IMG42)"
+ },
+ "cl_gongmyeong": {
+  "src": "dl1320/23.gif",
+  "mode": "white",
+  "ms": 70,
+  "why": "천인 9차 천공의공명: the resonance striking down (1320 #23, by its look)"
+ },
+ "l_agong": {
+  "src": "dl1320/26.gif",
+  "mode": "white",
+  "ms": 60,
+  "why": "살수 9차 아공간전개 (→ 무사): the sub-space circle (1320 #26, by its look)"
+ },
+ "dk_jangseung": {
+  "src": "gif2662/IMG75.gif",
+  "mode": "diff",
+  "bg": 0,
+  "frames": [
+   12,
+   140,
+   6
+  ],
+  "box": [
+   100,
+   0,
+   506,
+   520
+  ],
+  "t0": 34,
+  "t1": 100,
+  "ms": 90,
+  "gold": [
+   205,
+   215
+  ],
+  "mask": [
+   {
+    "box": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "ellipse": [
+     263,
+     250,
+     52,
+     62,
+     0.4
+    ]
+   },
+   [
+    205,
+    222,
+    252,
+    246
+   ]
+  ],
+  "why": "영술사 9차 장승영역 (→ 도깨비): the zone's bright gold glyphs and 태극 (2662 IMG75, still camera; the pre-cast frame subtracted, the flat floor, the 장승 units and the dummies left out)"
+ },
+ "w_ult9": {
+  "src": "gif2662/IMG09.gif",
+  "mode": "cinema",
+  "frames": [
+   18,
+   42,
+   2
+  ],
+  "box": [
+   0,
+   0,
+   793,
+   653
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 215,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   396,
+   296,
+   34,
+   50
+  ],
+  "field": [
+   396,
+   306,
+   206,
+   235
+  ],
+  "vignette": [
+   0.97,
+   0.89,
+   0.22
+  ],
+  "bars": 1,
+  "mask": [
+   {
+    "box": [
+     683,
+     212,
+     793,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     246,
+     0,
+     546,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "만검귀종: the 원작 궁극's art (2662 IMG09 frames 18-40, every other: the slashes, the spiral of blades, the vortex of fire in its graveyard of swords, 2.6 s) — the frame kept whole, its black see-through, the damage numbers and the hero filled from the art round them, and the art faded out towards an ellipse's edge: it is drawn centred on the hero at about two thirds of the screen's height, not stretched over the screen (사용자 결정)"
+ },
+ "r_ult9": {
+  "src": "gif2662/IMG19.gif",
+  "mode": "cinema",
+  "frames": [
+   11,
+   44,
+   3
+  ],
+  "skip": [
+   32
+  ],
+  "box": [
+   0,
+   0,
+   796,
+   627
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 215,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   398,
+   284,
+   34,
+   50
+  ],
+  "field": [
+   398,
+   294,
+   206,
+   225
+  ],
+  "vignette": [
+   1.02,
+   0.96,
+   0.16
+  ],
+  "grow": 19,
+  "stars": 1,
+  "mask": [
+   {
+    "box": [
+     686,
+     212,
+     796,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     248,
+     0,
+     548,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "질풍난무: the 원작 궁극's art (2662 IMG19 frames 11-41, every third: the bamboo grove framing the screen, the great kunai at its foot, the green gale closing in round the hero) — its black see-through, the damage numbers and the hero filled from the art round them (no life-bar keying: the bamboo is that green), faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+ },
+ "m_ult9": {
+  "src": "gif2662/IMG27.gif",
+  "mode": "cinema",
+  "frames": [
+   14,
+   48,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   802,
+   637
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 215,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   401,
+   289,
+   34,
+   50
+  ],
+  "field": [
+   401,
+   299,
+   208,
+   229
+  ],
+  "vignette": [
+   0.97,
+   0.89,
+   0.22
+  ],
+  "mask": [
+   {
+    "box": [
+     692,
+     212,
+     802,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     251,
+     0,
+     551,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "겁화: the 원작 궁극's art (2662 IMG27 frames 14-47, every third: the cavern of lava and its fangs, the spiral of fire closing on the hero, the yellow blast, the red ring) — its black see-through, the damage numbers and the hero filled from the art round them, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+ },
+ "p_ult9": {
+  "src": "gif2662/IMG38.gif",
+  "mode": "cinema",
+  "frames": [
+   14,
+   38,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   806,
+   646
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   403,
+   293,
+   34,
+   50
+  ],
+  "field": [
+   403,
+   303,
+   209,
+   232
+  ],
+  "mask": [
+   {
+    "box": [
+     696,
+     212,
+     806,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     253,
+     0,
+     553,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "a_ult9": {
+  "src": "gif2662/IMG47.gif",
+  "mode": "cinema",
+  "frames": [
+   17,
+   43,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   796,
+   644
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   398,
+   292,
+   34,
+   50
+  ],
+  "field": [
+   398,
+   302,
+   206,
+   231
+  ],
+  "mask": [
+   {
+    "box": [
+     686,
+     212,
+     796,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     248,
+     0,
+     548,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "만시창공: the 원작 궁극's full-screen art (2662 IMG47 frames 16-45); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "cl_ult9": {
+  "src": "gif2662/IMG56.gif",
+  "mode": "cinema",
+  "frames": [
+   11,
+   37,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   812,
+   632
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   406,
+   287,
+   34,
+   50
+  ],
+  "field": [
+   406,
+   297,
+   211,
+   227
+  ],
+  "mask": [
+   {
+    "box": [
+     702,
+     212,
+     812,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     256,
+     0,
+     556,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "천변지이: the 원작 궁극's full-screen art (2662 IMG56 frames 10-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "md_ult9": {
+  "src": "gif2662/IMG64.gif",
+  "mode": "cinema",
+  "frames": [
+   17,
+   42,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   805,
+   640
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   402,
+   290,
+   34,
+   50
+  ],
+  "field": [
+   402,
+   300,
+   209,
+   230
+  ],
+  "mask": [
+   {
+    "box": [
+     695,
+     212,
+     805,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     252,
+     0,
+     552,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "비전방진: the 원작 궁극's full-screen art (2662 IMG64 frames 16-44); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "rp_ult9": {
+  "src": "gif2662/IMG84.gif",
+  "mode": "cinema",
+  "frames": [
+   19,
+   45,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   802,
+   650
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   401,
+   295,
+   34,
+   50
+  ],
+  "field": [
+   401,
+   305,
+   208,
+   234
+  ],
+  "mask": [
+   {
+    "box": [
+     692,
+     212,
+     802,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     251,
+     0,
+     551,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "명계의회랑: the 원작 궁극's full-screen art (2662 IMG84 frames 18-47); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "l_ult9": {
+  "src": "gif2662/IMG92.gif",
+  "mode": "cinema",
+  "frames": [
+   10,
+   37,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   799,
+   651
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   399,
+   295,
+   34,
+   50
+  ],
+  "field": [
+   399,
+   305,
+   207,
+   234
+  ],
+  "mask": [
+   {
+    "box": [
+     689,
+     212,
+     799,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     249,
+     0,
+     549,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "청룡의격노 (살수): the 원작 궁극's full-screen art (2662 IMG92 frames 9-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "mk_ult9": {
+  "src": "gif2662/IMG103.gif",
+  "mode": "cinema",
+  "frames": [
+   21,
+   40,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   803,
+   652
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   401,
+   296,
+   34,
+   50
+  ],
+  "field": [
+   401,
+   306,
+   208,
+   234
+  ],
+  "mask": [
+   {
+    "box": [
+     693,
+     212,
+     803,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     251,
+     0,
+     551,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "낙화유영 (흑화랑): the 원작 궁극's full-screen art (2662 IMG103 frames 20-42); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "dk_ult9": {
+  "src": "gif2662/IMG73.gif",
+  "mode": "cinema",
+  "frames": [
+   9,
+   37,
+   3
+  ],
+  "box": [
+   0,
+   0,
+   812,
+   646
+  ],
+  "t0": 45,
+  "t1": 110,
+  "ms": 140,
+  "k": 1,
+  "max": 420,
+  "cap": 420,
+  "hero": [
+   406,
+   293,
+   34,
+   50
+  ],
+  "field": [
+   406,
+   303,
+   211,
+   232
+  ],
+  "mask": [
+   {
+    "box": [
+     702,
+     212,
+     812,
+     266
+    ],
+    "from": [
+     0,
+     -60
+    ]
+   },
+   {
+    "box": [
+     256,
+     0,
+     556,
+     34
+    ],
+    "from": [
+     0,
+     36
+    ]
+   }
+  ],
+  "why": "악귀출몰 (영술사): the 원작 궁극's full-screen art (2662 IMG73 frames 8-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+ },
+ "w_hogisword": {
+  "src": "gif2662/IMG02.gif",
+  "mode": "parts",
+  "key": "cool",
+  "warm": [
+   15,
+   60
+  ],
+  "floor": [
+   186,
+   142,
+   92
+  ],
+  "gray": [
+   6,
+   175
+  ],
+  "cell": [
+   360,
+   430
+  ],
+  "origin": [
+   180,
+   330
+  ],
+  "soft": 10,
+  "cells": [
+   [
+    {
+     "f": 53,
+     "at": [
+      311,
+      488
+     ],
+     "clip": [
+      -180,
+      -330,
+      180,
+      36
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -33,
+         -89,
+         32,
+         -52
+        ],
+        "d": [
+         0,
+         37
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         -62,
+         -103,
+         -19,
+         -58
+        ],
+        "ax": 0
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -18,
+         1,
+         28,
+         16
+        ],
+        "d": [
+         0,
+         -17
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         42,
+         -330,
+         180,
+         -131
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 27,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      30,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 54,
+     "at": [
+      311,
+      473
+     ],
+     "clip": [
+      -180,
+      -330,
+      180,
+      50
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -33,
+         -89,
+         32,
+         -52
+        ],
+        "d": [
+         0,
+         37
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         -62,
+         -103,
+         -19,
+         -58
+        ],
+        "ax": 0
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -18,
+         1,
+         28,
+         16
+        ],
+        "d": [
+         0,
+         -17
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         30,
+         -330,
+         180,
+         -114
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 29,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      44,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 55,
+     "at": [
+      311,
+      461
+     ],
+     "clip": [
+      -180,
+      -330,
+      180,
+      62
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -33,
+         -89,
+         32,
+         -52
+        ],
+        "d": [
+         0,
+         37
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         -62,
+         -103,
+         -19,
+         -58
+        ],
+        "ax": 0
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -18,
+         1,
+         28,
+         16
+        ],
+        "d": [
+         0,
+         -17
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         30,
+         -330,
+         180,
+         -106
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 29,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      56,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 56,
+     "at": [
+      311,
+      461
+     ],
+     "clip": [
+      -180,
+      -330,
+      180,
+      62
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -33,
+         -89,
+         32,
+         -52
+        ],
+        "d": [
+         0,
+         37
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         -62,
+         -103,
+         -19,
+         -58
+        ],
+        "ax": 0
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -18,
+         1,
+         28,
+         16
+        ],
+        "d": [
+         0,
+         -17
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         30,
+         -330,
+         180,
+         -106
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 30,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      56,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 57,
+     "at": [
+      311,
+      440
+     ],
+     "clip": [
+      -180,
+      -330,
+      180,
+      84
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -33,
+         -89,
+         32,
+         -52
+        ],
+        "d": [
+         0,
+         37
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         -62,
+         -103,
+         -19,
+         -58
+        ],
+        "ax": 0
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -18,
+         1,
+         28,
+         16
+        ],
+        "d": [
+         0,
+         -17
+        ]
+       }
+      },
+      {
+       "mirror": {
+        "box": [
+         30,
+         -330,
+         180,
+         -84
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 31,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      78,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 65,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 65,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 58,
+     "at": [
+      311,
+      422
+     ],
+     "clip": [
+      -180,
+      -330,
+      -129,
+      100
+     ]
+    },
+    {
+     "f": 58,
+     "at": [
+      311,
+      422
+     ],
+     "clip": [
+      129,
+      -330,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "mirror": {
+        "box": [
+         0,
+         -330,
+         180,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 58,
+     "at": [
+      311,
+      422
+     ],
+     "clip": [
+      -180,
+      25,
+      180,
+      100
+     ]
+    }
+   ],
+   [
+    {
+     "f": 66,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 66,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    },
+    {
+     "f": 34,
+     "at": [
+      403,
+      122
+     ],
+     "clip": [
+      -180,
+      25,
+      180,
+      100
+     ],
+     "ops": [
+      {
+       "clear": [
+        -180,
+        -40,
+        -118,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 67,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 67,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -86,
+         23,
+         -54
+        ],
+        "d": [
+         0,
+         32
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 68,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 68,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 69,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 69,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 70,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 70,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 71,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      0,
+      -330,
+      129,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      }
+     ]
+    },
+    {
+     "f": 71,
+     "at": [
+      455,
+      503
+     ],
+     "clip": [
+      -129,
+      -330,
+      0,
+      25
+     ],
+     "ops": [
+      {
+       "shift": {
+        "box": [
+         -13,
+         -25,
+         12,
+         4
+        ],
+        "d": [
+         0,
+         -27
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -24,
+         -110,
+         23,
+         -70
+        ],
+        "d": [
+         0,
+         42
+        ]
+       }
+      },
+      {
+       "shift": {
+        "box": [
+         -13,
+         1,
+         12,
+         15
+        ],
+        "d": [
+         0,
+         -16
+        ]
+       }
+      },
+      {
+       "clear": [
+        -129,
+        -330,
+        129,
+        -256
+       ]
+      },
+      {
+       "mirror": {
+        "box": [
+         -180,
+         -330,
+         0,
+         100
+        ],
+        "ax": 0
+       }
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "max": 360,
+  "why": "호기어검: the great sword that falls on a foe (2662 IMG02) — the ring of light and the bolt from the sky, the ice, the sword standing, its white ghost. Each art frame from the showings where it is whole and clean: the top from the one at frames 53-57 (the hero beside it: that corner from the other side, mirrored), the bottom from the one at 27-34 (the capture's top edge cuts it), the standing sword and its ghost from the one at 65-71 (its right half, and that mirrored for the left: the hero stands on the left); the damage number and the dead one's skull filled from the blade's own stripes beside them"
+ },
+ "w_hogisign": {
+  "src": "gif2662/IMG02.gif",
+  "mode": "parts",
+  "key": "cool",
+  "warm": [
+   15,
+   60
+  ],
+  "floor": [
+   186,
+   142,
+   92
+  ],
+  "gray": [
+   10,
+   215
+  ],
+  "cell": [
+   100,
+   180
+  ],
+  "origin": [
+   90,
+   170
+  ],
+  "cells": [
+   [
+    {
+     "f": 37,
+     "at": [
+      285,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ],
+   [
+    {
+     "f": 38,
+     "at": [
+      285,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ],
+   [
+    {
+     "f": 39,
+     "at": [
+      285,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ],
+   [
+    {
+     "f": 40,
+     "at": [
+      325,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ],
+   [
+    {
+     "f": 41,
+     "at": [
+      325,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ],
+   [
+    {
+     "f": 42,
+     "at": [
+      325,
+      212
+     ],
+     "clip": [
+      -80,
+      -158,
+      -44,
+      -12
+     ]
+    }
+   ]
+  ],
+  "ms": 90,
+  "scale": 0.62,
+  "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand"
+ },
+ "r_swaestar": {
+  "src": "gif2662/IMG13.gif",
+  "mode": "parts",
+  "key": "diff",
+  "bg": 87,
+  "t0": 24,
+  "t1": 70,
+  "cell": [
+   130,
+   80
+  ],
+  "origin": [
+   65,
+   40
+  ],
+  "cells": [
+   [
+    {
+     "f": 60,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ],
+   [
+    {
+     "f": 62,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ],
+   [
+    {
+     "f": 64,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ],
+   [
+    {
+     "f": 66,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ],
+   [
+    {
+     "f": 68,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ],
+   [
+    {
+     "f": 70,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -62,
+      -36,
+      62,
+      36
+     ]
+    }
+   ]
+  ],
+  "ms": 90,
+  "scale": 0.62,
+  "why": "묵마수리검'쇄: the blue shuriken (a kunai in blue fire) standing at the end of its throw (2662 IMG13, the one at the hero's right, frames 60-70: the camera still, nothing near it) — what moved from the clean field of frame 87. It points at the hero: drawn turned for each of the eight ways"
+ },
+ "r_swaeend": {
+  "src": "gif2662/IMG13.gif",
+  "mode": "parts",
+  "key": "diff",
+  "bg": 87,
+  "t0": 24,
+  "t1": 70,
+  "cell": [
+   200,
+   170
+  ],
+  "origin": [
+   100,
+   85
+  ],
+  "cells": [
+   [
+    {
+     "f": 79,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ],
+   [
+    {
+     "f": 80,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ],
+   [
+    {
+     "f": 81,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ],
+   [
+    {
+     "f": 82,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ],
+   [
+    {
+     "f": 83,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ],
+   [
+    {
+     "f": 84,
+     "at": [
+      545,
+      328
+     ],
+     "clip": [
+      -98,
+      -83,
+      98,
+      83
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "묵마수리검'쇄: its end — the white glint and the burst of blue fire as each shuriken goes (2662 IMG13 frames 79-84, the same one)"
+ },
+ "r_zan": {
+  "src": "gif2662/IMG11.gif",
+  "mode": "parts",
+  "key": "diff",
+  "bg": 25,
+  "t0": 34,
+  "t1": 80,
+  "cell": [
+   190,
+   190
+  ],
+  "origin": [
+   95,
+   95
+  ],
+  "soft": 6,
+  "cells": [
+   [
+    {
+     "f": 1,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ],
+     "t0": 60,
+     "t1": 110
+    }
+   ],
+   [
+    {
+     "f": 4,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 6,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 7,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 8,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 9,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 10,
+     "at": [
+      514,
+      502
+     ],
+     "clip": [
+      -95,
+      -95,
+      95,
+      95
+     ],
+     "ops": [
+      {
+       "clear": [
+        -95,
+        -95,
+        -70,
+        -38
+       ]
+      },
+      {
+       "clear": [
+        -95,
+        -95,
+        -40,
+        -64
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "묵혈파광참: the shadow's red slashes and the great seal 斬 it leaves — red, then pale with its ring, then gone (2662 IMG11 frames 1-10, the lowest of the three: no one stands under it; frames 2-3, where the client darkens the screen, left out) — what moved from the clean floor of frame 25; the dummy at its top-left corner cleared, frame 1 (the screen starting to darken) keyed harder"
+ },
+ "r_swaefly": {
+  "src": "gif2662/IMG13.gif",
+  "mode": "parts",
+  "key": "diff",
+  "bg": 87,
+  "t0": 24,
+  "t1": 70,
+  "cell": [
+   260,
+   44
+  ],
+  "origin": [
+   10,
+   22
+  ],
+  "soft": 4,
+  "cells": [
+   [
+    {
+     "f": 4,
+     "at": [
+      285,
+      327
+     ],
+     "clip": [
+      80,
+      -12,
+      250,
+      13
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      285,
+      327
+     ],
+     "clip": [
+      80,
+      -12,
+      250,
+      13
+     ]
+    }
+   ],
+   [
+    {
+     "f": 6,
+     "at": [
+      285,
+      327
+     ],
+     "clip": [
+      80,
+      -12,
+      250,
+      13
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "묵마수리검'쇄: the shuriken's flight out — the long white-blue streak it draws (2662 IMG13 frames 4-6, the one going right: its outer part, clear of the damage numbers round the hero)"
+ },
+ "r_mukdokcast": {
+  "src": "gif2662/IMG17.gif",
+  "mode": "parts",
+  "key": "blue",
+  "bt": [
+   20,
+   55
+  ],
+  "cell": [
+   160,
+   175
+  ],
+  "origin": [
+   80,
+   160
+  ],
+  "soft": 4,
+  "cells": [
+   [
+    {
+     "f": 2,
+     "at": [
+      315,
+      335
+     ],
+     "clip": [
+      -75,
+      -150,
+      75,
+      15
+     ]
+    }
+   ],
+   [
+    {
+     "f": 3,
+     "at": [
+      315,
+      335
+     ],
+     "clip": [
+      -75,
+      -150,
+      75,
+      15
+     ]
+    }
+   ],
+   [
+    {
+     "f": 4,
+     "at": [
+      315,
+      335
+     ],
+     "clip": [
+      -75,
+      -150,
+      75,
+      15
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      315,
+      335
+     ],
+     "clip": [
+      -75,
+      -150,
+      75,
+      15
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "묵혈독바르기: the cast — the dark violet poison welling up round the hero and its blades (2662 IMG17 frames 2-6), its violet keyed off the ground and the hero's own red"
+ },
+ "m_hoeseonwind": {
+  "src": "gif2662/IMG21.gif",
+  "mode": "parts",
+  "key": "teal",
+  "gt": [
+   25,
+   85
+  ],
+  "white": 200,
+  "cell": [
+   220,
+   175
+  ],
+  "origin": [
+   110,
+   90
+  ],
+  "soft": 6,
+  "cells": [
+   [
+    {
+     "f": 26,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 27,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 28,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 29,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 30,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 31,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 32,
+     "at": [
+      460,
+      390
+     ],
+     "clip": [
+      -110,
+      -90,
+      110,
+      85
+     ],
+     "unnum": [
+      [
+       -105,
+       -100,
+       45,
+       -45
+      ]
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "회선격풍: the gathered wind left on each one struck — a small teal swirl, then a green burst with a white heart (2662 IMG21 frames 26-32, the lower dummy), the damage number over it painted over"
+ },
+ "m_seorishot": {
+  "src": "gif2662/IMG23.gif",
+  "mode": "parts",
+  "key": "bluediff",
+  "bg": 0,
+  "t0": 20,
+  "t1": 60,
+  "bt": [
+   5,
+   35
+  ],
+  "cell": [
+   150,
+   145
+  ],
+  "origin": [
+   75,
+   75
+  ],
+  "soft": 6,
+  "cells": [
+   [
+    {
+     "f": 6,
+     "at": [
+      366,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 7,
+     "at": [
+      381,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 8,
+     "at": [
+      396,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 9,
+     "at": [
+      412,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 10,
+     "at": [
+      428,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 11,
+     "at": [
+      443,
+      278
+     ],
+     "clip": [
+      -64,
+      -46,
+      64,
+      62
+     ],
+     "ops": [
+      {
+       "clear": [
+        -20,
+        38,
+        64,
+        52
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "서리파편: the orb of frost shards flying ahead (2662 IMG23 frames 6-11, followed as it goes), the damage number over it painted over"
+ },
+ "m_jeondo": {
+  "src": "gif2662/IMG25.gif",
+  "mode": "parts",
+  "key": "cool",
+  "warm": [
+   2,
+   20
+  ],
+  "gray": [
+   45,
+   185
+  ],
+  "cell": [
+   400,
+   200
+  ],
+  "origin": [
+   40,
+   90
+  ],
+  "soft": 6,
+  "cells": [
+   [
+    {
+     "f": 100,
+     "at": [
+      250,
+      310
+     ],
+     "clip": [
+      35,
+      -60,
+      360,
+      14
+     ],
+     "ops": [
+      {
+       "clear": [
+        150,
+        2,
+        232,
+        14
+       ]
+      },
+      {
+       "clear": [
+        300,
+        2,
+        360,
+        14
+       ]
+      }
+     ]
+    },
+    {
+     "f": 101,
+     "at": [
+      250,
+      234
+     ],
+     "clip": [
+      35,
+      16,
+      360,
+      90
+     ],
+     "ops": [
+      {
+       "clear": [
+        140,
+        66,
+        360,
+        90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 101,
+     "at": [
+      250,
+      310
+     ],
+     "clip": [
+      35,
+      -60,
+      360,
+      14
+     ],
+     "ops": [
+      {
+       "clear": [
+        150,
+        2,
+        232,
+        14
+       ]
+      },
+      {
+       "clear": [
+        300,
+        2,
+        360,
+        14
+       ]
+      }
+     ]
+    },
+    {
+     "f": 102,
+     "at": [
+      250,
+      234
+     ],
+     "clip": [
+      35,
+      16,
+      360,
+      90
+     ],
+     "ops": [
+      {
+       "clear": [
+        140,
+        66,
+        360,
+        90
+       ]
+      }
+     ]
+    }
+   ],
+   [
+    {
+     "f": 102,
+     "at": [
+      250,
+      310
+     ],
+     "clip": [
+      35,
+      -60,
+      360,
+      14
+     ],
+     "ops": [
+      {
+       "clear": [
+        150,
+        2,
+        232,
+        14
+       ]
+      },
+      {
+       "clear": [
+        300,
+        2,
+        360,
+        14
+       ]
+      }
+     ]
+    },
+    {
+     "f": 100,
+     "at": [
+      250,
+      234
+     ],
+     "clip": [
+      35,
+      16,
+      360,
+      90
+     ],
+     "ops": [
+      {
+       "clear": [
+        140,
+        66,
+        360,
+        90
+       ]
+      }
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "전도체: the current of 과전류 running from the hero to the frost-struck — two forked blue-white bolts going out (2662 IMG25 frames 100-102), keyed off the brown ground (blue over red); the lower bolt (under the damage numbers) is the next frame's upper one set 75 px under. Drawn from the hero, turned to the one it strikes"
+ },
+ "_icons": {
+  "w_swords": "tips/IMG01.png",
+  "w_advance": "tips/IMG06.png",
+  "w_hogi": "tips/IMG04.png",
+  "r_bloodslash": "tips/IMG10.png",
+  "r_chainstar": "tips/IMG12.png",
+  "r_mukdok": "tips/IMG16.png",
+  "m_gale": "tips/IMG20.png",
+  "m_shards": "tips/IMG22.png",
+  "m_jeondo": "tips/IMG24.png",
+  "p_thunderbomb": "tips/IMG30.png",
+  "p_skyspirit": "tips/IMG32.png",
+  "a_eungchuk": "tips/IMG43.png",
+  "a_hwasalbi": "tips/IMG45.png",
+  "a_air": "tips/IMG39.png",
+  "cl_sunbo": "tips/IMG48.png",
+  "cl_haeil": "tips/IMG50.png",
+  "cl_cheonsin": "tips/IMG53.png",
+  "md_crossq": "tips/IMG57.png",
+  "md_frenzyshot": "tips/IMG61.png",
+  "rp_bisa": "tips/IMG78.png",
+  "rp_hwangcheon": "tips/IMG80.png",
+  "l_cheongryong": "tips/IMG85.png",
+  "l_erosion": "tips/IMG87.png",
+  "l_dimension": "tips/IMG89.png",
+  "mk_tugwi": "tips/IMG95.png",
+  "mk_yeonok": "tips/IMG97.png",
+  "mk_magung": "tips/IMG99.png",
+  "dk_hwahon": "tips/IMG67.png",
+  "dk_honbul": "tips/IMG69.png",
+  "dk_simpan": "tips/IMG70.png",
+  "w_mcheon": "tips/IMG03.png",
+  "r_jugeum": "tips/IMG14.png",
+  "m_hwanyeong": "tips/IMG28.png",
+  "p_banhyang": "tips/IMG36.png",
+  "a_cheongung": "tips/IMG41.png",
+  "cl_gongmyeong": "tips/IMG52.png",
+  "md_mstorm": "tips/IMG59.png",
+  "rp_galmuri": "tips/IMG82.png",
+  "rp_cut": "tips/IMG76.png",
+  "l_agong": "tips/IMG93.png",
+  "mk_bujori": "tips/IMG101.png",
+  "dk_jangseung": "tips/IMG74.png",
+  "w_myriad": "tips/IMG08.png",
+  "r_gale": "tips/IMG18.png",
+  "m_kalpa": "tips/IMG26.png",
+  "p_taiji": "tips/IMG37.png",
+  "a_mansi": "tips/IMG46.png",
+  "cl_cheonbyeon": "tips/IMG55.png",
+  "md_bijeon": "tips/IMG63.png",
+  "rp_myeonggye": "tips/IMG83.png",
+  "l_rage9": "tips/IMG91.png",
+  "mk_nakhwa": "tips/IMG102.png",
+  "dk_akgwi": "tips/IMG72.png"
+ },
+ "p_cheonseon9": {
+  "src": "gif2662/IMG35.gif",
+  "mode": "parts",
+  "key": "sub",
+  "gb": [
+   30,
+   90
+  ],
+  "white": 205,
+  "cell": [
+   360,
+   420
+  ],
+  "origin": [
+   180,
+   205
+  ],
+  "cells": [
+   [
+    {
+     "f": 10,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 11,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 12,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 13,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 14,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 15,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 16,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 17,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 18,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ],
+   [
+    {
+     "f": 19,
+     "at": [
+      261,
+      221
+     ],
+     "clip": [
+      -170,
+      -200,
+      170,
+      205
+     ]
+    }
+   ]
+  ],
+  "ms": 90,
+  "scale": 0.62,
+  "why": "천선의영역: the golden seal of the zone round the hero (2662 IMG35 frames 10-26, the camera still), its gold keyed off the grey ground (gold)",
+  "bg": 0,
+  "gmin": 100,
+  "add": true,
+  "fillzone": [
+   261,
+   248,
+   148,
+   150
+  ],
+  "nobars": true,
+  "fill": [
+   [
+    258,
+    232,
+    30,
+    58
+   ],
+   [
+    300,
+    230,
+    30,
+    58
+   ]
+  ],
+  "fzlo": 55
+ },
+ "p_cheonsin9": {
+  "src": "gif2662/IMG33.gif",
+  "mode": "parts",
+  "key": "sub",
+  "gb": [
+   30,
+   90
+  ],
+  "white": 215,
+  "cell": [
+   440,
+   400
+  ],
+  "origin": [
+   220,
+   200
+  ],
+  "cells": [
+   [
+    {
+     "f": 18,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 19,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 20,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 21,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 22,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 23,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 24,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 25,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ],
+   [
+    {
+     "f": 26,
+     "at": [
+      225,
+      236
+     ],
+     "clip": [
+      -220,
+      -200,
+      220,
+      200
+     ]
+    }
+   ]
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "why": "천신의기운: each second's burst of golden spikes and the gold ring spreading from it round the hero (2662 IMG33 frames 16-28), gold keyed off the grey ground",
+  "bg": 0,
+  "gmin": 110,
+  "noorange": true,
+  "add": true,
+  "noblue": true,
+  "nobars": true,
+  "sector": [
+   225,
+   236,
+   1.28,
+   62,
+   104,
+   50
+  ]
+ },
+ "p_cheonroe9": {
+  "src": "gif2662/IMG31.gif",
+  "mode": "parts",
+  "key": "orb",
+  "bg": 0,
+  "t0": 25,
+  "t1": 70,
+  "bt": [
+   0,
+   40
+  ],
+  "cell": [
+   170,
+   170
+  ],
+  "origin": [
+   85,
+   85
+  ],
+  "cells": [
+   [
+    {
+     "f": 2,
+     "at": [
+      243,
+      276
+     ],
+     "clip": [
+      -84,
+      -84,
+      84,
+      84
+     ],
+     "orb": [
+      243,
+      276,
+      52
+     ],
+     "boxes": [
+      [
+       245,
+       206,
+       310,
+       240
+      ],
+      [
+       198,
+       304,
+       258,
+       334
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 3,
+     "at": [
+      275,
+      275
+     ],
+     "clip": [
+      -84,
+      -84,
+      84,
+      84
+     ],
+     "orb": [
+      275,
+      275,
+      58
+     ],
+     "boxes": [
+      [
+       245,
+       206,
+       310,
+       240
+      ],
+      [
+       198,
+       304,
+       258,
+       334
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 4,
+     "at": [
+      275,
+      275
+     ],
+     "clip": [
+      -84,
+      -84,
+      84,
+      84
+     ],
+     "orb": [
+      275,
+      275,
+      58
+     ],
+     "boxes": [
+      [
+       245,
+       206,
+       310,
+       240
+      ],
+      [
+       198,
+       304,
+       258,
+       334
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      284,
+      275
+     ],
+     "clip": [
+      -84,
+      -84,
+      84,
+      84
+     ],
+     "orb": [
+      284,
+      275,
+      65
+     ],
+     "boxes": [
+      [
+       245,
+       206,
+       310,
+       240
+      ],
+      [
+       198,
+       304,
+       258,
+       334
+      ]
+     ]
+    }
+   ]
+  ],
+  "ms": 90,
+  "scale": 0.62,
+  "why": "폭렬천뢰탄: 2662 IMG31 frames 2-5 (growing sphere, full, burst). Inside the circle the frame's own pixels with the hero, the number and the bar filled from the sphere itself turned; outside it the blue lightning",
+  "white": 190,
+  "add": false
+ }
 }

@@ -4351,6 +4351,9 @@ function might() {
   if (G.buffs.power > G.t) k *= 1 + (G.buffs.powerK || 0.5);
   // 암습의 여세: for a moment after the 암습 every blow lands as from behind (연's 배후 공격 +50%).
   if (G.buffs.ambushF > G.t) k *= AMBUSH.followK;
+  // 치유의반향 (도사 9차 패시브, data.js p_banhyang.full9): at full health the blows are stronger.
+  const f9 = G.cls.id === 'poet' && SKILLS.p_banhyang && SKILLS.p_banhyang.full9;
+  if (f9 && G.player.hp >= G.player.maxHp * f9.at && promoOf('poet') >= 9) k *= 1 + f9.k;
   return k;
 }
 
@@ -8724,6 +8727,25 @@ const TIER_KINDS = {
   // 흑룡검풍, 천신의기운, 천신의권역, 비사검, 반탄강기, 불사귀인: held round the hero for `duration`: every
   // `tick` the foes within `radius` are struck (and shoved, slowed, burnt as the spell says); meanwhile
   // the hero takes less (ward), sends blows back (reflect), heals (hot, with the party) or drinks (drain).
+  // 천선의영역 (원작 2662 IMG35): the golden seal laid where the hero stands for `duration` seconds (o_p_cheonseon9 at the
+  // original's own size); while the hero is within `radius` tiles of it, what it takes is cut by `ward`; leaving it
+  // ends the seal at once. It strikes nothing (the original's is a guard alone).
+  zone9({ skill, def, fxid }) {
+    const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
+    if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
+    const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 0.85, must: true };
+    G.fxs.push(fx);
+    const end = G.t + life;
+    const tick = () => {
+      if (G !== run || G.dead || G.t >= end) return;
+      if (Math.hypot(p.x - cx, p.y - 14 - cy) > R) { fx.life = Math.min(fx.life, fx.t + 0.15); G.buffs.ward9 = 0; return; }
+      G.buffs.ward9 = G.t + 0.3;
+      G.buffs.ward9K = def.ward || 0.5;
+      later(0.2, tick);
+    };
+    tick();
+    note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
+  },
   aura9({ skill, st, def, fxid }) {
     // (it grows by one tile at most: held round the hero, a wider one hid the field)
     const p = G.player, r = Math.min(st.radius || 1, (def.radius || 1) + 1);

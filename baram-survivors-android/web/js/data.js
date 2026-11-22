@@ -1459,10 +1459,16 @@ const S9 = {
     ck: 'line', pre: 'm_cross', branch: 1,
     desc: '서리 파편을 앞으로 쏘아 여섯 칸까지 날려 보낸다. 몬스터에 닿거나 끝에 이르면 터져 3.5초 동안 그 자리에 얼음 결정이 거듭 솟아 든 몬스터를 치고 느리게 한다' },
   // 도사: 천신의기운 (아우라·회복), 선기전도 (광역, 그대로), 폭렬천뢰탄 (강한 일격)
-  p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'aura9', fx: 'o_p_cheonsin', fxCast: 'k_u_p_pillar_o', fxHit: 'k_u_p_sparkle', hit: 9, cd: 14, duration: 6, radius: 3,
-    tick: 0.5, hot: 1.2, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0,
-    desc: '6초 동안 천신의 기운이 자신과 동료에게 깃들어 0.5초마다 체력을 채우고, 둘레 세 칸의 몬스터를 거듭 친다' },
-  p_thunderbomb: { kind: 'smite', fx: 'o_p_cheonroe', fx2: 'k_p_noejeon', fxHit: 'h_hit_light', dmg: 110, cd: 4, range: 7, radius: 0, chain: 3, chainK: 0.5, shot: true,
+  // 도사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/poet.md). 시전 3 + 패시브 1 + 필살기:
+  //   폭렬천뢰탄 (IMG31: 전방으로 벼락 구체, 부딪힌 적 + 방전으로 둘레 둘), 천신의기운 (IMG33: 6초 매초 금빛 가시와 퍼지는 고리,
+  //   자신·동료 회복 + 7×7 피해), 천선의영역 (IMG35: 시전 자리에 금빛 영역 10초, 안에 있는 동안 받는 피해 감소, 나가면 해제),
+  //   치유의반향 = 패시브 (설명창 [지속효과 마법]: 체력이 가득하면 피해 30% 증가; 그림 없음).
+  p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'aura9', fx: 'o_p_cheonsin9', fxCast: undefined, fxHit: undefined, hit: 9, cd: 12, duration: 6, radius: 3,
+    tick: 1, hot: 5, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0, auraAlpha: 0.9,
+    desc: '6초 동안 천신의 기운이 자신과 동료에게 깃들어 매초 최대 체력의 5%를 채우고, 둘레 7×7의 몬스터를 거듭 친다' },
+  p_zone9: { promo: 9, cls: 'poet', req: 33, name: '천선의영역', kind: 'zone9', fx: 'o_p_cheonseon9', cd: 20, duration: 10, radius: 3, ward: 0.5, ck: 'buff', buff: 'shield', pre: 'p_cheonseon', branch: 2,
+    desc: '시전한 자리에 천선의 영역을 10초 동안 펼친다. 영역 안에 있는 동안 받는 피해가 절반이 되고, 영역 밖으로 나가면 곧바로 사라진다' },
+  p_thunderbomb: { kind: 'smite', fx: 'o_p_cheonroe9', fxShot: 'o_p_cheonroe9', fx2: undefined, fxHit: 'o_p_cheonroe', dmg: 110, cd: 4, range: 7, radius: 0, chain: 2, chainK: 0.5, shot: true,
     fxAfter: null, fxs: null, tint: null, modern: null, ck: 'spell',
     desc: '벼락의 힘을 담은 구체를 가장 강한 몬스터에게 쏘아 크게 치고, 방전하여 곁의 몬스터 둘에게 번개가 옮겨 붙는다' },
   // 궁사: 화살비폭격 (보조 공격), 이기뇌멸시 (광역; 허공람시가 이 이름으로), 응축뇌전시 (강한 일격)
@@ -1535,9 +1541,6 @@ const S9 = {
   m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,
     slow: 2, curse: 2, ck: 'strike', pre: 'm_seonsim', branch: 2,
     desc: '앞에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입는다' },
-  p_banhyang: { promo: 9, cls: 'poet', req: 33, name: '치유의반향', kind: 'echo', echo: 'mend', fx: 'o_p_banhyang', fxCast: 'k_u_p_pillar_b', fxLoop: 'o_p_banhyang', loopSize: 90, fxHit: 'k_u_p_sparkle',
-    hit: 40, cd: 18, duration: 10, every: 0.6, shots: 2, range: 6, heal: 0.6, power: 0.3, buff: 'power', ck: 'buff', pre: 'p_saint', branch: 0,
-    desc: '10초 동안 치유의 기운이 메아리쳐 피해가 30% 늘고, 가까운 몬스터 둘을 빛이 거듭 치며 칠 때마다 체력을 조금 되찾는다' },
   a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'aura9', fx: 'o_a_cheongung', auraSize: 0.6, fxCast: 'k_u_a_wind', fxHit: 'o_a_cheongung', hit: 9, cd: 9, duration: 2.5,
     radius: 1, tick: 0.12, dot: 'burn', ck: 'nova', pre: 'a_firewall', branch: 1,
     desc: '2.5초 동안 몸 둘레의 몬스터에게 천궁의 불화살을 쉴 새 없이 난사한다(화상)' },
@@ -1606,7 +1609,13 @@ SKILLS.m_jeondo = { name: '전도체', kind: 'passive', retired: true, was: 'mag
 SKILL_ALIAS.m_jeondo = 'm_shards';
 SKILLS.m_shards.desc += '. 9차 패시브 전도체: 천뢰마옥쌍구·뇌격구를 쓰면 50% 확률로 10초 과전류 — 서리파편에 맞은 몬스터에게 번개가 흐른다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
-for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
+// 치유의반향: a passive in the original ([지속효과 마법]: at full health (healed past it) the damage is 30% more) — no picture.
+// A saved slot of it is 천신의기운.
+SKILLS.p_banhyang = { name: '치유의반향', kind: 'passive', retired: true, was: 'poet', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 체력이 가득 차 있으면 주는 피해가 30% 늘어난다', full9: { at: 0.98, k: 0.3 } };
+SKILL_ALIAS.p_banhyang = 'p_skyspirit';
+SKILLS.p_skyspirit.desc += '. 9차 패시브 치유의반향: 체력이 가득하면 주는 피해가 30% 는다';
+for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect', 'p_seongi']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
 
 // The lines (계열) without the merged ones; a spell after a merged one comes after the one it became.
@@ -1692,7 +1701,7 @@ export const ULT_TIERS = {
     ult('poet', 'p_ult', '태양의희원', { iconFx: '124', mech: 'sanctuary', cast: 'k_p_ult', main: 'k_u_p_pillar_o', hit: 'h_hit_light', guard: 3, boss: 'p_jiroe', k: 1 }),
     ult('poet', 'p_break', '귀염추혼소', { iconFx: '120', mech: 'mark', cast: 'new_p_break', frac: 0.8, main: '120', markScale: 1.3, hit: 'k_u_p_sparkle', delay: 1.0, heal: 0.3, boss: 'p_noejeon', k: 1.15 }),
     ult('poet', 'p_daejijin', '대지진', { mech: 'rings', main: 'k_p_daejijin', mainSize: 300, hit: 'k_p_quake', heal: 0.3, boss: 'p_geomok', k: 1.3 }),
-    ult('poet', 'p_taiji', '태극팔괘진', { cutin: 'o_p_ult9', echoN: 28, echoCap: 2.5, openW: 0.5, echoW: 200, aura: 'k_u_p_sparkle', mech: 'totem', main: 'k_p_taiji', mainScale: 1.2, drop: 'k_u_p_pillar_b', dropSize: 160, hit: 'h_hit_light', n: 4, life: 2.4, heal: 0.4, guard: 2, boss: 'p_bonghwang', k: 1.5 }),
+    ult('poet', 'p_taiji', '태극팔괘진', { cine9: 0.75, cutin: 'o_p_ult9', echoN: 28, echoCap: 2.5, openW: 0.5, echoW: 200, aura: 'k_u_p_sparkle', mech: 'totem', main: 'k_p_taiji', mainScale: 1.2, drop: 'k_u_p_pillar_b', dropSize: 160, hit: 'h_hit_light', n: 4, life: 2.4, heal: 0.4, guard: 2, boss: 'p_bonghwang', k: 1.5 }),
   ],
   archer: [
     ult('archer', 'a_ult', '일환탄시', { mech: 'barrage', cast: 'k_a_ult', castSize: 200, shot: 'k_u_a_whip', shotScale: 2.4, hit: 'k_a_shot', n: 3, boss: 'a_aim', k: 1 }),
