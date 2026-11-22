@@ -6546,6 +6546,15 @@ function dashFrom(x0, y0) {
   p.slide = { dx, dy, t: G.t };
 }
 
+/** Where the hero is drawn while a dash is seen travelling its path (p.glide: from x0, y0 by dx, dy over d s — 화혼돌파):
+ *  the hero itself already stands at the end. */
+function glideAt(p) {
+  const g = p.glide;
+  if (!g || G.t - g.t >= g.d) return { x: p.x, y: p.y };
+  const k = Math.max(0, (G.t - g.t) / g.d);
+  return { x: g.x0 + g.dx * k, y: g.y0 + g.dy * k };
+}
+
 /** A blow's slash arc over a struck tile (dx, dy: the way the blow goes; h: which of a flurry). */
 function meleeSlash(tx, ty, dx, dy, h = 0) {
   const look = MELEE_LOOK[G.cls.id];
@@ -9809,21 +9818,32 @@ const TIER_KINDS = {
     for (let k = 1; k <= deep + ahead && !any; k++) any = onTiles(row(k)).length > 0;
     if (!any) return 0.3;
     let went = 0;
+    const x0 = p.x, y0 = p.y;
     if (!steering()) {
       let reach = 0;
       for (let k = 1; k <= deep; k++) { if (G.arena && !Hunt.open(sx + fx * k, sy + fy * k)) break; reach = k; }
       for (let k = reach; k >= 1 && !went; k--) {
         const tx = sx + fx * k, ty = sy + fy * k;
         for (const e of onTiles([[tx, ty]])) tkShove(e, tx + fy, ty + fx) || tkShove(e, tx - fy, ty - fx);
-        if (tkMoveHero(tx, ty)) { p.inv = Math.max(p.inv || 0, 0.4); went = k; }
+        if (tkMoveHero(tx, ty)) { went = k; }
       }
     }
-    const f = { id: def.fx, x: p.x, y: p.y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
+    // (the dash is seen along the way, not a jump: the hero is drawn travelling the path over `dashT` s a tile — 6 tiles
+    // ≈ 0.36 s — the swoosh and its trails carried with it, each row struck as the hero passes it; p.glide, drawHero)
+    const per = def.dashT || 0.06, travel = went * per, t0 = G.t;
+    if (went) {
+      G.ghosts = [];
+      p.slide = null;
+      p.glide = { x0, y0, dx: p.x - x0, dy: p.y - y0, t: t0, d: travel };
+      p.inv = Math.max(p.inv || 0, travel + 0.3);
+    }
+    const at = { get x() { return glideAt(p).x; }, get y() { return glideAt(p).y; } };
+    const f = { id: def.fx, x: 0, y: 0, on: at, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
     if (fx > 0) f.flip = true;
     if (fy) f.rot = fy < 0 ? Math.PI / 2 : -Math.PI / 2;
     G.fxs.push(f);
     const rows = went + ahead, seen = new Set();
-    for (let k = 1; k <= rows; k++) later(0.04 + (k - 1) * (0.3 / rows), () => {
+    for (let k = 1; k <= rows; k++) later(0.04 + (k <= went ? (k - 1) * per : travel + (k - went - 1) * 0.06), () => {
       if (G !== run) return;
       G.quietHit = true;
       for (const o of onTiles(row(k))) {
@@ -9853,7 +9873,7 @@ const TIER_KINDS = {
     if (src) {
       const rise = fxLife(def.fx + '#rise');
       G.fxs.push({ id: def.fx + '#rise', x, y, t: 0, life: rise, scale: 1, rot: 0, anchor: 'bottom', alpha: calm, must: true });
-      G.fxs.push({ id: def.fx + '#held', x, y, t: -rise, life: life, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
+      G.fxs.push({ id: def.fx + '#held', x, y, t: -rise, life: life - rise, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
     }
     if (M.fx[def.fxPole]) G.fxs.push({ id: def.fxPole, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
     const inside = e => tkFoe(e) && Math.abs(e.tx - tx0) <= R && Math.abs(e.ty - ty0) <= R;
@@ -10078,10 +10098,11 @@ function honbul(hb, skill, st) {
     e.honbul9 = 0;
     later(0.15 + i * 0.05, () => {
       if (G !== run || e.hp <= 0) return;
-      if (M.fx[hb.fx]) fxOn(hb.fx, e, { scale: 0.8 });
-      G.procHitting = true;
+      if (M.fx[hb.fx]) fxOn(hb.fx, e, { scale: SPARK_SCALE[hb.fx] || 0.5 });
+      // (one small fire on the one it clung to, no other marks: G.quietHit keeps the else-branch's claw marks off the struck)
+      G.procHitting = true; G.quietHit = true;
       for (const o of around(e.tx, e.ty, 1)) hurtEnemy(o, o === e ? blow : blow * 0.5);
-      G.procHitting = false;
+      G.procHitting = false; G.quietHit = false;
     });
   });
   tkNear(p.tx, p.ty, hb.cling).filter(e => !(e.honbul9 > G.t) && !lit.includes(e)).slice(0, hb.n).forEach(e => { e.honbul9 = G.t + hb.life; });
@@ -16472,6 +16493,12 @@ function camFollow(now, lead) {
   const p = G.player, C = G.camAt || (G.camAt = { x: p.x, y: p.y, at: now });
   const dt = Math.min(0.1, Math.max(0, now - C.at));
   C.at = now;
+  // (a dash seen travelling its path — p.glide: the camera goes along with the hero as drawn)
+  if (p.glide && G.t - p.glide.t < p.glide.d) {
+    const g = glideAt(p);
+    C.x = g.x; C.y = g.y; C.easing = false;
+    return [Math.round(C.x + lead.x - VW / 2), Math.round(C.y + lead.y - 30 - VH / 2)];
+  }
   const far = Math.hypot(p.x - C.x, p.y - C.y);
   if (far > TILE * 1.5 && far < TILE * 30 && !C.easing) C.easing = true;
   if (C.easing) {
@@ -17016,7 +17043,7 @@ function drawHero(now, hidden) {
     return;
   }
   // 연's ring at the player's own feet (FXs player_foot), turning under the hero all the while.
-  if (M.fx.k_x_hero_foot && !hidden) drawFx('k_x_hero_foot', p.x, p.y + 2, now, 1.3, 0, 'bottom', true);
+  if (M.fx.k_x_hero_foot && !hidden) { const g = glideAt(p); drawFx('k_x_hero_foot', g.x, g.y + 2, now, 1.3, 0, 'bottom', true); }
   // 연's own figure for the class, in the outfit of the armour worn.
   const yPose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
   // After a dash: fading copies along the way, and the last of the way slid, not popped.
@@ -17029,7 +17056,8 @@ function drawHero(now, hidden) {
       if (a > 0.02) drawYhero2(G.cls, p.gear, p, g.x, g.y, 'attack', a) || drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, g.x, g.y, 'attack', a);
     }
   }
-  if (p.slide && G.t - p.slide.t < 0.09) {
+  if (p.glide && G.t - p.glide.t < p.glide.d) ({ x: hx, y: hy } = glideAt(p));
+  else if (p.slide && G.t - p.slide.t < 0.09) {
     const k = 1 - (G.t - p.slide.t) / 0.09;
     hx += p.slide.dx * 0.35 * k * k;
     hy += p.slide.dy * 0.35 * k * k;

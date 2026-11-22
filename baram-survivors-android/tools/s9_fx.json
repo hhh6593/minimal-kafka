@@ -2388,7 +2388,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -2502,7 +2503,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -2616,7 +2618,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -2730,7 +2733,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -2844,7 +2848,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -2958,7 +2963,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3072,7 +3078,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3186,7 +3193,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3300,7 +3308,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3414,7 +3423,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3528,7 +3538,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3642,7 +3653,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3756,7 +3768,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3870,7 +3883,8 @@
          74,
          10
         ]
-       ]
+       ],
+       "soft": 6
       },
       {
        "only": [
@@ -3893,7 +3907,22 @@
   "despeck": 45,
   "ms": 80,
   "scale": 0.62,
-  "why": "화혼돌파 (영술사 9차, 2662 IMG68 frames 37-50; the caster has dashed to the left past the dummies and the camera jumped to it at 37, still from there): the great blue swoosh of soul fire sweeping before it (37-41), the blue flame bursting up over it (42-48), and the cyan trails of fire streaming back along the path it took (39-50, to the capture's right edge). Unmixed off frame 52 (the same camera; the caster stands there); kept only the fire's own blues and cyans (the caster's body, its spirit, the dummies out — open where the caster stood in the flame); the hit stars with their numbers and the bars made clear, nothing filled"
+  "why": "화혼돌파 (영술사 9차, 2662 IMG68 frames 37-50; the caster has dashed to the left past the dummies and the camera jumped to it at 37, still from there): the great blue swoosh of soul fire sweeping before it (37-41), the blue flame bursting up over it (42-48), and the cyan trails of fire streaming back along the path it took (39-50, to the capture's right edge). Unmixed off frame 52 (the same camera; the caster stands there); kept only the fire's own blues and cyans (the caster's body, its spirit, the dummies out — open where the caster stood in the flame); the hit stars with their numbers and the bars made clear, nothing filled; then tidied (tidy): the caster's grey and dark fragments and the lone white bits of stars and bars out, the holes the light closes round mended from its own dots beside them, its white heart solid as in the original, the cuts where numbers lay faded softly (drop soft)",
+  "tidy": {
+   "grey": [
+    "mx < 120",
+    "(mx - mn < 40) & (mx < 200)"
+   ],
+   "whitespeck": [
+    180,
+    320
+   ],
+   "mend": 500,
+   "whitecore": [
+    200,
+    6
+   ]
+  }
  },
  "dk_simpan": {
   "src": "gif2662/IMG71.gif",
@@ -3910,601 +3939,13 @@
    240,
    345
   ],
-  "ms": 90,
+  "ms": 105,
   "scale": 0.62,
   "despeck": 12,
   "cells": [
    [
     {
      "f": 14,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 15,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 16,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 17,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 18,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 19,
-     "at": [
-      300,
-      345
-     ],
-     "ops": [
-      {
-       "fadebox": [
-        -90,
-        -345,
-        90,
-        -326
-       ],
-       "soft": 4
-      },
-      {
-       "fadebox": [
-        -70,
-        120,
-        70,
-        200
-       ],
-       "soft": 18
-      },
-      {
-       "rot": [
-        [
-         -240,
-         -345,
-         240,
-         175
-        ]
-       ],
-       "where": [
-        "(b > 130) & (b > r + 40) & (b > g - 30)",
-        "(mn > 178) & (mx - mn < 40) & (y < 440)",
-        "(r > 200) & (g > 60) & (g < 200) & (b < 110) & (r - g > 50) & (y < 392)",
-        "(g > r + 40) & (g > b + 30)"
-       ],
-       "grow": 3,
-       "starbox": [
-        "(r > 190) & (b < 100) & (g > b + 25) & (g < 175) & (y < 392)",
-        [
-         8,
-         8,
-         62,
-         8
-        ]
-       ],
-       "rc": [
-        0,
-        -10
-       ],
-       "also": [
-        {
-         "rot": [
-          [
-           -42,
-           90,
-           42,
-           175
-          ],
-          [
-           -50,
-           -270,
-           0,
-           -195
-          ]
-         ]
-        }
-       ]
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        26,
-        40
-       ],
-       "rc": [
-        0,
-        -36
-       ],
-       "ry": 1.5
-      }
-     ],
-     "feather": [
-      0,
-      45,
-      0,
-      0
-     ]
-    }
-   ],
-   [
-    {
-     "f": 20,
      "at": [
       300,
       345
@@ -5228,9 +4669,9 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
@@ -5275,9 +4716,9 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
@@ -5322,9 +4763,9 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
@@ -5369,9 +4810,9 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
@@ -5416,9 +4857,9 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
@@ -5463,15 +4904,21 @@
       }
      ],
      "feather": [
-      0,
+      40,
       45,
-      0,
+      40,
       0
      ]
     }
    ]
   ],
-  "why": "천신의심판 (영술사 9차, 2662 IMG71, the camera still from frame 11): round the caster the dark red whirl with its flying black rocks drawing the foes in (frames 14-20, shown twice), then the great fist of the 천신 coming down as a pillar of pink and crimson light (21-23), the fire bursting at its foot under the dark violet pillar (24-28). Unmixed off the clean field (frame 36). In the whirl the damage numbers, hit stars, bars and bystanders over it are taken from the ring itself a turn on (rot). In the pillar and the fire nothing is filled: the numbers, stars, bars and the dummies' stakes standing over them in columns are left clear, the art round them fading out over a few pixels — only the original's own clean pixels. The map's name label and the bystanders out"
+  "why": "천신의심판 (영술사 9차, 2662 IMG71, the camera still from frame 11): round the caster the dark red whirl with its flying black rocks drawing the foes in (frames 14-20, shown twice), then the great fist of the 천신 coming down as a pillar of pink and crimson light (21-23), the fire bursting at its foot under the dark violet pillar (24-28). Unmixed off the clean field (frame 36). In the whirl the damage numbers, hit stars, bars and bystanders over it are taken from the ring itself a turn on (rot). In the pillar and the fire nothing is filled: the numbers, stars, bars and the dummies' stakes standing over them in columns are left clear, the art round them fading out over a few pixels — only the original's own clean pixels. The map's name label and the bystanders out; one turn of the whirl (14-20) then the pillar (21-26) at 105 ms — 1.37 s, the original's pace (not the whirl twice); the pillar's cells faded at their left and right edges (feather), the lone white dots of stars out (tidy)",
+  "tidy": {
+   "whitespeck": [
+    180,
+    120
+   ]
+  }
  },
  "m_hwanyeong": {
   "src": "gif2662/IMG29.gif",
@@ -8356,8 +7803,8 @@
    800,
    700
   ],
-  "t0": 45,
-  "t1": 110,
+  "t0": 10,
+  "t1": 40,
   "ms": 140,
   "k": 1,
   "max": 420,
@@ -8465,7 +7912,11 @@
   },
   "white": 254,
   "grow": 3,
-  "why": "악귀출몰 (영술사 궁극, 2662 IMG73 frames 13-37 every third): the whole-screen art — the blue spirits, eyes and waves round the screen, the great grey cloud ring and the cyan rings of spirit fire whirling round the caster in its middle — over the client's black; the damage numbers, hit stars, bars, the dummies, the caster and the two bystanders in the middle taken from the same frame's art turned round the whirl's middle (rotfill); the COMBO label a soft hole; faded out towards an ellipse's edge (cine9: drawn centred on the hero at three quarters of the screen's height)"
+  "why": "악귀출몰 (영술사 궁극, 2662 IMG73 frames 13-37 every third): the whole-screen art — the blue spirits, eyes and waves round the screen, the great grey cloud ring and the cyan rings of spirit fire whirling round the caster in its middle — over the client's black; the damage numbers, hit stars, bars, the dummies, the caster and the two bystanders in the middle taken from the same frame's art turned round the whirl's middle (rotfill); the COMBO label a soft hole; faded out towards an ellipse's edge (cine9: drawn centred on the hero at three quarters of the screen's height); as strong as the original (it read paler, S −16% V −9% as seen in the game): its alpha from the black up over t0 10..t1 40 (the art solid, only the black clear) and its colour matched (gain [1.18, 1.14], measured against the capture's own frames at the drawn scale: S −3% V −2%)",
+  "gain": [
+   1.18,
+   1.14
+  ]
  },
  "w_hogisword": {
   "src": "gif2662/IMG02.gif",

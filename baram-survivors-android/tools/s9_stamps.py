@@ -611,48 +611,110 @@ def _js_bars(a):
     return out
 
 
-def js_seal(fr, f, polemask):
-    """the seal of frame f, as rgba over the whole capture (where a 장승 stands over it: clear — the 장승 are drawn over it)"""
-    a, bg = fr[f].astype(np.float32), fr[2].astype(np.float32)
-    # (k 80: the seal as solid gold over our darker ground as over the original's grey — at 110 it read orange and pale)
-    F, al = _js_unmix(a, bg, 80, 18)
-    H, W = al.shape
+JS_TJ = (283, 300, 66)  # the 태극's round: middle and radius (frames 1-17's camera)
+JS_INNER = (176, 190, 386, 404)  # the seal's plain middle inside its band of glyphs (frames 1-17's camera)
+
+
+def js_caster(a):
+    """where the caster (its body, wings, dark streaks, bar, flag) lies over the seal in a frame (frames 1-17's camera): in
+    the seal's plain middle, what is not the seal's own colour — its gold, olive, cream and their outlines (red over green
+    over blue, not dark); above it, in the band of glyphs, the caster's old round and its flag's box"""
+    H, W = a.shape[:2]
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-    # (frames 1-17: the camera 48 px to the left of where it is from frame 21 on — these coordinates are that camera's)
-    cx, cy = JS_C[0] - JS_CAM, JS_C[1]
-    # (its own square, rounded at the corners, a little glow round it)
-    sq = np.clip((np.minimum(np.minimum(xx - 128, 434 - xx), np.minimum(yy - 142, 452 - yy))) / 8, 0, 1)
-    al = al * sq
-    # the caster over its middle: its body, its bars, its flag; the mouse pointer (a grey sword) and the ground's own grey
-    # specks round the 태극 (the seal has no grey but in the 태극's white)
-    # (the caster in the clean frame 2 too — its wings of light wider than in these: what either covers)
-    hole = (((xx - 262) / 92) ** 2 + ((yy - 236) / 106) ** 2 <= 1) | ((xx >= 248) & (xx < 312) & (yy >= 326) & (yy < 352))
-    hole |= (xx >= 258) & (xx < 304) & (yy >= 136) & (yy < 192)
-    # (the 장승's life bars over its lower edge: in both frames, so unmix reads them as clear — the seal's own pixels there)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    mx = a.max(2)
+    seal = (r >= g - 6) & (g >= 0.42 * r) & (b < g - 10) & (r - b > 45) & (mx > 95) & ((b < 0.85 * g) | (g > 0.9 * r))
+    x0, y0, x1, y1 = JS_INNER
+    inner = (xx >= x0) & (xx < x1) & (yy >= y0) & (yy < y1) & (np.hypot((xx - 275) / 150, (yy - 225) / 150) < 1)
+    m = ~seal & inner
+    m |= (((xx - 262) / 92) ** 2 + ((yy - 236) / 106) ** 2 <= 1) & (yy < y0)
+    m |= (xx >= 258) & (xx < 304) & (yy >= 136) & (yy < 192)
     for bx, by in _js_bars(a):
-        hole[max(0, by - 2):by + 9, max(0, bx - 2):bx + 49] = True
-    grey = (a.max(2) - a.min(2) < 40) & (np.hypot(xx - cx, yy - cy) > 120) & (al > 0.2)
-    hole |= ndimage.binary_dilation(grey, iterations=2)
-    out_F, out_al = F.copy(), al.copy()
-    todo = hole.copy()
-    dx, dy = xx - cx, yy - cy
-    # (half a turn first — the 태극 and the square both; then the square's own mirror and quarter turns)
-    for kind, ang in (("rot", 180), ("mir", 0), ("rot", 90), ("rot", -90)):
-        if not todo.any():
-            break
-        if kind == "mir":
-            sx, sy = np.rint(2 * cx - xx).astype(int).clip(0, W - 1), yy.astype(int)
-        else:
-            c, s = np.cos(np.radians(ang)), np.sin(np.radians(ang))
-            sx = np.rint(cx + dx * c - dy * s).astype(int).clip(0, W - 1)
-            sy = np.rint(cy + dx * s + dy * c).astype(int).clip(0, H - 1)
-        ok = todo & ~hole[sy, sx] & ~polemask[sy, sx]
-        out_F[ok], out_al[ok] = F[sy[ok], sx[ok]], al[sy[ok], sx[ok]]
-        todo &= ~ok
-    out_al[todo] = 0
-    # (what no turn gives — the 태극's middle, under the caster in every frame: our hero stands there — ends softly)
-    out_al *= np.clip(ndimage.distance_transform_edt(~todo) / 6, 0, 1)
-    return np.dstack([np.where(out_al[..., None] > 0, out_F, 0), out_al * 255]).astype(np.uint8)
+        m[max(0, by - 2):by + 9, max(0, bx - 2):bx + 49] = True
+    return ndimage.binary_dilation(m, iterations=2)
+
+
+def js_seals(fr, frames, polemask):
+    """the seal of each of `frames` (1-17), as rgba over the whole capture (frames 1-17's camera). Unmixed against frame 2
+    (no seal; where the caster stands in it too, against the floor's mean colour). Where the caster lies over it in that
+    frame: the same pixel of the frame nearest in time where it does not (frames 5-17, then 21-135 — the camera 48 px to
+    the right there), its brightness and opacity scaled by the two frames' seal round it (the seal pulses gold and red) — the
+    태극 and the plain middle are the seal's own, unmoved; what the caster covers in every frame (the middle of its body):
+    the seal's own pixels half a turn (or a quarter turn) round its middle, else clear, ending softly — our hero stands
+    there. Where a 장승 stands over it, left clear (the 장승 are drawn over it)."""
+    bg = fr[2].astype(np.float32)
+    H, W = bg.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    cx, cy = JS_C[0] - JS_CAM, JS_C[1]
+    # (the caster in the clean frame 2: unmixing against it would read the caster's colours as the seal's)
+    mx2, mn2 = bg.max(2), bg.min(2)
+    c2 = ndimage.binary_dilation(((mx2 - mn2 > 55) | (mx2 < 60) | (mn2 > 190)) & (np.hypot((xx - 275) / 160, (yy - 225) / 170) < 1), iterations=3)
+    floor = bg[(np.hypot(xx - cx, yy - cy) < 220) & ~c2].mean(0)
+    sq = np.clip((np.minimum(np.minimum(xx - 128, 434 - xx), np.minimum(yy - 142, 452 - yy))) / 8, 0, 1)
+    pool = list(range(5, 18)) + list(range(21, 136, 2))
+    got = {}
+    for f in pool:
+        a = fr[f].astype(np.float32)
+        if f >= 21:
+            a = np.roll(a, -JS_CAM, axis=1)
+        # (k 80: the seal as solid gold over our darker ground as over the original's grey — at 110 it read orange and pale)
+        F, al = _js_unmix(a, bg, 80, 18)
+        F2, al2 = _js_unmix(a, np.broadcast_to(floor, a.shape), 80, 18)
+        al2 = np.where(al2 < 0.3, 0, al2)  # (the floor's own grain read as a faint seal: not taken)
+        F[c2], al[c2] = F2[c2], al2[c2]
+        hole = js_caster(a)
+        # (the ground's own grey specks round the 태극 — the seal has no grey but in the 태극's white)
+        grey = (a.max(2) - a.min(2) < 40) & (np.hypot(xx - cx, yy - cy) > 120) & (al > 0.2)
+        hole |= ndimage.binary_dilation(grey, iterations=2)
+        got[f] = (F, al * sq, hole)
+    ring = (np.hypot(xx - cx, yy - cy) > 40) & (np.hypot(xx - cx, yy - cy) < 150)
+    out = []
+    for f in frames:
+        F, al, hole = got[f]
+        oF, oal, todo = F.copy(), al.copy(), hole.copy()
+        # (the seal rising, 5-7: its 태극 a plain disk not yet drawn — the held seal's is another light; turned and mended below)
+        for g in sorted((g for g in pool if g != f and f > 7 and g > 7), key=lambda g: (g >= 21, abs(g - f))):
+            if not todo.any():
+                break
+            Fg, alg, hg = got[g]
+            ok = todo & ~hg
+            if not ok.any():
+                continue
+            both = ring & ~hole & ~hg & (al > 0.3) & (alg > 0.3)
+            # (one brightness for all three channels: a per-channel ratio from the gold round it turned the 태극's white pink)
+            kF = float(np.clip(F[both].mean() / max(Fg[both].mean(), 1), 0.8, 1.25)) if both.sum() > 200 else 1.0
+            kA = al[both].mean() / max(alg[both].mean(), 1e-3) if both.sum() > 200 else 1.0
+            oF[ok] = np.clip(Fg[ok] * kF, 0, 255)
+            oal[ok] = np.clip(alg[ok] * kA, 0, 1)
+            todo &= ~ok
+        dx, dy = xx - cx, yy - cy
+        src_F, src_al, bad = oF.copy(), oal.copy(), todo.copy()
+        # (half a turn first — the 태극 and the square both; then the square's own mirror and quarter turns)
+        for kind, ang in (("rot", 180), ("mir", 0), ("rot", 90), ("rot", -90)):
+            if not todo.any():
+                break
+            if kind == "mir":
+                sx, sy = np.rint(2 * cx - xx).astype(int).clip(0, W - 1), yy.astype(int)
+            else:
+                c, s_ = np.cos(np.radians(ang)), np.sin(np.radians(ang))
+                sx = np.rint(cx + dx * c - dy * s_).astype(int).clip(0, W - 1)
+                sy = np.rint(cy + dx * s_ + dy * c).astype(int).clip(0, H - 1)
+            ok = todo & ~bad[sy, sx] & ~polemask[sy, sx]
+            oF[ok], oal[ok] = src_F[sy[ok], sx[ok]], src_al[sy[ok], sx[ok]]
+            todo &= ~ok
+        # (inside the 태극's round, what nothing gives — the middle of the caster's body — from the nearest dot of the 태극 round
+        # it, colour and opacity: a broken dot filled with the same colour beside it)
+        tj = todo & (np.hypot(xx - JS_TJ[0], yy - JS_TJ[1]) < JS_TJ[2])
+        if tj.any():
+            _, (iy, ix) = ndimage.distance_transform_edt(todo, return_indices=True)
+            oF[tj], oal[tj] = oF[iy[tj], ix[tj]], oal[iy[tj], ix[tj]]
+            todo &= ~tj
+        oal[todo] = 0
+        # (what nothing gives ends softly, round — no ragged rim)
+        soft = ndimage.binary_closing(ndimage.binary_opening(todo, iterations=3), iterations=3)
+        oal *= np.clip(ndimage.distance_transform_edt(~(soft | todo)) / 6, 0, 1)
+        out.append(np.dstack([np.where(oal[..., None] > 0, oF, 0), oal * 255]).astype(np.uint8))
+    return out
 
 
 def js_kinds(fr):
@@ -762,8 +824,7 @@ def dk_jang(src_dir, out_dir=None):
     polemask[:, :162 - JS_CAM] = True
     polemask[:, 497 - JS_CAM:] = True
     seals = []
-    for f in range(5, 18):
-        sl = js_seal(fr, f, polemask)
+    for sl in js_seals(fr, range(5, 18), polemask):
         cell = Image.new("RGBA", (cw, ch))
         put(cell, sl[0:540, 160 - JS_CAM:500 - JS_CAM], 160, 0)
         seals.append(cell)
