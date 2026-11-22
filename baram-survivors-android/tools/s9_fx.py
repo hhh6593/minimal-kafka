@@ -232,6 +232,10 @@ def keyed(frames, i, e, part=None):
         F[al <= 0] = 0
         return np.dstack([F, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    if part.get("bgzero", e.get("bgzero")):
+        # (an 궁극's art over the client's own black — 낙화유영's vortex: unmix over pure black, so "rot" can carry the
+        # whirl's own pixels over the numbers and bodies standing in it)
+        bg = np.zeros_like(bg)
     bm = part.get("bgmed", e.get("bgmed"))
     if bm:
         # (no frame of the scene is clear round the caster — 비사검's ring turns round it the whole time: the field put
@@ -247,6 +251,10 @@ def keyed(frames, i, e, part=None):
                 med_ = np.nanmedian(np.where(ok_[..., None], A_, np.nan), axis=0)
             _BGMED[ck_] = np.where(np.isnan(med_), np.median(A_, axis=0), med_).astype(np.float32)
         bg = _BGMED[ck_]
+    if part.get("bgshift"):
+        # (the camera moved between the clean frame and this one — 아공간전개's later frames: the clean field moved with it)
+        sx_, sy_ = part["bgshift"]
+        bg = np.roll(np.roll(bg, sy_, 0), sx_, 1)
     for fi, x0, y0, x1, y1 in part.get("bgpatch", e.get("bgpatch", [])):
         # (the clean field put together: a box of it from another frame of the same still camera, where someone stood
         # in "bg" — 순보선풍's caster before the leap)
@@ -441,7 +449,52 @@ def keyed(frames, i, e, part=None):
                     hm |= eval(ex, {}, env)
                 for ex, px in part.get("holenear", e.get("holenear", [])):
                     hm |= eval(ex, {}, env) & ndimage.binary_dilation(hm, iterations=px)
-                hole |= ndimage.binary_fill_holes(ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3))))
+                hm = ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3)))
+                # ("fillholes" false: a ring of found things — a crescent's white circle near the numbers — does not
+                # make all inside it a hole)
+                hole |= ndimage.binary_fill_holes(hm) if part.get("fillholes", e.get("fillholes", True)) else hm
+            if part.get("_raw"):
+                return al, F, hole
+            pl = part.get("plate", e.get("plate"))
+            if pl and hole.any():
+                # (a drawing that stands still while the numbers stack over it — 연옥'만월's moon and its seal: a covered pixel
+                # from the other frames "plate" [f …] where that place was clear (the median of those, its own dots, no
+                # blur); what every one of them covers is left to the turn below)
+                ck_ = ("plate", id(frames), tuple(pl), tuple(part["at"]), json.dumps(part.get("holeexpr", e.get("holeexpr"))))
+                if ck_ not in _BGMED:
+                    import warnings
+                    As, Fs, Ok = [], [], []
+                    for fi in pl:
+                        a2, F2, h2 = keyed(frames, fi, e, {**part, "f": fi, "_raw": True})
+                        As.append(a2)
+                        Fs.append(F2)
+                        Ok.append(~h2)
+                    Ok = np.stack(Ok)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        mal = np.nanmedian(np.where(Ok, np.stack(As), np.nan), axis=0)
+                        mF = np.nanmedian(np.where(Ok[..., None], np.stack(Fs), np.nan), axis=0)
+                    _BGMED[ck_] = (np.nan_to_num(mal), np.nan_to_num(mF), Ok.sum(0))
+                mal, mF, cnt = _BGMED[ck_]
+                use = hole & (cnt >= part.get("platemin", e.get("platemin", 1)))
+                al = np.where(use, mal, al)
+                F = np.where(use[..., None], mF, F)
+                hole = hole & ~use
+            mf = part.get("mirrorfill", e.get("mirrorfill"))
+            if mf and hole.any():
+                # (a seal drawn the same about its own middle — 연옥'만월's moon: what is still covered taken from the same
+                # place mirrored about the middle ("at"): "v" top↔bottom, "h" left↔right, "p" both — the first that is
+                # clear; its own ornament goes on, not the shards of a turn)
+                src_al, src_F = al.copy(), F.copy()
+                for mode_ in mf:
+                    sx = np.rint(2 * cx - xx_ if mode_ in "hp" else xx_).astype(int)
+                    sy = np.rint(2 * cy - yy_ if mode_ in "vp" else yy_).astype(int)
+                    inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                    sxc, syc = sx.clip(0, W_ - 1), sy.clip(0, H_ - 1)
+                    ok = hole & inside & ~hole[syc, sxc]
+                    al[ok] = src_al[syc[ok], sxc[ok]]
+                    F[ok] = src_F[syc[ok], sxc[ok]]
+                    hole = hole & ~ok
             sf = part.get("shiftfill", e.get("shiftfill"))
             if sf:
                 # (a sheet of water over the field — 해일강타's wave — whose caustics run on to every side: a covered pixel
@@ -524,8 +577,19 @@ def keyed(frames, i, e, part=None):
                     al1 = A
                 al, F = al1, F1
                 hole = np.zeros_like(hole)
+            rmax = part.get("rotmax", e.get("rotmax"))
+            if rmax:
+                # (past "rotmax" from the middle a covered place is not made up from a turn — a spiral's arms do not
+                # line up turned, the patches came out as shards: it is left clear, softly over 4 px — the art's own black
+                # shows there, the game's dark under it)
+                far = hole & (rr > rmax)
+                keep_ = np.clip(ndimage.distance_transform_edt(~far) / 4.0, 0, 1)
+                hole = hole & ~far
+                src_hole_ = hole | far
             todo = hole.copy()
             src_al, src_F = al.copy(), F.copy()
+            if rmax:
+                hole = src_hole_  # (never a source: what lay over the far places)
             DEGS = part.get("rotdeg", e.get("rotdeg", (35, -35, 70, -70, 105, -105, 140, -140, 180)))
 
             def turned(deg, rs):
@@ -562,6 +626,8 @@ def keyed(frames, i, e, part=None):
                     F[ok] = src_F[syc[ok], sxc[ok]]
                     todo &= ~ok
             al[todo] = 0
+            if rmax:
+                al = al * keep_
             rd = part.get("radial", e.get("radial"))
             if rd:
                 # (its own round edge: what lies past it in the frame is not the whirl's)
@@ -855,7 +921,7 @@ def parts_cells(frames, e):
     for ci, parts in enumerate(e["cells"]):
         cell = np.zeros((ch, cw, 4), dtype=np.uint8)
         for part in parts:
-            ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
+            ck = (part["f"], part.get("key"), part.get("bg"), json.dumps(part.get("bgshift")), part.get("t0"), part.get("t1"), json.dumps(part.get("unnum")), tuple(part.get("at", ())) if part.get("unnum") else None)
             if ck not in cache:
                 cache[ck] = keyed(frames, part["f"], e, part)
             a = cache[ck].copy()
@@ -889,10 +955,13 @@ def parts_cells(frames, e):
                             # blue, the star's white — grown by "grow": the burst round them kept, no square seam)
                             from scipy import ndimage
                             o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                            if sub_.get("onres"):
+                                # (a second pass over what the first left: the expression over the part as it now is)
+                                o_ = a[..., :3].astype(np.float32)
                             b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
                             # ("d": how far it moved from the clean frame — a marker drawn over the effect has not moved)
                             env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
-                                    "d": np.abs(o_ - b_).max(axis=2), "y": np.mgrid[0:H, 0:W][0], "x": np.mgrid[0:H, 0:W][1]}
+                                    "d": np.abs(o_ - b_).max(axis=2), "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                             hit_ = np.zeros((H, W), bool)
                             for ex_ in sub_["where"]:
                                 hit_ |= eval(ex_, {}, env_)
@@ -910,7 +979,10 @@ def parts_cells(frames, e):
                             m_ &= ndimage.binary_fill_holes(hit_)
                         bad_ |= m_
                     yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
-                    dx_, dy_ = xx_ - rcx, yy_ - rcy
+                    # ("ys": a whirl wider than tall — 청룡의격노's whirlpool — turned along its own ellipse: y squashed by ys
+                    # before the turn and stretched back after)
+                    ys_ = op.get("ys", 1.0)
+                    dx_, dy_ = xx_ - rcx, (yy_ - rcy) / ys_
                     todo_ = bad_.copy()
                     src_ = a.copy()
                     if op.get("mirrorx"):
@@ -928,7 +1000,7 @@ def parts_cells(frames, e):
                             break
                         c_, s_ = np.cos(np.radians(ang)), np.sin(np.radians(ang))
                         sx_ = np.rint(rcx + dx_ * c_ - dy_ * s_).astype(int)
-                        sy_ = np.rint(rcy + dx_ * s_ + dy_ * c_).astype(int)
+                        sy_ = np.rint(rcy + (dx_ * s_ + dy_ * c_) * ys_).astype(int)
                         inb_ = (sx_ >= 0) & (sx_ < W) & (sy_ >= 0) & (sy_ < H)
                         sxc_, syc_ = sx_.clip(0, W - 1), sy_.clip(0, H - 1)
                         ok_ = todo_ & inb_ & ~bad_[syc_, sxc_]
@@ -1084,13 +1156,43 @@ def parts_cells(frames, e):
                         k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
                     a[~k_, 3] = 0
                     continue
+                if "drop" in op:
+                    # (what the expressions name over the capture's own frame — a hero's gold and red, a weapon's white in a
+                    # box of it (x, y: the capture's own; d: moved from the clean frame) — cleared, "grow" px round it, its
+                    # edge faded over "soft" px: no hole with a hard rim)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+                    if part.get("bgshift"):
+                        b_ = np.roll(np.roll(b_, part["bgshift"][1], 0), part["bgshift"][0], 1)
+                    yy_, xx_ = np.mgrid[0:H, 0:W]
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "x": xx_, "y": yy_, "d": np.abs(o_ - b_).max(axis=2)}
+                    k_ = np.zeros((H, W), bool)
+                    for ex_ in op["drop"]:
+                        k_ |= eval(ex_, {}, env_)
+                    for ex_, px_ in op.get("near", []):
+                        # (a hit star's white heart, a digit's white face: only beside what was found)
+                        k_ |= eval(ex_, {}, env_) & ndimage.binary_dilation(k_, iterations=px_)
+                    if op.get("fillholes"):
+                        k_ = ndimage.binary_fill_holes(ndimage.binary_closing(k_, iterations=2))
+                    if op.get("grow"):
+                        k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
+                    sf_ = op.get("soft", 0)
+                    if sf_:
+                        dist_ = ndimage.distance_transform_edt(~k_)
+                        a[..., 3] = (a[..., 3] * np.clip(dist_ / sf_, 0, 1)).astype(np.uint8)
+                    else:
+                        a[k_, 3] = 0
+                    continue
                 if "patch" in op:
                     # (small marks of a body over the drawing — the hero's dark ornaments, a thin ring of its costume —
                     # each pixel the expressions name in the box (relative to "at") taken from the nearest pixel they do
                     # not name: the drawing's own dot beside it, no box seam; "grow" px round them too)
                     from scipy import ndimage
                     o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
-                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np, "y": np.mgrid[0:H, 0:W][0], "x": np.mgrid[0:H, 0:W][1]}
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                     p_ = np.zeros((H, W), bool)
                     for ex_ in op["where"]:
                         p_ |= eval(ex_, {}, env_)
@@ -1112,7 +1214,7 @@ def parts_cells(frames, e):
                     o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
                     b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
                     env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
-                            "d": np.abs(o_ - b_).max(axis=2)}
+                            "d": np.abs(o_ - b_).max(axis=2), "x": np.mgrid[0:H, 0:W][1], "y": np.mgrid[0:H, 0:W][0]}
                     s_ = np.zeros((H, W), bool)
                     for ex_ in op["solid"]:
                         s_ |= eval(ex_, {}, env_)
@@ -1182,6 +1284,11 @@ def parts_cells(frames, e):
                 a = a[:, ::-1].copy()
                 ax = W - 1 - ax
                 box = lambda b: (max(0, ax + b[0]), max(0, ay + b[1]), min(W, ax + b[2]), min(H, ay + b[3]))
+            if part.get("flipv2"):
+                # (upside down round its own level line after the fills — they read the capture where it lies: 극청룡참's
+                # crescent, its clean upper half laid again below its axis)
+                a = a[::-1].copy()
+                ay = H - 1 - ay
             clip = part.get("clip", [-ox, -oy, cw - ox, ch - oy])
             # the part's kept box, in the frame and in the cell
             fx0, fy0 = max(0, ax + max(clip[0], -ox)), max(0, ay + max(clip[1], -oy))
@@ -1205,6 +1312,10 @@ def parts_cells(frames, e):
             # under what is there already (the first part on top)
             da = dst[..., 3:4].astype(np.float32) / 255
             sa = src[..., 3:4].astype(np.float32) / 255
+            if part.get("holeonly"):
+                # (only into what those before left clear — a body's silhouette cut out of a see-through sheet, filled from
+                # another frame where the sheet lay clear there — not laid again over the sheet itself)
+                sa = sa * (da < 0.04)
             oa = da + sa * (1 - da)
             rgb = (dst[..., :3] * da + src[..., :3] * sa * (1 - da)) / np.maximum(oa, 1e-3)
             dst[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
@@ -1374,6 +1485,9 @@ def build(spec, src_dir, out_dir, only=None):
         index = {k: v for k, v in json.load(open(ipath, encoding="utf-8")).items() if k in spec}
     for sid, e in spec.items():
         if sid.startswith("_") or (only and sid not in only):
+            continue
+        if e.get("mode") == "stamps":
+            # (built by tools/s9_stamps.py: its sheet and index entry are kept here, not rebuilt)
             continue
         frames, durs = frames_of(os.path.join(src_dir, e["src"]))
         s, t, st = (e.get("frames") or [0, len(frames), 1])
