@@ -241,8 +241,8 @@ export function initWar(api) {
   return War;
 }
 /** The war is left (game.js enterTown; a hunt started): its field's pieces are closed, and its small
- *  made pictures (names, plates, glows) let go. The fighters' frames stay for the next war of the
- *  session (they are small, cropped: some 30 MB for every look) unless `all` (a hunt needs the room). */
+ *  made pictures (names, plates, glows) let go; with `all` (the town, a hunt) the fighters' frames
+ *  too (some 3000 cropped pictures: the next war makes its own again in its opening count). */
 function releaseWar(all) {
   warmGen++;
   warming.clear();

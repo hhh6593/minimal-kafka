@@ -321,7 +321,7 @@ function loadImage(path) {
       bm.naturalWidth = bm.width;
       bm.naturalHeight = bm.height;
       bm.src = url;
-      bm.used = bitmapClock;
+      bm.used = bitmapClock - 3; // (not drawn yet: among the first to go if the effects are past their budget)
       images[path] = bm;
       return bm;
     });
@@ -418,8 +418,9 @@ function fxLoad(src) {
 }
 // The effect sheets held at most (decoded): past it the least lately drawn are let go (never a common
 // one, nor one drawn these last seconds) and load again when next used. A hunt's own kit is 40 to
-// 60 MB; a long one with every 격 and proc going, or a war with every class's spells, stays under this.
-const FX_BUDGET = 110e6;
+// 60 MB; a long one with every 격 and proc going stays under this, and a war, which asks for every
+// class's spells at its start (245 MB), keeps what it draws.
+const FX_BUDGET = 96e6;
 function fxTrim() {
   let total = 0;
   const list = [];
@@ -431,7 +432,7 @@ function fxTrim() {
   if (total <= FX_BUDGET) return;
   list.sort((x, y) => (x[1].used || 0) - (y[1].used || 0));
   for (const [path, im] of list) {
-    if (total <= FX_BUDGET * 0.8 || bitmapClock - (im.used || 0) < 5) break;
+    if (total <= FX_BUDGET * 0.8 || bitmapClock - (im.used || 0) < 2) break;
     total -= im.width * im.height * 4;
     delete images[path];
     picForget(im);
@@ -10322,7 +10323,7 @@ function enterTown(cls) {
   // (the ground, its monsters, the war's field and fighters); the town's own are loaded.
   fxKeep([]);
   leaveScreen(cls, savedGear(cls), ['ytown/']);
-  War.release();
+  War.release(true);
   Hunt.release();
   picWarm(townPics('market'));
   heroWarm(cls, savedGear(cls));
