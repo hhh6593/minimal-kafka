@@ -438,6 +438,14 @@ function fxTrim() {
     picForget(im);
   }
 }
+/** Whether effect sheets may be loaded ahead (the war's fighters' kits, war.js nearKitFx): under
+ *  three fifths of the budget, so what is loaded ahead is not let go again before it is drawn, and a
+ *  war holds what it draws rather than a budget's worth of what it might. */
+function fxRoom() {
+  let total = 0;
+  for (const [path, im] of Object.entries(images)) if (path.startsWith('fx/') && im && im.width) total += im.width * im.height * 4;
+  return total < FX_BUDGET * 0.6;
+}
 /** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
 function fxWarm(ids, wait = 0) {
   const srcs = new Set();
@@ -13213,7 +13221,8 @@ function skillIcon(id, fx) {
     im.className = 'item skillicon';
     return im;
   }
-  if (!fx) return itemIcon('p_power');
+  // (hit sparks, the level-up burst and the like have no icon of their own: 누리's h_levelup_force)
+  if (!fx || !M.fx[fx] || /^(new_|h_|g_)/.test(fx)) return itemIcon('p_power');
   const im = fxIcon(fx);
   if (SKILLS[id].tint) im.style.filter = SKILLS[id].tint;
   return im;
@@ -14193,7 +14202,9 @@ function heroFrameMake(L, sheets, a, f) {
   if (L.dz && sheets.weapon) L.pts.set(fk, dressFrame(c, L.H, sheets, a, f, L.box, L.dz));
   drawLayers(c.getContext('2d'), L.H, sheets, a, f, L.box);
   L.frames.set(fk, c);
-  if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (L.frames.get(fk) === c) L.frames.set(fk, bm); else bm.close(); }).catch(() => {});
+  // (the canvas emptied once its bitmap is made: some two thousand of them left to the collector in
+  // the dress room's try-ons were a few hundred MB before it ran)
+  if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (L.frames.get(fk) === c) L.frames.set(fk, bm); else bm.close(); c.width = c.height = 0; }).catch(() => {});
   return c;
 }
 function heroLookDrop(key) {
@@ -17063,7 +17074,7 @@ const War = initWar({
   raidSet, raidTier, pickGear, bag: c => bag(c),
   // AI 동료 (war.js personas): the hero's 전투력 (the spread of the fighters' specs), a skill's own
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
-  combatPower: c => combatPower(c), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
+  combatPower: c => combatPower(c), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).

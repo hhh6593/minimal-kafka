@@ -246,11 +246,12 @@ export function initWar(api) {
 function releaseWar(all) {
   warmGen++;
   warming.clear();
+  warmQueue.length = 0;
   for (const [path, bm] of mapBms) { if (bm && bm.close) bm.close(); mapBms.delete(path); }
   for (const m of [labels, plates, hudPics, glowPics]) { for (const v of m.values()) { const pic = v && (v.pic || v.c || v); if (pic && pic.close) pic.close(); } m.clear(); }
   portraits.clear();
   if (all) {
-    for (const e of frames.values()) if (e && e.pic && e.pic.close) e.pic.close();
+    for (const e of frames.values()) freePic(e && e.pic);
     frames.clear();
     lookAny.clear();
   }
@@ -494,13 +495,12 @@ async function startWar(id, cls, role, opts = {}) {
   // The fighters' looks (aiLooks), kept for the session: a later war's frames are made already (see warmLooks).
   await aiLooksReady();
   const looks = sessionLooks;
-  // The effects of the war's spells (every class's kit, the hero's own, the hits, kills and
-  // revives) decoded now: a strip is decoded the first time it is drawn, and the first clash of
-  // a war drew forty of them at once (a 4000-pixel strip is a long frame on its own).
+  // The effects of the hero's own spells, the hits, kills and revives decoded now (off the main
+  // thread). The fighters' spells are not: every class's kit at once was some 245 MB decoded at the
+  // war's start, most of it never drawn — they are loaded as fighters come near the screen
+  // (nearKitFx), each sheet past the effects' budget let go again (game.js fxTrim).
   const fxIds = new Set(['h_hit_tiger', 'h_kill', 'k_revive', A.FX.revive, A.FX.shield, A.FX.heal]);
   const skFx = id => { const d = id && SK[id]; if (!d) return; if (d.fx) fxIds.add(d.fx); if (d.fxs) for (const f of d.fxs) fxIds.add(f); };
-  for (const c of A.CLASSES) { const kit = kitFor(c); for (const id of [kit.basic[0], kit.aoe[0], kit.ult[0], kit.heal, kit.group, kit.curse]) skFx(id); }
-  for (const id of ['c_heal', 'p_realm', 'p_barrier', 'w_tiger', 'w_roar', 'm_curse', 'p_sky']) skFx(id);
   for (const [id, d] of Object.entries(SK)) if (d.cls === cls.id) skFx(id);
   for (const col of Object.values(A.SHOT_FX || {})) fxIds.add(col);
   // (loaded too: an effect sheet is loaded as a run needs it, game.js fxWarm)
@@ -999,6 +999,7 @@ export const War = {
 function update(dt) {
   const G = A.G(), W = G.war;
   if (!W || W.over) return;
+  nearKitFx(W);
   if (W.raid) return updateRaid(dt);
   W.t += dt;
   W.left -= dt;
@@ -3209,12 +3210,27 @@ function aiSkillFx(b, id) {
   const fx = A.memberFx ? A.memberFx(id, 1) : null;
   return fx && M.fx[fx] ? fx : null;
 }
-/** The kits' pictures decoded ahead, in the opening count (a sheet first drawn mid-fight stalls a frame). */
+/** How many sheets the field's kits draw from (a test's count: they load as fighters come near, nearKitFx). */
 function warmKitFx(W) {
   const seen = new Set();
   for (const b of W.bodies) for (const s of b.skills || []) { const fx = aiSkillFx(b, s.id); if (fx) seen.add(A.M().fx[fx].src || fx); }
-  A.fxWarm(seen);
   W.kitFx = seen.size;
+  W.kitFxAt = 0;
+}
+/** Twice a second: the kits' pictures of the fighters in view or about to be loaded ahead (off
+ *  the main thread) while the effects' budget has room — what is about to be cast in view is in when
+ *  it is cast; one cast before it is in shows the caster's cue and its blow without the picture. */
+function nearKitFx(W) {
+  const G = A.G();
+  if (G.t < (W.kitFxAt || 0)) return;
+  W.kitFxAt = G.t + 0.5;
+  const c = window.__warCam, x = c ? c[0] : G.player.x, y = c ? c[1] : G.player.y, mx = A.VW() / 2 + 120, my = A.VH() / 2 + 120;
+  const ids = new Set();
+  for (const b of W.bodies) {
+    if (b.dead || !b.skills || Math.abs(b.x - x) > mx || Math.abs(b.y - y) > my) continue;
+    for (const s of b.skills) { const fx = aiSkillFx(b, s.id); if (fx) ids.add(fx); }
+  }
+  if (ids.size && A.fxRoom()) A.fxWarm(ids);
 }
 /** One skill of the fighter's turn, if one is ready and it suits; true when it cast. */
 function castSkills(W, b, t, many, big) {
@@ -7249,7 +7265,11 @@ function keep(map, key, c) {
   map.set(key, c);
   if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (map.get(key) === c) map.set(key, bm); }).catch(() => {});
 }
-/** A body's frame kept cropped to what is drawn (most of a cell is empty): { pic, ox, oy }. */
+/** A body's frame kept cropped to what is drawn (most of a cell is empty): { pic, ox, oy }.
+ *  `c` is the one canvas every frame is drawn on (composeCanvas): only the drawn box is copied out,
+ *  into a canvas of its own size, then into a bitmap of it (that canvas emptied at once). A war makes
+ *  some 3000 frames in its opening count: a canvas of the whole cell each (and the box first drawn
+ *  from it) was some 300 MB of canvases left for the collector — a phone's WebView was killed there. */
 function keepFrame(key, c) {
   const g = c.getContext('2d', { willReadFrequently: true }), W = c.width, H = c.height;
   const d = new Uint32Array(g.getImageData(0, 0, W, H).data.buffer);
@@ -7266,15 +7286,34 @@ function keepFrame(key, c) {
       for (let x = W - 1; x > x1; x--) if (d[r + x] & AM) { x1 = x; break; }
     }
   }
-  // The drawn box of the picture: drawn from the canvas by its box until the bitmap of just that
-  // box is made (a second, cropped canvas cost as much again).
-  const e = x1 >= x0 ? { pic: c, sx: x0, sy: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, ox: x0, oy: y0 } : { pic: c, sx: 0, sy: 0, w: W, h: H, ox: 0, oy: 0 };
+  const box = x1 >= x0 ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : { x: 0, y: 0, w: 1, h: 1 };
+  const crop = document.createElement('canvas');
+  crop.width = box.w;
+  crop.height = box.h;
+  crop.getContext('2d').drawImage(c, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+  const e = { pic: crop, sx: 0, sy: 0, w: box.w, h: box.h, ox: box.x, oy: box.y };
   framesMade++;
-  if (frames.size > 3600) { const old = frames.keys().next().value, v = frames.get(old); frames.delete(old); if (v && v.pic && v.pic.close) v.pic.close(); }
+  if (frames.size > FRAMES_MAX) dropFrame(frames.keys().next().value);
   frames.set(key, e);
   lookAny.set(key.slice(0, key.indexOf('|')), key);
-  if (window.createImageBitmap) { const src = e.pic; createImageBitmap(src, e.sx, e.sy, e.w, e.h).then(bm => { if (e.pic === src) { e.pic = bm; e.sx = e.sy = 0; } }).catch(() => {}); }
+  if (window.createImageBitmap) {
+    createImageBitmap(crop).then(bm => {
+      if (e.pic === crop && frames.get(key) === e) e.pic = bm; else bm.close();
+      crop.width = crop.height = 0;
+    }).catch(() => {});
+  }
   return e;
+}
+/** A kept frame let go (the oldest, past FRAMES_MAX; a war left): its bitmap or canvas emptied now. */
+function dropFrame(key) {
+  const e = frames.get(key);
+  frames.delete(key);
+  freePic(e && e.pic);
+}
+function freePic(pic) {
+  if (!pic) return;
+  if (pic.close) pic.close();
+  else if (pic.getContext) pic.width = pic.height = 0;
 }
 /** A kept frame drawn with its top left at (x, y) of the cell. */
 function blit(ctx, e, x, y) {
@@ -7391,7 +7430,7 @@ const drawFighterKey = (b, pose) => drawFighter(b, 0, 0, pose, 1, true);
  * and whenever a frame is still missing, a fighter shows a frame it has (the last it showed), and
  * a frame of play makes new ones for a few milliseconds at most.
  */
-const COMPOSE_MS = 3, WARM_MS = 20;
+const COMPOSE_MS = 3, WARM_MS = 20, FRAMES_MAX = 3600;
 let composeMs = 0, warmGen = 0;
 const warming = new Set();
 const nowMs = () => performance.now();
@@ -7417,9 +7456,9 @@ function sheetBitmap(path) {
   if (!window.createImageBitmap || !window.fetch) return Promise.resolve(null);
   return fetch('assets/' + path).then(r => (r.ok ? r.blob() : null)).then(bl => (bl ? createImageBitmap(bl) : null)).catch(() => null);
 }
-async function warmLooks(W) {
-  const gen = ++warmGen, G = A.G();
-  const seen = new Map();
+/** The looks of the war's fighters made ahead (warmLooks), nearest the hero first. */
+function warmLooks(W) {
+  const G = A.G(), seen = new Map();
   for (const b of W.bodies) {
     if (!b.cls) continue;
     const L = lookOf(b.cls, b.gear);
@@ -7430,19 +7469,44 @@ async function warmLooks(W) {
     if (!had) seen.set(L.yvKey, Object.assign(L, { d }));
     else had.d = Math.min(had.d, d);
   }
-  // The looks round the hero first; the ones already made (an earlier war's) not again.
-  const looks = [...seen.values()].filter(L => lookFrames(L.H).some(([a, f, m]) => !frames.has(L.yvKey + '|' + a.row + '|' + f + (m ? 'm' : '')))).sort((x, y) => x.d - y.d);
+  warmGen++;
   warming.clear();
-  for (const L of looks) warming.add(L.yvKey);
+  warmQueue.length = 0;
+  // A class's looks one after another (they share their body, head and many a piece: each sheet
+  // decoded once and closed when the next look does not draw from it), the class nearest the hero first.
+  const near = new Map();
+  for (const L of seen.values()) near.set(L.cls.id, Math.min(near.has(L.cls.id) ? near.get(L.cls.id) : 1e9, L.d));
+  for (const L of [...seen.values()].sort((x, y) => near.get(x.cls.id) - near.get(y.cls.id) || (x.cls.id < y.cls.id ? -1 : x.cls.id > y.cls.id ? 1 : 0) || x.d - y.d)) wantLook(L);
+}
+/** A look queued to be made (any of its frames missing): the fighter shows nothing, or the frame it
+ *  showed last, until it is. A frame wanted in play is never made there from sheets loaded for it:
+ *  each look's sheets (five to seven of 1200x1800) held at once for the field's forty looks were
+ *  over a gigabyte decoded. */
+const warmQueue = [];
+let warmRunning = false;
+function wantLook(L) {
+  if (warming.has(L.yvKey)) return;
+  if (!lookFrames(L.H).some(([a, f, m]) => !frames.has(L.yvKey + '|' + a.row + '|' + f + (m ? 'm' : '')))) return;
+  warming.add(L.yvKey);
+  warmQueue.push(L);
+  if (!warmRunning) runWarm();
+}
+async function runWarm() {
+  warmRunning = true;
+  const gen = warmGen, G = A.G();
   const paths = L => Object.entries(L.yv2).map(([kind, v]) => [kind, L.H.layers[kind] && L.H.layers[kind][v]]).filter(x => x[1]).map(([kind, meta]) => [kind, 'yhero2/' + meta.file]);
-  const uses = new Map(), bms = new Map();
-  for (const L of looks) for (const [, p] of paths(L)) uses.set(p, (uses.get(p) || 0) + 1);
+  const bms = new Map();
   const want = L => { for (const [, p] of paths(L)) if (!bms.has(p)) bms.set(p, sheetBitmap(p)); };
+  // (one look's sheets at a time, and only those the next look draws from kept on: a sheet a later
+  // look draws from is decoded again then — kept for every look still queued, and the next look's
+  // decoded meanwhile, the sheets held were 150 to 320 MB at a war's start)
+  const still = p => !!warmQueue[0] && paths(warmQueue[0]).some(([, q]) => q === p);
   try {
-    for (let i = 0; i < looks.length; i++) {
-      const L = looks[i];
+    while (warmQueue.length) {
+      // (the hero's own look first: its sheets and these together were the war's highest moment)
+      for (let n = 0; n < 40 && A.heroBusy && A.heroBusy(); n++) { await nextFrame(); if (gen !== warmGen || A.G() !== G) return; }
+      const L = warmQueue.shift();
       want(L);
-      if (looks[i + 1]) want(looks[i + 1]); // the next look's sheets decode while this one's frames are made
       const src = {};
       for (const [kind, p] of paths(L)) src[kind] = await bms.get(p);
       if (gen !== warmGen || A.G() !== G) return;
@@ -7455,17 +7519,25 @@ async function warmLooks(W) {
         if (j < list.length) { await nextFrame(); if (gen !== warmGen || A.G() !== G) return; }
       }
       warming.delete(L.yvKey);
-      for (const [, p] of paths(L)) {
-        const n = uses.get(p) - 1;
-        uses.set(p, n);
-        if (n <= 0) { const bm = await bms.get(p); if (bm && bm.close) bm.close(); bms.delete(p); }
-      }
+      // The sheets the next look does not draw from: closed now.
+      for (const [p, pr] of [...bms]) if (!still(p)) { bms.delete(p); const bm = await pr; if (bm && bm.close) bm.close(); }
       await nextFrame();
     }
   } finally {
-    if (gen === warmGen) warming.clear();
+    warmRunning = false;
     for (const [, pr] of bms) pr.then(bm => bm && bm.close && bm.close());
+    if (gen !== warmGen) { if (warmQueue.length) runWarm(); } else { warming.clear(); warmQueue.length = 0; }
   }
+}
+/** The one canvas every frame is composed on (keepFrame copies its drawn box out). */
+let composeCv = null;
+function composeCanvas(w, h) {
+  if (!composeCv) composeCv = document.createElement('canvas');
+  if (composeCv.width !== w || composeCv.height !== h) { composeCv.width = w; composeCv.height = h; }
+  const g = composeCv.getContext('2d', { willReadFrequently: true });
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return composeCv;
 }
 function composeFrame(H, b, a, f, mirror, force, src) {
   const k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
@@ -7473,6 +7545,8 @@ function composeFrame(H, b, a, f, mirror, force, src) {
   if (c) return c;
   // While its look is being made ahead, or past this frame's time, a frame is not made in play.
   if (!force && (composeMs > COMPOSE_MS || warming.has(b.yvKey))) return null;
+  // In play (not a one-off picture: a portrait, the result's hero): its look queued to be made.
+  if (!force && !src) { wantLook({ cls: b.cls, yv2: b.yv2, yvKey: b.yvKey, H }); return null; }
   const t0 = nowMs();
   const sheets = {};
   for (const [kind, v] of Object.entries(b.yv2)) {
@@ -7489,10 +7563,8 @@ function composeFrame(H, b, a, f, mirror, force, src) {
   }
   // The class's cell, grown where a 코디 reaches past it (costume.js).
   const box = frameBox(H, Object.values(sheets).map(s => s.meta)), { cw, ch, fx, fy } = box;
-  c = document.createElement('canvas');
-  c.width = cw;
-  c.height = ch;
-  const g = c.getContext('2d', { willReadFrequently: true });
+  const cv = composeCanvas(cw, ch);
+  const g = cv.getContext('2d', { willReadFrequently: true });
   // The shadow under the feet, in the same picture.
   g.fillStyle = 'rgba(0,0,0,0.3)';
   g.beginPath();
@@ -7500,7 +7572,7 @@ function composeFrame(H, b, a, f, mirror, force, src) {
   g.fill();
   if (mirror) { g.translate(cw, 0); g.scale(-1, 1); }
   drawLayers(g, H, sheets, a, f, box);
-  c = keepFrame(k, c);
+  c = keepFrame(k, cv);
   c.m = mirror;
   c.box = box;
   composeMs += nowMs() - t0;
@@ -7524,9 +7596,8 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   let mirror = name !== 'dead' && dir === 'side' && fdx > 0;
   let k = b.yvKey + '|' + a.row + '|' + f + (mirror ? 'm' : '');
   const last = b.lastKey && frames.has(b.lastKey) ? b.lastKey : lookAny.get(b.yvKey);
-  // A fighter with no frame at all yet is made one now, unless its look is being made ahead (it
-  // shows within the opening count).
-  let c = composeFrame(H, b, a, f, mirror, noDraw || (!(last && frames.has(last)) && !warming.has(b.yvKey)));
+  // A frame missing in play: its look queued to be made (wantLook); meanwhile the last it showed.
+  let c = composeFrame(H, b, a, f, mirror, noDraw);
   if (c === false) return false;
   if (!c) {
     // Out of this frame's making time: the frame it showed last (made already), as it was.
@@ -7535,6 +7606,8 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
     k = last;
     mirror = !!c.m;
   }
+  // (kept the longest of all: the frames drawn lately; FRAMES_MAX lets go of the least lately drawn)
+  else if (!noDraw) { frames.delete(k); frames.set(k, c); }
   b.lastKey = k;
   if (noDraw) return true;
   const ctx = A.ctx;
