@@ -912,6 +912,59 @@ def cinema_hole(f, e, frames=None, fi=None, want_keep=False):
     return (a, hole, rf_keep) if want_keep else (a, hole)
 
 
+def tidy_cell(cell, t):
+    """A cell's own pixels tidied after the parts are laid ("tidy" {…}, each optional, in this order):
+    "grey" [expressions over the cell's colours] — a caster's grey and white fragments left in a coloured light: cleared;
+    "whitespeck" [least channel, px] — a lone white dot (a star's rim) apart from the drawing: cleared;
+    "mend" px — holes the drawing closes round (a bar, a star, a body cut out of the light) up to px dots: each dot from the
+    nearest dot of the drawing round it, colour and opacity (a broken dot filled with the same colour beside it);
+    "dark" brightest — an opaque dark dot (a body's shadow read as the light's colour) from the nearest dot of the light;
+    "whitecore" [least channel, px] — white well inside the drawing (px in from its rim) made solid;
+    "edge" px — the rim of what is left faded over px (a hole's straight cut ends softly, not on a line)."""
+    from scipy import ndimage
+    q = cell[..., :3].astype(np.float32)
+    env = {"r": q[..., 0], "g": q[..., 1], "b": q[..., 2], "mn": q.min(axis=2), "mx": q.max(axis=2), "a": cell[..., 3].astype(np.float32), "np": np}
+    if t.get("grey"):
+        k = np.zeros(cell.shape[:2], bool)
+        for ex in t["grey"]:
+            k |= eval(ex, {}, env)
+        cell[k, 3] = 0
+    if t.get("whitespeck"):
+        lo, px = t["whitespeck"]
+        lab, n = ndimage.label(cell[..., 3] > 20)
+        if n:
+            sz = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
+            wm = ndimage.mean(env["mn"], lab, range(1, n + 1))
+            cell[np.isin(lab, 1 + np.nonzero((sz <= px) & (np.asarray(wm) >= lo))[0]), 3] = 0
+    if t.get("dark"):
+        dk = (cell[..., :3].max(axis=2) < t["dark"]) & (cell[..., 3] > 0)
+        if dk.any():
+            _, (iy, ix) = ndimage.distance_transform_edt(dk | (cell[..., 3] < 40), return_indices=True)
+            cell[dk] = cell[iy[dk], ix[dk]]
+    if t.get("mend"):
+        solid = cell[..., 3] > 60
+        gap = ndimage.binary_fill_holes(solid) & ~solid
+        lab, n = ndimage.label(gap)
+        if n:
+            sz = ndimage.sum(gap, lab, range(1, n + 1))
+            h = np.isin(lab, 1 + np.nonzero(sz <= t["mend"])[0])
+            if h.any():
+                _, (iy, ix) = ndimage.distance_transform_edt(~solid, return_indices=True)
+                cell[h] = cell[iy[h], ix[h]]
+    if t.get("whitecore"):
+        # (the light's white heart, see-through where a body under it was unmixed out: solid again, as the original
+        # shows it — only well inside the drawing, its fringe kept as it was)
+        lo, inset = t["whitecore"]
+        inner = ndimage.binary_erosion(ndimage.binary_fill_holes(cell[..., 3] > 60), iterations=inset)
+        w = inner & (cell[..., :3].min(axis=2) >= lo) & (cell[..., 3] > 20)
+        cell[w, 3] = 255
+    if t.get("edge"):
+        al = cell[..., 3].astype(np.float32)
+        d = ndimage.distance_transform_edt(al > 30)
+        cell[..., 3] = (al * np.clip(d / t["edge"], 0, 1)).astype(np.uint8)
+    return cell
+
+
 def parts_cells(frames, e):
     """mode "parts": each frame's cell put together from parts of the capture (see the module's notes)."""
     cw, ch = e["cell"]
@@ -1332,6 +1385,10 @@ def parts_cells(frames, e):
             al_ = ndimage.uniform_filter(f_[..., 3], 2)
             rgb_ = np.stack([ndimage.uniform_filter(f_[..., c] * f_[..., 3], 2) for c in range(3)], -1) / np.maximum(al_, 1)[..., None]
             cell = np.dstack([rgb_, al_]).clip(0, 255).astype(np.uint8)
+        for td in ([e["tidy"]] if isinstance(e.get("tidy"), dict) else e.get("tidy", [])):
+            # (each {…} for every cell, or with "cells" [i …] for those only)
+            if "cells" not in td or ci in td["cells"]:
+                cell = tidy_cell(cell, td)
         if e.get("nogray"):
             # (a grey blade or post left in a coloured effect: dark and without colour — the effect's own pixels have it)
             mx_, mn_ = cell[..., :3].max(axis=2).astype(int), cell[..., :3].min(axis=2).astype(int)
@@ -1667,6 +1724,13 @@ def build(spec, src_dir, out_dir, only=None):
                     if n:
                         sz = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
                         al[np.isin(lab, 1 + np.nonzero(sz < e["despeck"])[0])] = 0
+                if e.get("gain"):
+                    # (colour matched to the original as seen: shrunk to the cell and drawn smaller again in the game, the
+                    # art's thin bright lines blur into the black and it reads dimmer and greyer than the capture —
+                    # "gain" [brightness, saturation], measured against the capture's own frames at the same scale)
+                    gv, gs = e["gain"]
+                    lum = a.mean(axis=2, keepdims=True)
+                    a = np.clip((lum + (a - lum) * gs) * gv, 0, 255)
                 a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
                 # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the
