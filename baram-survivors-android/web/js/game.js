@@ -7783,6 +7783,8 @@ function cast(skill, st) {
     }
   }
   if (used && def.wind9 && (promoOf(G.cls.id) >= 9 || G.training || window.__windAlways)) heukWind(def.wind9, skill);
+  // 화살비폭격 (원작 9차 패시브): 염시투사·응축뇌전시·마탄 bring the rain of arrows before the hero
+  if (used) hwasalbi9(skill, st);
   // 전도체 (원작 9차 패시브): 천뢰마옥쌍구 or 뇌격구 brings 과전류, one time in two (9차 승급부터, 수련장에서는 늘)
   const oc = SKILLS.m_jeondo && SKILLS.m_jeondo.proc9;
   if (used && oc && oc.ids.includes(skill.id) && G.cls.id === 'mage' && (promoOf('mage') >= 9 || G.training) && (window.__overAlways || Math.random() < oc.chance)) {
@@ -7809,6 +7811,149 @@ function cast(skill, st) {
     strikePose(melee && !isMend(def) ? 'attack' : 'magic');
     G.player.castUntil = G.t + 0.3; // 기본 공격: not in the middle of a cast
   }
+}
+
+// ---------------------------------------------------------------- 궁사 9차 (원작 2662 IMG40·42·44)
+/** 응축뇌전시 (원작 2662 IMG44, its first part): the great lightning arrow (o_a_eungbolt at the original's own size, drawn
+ *  going right, turned the way it flies) shot along the row with the most foes, up to `depth` tiles; what it passes (its
+ *  tile and one to each side) is struck and drawn onto its path. At its end the blue rune disk opens (o_a_eungvortex, its
+ *  middle the arrow's end): what stands within `endR` game pixels of it (the disk's own round) is drawn a step in and blown
+ *  up as the disk shatters. 이펙트=판정: the arrow's path, the disk. */
+function eungchuk9(st, def, smite) {
+  const p = G.player, best = tkBestRow(def.depth, DIRS);
+  const near = tkNear(p.tx, p.ty, def.depth);
+  if (!best && !near.length) return 0.3;
+  let dx, dy;
+  if (best) [dx, dy] = best;
+  else { const e = near[0], ex = e.tx - p.tx, ey = e.ty - p.ty; if (Math.abs(ex) >= Math.abs(ey)) { dx = Math.sign(ex); dy = 0; } else { dx = 0; dy = Math.sign(ey); } }
+  if (window.__eungDir) [dx, dy] = window.__eungDir; // (test: the way it is shot)
+  p.fdx = dx; p.fdy = dy;
+  if (dx) p.face = dx;
+  const run = G, sx = p.tx, sy = p.ty, len = def.depth * TILE, x0 = p.x, y0 = p.y - 24, steps = Math.round(def.dur / 0.075);
+  const ex = x0 + dx * len, ey = y0 + dy * len, rot = Math.atan2(dy, dx), alpha = settings.calmFx ? 0.8 : 1;
+  // the arrow: its head (the cell's pivot) running from the hero to the end
+  if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: def.dur, scale: 1, rot, anchor: 'bottom', alpha, must: true, loop: true, mv: [dx * len, dy * len, def.dur] });
+  const seen = new Set();
+  for (let s = 1; s <= steps; s++) later(s * 0.075, () => {
+    if (G !== run) return;
+    const k = Math.round((s / steps) * def.depth), cx = sx + dx * k, cy = sy + dy * k;
+    G.quietHit = true;
+    for (let o = -1; o <= 1; o++) for (const e of onTiles([[cx + (dy ? o : 0), cy + (dx ? o : 0)]])) {
+      if (seen.has(e)) continue;
+      seen.add(e);
+      if (dx) tkShove(e, e.tx, cy); else tkShove(e, cx, e.ty);
+      smite(e, st.dmg * def.k);
+    }
+    G.quietHit = false;
+  });
+  later(def.dur, () => {
+    if (G !== run) return;
+    if (M.fx[def.fxEnd]) G.fxs.push({ id: def.fxEnd, x: ex, y: ey, t: 0, life: fxLife(def.fxEnd), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
+    const R = def.endR || 92, inDisk = e => tkFoe(e) && Math.hypot(e.x - ex, e.y - 24 - ey) <= R;
+    // drawn in to the middle as the disk turns, blown up as it shatters (its last frames)
+    later(0.15, () => { if (G === run) for (const e of G.enemies) if (inDisk(e)) tkShove(e, e.tx - Math.sign(e.tx - (sx + dx * def.depth)), e.ty - Math.sign(e.ty - (sy + dy * def.depth))); });
+    later(Math.max(0.2, fxLife(def.fxEnd) - 0.16), () => {
+      if (G !== run) return;
+      G.shake = Math.max(G.shake, 0.08);
+      G.quietHit = true;
+      for (const e of G.enemies) if (inDisk(e) || (tkFoe(e) && Math.hypot(e.x - ex, e.y - 24 - ey) <= R + 24)) smite(e, st.dmg * def.endBurst);
+      G.quietHit = false;
+    });
+  });
+}
+
+const IGI_CROSS = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+/** 이기뇌멸시 (원작 2662 IMG40): `n` 뇌전시 shot at the nearest foes within `range` (one each, the nearest first): each comes
+ *  down out of the sky on its foe (o_a_igibolt at the original's own size, its pivot the arrowhead's point at the foe's
+ *  feet) and bursts; the 뇌기 spreads over the ground — a pool of lightning opens on its tile and on the four beside it
+ *  (o_a_igipool) — striking what stands on those tiles and holding them `stun` seconds (경직). 이펙트=판정: the pools. */
+function igi9(st, def, smite) {
+  const p = G.player, foes = tkNear(p.tx, p.ty, st.range || def.range).slice(0, def.n || 5);
+  if (!foes.length) return 0.3;
+  const run = G, alpha = settings.calmFx ? 0.8 : 1, fall = 0.12;
+  if (Math.abs(foes[0].x - p.x) > 2) p.face = Math.sign(foes[0].x - p.x);
+  foes.forEach((t, i) => later(i * 0.06, () => {
+    if (G !== run) return;
+    const tx = t.tx, ty = t.ty, fx = tx * TILE + TILE / 2, fy = ty * TILE + TILE - 6;
+    // the bolt falls the last stretch onto the spot, and stands a moment
+    if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: fx, y: fy - 60, t: 0, life: fall + 0.16, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, loop: true, mv: [0, 60, fall] });
+    later(fall, () => {
+      if (G !== run) return;
+      G.quietHit = true;
+      if (t.hp > 0) { smite(t, st.dmg); tkAfflict(t, { stun: def.stun }); }
+      G.quietHit = false;
+      // the pools open one after another, out from the struck tile
+      IGI_CROSS.forEach(([ox, oy], j) => later(j ? 0.08 : 0, () => {
+        if (G !== run) return;
+        const px = (tx + ox) * TILE + TILE / 2, py = (ty + oy) * TILE + TILE - 14;
+        if (M.fx[def.fxPool]) tkLoop(def.fxPool, px, py, 0.8, { alpha: alpha * 0.95, anchor: 'bottom' });
+        if (!j) return;
+        G.quietHit = true;
+        for (const e of onTiles([[tx + ox, ty + oy]])) { smite(e, st.dmg * (def.poolK || 0.5)); tkAfflict(e, { stun: def.stun }); }
+        G.quietHit = false;
+      }));
+    });
+  }));
+}
+
+/** 천궁난사 (원작 2662 IMG42): for `duration` seconds, every `every`, a fire arrow of 천궁 at one of the foes ahead (the way
+ *  the hero faces, within `range` tiles; the one in front with the most round it first, then the others in turn); where it
+ *  strikes, the great burst of fire (o_a_cheongung at the original's own size, its middle on the foe) — what stands in the
+ *  3×3 under it is struck and burns. 이펙트=판정: the burst (2.4 tiles across) over the 3×3 it strikes. */
+function cheon9(st, def, smite) {
+  const p = G.player, r = def.range || 5;
+  const ahead = () => {
+    const fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = p.fdx ? 0 : p.fdy || 0;
+    return tkNear(p.tx, p.ty, r).filter(e => fx ? Math.sign(e.tx - p.tx) === Math.sign(fx) && Math.abs(e.ty - p.ty) <= Math.abs(e.tx - p.tx) + 1
+      : Math.sign(e.ty - p.ty) === fy && Math.abs(e.tx - p.tx) <= Math.abs(e.ty - p.ty) + 1);
+  };
+  let list = ahead();
+  if (!list.length) {
+    // (none ahead: turned to the nearest)
+    const e = tkNear(p.tx, p.ty, r)[0];
+    if (!e) return 0.3;
+    const ex = e.tx - p.tx, ey = e.ty - p.ty;
+    if (Math.abs(ex) >= Math.abs(ey)) { p.fdx = Math.sign(ex) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(ey); }
+    list = ahead();
+    if (!list.length) return 0.3;
+  }
+  const run = G, n = Math.max(1, Math.round((def.duration || 1.25) / (def.every || 0.25))), alpha = settings.calmFx ? 0.8 : 1, used = new Map();
+  for (let i = 0; i < n; i++) later(i * (def.every || 0.25), () => {
+    if (G !== run || G.dead) return;
+    const pool = ahead();
+    if (!pool.length) return;
+    // the thickest first, then each in turn (the one shot least)
+    const t = pool.slice(0, 10).sort((a, b) => (used.get(a) || 0) - (used.get(b) || 0) || around(b.tx, b.ty, 1).length - around(a.tx, a.ty, 1).length)[0];
+    used.set(t, (used.get(t) || 0) + 1);
+    const tx = t.tx, ty = t.ty;
+    G.fxs.push({ id: def.fx, x: tx * TILE + TILE / 2, y: ty * TILE + TILE - 30, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
+    later(0.06, () => {
+      if (G !== run) return;
+      G.quietHit = true;
+      for (const e of around(tx, ty, def.radius || 1)) { smite(e, e === t ? st.dmg : st.dmg * 0.7); tkAfflict(e, def); }
+      G.quietHit = false;
+    });
+  });
+}
+
+/** 화살비폭격 (궁사 9차 패시브; 원작 2662 IMG44, after 응축뇌전시): a cast of one of proc9.ids brings a rain of white arrows
+ *  `ahead` tiles before the hero (the way it faces): o_a_hwasalbi (the original's own streaks and dust, its middle there),
+ *  striking what stands within its half width and depth `ticks` times as it falls. 이펙트=판정: the rain's ground. */
+function hwasalbi9(skill, st) {
+  const c = SKILLS.a_hwasalbi && SKILLS.a_hwasalbi.proc9;
+  if (!c || !c.ids.includes(skill.id) || G.cls.id !== 'archer' || !(promoOf('archer') >= 9 || G.training || window.__rainAlways)) return;
+  if (G.t < (G.rain9At || 0)) return;
+  G.rain9At = G.t + (c.cd || 1);
+  const p = G.player, fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = p.fdx ? 0 : p.fdy || 0;
+  const x = p.x + Math.sign(fx) * c.ahead * TILE, y = p.y - 20 + fy * c.ahead * TILE, run = G, [hx, hy] = c.half;
+  tkLoop(c.fx, x, y, fxLife(c.fx), { alpha: settings.calmFx ? 0.75 : 1, anchor: 'bottom' });
+  const d = (st.dmg || 30) * c.k;
+  for (let k = 0; k < c.ticks; k++) later(0.15 + k * (fxLife(c.fx) - 0.2) / c.ticks, () => {
+    if (G !== run || G.dead) return;
+    G.quietHit = true;
+    for (const e of G.enemies) if (tkFoe(e) && Math.abs(e.x - x) <= hx && Math.abs(e.y - 20 - y) <= hy) hurtEnemy(e, d);
+    G.quietHit = false;
+  });
 }
 
 // ---------------------------------------------------------------- 차수별 고유 기술 (TIER_KINDS)
@@ -8381,6 +8526,7 @@ const TIER_KINDS = {
   },
   // 회오리, 회색지대: a whirl sent down the row of most foes, drawing those beside its path onto it.
   vortex({ st, def, fxid, smite }) {
+    if (def.fxEnd) return eungchuk9(st, def, smite);
     const p = G.player, best = tkBestRow(def.depth, DIRS);
     const near = tkNear(p.tx, p.ty, def.depth);
     if (!best && !near.length) return 0.3;
@@ -9155,6 +9301,9 @@ const TIER_KINDS = {
   // faces) for `duration` (o_m_hwanyeong at the original's own size, its pivot the hero's feet where it was cast); every
   // `tick` the foes in it (reach: from and to how far ahead, side: how far to each side) lose their way — slowed,
   // cursed (they take more) — and are struck a little.
+  // 궁사 9차 (원작 2662 IMG40, IMG42): see igi9, cheon9 above
+  igi9({ st, def, smite }) { return igi9(st, def, smite); },
+  cheon9({ st, def, smite }) { return cheon9(st, def, smite); },
   fog9({ skill, st, def }) {
     const p = G.player, fx = p.fdx || (p.face || -1), fy = p.fdx ? 0 : p.fdy || 0;
     const ux = fy ? 0 : Math.sign(fx) || -1, uy = fy, [r0, r1] = def.reach, side = def.side;

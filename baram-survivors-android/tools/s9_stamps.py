@@ -124,7 +124,91 @@ def seori(src_dir):
     return cells, {"cell": [cw, ch], "n": N, "ms": 80, "add": False, "cap": 420, "anchor": [ox, oy], "src": "gif2662/IMG23.gif", "k": 0.62}
 
 
-BUILDERS = {"m_seori": seori}
+def white_pieces(fr, bg, frames, x_max=682):
+    """the clear white pieces (arrow streaks, dust) of 2662 IMG44's 화살비폭격, frames `frames`: [(kind, rgba, foot x, foot y)].
+    A piece is kept only when nothing round it is a number's blue, a hit star's orange, a bar's green or a digit's dark rim
+    (6 px clear); its opacity and colour from how far it moved from the clean frame (O = a·F + (1−a)·B)."""
+    out = []
+    for f in frames:
+        a = fr[f].astype(np.float32)
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        D = a - bg
+        d = np.abs(D).max(2)
+        white = (d > 35) & (a.min(2) > 150) & (a.max(2) - a.min(2) < 45)
+        bad = ((r > 190) & (r - b > 70)) | ((b - r > 60) & (b > 120)) | ((g > r + 40) & (g > b + 40)) | ((b - r > 25) & (a.max(2) < 140))
+        bad = ndimage.binary_dilation(bad, iterations=6)
+        lab, n = ndimage.label(ndimage.binary_dilation(white, iterations=2))
+        for k, sl in enumerate(ndimage.find_objects(lab)):
+            comp = lab[sl] == k + 1
+            h, w = comp.shape
+            if comp.sum() < 30 or (bad[sl] & comp).any() or sl[1].start < 4 or sl[1].stop > x_max or sl[0].start < 2:
+                continue
+            kind = 'streak' if h > 2.5 * w and h > 30 else ('puff' if comp.sum() > 120 and h < 2 * w + 10 else None)
+            if not kind:
+                continue
+            y0, y1, x0, x1 = sl[0].start - 3, sl[0].stop + 3, sl[1].start - 3, sl[1].stop + 3
+            reg = ndimage.binary_dilation(lab == k + 1, iterations=2)[y0:y1, x0:x1]
+            al = np.clip((d[y0:y1, x0:x1] - 14) / 90, 0, 1) * reg
+            F = np.clip(bg[y0:y1, x0:x1] + D[y0:y1, x0:x1] / np.maximum(al, 0.05)[..., None], 0, 255)
+            # (white: the ground's own tint taken out of what is left — no brown or grey haze round a white piece)
+            F = np.where((al > 0)[..., None], np.maximum(F, F.max(2, keepdims=True) - 12), 0)
+            rgba = np.dstack([F, al * 255]).astype(np.uint8)
+            ys, xs = np.nonzero(reg)
+            out.append((kind, Image.fromarray(rgba), int(np.median(xs)), int(ys.max())))
+    return out
+
+
+def hwasalbi(src_dir):
+    """화살비폭격 (궁사 9차 패시브; 2662 IMG44 frames 10-22, after 응축뇌전시): white arrows streak down out of the sky onto the
+    ground ahead and burst into white dust. The capture's field is thick with numbers and stars over the dummies, so only the
+    streaks and the dust standing clear of all of them are taken, each whole, and set over the rain's own ground (cell
+    ±130 × ±80 capture px round its middle = ±81 × ±50 game px at k 0.62): each streak falls on its spot over two frames and
+    leaves its dust there, which fades — 14 spots in turn on a 12-frame loop. Pieces only moved, never drawn."""
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG44.gif"))
+    ps = white_pieces(fr, fr[0].astype(np.float32), range(10, 23))
+    seen, uniq = set(), []
+    for p in ps:
+        key = (p[0], p[1].size, p[2], p[3])
+        if key not in seen:
+            seen.add(key)
+            uniq.append(p)
+    streaks = sorted([p for p in uniq if p[0] == 'streak'], key=lambda p: -p[1].height)
+    puffs = sorted([p for p in uniq if p[0] == 'puff'], key=lambda p: -(p[1].width * p[1].height))
+    cw, ch, ox, oy, hx, hy = 330, 300, 165, 190, 130, 80  # (room above for the streaks coming down)
+    spots = []
+    for j in range(3):
+        cols = 5 if j % 2 == 0 else 4
+        for i in range(cols):
+            x = ox - hx + 14 + (i + (0.5 if cols == 4 else 0)) * (2 * hx - 28) / 4
+            spots.append((x, oy - hy + 16 + j * (2 * hy - 32) / 2))
+    rng = np.random.RandomState(44)
+    order = rng.permutation(len(spots))
+    N = 12
+    cells = [Image.new("RGBA", (cw, ch)) for _ in range(N)]
+    for si, (x, y) in enumerate(spots):
+        sk = streaks[si % len(streaks)]
+        pf = puffs[si % min(len(puffs), 6)]
+        ph = int(order[si] * N / len(spots))
+        for t in range(N):
+            loc = (t - ph) % N
+            if loc < 2:
+                # the streak falling onto its spot (its foot 40, then 12 px above it)
+                img, bx, by = sk[1], sk[2], sk[3]
+                fy = y - (40 if loc == 0 else 12)
+                cells[t].alpha_composite(img, (int(round(x - bx)), int(round(fy - by))))
+            if 2 <= loc <= 5:
+                img, bx, by = pf[1], pf[2], pf[3]
+                arr = np.asarray(img).astype(np.float32).copy()
+                arr[..., 3] *= {2: 1.0, 3: 1.0, 4: 0.65, 5: 0.3}[loc]
+                cells[t].alpha_composite(Image.fromarray(arr.astype(np.uint8)), (int(round(x - bx)), int(round(y + 6 - by))))
+                if loc == 2:
+                    # (the streak still standing in the dust as it lands)
+                    img, bx, by = sk[1], sk[2], sk[3]
+                    cells[t].alpha_composite(img, (int(round(x - bx)), int(round(y - by))))
+    return cells, {"cell": [cw, ch], "n": N, "ms": 80, "add": False, "cap": 420, "anchor": [ox, oy], "src": "gif2662/IMG44.gif", "k": 0.62}
+
+
+BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi}
 
 
 def main():
