@@ -33,9 +33,9 @@ here: each frame is the client's own pixels, taken off their backdrop:
                            far the pixel moved from the field ("bg": a clean frame; t0/t1), kept only where it
                            went darker and redder ("red": least red over blue);
                   "diff" — mode "diff" with the part's own "bg".
-  mode "cinema" also takes "vignette" [rx, ry, soft] (shares of the half width/height): the art faded out towards an
+  mode "cinema" also takes "stars" (the hit stars' orange taken out with the numbers) and "vignette" [rx, ry, soft] (shares of the half width/height): the art faded out towards an
                 ellipse's edge, for a cinematic drawn smaller than the screen (no hard rectangle of art on the field).
-Each entry: src, mode, frames [start, end, step] (default all), box [x0, y0, x1, y1], bg (frame
+Each entry: src, mode, frames [start, end, step] (default all; "skip" [frame …] left out), box [x0, y0, x1, y1], bg (frame
 index, diff), t0/t1 (diff ramp), mask [[x0, y0, x1, y1] ...], half (halve the size: the client draws
 at about twice the old one's pixel size), anchor [fx, fy] (where the target's feet fall, as a share
 of the cell; default the middle), ms (per frame), add (drawn added), max (cell's longest side, 360),
@@ -149,7 +149,7 @@ def keyed(frames, i, e, part=None):
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
     if key == "dark":
         return key_dark(a, bg, e)
-    return diffed(frames[i], frames[part.get("bg", e.get("bg", 0))], e.get("t0", 18), e.get("t1", 70))
+    return diffed(frames[i], frames[part.get("bg", e.get("bg", 0))], part.get("t0", e.get("t0", 18)), part.get("t1", e.get("t1", 70)))
 
 
 def parts_cells(frames, e):
@@ -161,7 +161,7 @@ def parts_cells(frames, e):
     for parts in e["cells"]:
         cell = np.zeros((ch, cw, 4), dtype=np.uint8)
         for part in parts:
-            ck = (part["f"], part.get("key"), part.get("bg"))
+            ck = (part["f"], part.get("key"), part.get("bg"), part.get("t0"), part.get("t1"))
             if ck not in cache:
                 cache[ck] = keyed(frames, part["f"], e, part)
             a = cache[ck].copy()
@@ -231,7 +231,7 @@ def build(spec, src_dir, out_dir, only=None):
             continue
         frames, durs = frames_of(os.path.join(src_dir, e["src"]))
         s, t, st = (e.get("frames") or [0, len(frames), 1])
-        pick = list(range(s, min(t, len(frames)), st))
+        pick = [i for i in range(s, min(t, len(frames)), st) if i not in e.get("skip", [])]
         box = e.get("box")
         mode = e.get("mode", "white")
         bg = frames[e.get("bg", 0)] if mode == "diff" else None
@@ -267,6 +267,8 @@ def build(spec, src_dir, out_dir, only=None):
                 hole = ((bl > 170) & (r < 120) & (bl - r > 90)) | (a.min(axis=2) > e.get("white", 225))
                 if e.get("bars"):  # the life bars' green and the DEAD labels' red over the field
                     hole |= ((g > 140) & (r < 110) & (bl < 110)) | ((r > 150) & (g < 40) & (bl < 40))
+                if e.get("stars"):  # the hit stars' orange round the damage numbers (질풍난무: not the bamboo's yellow)
+                    hole |= (r > 190) & (g < 170) & (bl < 100) & (r - g > 60)
                 hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
                 if e.get("hero"):
                     cx, cy, rx, ry = e["hero"]

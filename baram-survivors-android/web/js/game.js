@@ -5902,7 +5902,9 @@ function hurtEnemy(e, dmg, push = null) {
   // of the roll, 최종 피해 the whole; 치명타 확률·피해 below. A companion's blows are its own.
   const own = !G.allyHitting;
   const lo = own ? Math.min(1.08, 0.9 + GEAR_OPT.floor * opt('floor')) : 0.9;
+  if (own && G.coat9 && G.t < G.coat9.win) coatInfect(e); // 묵혈독바르기: a striking skill's blows while it is on
   dmg *= (lo + Math.random() * (1.1 - lo)) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
+    * (e.venom9 && e.venom9.until > G.t ? 1 + (e.venom9.k || 0) : 1)
     * (own ? 1 + GEAR_OPT.final * opt('final') : 1)
     * (e.st && e.st.mark && e.st.mark.until > G.t ? 1 + e.st.mark.k : 1)
     * (e.kind === 'boss' || e.kind === 'mini' ? 1 + 0.25 * opt('boss') : 1)
@@ -5986,8 +5988,9 @@ function hurtEnemy(e, dmg, push = null) {
   // 연's strike marks on the struck: a claw slash for blade classes, a burst of fire for a
   // 주술사's heavy blow; a crit stops the world for a blink. Budgeted, not on a whole crowd.
   // A close-in fighter's blows carry its own 연 hit flash (meleeMark).
-  const look = !G.allyHitting && !G.procHitting && MELEE_LOOK[G.cls.id];
-  if (look && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2 && M.fx[look.hit]) meleeMark(e, look, crit);
+  // (G.quietHit: a 9차 blow whose original shows no hit mark — its own picture is the whole of what is seen)
+  const look = !G.allyHitting && !G.procHitting && !G.quietHit && MELEE_LOOK[G.cls.id];
+  if (G.quietHit) { /* no mark */ } else if (look && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2 && M.fx[look.hit]) meleeMark(e, look, crit);
   else if (G.spark && !G.allyHitting && !G.procHitting) {
     // A caster's spell: 연's small spark of its element (fire, lightning, an arrow's, a claw's)
     // on each one struck, a little larger on a crit. Budgeted, not on a whole crowd.
@@ -6477,6 +6480,17 @@ function killEnemy(e) {
   if (G.endEnd) Hunt.sweepKill(e); // 사냥 기믹: 소탕's spoils
   if (G.player.abyssHunt && !G.allyHitting) abyssBurst(e);
   if (e.venom9) venomBurst(e); // 묵혈독바르기
+  // 죽음의희열 (원작 9차 패시브, 설명창 IMG14; no picture — 2662 IMG15 shows only 묵마수리검'쇄 thrown again): a kill
+  // brings, three times in ten, one of the 수리검 skills ready at once (at most once in three seconds)
+  const jg = SKILLS.r_jugeum && SKILLS.r_jugeum.proc9;
+  if (jg && G.cls.id === 'rogue' && !G.allyHitting && (promoOf('rogue') >= 9 || G.training) && G.t >= (G.jugeumAt || 0) && Math.random() < jg.chance) {
+    const ready = G.skills.filter(s => jg.ids.includes(s.id) && s.timer > 0.3);
+    if (ready.length) {
+      ready[Math.floor(Math.random() * ready.length)].timer = 0.05;
+      G.jugeumAt = G.t + jg.cd;
+      note('죽음의희열: 수리검의 재사용 대기가 끝났습니다.');
+    }
+  }
   // 영혼갈무리·죽음의희열 (9차): a foe felled while it is up brings the other skills' waits nearer
   if (G.buffs.killCut > G.t) for (const s of G.skills) if (s.timer > 0.5 && SKILLS[s.id].kind !== 'ult') s.timer -= Math.min(s.timer * 0.25, G.buffs.killCutK || 0.125);
   gearProc('kill', e);
@@ -7600,6 +7614,12 @@ function cast(skill, st) {
     }
   }
   if (used && def.wind9 && (promoOf(G.cls.id) >= 9 || G.training || window.__windAlways)) heukWind(def.wind9, skill);
+  // 묵혈독바르기: a striking skill cast while the blade is coated takes a charge — its blows for the next second leave 묵혈독
+  if (used && G.coat9 && def.kind !== 'coat9' && (def.dmg || def.hit) && G.t < G.coat9.until && G.coat9.n > 0) {
+    G.coat9.n--;
+    G.coat9.win = G.t + 1.2;
+    if (!G.coat9.n) G.coat9.until = G.t + 1.2;
+  }
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
@@ -8733,6 +8753,115 @@ const TIER_KINDS = {
       });
     }
   },
+  // 묵마수리검'쇄 (원작 2662 IMG13): eight blue kunai thrown the eight ways — the white-blue streak of each flight
+  // (o_r_swaefly) cutting what it passes — stand `ring` game pixels out (the original's 260 capture pixels: three
+  // tiles and a third) for `dur` seconds, points to the hero, round the spot it was cast on (o_r_swaestar at the
+  // original's own size); every `tick` what stands inside their ring is ground, and at the end each goes in a white
+  // glint and a burst of blue fire (o_r_swaeend) striking what it covers. 이펙트=판정: the streaks, the ring the eight
+  // stand on, the bursts.
+  swae9({ skill, st, def, smite }) {
+    // (the original's own size: def.fx itself, not grown with the 단 — what it strikes is fixed in pixels)
+    const p = G.player, R = def.ring || 159, fxid = def.fx;
+    const cx = p.x, cy = p.y - 20, inRing = e => Math.hypot(e.x - cx, e.y - 20 - cy) <= R;
+    if (!G.enemies.some(e => tkFoe(e) && Math.hypot(e.x - cx, e.y - 20 - cy) <= R + 24)) return 0.3;
+    const run = G, n = def.n || 8, dur = def.dur || 5, alpha = settings.calmFx ? 0.75 : 1;
+    const spots = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+      spots.push([x, y, a]);
+      // the streak out, its pivot the hero (the picture is drawn going right: turned the way it flies)
+      if (def.fxFly && M.fx[def.fxFly]) G.fxs.push({ id: def.fxFly, x: cx, y: cy, t: 0, life: fxLife(def.fxFly), scale: 1, rot: a, anchor: 'bottom', alpha, must: true });
+      // the kunai standing at the ring's edge, its tip to the hero (drawn pointing left: turned by its own angle)
+      later(0.2, () => {
+        if (G !== run) return;
+        G.fxs.push({ id: fxid, x, y, t: 0, life: dur, scale: 1, rot: a, anchor: 'bottom', loop: true, seenLoop: true, alpha });
+      });
+    }
+    // the flight: what lies on each streak (within a third of a tile of its line), once
+    later(0.1, () => {
+      if (G !== run) return;
+      const seen = new Set();
+      for (const [x, y] of spots) for (const e of G.enemies) {
+        if (!tkFoe(e) || seen.has(e)) continue;
+        const ux = x - cx, uy = y - cy, ex = e.x - cx, ey = e.y - 20 - cy, t = (ex * ux + ey * uy) / (R * R);
+        if (t < 0 || t > 1 || Math.abs(ex * uy - ey * ux) / R > TILE * 0.45) continue;
+        seen.add(e);
+        G.quietHit = true;
+        smite(e, st.dmg);
+        G.quietHit = false;
+      }
+    });
+    // inside the ring, ground every tick while they stand
+    const ticks = Math.round(dur / def.tick);
+    for (let k = 1; k <= ticks; k++) later(0.2 + k * def.tick, () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true; // (no hit marks: the original shows the ring and nothing else while it grinds)
+      for (const e of G.enemies) if (tkFoe(e) && inRing(e)) smite(e, st.dmg * def.k);
+      G.quietHit = false;
+    });
+    // the end: each one a white glint and a burst of blue fire, striking what it covers (a tile and a bit round it)
+    later(0.2 + dur, () => {
+      if (G !== run) return;
+      for (const [x, y, a] of spots) {
+        if (def.fxEnd && M.fx[def.fxEnd]) G.fxs.push({ id: def.fxEnd, x, y, t: 0, life: fxLife(def.fxEnd), scale: 1, rot: a, anchor: 'bottom', alpha, must: true });
+      }
+      later(0.08, () => {
+        if (G !== run) return;
+        const seen = new Set();
+        G.quietHit = true;
+        for (const [x, y] of spots) for (const e of G.enemies) if (tkFoe(e) && !seen.has(e) && Math.abs(e.x - x) <= 60 && Math.abs(e.y - 20 - y) <= 52) { seen.add(e); smite(e, st.dmg * def.endK); }
+        G.quietHit = false;
+      });
+    });
+  },
+  // 묵혈파광참 (원작 2662 IMG11): the hero's shadow goes to a foe within `range` tiles (the one ahead first, else the
+  // strongest, the hero turned to it) and leaves the great red seal 斬 on it (o_r_zan at the original's own size:
+  // red, then pale in its ring, then gone); reaching it, the shadow splits to the left and right and leaves one
+  // more each, `side` game pixels to either side across the way. 이펙트=판정: each seal strikes what it covers (a
+  // square of 2 × `half` pixels), the middle one in full, the sides a share; all are weakened (curse).
+  zan9({ st, def, smite }) {
+    const p = G.player, r = def.range || 4, fxid = def.fx;
+    const foes = tkNear(p.tx, p.ty, r + 0.5).filter(e => Math.abs(e.tx - p.tx) <= r && Math.abs(e.ty - p.ty) <= r);
+    if (!foes.length) return 0.3;
+    const fx = p.fdx || 0, fy = fx ? 0 : p.fdy || 1;
+    const ahead = foes.filter(e => fx ? Math.sign(e.tx - p.tx) === fx && Math.abs(e.ty - p.ty) <= 1 : Math.sign(e.ty - p.ty) === fy && Math.abs(e.tx - p.tx) <= 1);
+    const t = ahead[0] || foes.slice(0, 16).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || b.maxHp - a.maxHp)[0];
+    const ex = t.tx - p.tx, ey = t.ty - p.ty;
+    if (!ahead.length) { if (Math.abs(ex) >= Math.abs(ey)) { p.fdx = Math.sign(ex) || 1; p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(ey); } }
+    // (across the way, left and right of the line from the hero to it, and `back` pixels back toward the hero: the
+    // three stand in a wedge opening to the hero, as in the original — the sides about level with the hero)
+    const along = Math.abs(ex) >= Math.abs(ey), ux = along ? Math.sign(ex) || 1 : 0, uy = along ? 0 : Math.sign(ey) || 1;
+    const run = G, h = def.half || 59, bk = def.back || 0;
+    // (the middle one at least `back` ahead of the hero — a foe next to it is still under its lower half — so the
+    // wedge keeps the original's shape)
+    const mx = along ? p.x + ux * Math.max(bk, Math.abs(t.x - p.x)) : t.x, my = along ? t.y - 20 : p.y - 20 + uy * Math.max(bk, Math.abs(t.y - p.y));
+    const seals = [[mx, my, 1], [mx - ux * bk + uy * def.side, my - uy * bk + ux * def.side, def.splash], [mx - ux * bk - uy * def.side, my - uy * bk - ux * def.side, def.splash]];
+    for (const [x, y] of seals) G.fxs.push({ id: fxid, x, y, t: 0, life: fxLife(fxid), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.75 : 1, must: true });
+    later(0.08, () => {
+      if (G !== run) return;
+      G.shake = Math.max(G.shake, 0.08);
+      const seen = new Set();
+      for (const [x, y, k] of seals) for (const e of G.enemies) {
+        if (!tkFoe(e) || seen.has(e) || Math.abs(e.x - x) > h || Math.abs(e.y - 20 - y) > h) continue;
+        seen.add(e);
+        G.quietHit = true;
+        smite(e, st.dmg * k);
+        G.quietHit = false;
+        tkAfflict(e, def);
+      }
+    });
+  },
+  // 묵혈독바르기 (원작 2662 IMG17): the dark violet poison wells up round the hero and its blades (o_r_mukdokcast);
+  // the next `charges` casts of a striking skill (within `duration`) leave 묵혈독 on every foe they strike for `infect`
+  // seconds — the blue-violet flame bursting on it as it takes hold (o_r_mukdok) — under which it takes `taken` more,
+  // and falling with it on, it bursts (venomBurst). Nothing struck by itself (설명창: no blow of its own).
+  coat9({ skill, def }) {
+    const p = G.player, fxid = def.fx;
+    if (!tkNear(p.tx, p.ty, 6).length) return 0.4;
+    G.coat9 = { n: def.charges || 5, until: G.t + (def.duration || 10), win: 0, infect: def.infect || 7, taken: def.taken || 0.15, burst: tkHit(def, skill) * (def.burst || 1), fx: fxid };
+    if (def.fxCast && M.fx[def.fxCast]) addFx(def.fxCast, 0, 0, { follow: true, anchor: 'bottom', must: true });
+    note(`${skillName(skill.id, skill.lv)}: 다음 공격 기술 ${G.coat9.n}번이 묵혈독을 남깁니다.`);
+  },
 };
 
 // The follow-up blows of the 9차 보조 공격 (echo): (def, blow, tick).
@@ -8906,12 +9035,21 @@ function heukWind(w, skill) {
   });
   note(`${w.name}이 일어납니다.`);
 }
+/** 묵혈독바르기 (원작 9차, 2662 IMG17): 묵혈독 takes hold on a foe struck by a skill cast while the blade is coated — the
+ *  blue-violet flame bursting on it (o_r_mukdok, at the original's own size), its weakness for `infect` seconds. */
+function coatInfect(e) {
+  const c = G.coat9;
+  if (e.venom9 && e.venom9.until > G.t + 1) return;
+  e.venom9 = { until: G.t + c.infect, burst: c.burst, k: c.taken };
+  if (M.fx[c.fx] && fxBudget('venom9h', 6)) addFx(c.fx, e.x, e.y - 10, { anchor: 'bottom' });
+}
 /** 묵혈독바르기: a foe falling with 묵혈독 on it bursts, striking those round it. */
 function venomBurst(e) {
   const v = e.venom9;
   if (!v || v.until < G.t) return;
   e.venom9 = null;
-  if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 20, { scale: 0.9 });
+  // (묵혈독's own flame, o_r_mukdok, drawn as wide as the burst strikes: three tiles)
+  if (fxBudget('venom9', 3)) addFx(M.fx.o_r_mukdok ? 'o_r_mukdok' : 'g_poison_purple', e.x, e.y - 10, { scale: M.fx.o_r_mukdok ? 1.3 : 0.9, anchor: 'bottom' });
   later(0.05, () => { for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); });
 }
 
@@ -9746,7 +9884,9 @@ function ultCine9(def, strike) {
   for (let i = 0; i < BEATS; i++) later(lead + life * 0.4 + i * 0.25, () => {
     if (G !== run || G.dead) return;
     G.shake = Math.max(G.shake, 0.3);
+    G.quietHit = true; // (no hit marks over the cinematic: it is the whole of what is seen)
     for (const e of G.enemies) if (tkFoe(e) && ((e.x - p.x) / rx) ** 2 + ((e.y - 24 - (p.y - 12)) / ry) ** 2 <= 1) strike(e, 1 / BEATS);
+    G.quietHit = false;
   });
   return true;
 }
