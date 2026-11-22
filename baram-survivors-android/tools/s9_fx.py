@@ -215,6 +215,37 @@ def keyed(frames, i, e, part=None):
             d[(a[..., 2] > (a[..., 0] + a[..., 1]) / 2 + 25)] = 0
         if e.get("noorange"):
             d[(a[..., 1] < 0.72 * a[..., 0]) & (a[..., 0] > 150)] = 0
+        spin = np.zeros(d.shape[:2], bool)
+        if e.get("nogreen"):
+            # (only the bars' green and their dark frame — for a blue effect, whose blue "nobars" would take for numbers)
+            from PIL import ImageFilter
+            gr = (a[..., 1] > a[..., 0] + 50) & (a[..., 1] > a[..., 2] + 50)
+            spin |= np.asarray(Image.fromarray((gr * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+        for x0, y0, x1, y1 in e.get("zero", []):
+            spin[y0:y1, x0:x1] = True  # (a dummy flashing white where it is struck: a still place in the frame)
+        if spin.any():
+            # what lay there is not ours: the ball's own light from the same distance a turn on round its middle ("at")
+            ax_, ay_ = part["at"]
+            yy_, xx_ = np.mgrid[0:d.shape[0], 0:d.shape[1]].astype(np.float32)
+            dx_, dy_ = xx_ - ax_, yy_ - ay_
+            todo = spin.copy()
+            H_, W_ = spin.shape
+            for ang in (40, -40, 70, -70, 100, -100, 140, -140, 180):
+                if not todo.any():
+                    break
+                c_, s_ = np.cos(np.radians(ang)), np.sin(np.radians(ang))
+                sx = np.rint(ax_ + dx_ * c_ - dy_ * s_).astype(int).clip(0, W_ - 1)
+                sy = np.rint(ay_ + dx_ * s_ + dy_ * c_).astype(int).clip(0, H_ - 1)
+                ok = todo & ~spin[sy, sx]
+                d[ok] = d[sy[ok], sx[ok]]
+                todo &= ~ok
+            d[todo] = 0
+        if e.get("radial"):
+            # (its light gone round it: a ball of light, not a lit box)
+            r0, r1 = e["radial"]
+            ax_, ay_ = part["at"]
+            yy_, xx_ = np.mgrid[0:d.shape[0], 0:d.shape[1]]
+            d = (d * np.clip((r1 - np.hypot(xx_ - ax_, yy_ - ay_)) / (r1 - r0), 0, 1)[..., None]).astype(d.dtype)
         lo = part.get("floor", e.get("floor", 14))
         d[d.max(axis=2) < lo] = 0
         # The bodies standing in front of it (the dummies, the hero, their bars) hide its light: where it lies under one

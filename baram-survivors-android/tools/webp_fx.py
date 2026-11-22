@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Shrinks the build's effect sheets: each large fx/<id>.png becomes fx/<id>.webp (lossy, quality 90).
+"""Shrinks the build's effect sheets: each large fx/<id>.png becomes fx/<id>.webp (lossy, quality 90; the original
+바람의나라 captures "o_<id>" lossless).
 
     webp_fx.py ASSETS_DIR
 
@@ -7,6 +8,9 @@ Effects are soft glows and flashes, where WebP's loss does not show, and they we
 APK. Sprites (heroes, monsters, maps) keep their lossless PNGs: their single pixels would smear.
 The ids converted are listed in manifest.json as "fxWebp"; the game loads those as .webp under
 the same image key (fx/<id>.png).
+
+The 9차 effects cut from the original's captures ("o_…", tools/s9_fx.py) are pixel art: lossy WebP broke them into
+8×8 blocks and smeared their single dots (사용자: 추출한 도트들에 깨지는 부분) — they go lossless.
 """
 import json
 import os
@@ -35,7 +39,10 @@ def main():
             im = im.convert('RGBA')
             if max(im.size) > 16383:  # WebP's limit: keep the PNG
                 continue
-            im.save(dst, 'WEBP', quality=90, alpha_quality=90, method=4)
+            if name.startswith('o_'):
+                im.save(dst, 'WEBP', lossless=True, method=4)
+            else:
+                im.save(dst, 'WEBP', quality=90, alpha_quality=90, method=4)
         if os.path.getsize(dst) >= size:
             os.remove(dst)
             continue

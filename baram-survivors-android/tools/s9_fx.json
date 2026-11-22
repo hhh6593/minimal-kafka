@@ -5557,7 +5557,7 @@
  "m_seorishot": {
   "src": "gif2662/IMG23.gif",
   "mode": "parts",
-  "key": "bluediff",
+  "key": "sub",
   "bg": 0,
   "t0": 20,
   "t1": 60,
@@ -5567,13 +5567,13 @@
   ],
   "cell": [
    150,
-   145
+   125
   ],
   "origin": [
    75,
-   75
+   60
   ],
-  "soft": 6,
+  "soft": 0,
   "cells": [
    [
     {
@@ -5583,20 +5583,10 @@
       278
      ],
      "clip": [
-      -64,
+      -70,
       -46,
-      64,
+      70,
       62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
      ]
     }
    ],
@@ -5608,20 +5598,10 @@
       278
      ],
      "clip": [
-      -64,
+      -70,
       -46,
-      64,
+      70,
       62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
      ]
     }
    ],
@@ -5633,102 +5613,32 @@
       278
      ],
      "clip": [
-      -64,
+      -70,
       -46,
-      64,
+      70,
       62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 9,
-     "at": [
-      412,
-      278
-     ],
-     "clip": [
-      -64,
-      -46,
-      64,
-      62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 10,
-     "at": [
-      428,
-      278
-     ],
-     "clip": [
-      -64,
-      -46,
-      64,
-      62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 11,
-     "at": [
-      443,
-      278
-     ],
-     "clip": [
-      -64,
-      -46,
-      64,
-      62
-     ],
-     "ops": [
-      {
-       "clear": [
-        -20,
-        38,
-        64,
-        52
-       ]
-      }
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "서리파편: the orb of frost shards flying ahead (2662 IMG23 frames 6-11, followed as it goes), the damage number over it painted over"
+  "why": "서리파편: the orb of frost shards flying ahead (2662 IMG23 frames 6-11, followed as it goes): the light it adds to the clean field (sub, drawn added), the dummies' bars and markers left out by their colours, no box cut; frames 6-8 only (from frame 9 on the struck dummy stands in its middle)",
+  "add": true,
+  "noorange": true,
+  "nogreen": true,
+  "zero": [
+   [
+    432,
+    195,
+    460,
+    300
+   ]
+  ],
+  "radial": [
+   48,
+   64
+  ]
  },
  "m_jeondo": {
   "src": "gif2662/IMG25.gif",
