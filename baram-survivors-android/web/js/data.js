@@ -1616,7 +1616,7 @@ SKILLS.m_shards.desc += '. 9차 패시브 전도체: 천뢰마옥쌍구·뇌격�
 // 염시투사 (투염시), 응축뇌전시, 마탄 (폭발사격). A saved slot of it is 응축뇌전시.
 SKILLS.a_hwasalbi = { name: '화살비폭격', kind: 'passive', retired: true, was: 'archer', cls: '-', promo: 9, req: 33,
   desc: '9차 패시브. 염시투사·응축뇌전시·마탄을 쓸 때 앞에 화살비가 쏟아져 그곳의 몬스터를 모두 친다',
-  proc9: { ids: ['a_flame', 'a_eungchuk', 'a_bomb'], fx: 'o_a_hwasalbi', ahead: 2, half: [81, 50], k: 0.5, ticks: 3, cd: 1 } };
+  proc9: { ids: ['a_flame', 'a_eungchuk', 'a_bomb'], fx: 'o_a_hwasalbi', ahead: 2, scale: 1.3, half: [105, 65], k: 0.5, ticks: 4, cd: 1 } };
 SKILL_ALIAS.a_hwasalbi = 'a_eungchuk';
 SKILLS.a_eungchuk.desc += '. 9차 패시브 화살비폭격: 염시투사·응축뇌전시·마탄을 쓰면 앞에 화살비가 쏟아진다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
