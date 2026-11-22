@@ -932,6 +932,18 @@ def parts_cells(frames, e):
             cell[(mx_ < e["nogray"]) & (mx_ - mn_ < 45), 3] = 0
         for x0, y0, x1, y1 in e.get("clearcell", []):
             cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
+        if e.get("unadd"):
+            # (a light drawn added — 천선의영역's seal, 천신의기운's rings — reads as bright as in the original only over a floor
+            # as light as its grey; over our dark ground it went dull brown. Made a plain layer that, laid over that grey
+            # ("unadd" [grey, k]), gives the original's own pixels: alpha from how much light it adds (k = solid), its colour
+            # the grey plus that light — the entry's "add" then false)
+            gl, kk = e["unadd"][:2]
+            lo_ = e["unadd"][2] if len(e["unadd"]) > 2 else 0  # (a faint wash of light under it: not kept)
+            dl = cell[..., :3].astype(np.float32) * (cell[..., 3:4].astype(np.float32) / 255)
+            m_ = dl.max(axis=2)
+            a_ = np.clip((m_ - lo_) / (kk - lo_), 0, 1)
+            col = np.clip(gl + dl / np.maximum(a_, 1e-3)[..., None], 0, 255)
+            cell = np.dstack([np.where(a_[..., None] > 0, col, 0), a_ * 255]).astype(np.uint8)
         if e.get("opaque"):
             # (a see-through effect taken off the original's light grey floor reads as strong as it did there only over a
             # floor as light; over our dark ground the same alpha shows the ground through and the effect looks pale: its

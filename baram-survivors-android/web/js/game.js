@@ -7894,7 +7894,7 @@ function igi9(st, def, smite) {
       IGI_CROSS.forEach(([ox, oy], j) => later(j ? 0.08 : 0, () => {
         if (G !== run) return;
         const px = (tx + ox) * TILE + TILE / 2, py = (ty + oy) * TILE + TILE - 14;
-        if (M.fx[def.fxPool]) tkLoop(def.fxPool, px, py, 0.8, { alpha: alpha * 0.95, anchor: 'bottom' });
+        if (M.fx[def.fxPool]) tkLoop(def.fxPool, px, py, 0.8, { alpha, anchor: 'bottom' });
         if (!j) return;
         G.quietHit = true;
         for (const e of onTiles([[tx + ox, ty + oy]])) { smite(e, st.dmg * (def.poolK || 0.5)); tkAfflict(e, { stun: def.stun }); }
@@ -8872,7 +8872,7 @@ const TIER_KINDS = {
     if (def.killCut) { G.buffs.killCut = Math.max(G.buffs.killCut || 0, G.t + life); G.buffs.killCutK = def.killCut; }
     if (!def.noCast) addFx(bigFx(fxid, 150, 'e9'), 0, -26, { follow: true });
     // (its sign held over the hero while it lasts: 호기어검's swords, 묵혈독's dark blade …)
-    if (def.fxLoop && M.fx[def.fxLoop]) tkLoop(bigFx(def.fxLoop, def.loopSize || 110, 'e9l'), 0, def.loopY || -40, life, { follow: true, alpha: settings.calmFx ? 0.5 : 0.8 });
+    if (def.fxLoop && M.fx[def.fxLoop]) tkLoop(bigFx(def.fxLoop, def.loopSize || 110, 'e9l'), 0, def.loopY || -40, life, { follow: true, alpha: settings.calmFx ? 0.5 : 1 });
     for (let k = 1; k <= n; k++) later(k * def.every, () => {
       if (G !== run || G.dead) return;
       way(def, d, k);
@@ -8892,7 +8892,7 @@ const TIER_KINDS = {
   zone9({ skill, def, fxid }) {
     const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
     if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
-    const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 0.85, must: true };
+    const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 1, must: true };
     if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 }); // (its pivot its middle: on the hero's body)
     G.fxs.push(fx);
     const end = G.t + life;
@@ -9306,7 +9306,7 @@ const TIER_KINDS = {
     later(fly, () => {
       if (G !== run) return;
       const [hx, hy] = def.half, life = def.dur;
-      tkLoop(def.fx, ex, ey, life, { alpha: settings.calmFx ? 0.7 : 0.95, anchor: 'bottom' }); // (its pivot the field's middle)
+      tkLoop(def.fx, ex, ey, life, { alpha: settings.calmFx ? 0.7 : 1, anchor: 'bottom' }); // (its pivot the field's middle)
       const n = Math.round(life / def.tick);
       for (let i = 0; i < n; i++) later(i * def.tick, () => {
         if (G !== run || G.dead) return;
@@ -9333,7 +9333,7 @@ const TIER_KINDS = {
     if (!G.enemies.some(e => tkFoe(e) && inFog(e))) return 0.4;
     const life = st.duration || def.duration, d = tkHit(def, skill);
     // (drawn going left: flipped when the hero faces right, turned for up and down)
-    const f = tkLoop(def.fx, ox, p.y, life, { alpha: settings.calmFx ? 0.6 : 0.9, anchor: 'bottom' });
+    const f = tkLoop(def.fx, ox, p.y, life, { alpha: settings.calmFx ? 0.6 : 1, anchor: 'bottom' });
     if (f) { if (ux > 0) f.flip = true; if (uy) f.rot = uy < 0 ? Math.PI / 2 : -Math.PI / 2; }
     for (let k = 1; k <= Math.round(life / def.tick); k++) later(k * def.tick, () => {
       if (G !== run || G.dead) return;
@@ -9591,7 +9591,7 @@ function heukWind(w, skill) {
   // (it rises beside the hero and goes round it, a tile and a half out, once in three and a half seconds)
   const at = t => { const a = a0 + (t / 3.5) * Math.PI * 2; return [Math.cos(a) * 1.5 * TILE, Math.sin(a) * 1.1 * TILE]; };
   const [x0, y0] = at(0);
-  const f = tkLoop(w.fx, x0, y0 - 4, w.duration, { follow: true, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 0.95 });
+  const f = tkLoop(w.fx, x0, y0 - 4, w.duration, { follow: true, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 });
   if (!f) return;
   const step = 0.05, n = Math.round(w.duration / step), every = Math.round(w.tick / step);
   for (let k = 1; k <= n; k++) later(k * step, () => {
@@ -10460,7 +10460,7 @@ function ultCine9(def, strike) {
   p.inv = Math.max(p.inv || 0, lead + life);
   later(lead, () => {
     if (G !== run || G.dead) return;
-    G.fxs.push({ id, x: 0, y: -12, t: 0, life, scale: 1, rot: 0, follow: true, anchor: 'mid', alpha: settings.calmFx ? 0.6 : 0.96, big: true, skip: 0, fadeIn: 0 });
+    G.fxs.push({ id, x: 0, y: -12, t: 0, life, scale: 1, rot: 0, follow: true, anchor: 'mid', alpha: settings.calmFx ? 0.6 : 1, big: true, skip: 0, fadeIn: 0 });
   });
   // (the art's own ellipse: the cell's, less its faded edge)
   const rx = (f.w * k) / 2 * 0.92, ry = (f.h * k) / 2 * 0.86, BEATS = 2;

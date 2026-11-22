@@ -1464,7 +1464,7 @@ const S9 = {
   //   자신·동료 회복 + 7×7 피해), 천선의영역 (IMG35: 시전 자리에 금빛 영역 10초, 안에 있는 동안 받는 피해 감소, 나가면 해제),
   //   치유의반향 = 패시브 (설명창 [지속효과 마법]: 체력이 가득하면 피해 30% 증가; 그림 없음).
   p_skyspirit: { promo: 9, cls: 'poet', req: 33, name: '천신의기운', kind: 'aura9', fx: 'o_p_cheonsin9', fxCast: undefined, fxHit: undefined, hit: 9, cd: 12, duration: 6, radius: 3,
-    tick: 1, hot: 5, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0, auraAlpha: 0.9,
+    tick: 1, hot: 5, party: true, mana: 0.15, buff: 'shield', ck: 'heal', heal: 30, pre: 'p_saint', branch: 0, auraAlpha: 1,
     desc: '6초 동안 천신의 기운이 자신과 동료에게 깃들어 매초 최대 체력의 5%를 채우고, 둘레 7×7의 몬스터를 거듭 친다' },
   p_zone9: { promo: 9, cls: 'poet', req: 33, name: '천선의영역', kind: 'zone9', fx: 'o_p_cheonseon9', cd: 20, duration: 10, radius: 3, ward: 0.5, ck: 'buff', buff: 'shield', pre: 'p_cheonseon', branch: 2,
     desc: '시전한 자리에 천선의 영역을 10초 동안 펼친다. 영역 안에 있는 동안 받는 피해가 절반이 되고, 영역 밖으로 나가면 곧바로 사라진다' },
