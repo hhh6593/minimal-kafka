@@ -141,6 +141,13 @@ def key_dark(a, b, e):
         win = np.stack([pad[:, k:k + al.shape[1]] for k in range(2 * wide + 1)])
         closed = np.minimum(win[:wide + 1].max(axis=0), win[wide:].max(axis=0))
         al = np.where(line, np.maximum(al, closed), al)
+        if e.get("stripecol"):
+            # (and their colour: the floor's black line kept its own black under the alpha carried over it — a dark
+            # upright seam down the wind; each line pixel's colour from the nearest pixel beside it off the line)
+            from scipy import ndimage
+            _, (iy_, ix_) = ndimage.distance_transform_edt(line, return_indices=True)
+            a = a.copy()
+            a[line] = a[iy_[line], ix_[line]]
     return np.dstack([a, al * 255]).astype(np.uint8)
 
 
@@ -1360,6 +1367,23 @@ def parts_cells(frames, e):
             a_ = np.clip((m_ - lo_) / (kk - lo_), 0, 1)
             col = np.clip(gl + dl / np.maximum(a_, 1e-3)[..., None], 0, 255)
             cell = np.dstack([np.where(a_[..., None] > 0, col, 0), a_ * 255]).astype(np.uint8)
+        if e.get("seethru") and len(e["cells"][ci]) == 1:
+            # (where the bodies stood in the light — the hero in 천선의영역's seal — the fill made a solid blob that hid our
+            # hero: there the light kept only as thin as "seethru" [[cx, cy, rx, ry, k] …] says (frame coords), soft-edged,
+            # so the hero shows through it as in the original)
+            ax_, ay_ = e["cells"][ci][0]["at"]
+            ox_, oy_ = e["origin"]
+            yy, xx = np.mgrid[0:ch, 0:cw].astype(np.float32)
+            cell = cell.copy()
+            for sx_, sy_, rx_, ry_, k_ in e["seethru"]:
+                rr_ = np.sqrt(((xx - (sx_ - ax_ + ox_)) / rx_) ** 2 + ((yy - (sy_ - ay_ + oy_)) / ry_) ** 2)
+                f_ = k_ + (1 - k_) * np.clip((rr_ - 0.7) / 0.3, 0, 1)
+                cell[..., 3] = (cell[..., 3] * f_).astype(np.uint8)
+        if e.get("gain"):
+            # (its colour brought back to the original's, channel by channel, measured on the same pixels of the capture —
+            # 천신의기운's gold read cream once taken off the grey floor)
+            cell = cell.copy()
+            cell[..., :3] = np.clip(cell[..., :3].astype(np.float32) * np.array(e["gain"], np.float32), 0, 255).astype(np.uint8)
         if e.get("opaque"):
             # (a see-through effect taken off the original's light grey floor reads as strong as it did there only over a
             # floor as light; over our dark ground the same alpha shows the ground through and the effect looks pale: its
@@ -1392,6 +1416,14 @@ def parts_cells(frames, e):
             ramp = np.minimum(np.arange(cw), np.arange(cw)[::-1]).clip(0, n) / n
             rampy = np.minimum(np.arange(ch), np.arange(ch)[::-1]).clip(0, n) / n
             cell[..., 3] = (cell[..., 3] * np.minimum(ramp[None, :], rampy[:, None])).astype(np.uint8)
+        if e.get("ellfade"):
+            # (a fog cut by the capture's edge — 환영안개 at the screen's left, under the top: the straight soft ramp of
+            # "soft" still read as a square cut; faded instead towards an ellipse in the cell, [rx, ry, soft] of its half
+            # sizes, so it ends in a round, its own way)
+            rx_, ry_, sf_ = e["ellfade"]
+            yy, xx = np.mgrid[0:ch, 0:cw].astype(np.float32)
+            rr_ = np.sqrt(((xx - (cw - 1) / 2) / (cw / 2 * rx_)) ** 2 + ((yy - (ch - 1) / 2) / (ch / 2 * ry_)) ** 2)
+            cell[..., 3] = (cell[..., 3] * np.clip((1 - rr_) / sf_, 0, 1)).astype(np.uint8)
         out.append(cell)
     return out
 
@@ -1473,6 +1505,19 @@ def rotfill(a, o, frames, fi):
             ok = todo & ~bad_of(q)
             out[ok] = q[ok]
             todo &= ~ok
+    if o.get("restblur") and todo.any():
+        # ("restblur": what no turn gave — where the turn lands on another column of numbers, or outside "srcbox" —
+        # filled from the clean art right round it (a normalised blur over "restblur" px) instead of left see-through:
+        # see-through there was a dark blot in a white flash)
+        from PIL import ImageFilter
+        rad = o["restblur"]
+        ok_ = (~todo).astype(np.float32)
+        num = np.dstack([out[..., c] * ok_ for c in range(3)])
+        bn = np.dstack([np.asarray(Image.fromarray(num[..., c].clip(0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) for c in range(3)])
+        bk = np.asarray(Image.fromarray((ok_ * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(rad))).astype(np.float32) / 255
+        got = todo & (bk > 0.02)
+        out[got] = (bn / np.maximum(bk, 1e-3)[..., None])[got]
+        todo &= ~got
     keep = np.clip(ndimage.distance_transform_edt(~todo) / max(1, o.get("soft", 12)), 0, 1)
     eye = o.get("eye")
     if eye:
@@ -1708,6 +1753,16 @@ def build(spec, src_dir, out_dir, only=None):
                         a[y0:y1, x0:x1, 3] = 0
                 else:
                     a[m[1]:m[3], m[0]:m[2], 3] = 0
+            if mode == "cinema" and e.get("vignette") and e.get("vigafter"):
+                # ("vigafter": the soft ellipse once more over what the masks filled — a box filled from beside it kept
+                # its source's full alpha and showed as a straight-edged patch outside the ellipse)
+                rx, ry, soft = e["vignette"]
+                bx = e.get("box") or [0, 0, a.shape[1], a.shape[0]]
+                cx, cy = (bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2
+                yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                rr = np.sqrt(((xx - cx) / ((bx[2] - bx[0]) / 2 * rx)) ** 2 + ((yy - cy) / ((bx[3] - bx[1]) / 2 * ry)) ** 2)
+                a = a.copy()
+                a[..., 3] = np.minimum(a[..., 3], np.clip((1 - rr) / soft, 0, 1) * 255).astype(np.uint8)
             if box:
                 a = a[box[1]:box[3], box[0]:box[2]]
             arrs.append(a)

@@ -55,7 +55,8 @@ def crystals(fr, bg, f, keep=None):
         # the body: the blue, the white-hot heart between it, the gaps closed and filled
         white = (a.min(2) > 150) & (d > 40) & ndimage.binary_dilation(comp, iterations=2)
         body = ndimage.binary_fill_holes(ndimage.binary_closing(comp | white, iterations=4)) & reg
-        soft = np.clip((d - 25) / 40, 0, 1) * np.clip((b - r - 15) / 30, 0, 1)
+        # (the glow as strong as it reads over the original's grey floor: lifted, it was dim over our dark ground)
+        soft = (np.clip((d - 25) / 40, 0, 1) * np.clip((b - r - 15) / 30, 0, 1)) ** 0.8
         al = np.where(body, 1.0, np.where(reg, soft, 0.0))
         # broken dots inside it (a stray dark or warm pixel of the floor showing through): the nearest ice pixel's colour
         a = a.copy()
@@ -84,14 +85,15 @@ def seori(src_dir):
     st = [c for f in (35, 36, 38) for c in crystals(fr, fr[0], f)]
     st.sort(key=lambda s: -s[0].height)
     cw, ch, ox, oy, hx, hy = 330, 420, 165, 245, 137, 169  # (room above the top row for the tallest crystal)
-    # 16 spots, a staggered grid over the hit box; the big clusters on the inner ones
+    # 21 spots, a staggered grid over the hit box; the big clusters on the inner ones (16 read about a fifth sparser and dimmer than the
+    # original's field, packed crystal against crystal)
     spots = []
-    rows = 5
+    rows = 6
     for j in range(rows):
-        y = oy - hy + 40 + j * (2 * hy - 50) / (rows - 1)
+        y = oy - hy + 36 + j * (2 * hy - 46) / (rows - 1)
         cols = 4 if j % 2 == 0 else 3
         for i in range(cols):
-            x = ox - hx + 22 + (i + (0.5 if cols == 3 else 0)) * (2 * hx - 44) / 3
+            x = ox - hx + 18 + (i + (0.5 if cols == 3 else 0)) * (2 * hx - 36) / 3
             spots.append((x, y))
     rng = np.random.RandomState(23)
     order = rng.permutation(len(spots))

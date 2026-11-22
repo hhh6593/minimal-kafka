@@ -175,7 +175,9 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks)"
+  "why": "흑룡검풍: the dark red wind that roams the floor (2662 IMG05 frames 103-108: the camera still, the wind alone below the hero) — what went darker and redder than the clean floor of frame 158. (1320 #18, used before, is not it: laid beside the scene it is the red ring of 흑룡참파 itself, a tight bright rose; the wind is thin dark streaks) [재검증: 바닥 기둥 줄의 검은색이 남아 생긴 가운데 세로 이음매 — 줄 픽셀의 색을 옆 픽셀에서(stripecol); 얇은 가장자리 불투명도 올림(opaque)]",
+  "stripecol": true,
+  "opaque": 1.4
  },
  "w_apdo": {
   "src": "gif2662/IMG07.gif",
@@ -185,7 +187,7 @@
   "t0": 22,
   "t1": 80,
   "cell": [
-   200,
+   225,
    360
   ],
   "origin": [
@@ -227,7 +229,7 @@
      "clip": [
       -192,
       -200,
-      -55,
+      -30,
       145
      ],
      "ops": [
@@ -250,7 +252,7 @@
      "clip": [
       -192,
       -200,
-      -55,
+      -30,
       145
      ],
      "ops": [
@@ -289,7 +291,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead",
+  "why": "압도적진격: the wall of three rings of fire the shield throws up before the hero (2662 IMG07 frames 6-9, 0.3 s; the camera still) — what moved from the clean floor of frame 22, see-through as in the scene; the anchor is the hero's feet (292, 305), the wall to its left as the hero faces left. Frame 6 (the two foes still standing inside the rings) is frame 9's own thin rings instead [재검증: #1·#2의 오른쪽 곧은 잘림 — 셀을 그 프레임만 오른쪽으로 넓힘]",
   "feather": 18,
   "nogray": 150
  },
@@ -298,11 +300,11 @@
   "mode": "parts",
   "key": "unmix",
   "cell": [
-   118,
+   180,
    150
   ],
   "origin": [
-   45,
+   107,
    115
   ],
   "soft": 14,
@@ -315,10 +317,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -330,10 +358,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -345,10 +399,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -360,10 +440,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -375,10 +481,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -390,10 +522,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -405,10 +563,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -420,10 +604,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -435,10 +645,36 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ],
@@ -450,17 +686,43 @@
       310
      ],
      "clip": [
-      -45,
+      -107,
       -115,
       73,
       35
+     ],
+     "ops": [
+      {
+       "rot": [
+        [
+         -107,
+         -115,
+         -4,
+         35
+        ]
+       ],
+       "where": [
+        "(d > 25) & (b < r + 30)",
+        "(d > 25) & (mn > 165)"
+       ],
+       "grow": 3,
+       "mirrorx": true,
+       "angles": [
+        20,
+        -20,
+        40,
+        -40,
+        60,
+        -60
+       ]
+      }
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 82-92: no damage number over it) — unmixed from the clean field (frame 0): the dummy under it stands still and drops out, the hero beside it on the left left out (the cell starts at its right shoulder and fades in), the dummy's bar and marker filled from the flame round them. (1320 #05 is not it.) The cast (frames 2-6) is only the hero's own body tinted violet — not used: it would carry the hero's outline [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
+  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 82-92: no damage number over it) — unmixed from the clean field (frame 0): the dummy under it stands still and drops out, the hero beside it on the left left out (the cell starts at its right shoulder and fades in), the dummy's bar and marker filled from the flame round them. (1320 #05 is not it.) The cast (frames 2-6) is only the hero's own body tinted violet — not used: it would carry the hero's outline [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept] [재검증: 영웅이 서 있던 왼쪽까지 셀을 넓히고 그 자리는 불꽃 자신을 세로축 거울·돌림으로 메움(rot mirrorx) — 원작 폭 그대로; 터짐의 맞는 범위 = 그린 불꽃]",
   "bg": 0,
   "k": 110,
   "smooth": 3,
@@ -473,21 +735,22 @@
     246
    ]
   ],
-  "opaque": 1.8
+  "opaque": 1.8,
+  "despeck": 30
  },
  "m_hoeseon": {
   "src": "gif2662/IMG21.gif",
   "mode": "parts",
   "key": "unmix",
   "cell": [
-   295,
-   325
+   345,
+   345
   ],
   "origin": [
-   115,
-   285
+   140,
+   305
   ],
-  "soft": 40,
+  "soft": 20,
   "cells": [
    [
     {
@@ -497,9 +760,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -512,9 +775,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -527,9 +790,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -542,9 +805,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -557,9 +820,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -572,9 +835,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -587,9 +850,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -602,9 +865,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -617,9 +880,9 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
@@ -632,38 +895,39 @@
       375
      ],
      "clip": [
-      -115,
-      -285,
-      180,
+      -140,
+      -305,
+      205,
       40
      ]
     }
    ]
   ],
-  "ms": 80,
+  "ms": 110,
   "scale": 0.62,
-  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 13-22; the camera still) — unmixed from the clean field with the grid (frame 8): its opacity and own colour; the hit stars (found by their orange rims) and the numbers beside them, and the target's name, filled with the wind round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
+  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 13-22; the camera still) — unmixed from the clean field with the grid (frame 8): its opacity and own colour; the hit stars (found by their orange rims) and the numbers beside them, and the target's name, filled with the wind round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept] [재검증: 깨끗한 곳은 원작 픽셀 그대로(keepraw) — 흰 번개 날개가 살아 있음; 숫자·별·막대·이름만 색으로 찾아 메움; 셀을 넓혀 #0·#2 네모 잘림 없음; 원작처럼 약 1.1초(110ms×10)]",
   "bg": 8,
   "k": 120,
   "smooth": 3,
   "holeexpr": [
-   "(b > r + 60) & (b >= g) & (d > 30) & (y < 318)",
-   "(r > 190) & (g < 185) & (r > b + 50) & (d > 30)",
-   "(g < r + 10) & (mn < 200) & (d > 40) & (y < 318)"
+   "(b > r + 50) & (b >= g + 5) & (d > 30) & (x > 380) & (x < 525) & (y > 140) & (y < 340)",
+   "(r > 190) & (g < 185) & (r > b + 50) & (d > 30) & (x > 380) & (y > 130) & (y < 340)",
+   "(r > 120) & (r > g + 50) & (r > b + 50) & (d > 20)",
+   "(g > r + 80) & (g > b + 80)"
   ],
-  "holegrow": 5,
+  "holegrow": 3,
   "holenear": [
    [
     "(mn > 200) & (d > 30)",
-    8
+    6
    ],
    [
-    "(mx < 70) & (d > 30)",
+    "(mx < 80)",
     3
    ]
   ],
   "starbox": [
-   "(r > 180) & (g < 190) & (r > b + 50) & (d > 30)",
+   "(r > 180) & (g < 190) & (r > b + 50) & (d > 30) & (x > 380) & (y > 130) & (y < 340)",
    [
     6,
     6,
@@ -673,26 +937,24 @@
   ],
   "badbox": [
    [
-    315,
-    100,
-    445,
-    180
-   ],
-   [
-    285,
-    298,
-    420,
-    415
-   ],
-   [
-    565,
-    240,
-    660,
-    310
+    322,
+    138,
+    392,
+    172
    ]
   ],
   "grain": false,
-  "opaque": 1.6
+  "opaque": 1.6,
+  "keepraw": true,
+  "nogray": 130,
+  "clearcell": [
+   [
+    0,
+    85,
+    32,
+    150
+   ]
+  ]
  },
  "m_seori": {
   "src": "gif2662/IMG23.gif",
@@ -6302,7 +6564,7 @@
   ],
   "ms": 120,
   "scale": 0.62,
-  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded); now unmixed: its opacity and own colour taken out of the clean carpet (frame 0), the target and its bar under it (tinted by the fog) filled from the fog round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
+  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded); now unmixed: its opacity and own colour taken out of the clean carpet (frame 0), the target and its bar under it (tinted by the fog) filled from the fog round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept] [재검증: 화면 가장자리에 잘린 위·왼쪽이 네모로 끝나지 않게 타원으로 사라짐(ellfade)]",
   "bg": 0,
   "k": 110,
   "smooth": 4,
@@ -6326,7 +6588,12 @@
     335
    ]
   ],
-  "opaque": 1.5
+  "opaque": 1.5,
+  "ellfade": [
+   1.08,
+   1.1,
+   0.3
+  ]
  },
  "a_cheongung": {
   "src": "gif2662/IMG42.gif",
@@ -6823,7 +7090,41 @@
     ]
    }
   ],
-  "why": "만검귀종: the 원작 궁극's art (2662 IMG09 frames 18-40, every other: the slashes, the spiral of blades, the vortex of fire in its graveyard of swords, 2.6 s) — the frame kept whole, its black see-through, the damage numbers and the hero filled from the art round them, and the art faded out towards an ellipse's edge: it is drawn centred on the hero at about two thirds of the screen's height, not stretched over the screen (사용자 결정)"
+  "why": "만검귀종: the 원작 궁극's art (2662 IMG09 frames 18-40, every other: the slashes, the spiral of blades, the vortex of fire in its graveyard of swords, 2.6 s) — the frame kept whole, its black see-through, the damage numbers and the hero filled from the art round them, and the art faded out towards an ellipse's edge: it is drawn centred on the hero at about two thirds of the screen's height, not stretched over the screen (사용자 결정) [재검증: 가운데 숫자·별·막대·허수아비를 같은 프레임의 소용돌이를 돌려 메움(rotfill), 남는 곳은 둘레 그림으로(restblur) — 회색 얼룩 없음; 마스크로 메운 칸도 타원 가장자리로(vigafter)]",
+  "rotfill": {
+   "at": [
+    398,
+    322
+   ],
+   "ys": 1.0,
+   "box": [
+    120,
+    0,
+    680,
+    560
+   ],
+   "grow": 8,
+   "fill": [
+    [
+     398,
+     318,
+     28,
+     46
+    ]
+   ],
+   "soft": 12,
+   "bad": [
+    "(b > 150) & (b - r > 70) & (b - g > 25)",
+    "mn > 190",
+    "(g > r + 50) & (g > b + 50)",
+    "(mx - mn < 45) & (mx > 80)",
+    "(r > 140) & (g < 60) & (b < 60) & (y > 330)"
+   ],
+   "restblur": 10
+  },
+  "white": 254,
+  "grow": 3,
+  "vigafter": true
  },
  "r_ult9": {
   "src": "gif2662/IMG19.gif",
@@ -7023,12 +7324,6 @@
   "k": 1,
   "max": 420,
   "cap": 420,
-  "hero": [
-   403,
-   293,
-   34,
-   50
-  ],
   "mask": [
    {
     "box": [
@@ -7055,7 +7350,7 @@
     ]
    }
   ],
-  "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them [가운데 복원: the number, star, bar and dummy columns filled from the same frame's clouds and wind a turn on round the compass star (rotfill), no more vivid-only field]",
+  "why": "태극팔괘진: the 원작 궁극's full-screen art (2662 IMG38 frames 13-40); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them [가운데 복원: the number, star, bar and dummy columns filled from the same frame's clouds and wind a turn on round the compass star (rotfill), no more vivid-only field] [재검증: 네모 테두리 대신 다른 궁극처럼 부드러운 타원 가장자리(vignette, vigafter); 영웅 자리는 회색 흐림 대신 rotfill로, 남는 곳은 둘레 그림으로(restblur) — 위쪽 어두운 얼룩 없음]",
   "rotfill": {
    "at": [
     396,
@@ -7098,6 +7393,12 @@
      320,
      30,
      48
+    ],
+    [
+     403,
+     293,
+     34,
+     50
     ]
    ],
    "soft": 12,
@@ -7106,10 +7407,17 @@
     "(r > 170) & (r - g > 45) & (b < 140)",
     "(g > r + 50) & (g > b + 50)",
     "(r > 110) & (r - b > 50) & (g < 130)"
-   ]
+   ],
+   "restblur": 10
   },
   "white": 254,
-  "grow": 3
+  "grow": 3,
+  "vignette": [
+   0.97,
+   0.89,
+   0.22
+  ],
+  "vigafter": true
  },
  "a_ult9": {
   "src": "gif2662/IMG47.gif",
@@ -10227,7 +10535,7 @@
     {
      "f": 37,
      "at": [
-      285,
+      277,
       212
      ],
      "clip": [
@@ -10242,7 +10550,7 @@
     {
      "f": 38,
      "at": [
-      285,
+      292,
       212
      ],
      "clip": [
@@ -10257,7 +10565,7 @@
     {
      "f": 39,
      "at": [
-      285,
+      305,
       212
      ],
      "clip": [
@@ -10316,7 +10624,7 @@
   ],
   "ms": 90,
   "scale": 0.62,
-  "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand",
+  "why": "호기어검: the sword of light that hovers at the hero's shoulder while it lasts (2662 IMG02 frames 37-42: the hero standing, the field clear), its blue and white keyed off the sand [재검증: #0-#2는 검이 실제로 선 자리(at x 277·292·305)에서 — #2가 거의 빈 칸이던 것 고침]",
   "feather": 6
  },
  "r_swaestar": {
@@ -10518,6 +10826,15 @@
       -83,
       98,
       83
+     ],
+     "ops": [
+      {
+       "drop": [
+        "(x > 495) & (x < 580) & (y > 314) & (y < 340) & ~((b > r + 60) & (g > r + 40))"
+       ],
+       "grow": 2,
+       "soft": 3
+      }
      ]
     }
    ],
@@ -10539,7 +10856,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "묵마수리검'쇄: its end — the white glint and the burst of blue fire as each shuriken goes (2662 IMG13 frames 79-84, the same one)"
+  "why": "묵마수리검'쇄: its end — the white glint and the burst of blue fire as each shuriken goes (2662 IMG13 frames 79-84, the same one) [재검증: #4에서 다시 나타나던 쿠나이 몸통을 색으로 지움(drop) — 불꽃만]"
  },
  "r_zan": {
   "src": "gif2662/IMG11.gif",
@@ -11295,26 +11612,26 @@
   ],
   "white": 205,
   "cell": [
-   360,
-   420
+   350,
+   355
   ],
   "origin": [
-   180,
-   205
+   175,
+   180
   ],
   "cells": [
    [
     {
      "f": 10,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11322,14 +11639,14 @@
     {
      "f": 11,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11337,14 +11654,14 @@
     {
      "f": 12,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11352,14 +11669,14 @@
     {
      "f": 13,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11367,14 +11684,14 @@
     {
      "f": 14,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11382,14 +11699,14 @@
     {
      "f": 15,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11397,14 +11714,14 @@
     {
      "f": 16,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11412,14 +11729,14 @@
     {
      "f": 17,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11427,14 +11744,14 @@
     {
      "f": 18,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ],
@@ -11442,30 +11759,24 @@
     {
      "f": 19,
      "at": [
-      261,
-      221
+      286,
+      276
      ],
      "clip": [
-      -170,
-      -200,
-      170,
-      205
+      -175,
+      -180,
+      175,
+      175
      ]
     }
    ]
   ],
   "ms": 90,
   "scale": 0.62,
-  "why": "천선의영역: the golden seal of the zone round the hero (2662 IMG35 frames 10-26, the camera still), its gold keyed off the grey ground (gold) [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)]",
+  "why": "천선의영역: the golden seal of the zone round the hero (2662 IMG35 frames 10-26, the camera still), its gold keyed off the grey ground (gold) [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)] [재검증: 인장 가운데(발)에 맞춰 at을 인장 중심(286,276)으로; 영웅이 서 있던 자리는 비치게(seethru) — 원작처럼 영웅이 보임; 보호 범위 = 그린 둥근 반경(data.js reach 90)]",
   "bg": 0,
   "gmin": 100,
   "add": false,
-  "fillzone": [
-   261,
-   248,
-   148,
-   150
-  ],
   "nobars": true,
   "fill": [
    [
@@ -11481,11 +11792,26 @@
     58
    ]
   ],
-  "fzlo": 55,
   "unadd": [
    125,
    110
-  ]
+  ],
+  "seethru": [
+   [
+    286,
+    234,
+    50,
+    68,
+    0.25
+   ]
+  ],
+  "fillzone": [
+   286,
+   276,
+   148,
+   150
+  ],
+  "fzlo": 55
  },
  "p_cheonsin9": {
   "src": "gif2662/IMG33.gif",
@@ -11498,7 +11824,7 @@
   "white": 215,
   "cell": [
    440,
-   400
+   430
   ],
   "origin": [
    220,
@@ -11516,7 +11842,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11531,7 +11857,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11546,7 +11872,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11561,7 +11887,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11576,7 +11902,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11591,7 +11917,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11606,7 +11932,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11621,7 +11947,7 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ],
@@ -11636,14 +11962,14 @@
       -220,
       -200,
       220,
-      200
+      230
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "천신의기운: each second's burst of golden spikes and the gold ring spreading from it round the hero (2662 IMG33 frames 16-28), gold keyed off the grey ground [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)]",
+  "why": "천신의기운: each second's burst of golden spikes and the gold ring spreading from it round the hero (2662 IMG33 frames 16-28), gold keyed off the grey ground [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)] [재검증: 금빛을 어두운 바닥 위에서 원작과 같은 채도로(unadd 회색 92 = 원작 바닥이 실제로 깔린 값, gain); 바닥 무늬 대신 깨끗한 조각(sector)을 고리의 실제 중심(발 아래 286)에서 돌림; 원작 크기 k 0.62, 맞는 범위 = 그린 고리(data.js half·halfAt)]",
   "bg": 0,
   "gmin": 110,
   "noorange": true,
@@ -11652,16 +11978,23 @@
   "nobars": true,
   "sector": [
    225,
-   236,
-   1.28,
+   286,
+   1.34,
    62,
    104,
-   50
+   40
   ],
   "unadd": [
-   125,
+   92,
    130,
    45
+  ],
+  "max": 420,
+  "cap": 420,
+  "gain": [
+   1.02,
+   0.91,
+   0.81
   ]
  },
  "p_cheonroe9": {
