@@ -583,9 +583,10 @@ async function boot() {
   // Every getting-up (성황령, the class's own 부활, a companion raised) shows 연's revive.
   if (M.fx.k_revive) FX.revive = 'k_revive';
   // Better still, the spell's own effect out of 연's client, where it has one by that name.
+  // (not over the original's own 9차 picture, o_<id>: 해일강타 had 연's water storm before the original's wave)
   for (const id of Object.keys(SKILLS)) {
     const fx = 'k_' + id;
-    if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
+    if (M.fx[fx] && !String(SKILLS[id].fx || '').startsWith('o_')) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
   // 태초광명 격: 천자의분노's blow drawn additive (its dark strokes drop out), a gold-white light.
   if (M.fx.g_anger_son) M.fx.g_taecho_light = { ...M.fx.g_anger_son, src: M.fx.g_anger_son.src || 'g_anger_son', add: true };
@@ -6003,7 +6004,11 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
   if (p.sts && heroStatusOn('curse')) taken *= 1.25;
   if (G.buffs.g_ward > G.t) taken *= 1 - (G.buffs.g_wardK || 0);
-  if (G.buffs.ward9 > G.t) taken *= 1 - (G.buffs.ward9K || 0); // 9차 아우라 (data.js S9: ward)
+  if (G.buffs.ward9 > G.t) {
+    // 9차 아우라 (data.js S9: ward); 천신의권역's (zone9 wardHits): so many blows at the first cut, the rest at the second
+    const wh = G.ward9Hits && G.ward9Hits.inside && G.ward9Hits.until > G.t ? G.ward9Hits : null;
+    taken *= 1 - (wh ? (wh.n++ < wh.at[0] ? wh.at[1] : wh.at[2]) : G.buffs.ward9K || 0);
+  }
   // 현무의 철옹's shell: whoever strikes the one in it is pricked back (each attacker twice a second at most).
   const thorn = from && from.m && from.hp > 0 && shellThorns();
   if (thorn && G.t - (from.thornAt || -9) >= 0.5) {
@@ -7791,6 +7796,9 @@ function cast(skill, st) {
     if (!(G.overcur > G.t)) note('전도체: 과전류 상태가 됩니다.');
     G.overcur = G.t + oc.dur;
   }
+  // 천공의공명 (원작 9차 패시브): a 천기 skill rings the 풍랑의표식 (9차 승급부터, 수련장에서는 늘)
+  const gm = SKILLS.cl_gongmyeong && SKILLS.cl_gongmyeong.gong9;
+  if (used && gm && !st.nine && gm.ids.includes(skill.id) && G.cls.id === 'celestial' && (promoOf('celestial') >= 9 || G.training)) gongmyeong(gm, skill, st);
   // 묵혈독바르기: a striking skill cast while the blade is coated takes a charge — its blows for the next second leave 묵혈독
   if (used && G.coat9 && def.kind !== 'coat9' && (def.dmg || def.hit) && G.t < G.coat9.until && G.coat9.n > 0) {
     G.coat9.n--;
@@ -8876,17 +8884,29 @@ const TIER_KINDS = {
   // 천선의영역 (원작 2662 IMG35): the golden seal laid where the hero stands for `duration` seconds (o_p_cheonseon9 at the
   // original's own size); while the hero is within `radius` tiles of it, what it takes is cut by `ward`; leaving it
   // ends the seal at once. It strikes nothing (the original's is a guard alone).
+  // 천신의권역 (원작 2662 IMG54): the same, with the blue vortex (o_cl_cheonsin at the original's own size, its pivot its
+  // middle) — `reach` its drawn round in game pixels; it stays its whole life (stay) whether the hero is in it or not,
+  // guarding only while the hero is; wardHits [n, k1, k2]: the first n blows taken in it cut by k1, the rest by k2
+  // (설명창: 피격 10회까지 방어도 -80, 초과하면 -40).
   zone9({ skill, def, fxid }) {
-    const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
+    const p = G.player, run = G, cx = p.x, cy = p.y - 14, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
     if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
     const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 0.85, must: true };
+    if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom' }); // (its pivot its middle: on the hero's body)
     G.fxs.push(fx);
     const end = G.t + life;
+    G.ward9Hits = def.wardHits ? { n: 0, at: def.wardHits, until: end } : null;
     const tick = () => {
       if (G !== run || G.dead || G.t >= end) return;
-      if (Math.hypot(p.x - cx, p.y - 14 - cy) > R) { fx.life = Math.min(fx.life, fx.t + 0.15); G.buffs.ward9 = 0; return; }
+      if (Math.hypot(p.x - cx, p.y - 14 - cy) > R) {
+        if (!def.stay) { fx.life = Math.min(fx.life, fx.t + 0.15); G.buffs.ward9 = 0; return; }
+        if (G.ward9Hits) G.ward9Hits.inside = false;
+        later(0.2, tick);
+        return;
+      }
       G.buffs.ward9 = G.t + 0.3;
       G.buffs.ward9K = def.ward || 0.5;
+      if (G.ward9Hits) G.ward9Hits.inside = true;
       later(0.2, tick);
     };
     tick();
@@ -9322,7 +9342,98 @@ const TIER_KINDS = {
     });
     note(`${skillName(skill.id, skill.lv)}: 환영 안개가 퍼집니다.`);
   },
+  // 순보선풍 (원작 2662 IMG49; 이동 기술 → 바라보는 쪽으로만): the 천인 leaps the way it faces onto the foe there (up to `range`
+  // tiles ahead, a tile to either side of the line) with the most round it, and strikes as it lands; the blue gale
+  // (o_cl_sunbo at the original's own size, its pivot the whirl's middle, 22 over the feet) whirls where it landed for its
+  // life, every `tick` striking what stands inside its round (def.half: the whirl's half width and depth); landing, the
+  // hero takes less a moment (설명창: 순간적으로 방어에 최적화 — `guard` for `guardT` s). 이펙트=판정: the whirl.
+  sunbo9({ skill, st, def, smite }) {
+    const p = G.player, fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = fx ? 0 : p.fdy;
+    const ahead = e => {
+      const a = (e.tx - p.tx) * fx + (e.ty - p.ty) * fy, s = Math.abs((e.tx - p.tx) * fy - (e.ty - p.ty) * fx);
+      return a >= 1 && a <= (def.range || 6) && s <= 1 ? a : 0;
+    };
+    const foes = G.enemies.filter(e => tkFoe(e) && ahead(e));
+    if (!foes.length) return 0.3;
+    let t = null, most = -1;
+    for (const e of foes.slice(0, 24)) {
+      const n = around(e.tx, e.ty, 1).length;
+      if (n > most || (n === most && ahead(e) > ahead(t))) { most = n; t = e; }
+    }
+    if (!steering()) {
+      // (down on the near side of it, or beside it: the way it faces stays the way it leapt)
+      const spots = [[t.tx - fx, t.ty - fy], [t.tx - fx + fy, t.ty - fy + fx], [t.tx - fx - fy, t.ty - fy - fx], [t.tx + fy, t.ty + fx], [t.tx - fy, t.ty - fx]];
+      for (const [x, y] of spots) if ((x !== p.tx || y !== p.ty) && ahead({ tx: x, ty: y }) && tkMoveHero(x, y)) break;
+    }
+    p.inv = Math.max(p.inv || 0, 0.35);
+    if (def.guard && !(G.buffs.ward9 > G.t + def.guardT)) { G.buffs.ward9 = G.t + def.guardT; G.buffs.ward9K = Math.max(def.guard, G.buffs.ward9 > G.t ? G.buffs.ward9K || 0 : 0); }
+    // (its frames at the original's own pace — 3 s, as long as it strikes — not cut to the game's usual 0.11 s a frame)
+    const fid = def.fx + '#hold';
+    if (!M.fx[fid] && M.fx[def.fx]) M.fx[fid] = { ...M.fx[def.fx], src: M.fx[def.fx].src || def.fx, hold: true };
+    const run = G, x = p.x, y = p.y - 22, [hx, hy] = def.half, life = fxLife(fid) || 2.8;
+    G.fxs.push({ id: fid, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.7 : 0.95, must: true });
+    const inWhirl = e => tkFoe(e) && ((e.x - x) / hx) ** 2 + ((e.y - 20 - y) / hy) ** 2 <= 1;
+    const n = Math.max(1, Math.round((life - 0.2) / (def.tick || 0.5)));
+    for (let k = 0; k <= n; k++) later(0.08 + k * (def.tick || 0.5), () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true; // (no hit marks of another's: the whirl is what strikes)
+      for (const e of G.enemies.filter(inWhirl)) smite(e, k ? st.dmg * (def.k || 0.3) : e === t ? st.dmg : st.dmg * 0.7);
+      G.quietHit = false;
+    });
+  },
+  // 해일강타 (원작 2662 IMG51): the 천인 raises a tidal wave the way with the most foes (the hero turned to it): every foe
+  // `depth` tiles ahead and `width` to each side is struck at once, an ice pillar rising on it (o_cl_haeilhit, at most
+  // twelve drawn) and 풍랑의표식 left on it for `mark` s (cursed: it takes more; 천공의공명 rings it); the sheet of water
+  // (o_cl_haeil at the original's own size, its pivot the hero's feet; drawn going left — flipped going right, turned
+  // for up and down) sweeps out over that ground in a second. 이펙트=판정: the water covers what was struck.
+  haeil9({ skill, st, def, smite }) {
+    // (test: window.__faceOnly — only the way the hero faces, for a side-by-side with the original's leftward wave)
+    const p = G.player, best = tkBestRow(def.depth, window.__faceOnly ? [] : DIRS);
+    if (!best) return 0.3;
+    const [dx, dy] = best;
+    p.fdx = dx; p.fdy = dy;
+    if (dx) p.face = dx;
+    const sx = p.tx, sy = p.ty, w = def.width || 1, run = G;
+    const inWave = e => {
+      const a = (e.tx - sx) * dx + (e.ty - sy) * dy, s = Math.abs((e.tx - sx) * dy - (e.ty - sy) * dx);
+      return tkFoe(e) && a >= 1 && a <= def.depth && s <= w;
+    };
+    const f = { id: def.fx, x: p.x, y: p.y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.65 : 0.92, must: true };
+    if (dx > 0) f.flip = true;
+    if (dy) f.rot = dy < 0 ? Math.PI / 2 : -Math.PI / 2;
+    G.fxs.push(f);
+    later(0.12, () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true;
+      let drawn = 0;
+      for (const e of G.enemies.filter(inWave)) {
+        if (def.fxHit && M.fx[def.fxHit] && drawn++ < 12) addFx(def.fxHit, 0, 2, { on: e, anchor: 'bottom' });
+        smite(e, st.dmg);
+        tkAfflict(e, def);
+        e.mark9 = G.t + (def.mark || 8);
+      }
+      G.quietHit = false;
+    });
+  },
 };
+/** 천공의공명 (원작 9차 패시브, 설명창 IMG52; data.js cl_gongmyeong.gong9): a 천기 skill cast sets the 풍랑의표식 ringing — on every
+ *  marked foe within `reach` tiles (at most `max`) a bolt of the storm falls (the small light of a blow: the original shows
+ *  no picture of it), and the skill's wait shrinks `cut` a foe (at most `cutMax`). */
+function gongmyeong(gm, skill, st) {
+  const p = G.player, run = G;
+  const marked = G.enemies.filter(e => tkFoe(e) && e.mark9 > G.t && Math.hypot(e.tx - p.tx, e.ty - p.ty) <= gm.reach).slice(0, gm.max);
+  if (!marked.length) return;
+  const blow = (st.dmg || 30) * gm.k;
+  marked.forEach((e, i) => later(0.12 + i * 0.05, () => {
+    if (G !== run || e.hp <= 0) return;
+    if (M.fx[gm.fx]) fxOn(gm.fx, e, { scale: 0.7 });
+    G.procHitting = true;
+    hurtEnemy(e, blow);
+    G.procHitting = false;
+  }));
+  const cut = Math.min(gm.cutMax, marked.length * gm.cut);
+  if (skill.timer > 0) skill.timer -= (skill.cdMax || skill.timer) * cut;
+}
 
 // The follow-up blows of the 9차 보조 공격 (echo): (def, blow, tick).
 const ECHO = {

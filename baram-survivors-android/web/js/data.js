@@ -1483,16 +1483,24 @@ const S9 = {
   a_eungchuk: { promo: 9, cls: 'archer', req: 33, name: '응축뇌전시', kind: 'vortex', fx: 'o_a_eungbolt', fxEnd: 'o_a_eungvortex', fx2: undefined, fxHit: undefined, dmg: 60, cd: 12,
     depth: 8, dur: 0.6, k: 0.5, endBurst: 2.2, endR: 92, fxCast: undefined, ck: 'line', pre: 'a_chain', branch: 0,
     desc: '거대한 뇌 기운을 담은 뇌전시를 쏜다. 뇌전시는 여덟 칸까지 날아가며 지나는 길의 몬스터를 끌어당기고, 끝에서 뇌기의 진이 열려 둘레의 몬스터를 모아 크게 폭발한다' },
-  // 천인: 천신의권역 (아우라·방어), 순보선풍 (광역), 해일강타 (전방 일격)
-  cl_cheonsin: { promo: 9, cls: 'celestial', req: 33, name: '천신의권역', kind: 'aura9', fx: 'o_cl_cheonsin', fxCast: 'k_u_cl_soul', fxHit: 'h_hit_6', hit: 10, cd: 18, duration: 8, radius: 2, tick: 0.5,
-    ward: 0.4, buff: 'shield', ck: 'buff', pre: 'cl_defense', branch: 2,
-    desc: '자신의 자리에 천신의 권역을 8초 동안 펼친다. 권역 안에서는 받는 피해가 40% 줄고, 권역에 든 몬스터는 거듭 피해를 입는다' },
-  cl_sunbo: { promo: 9, cls: 'celestial', req: 33, name: '순보선풍', kind: 'charge', fx: 'k_cl_storm', fxCast: 'k_u_cl_speed', fx2: 'k_cl_storm', dmg: 40, cd: 6, range: 6, radius: 2,
-    linger: 3, lingerK: 0.25, lingerFx: 'k_cl_storm', ck: 'nova', pre: 'cl_storm', branch: 1,
-    desc: '깃털보다 가볍게 멀리 떨어진 몬스터 무리에 순식간에 도약해 친다. 도약한 자리에 돌풍이 일어 3초 동안 둘레 두 칸을 거듭 휩쓴다' },
-  cl_haeil: { promo: 9, cls: 'celestial', req: 33, name: '해일강타', kind: 'crosswave', fx: 'k_cl_haeil', fxHit: 'h_hit_6', dmg: 48, cd: 5, depth: 5, width: 1, ways: 1, pulses: 1,
-    curse: 4, ck: 'line', pre: 'cl_ego', branch: 0,
-    desc: '해일을 일으켜 앞쪽 다섯 칸, 폭 세 칸의 몬스터를 크게 치고 풍랑의 표식을 남겨 받는 피해를 늘린다' },
+  // 천인 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/celestial.md). 시전 3 + 패시브 1 + 필살기:
+  //   순보선풍 (IMG49: 바라보는 쪽 앞의 몬스터 무리로 순식간에 도약해 치고, 내려선 자리에 푸른 돌풍이 3초 동안 휘몰아친다;
+  //     이동 기술이라 바라보는 쪽으로만; 내려서는 순간 받는 피해가 준다 — 설명창: 순간적으로 방어에 최적화),
+  //   해일강타 (IMG51: 앞 여섯 칸·폭 세 칸에 해일을 일으켜 맞은 몬스터마다 얼음 기둥, 풍랑의표식(받는 피해 증가)을 남긴다),
+  //   천신의권역 (IMG54: 시전한 자리에 푸른 권역 8초, 안에 있는 동안 받는 피해가 크게 준다 — 열 번 맞을 때까지 60%, 그다음 30%;
+  //     권역은 피해를 주지 않는다),
+  //   천공의공명 = 패시브, 그림 없음 (설명창 IMG52 [지속효과 마법]: 천기 기술을 쓰면 풍랑의표식이 공명해 표식 있는 몬스터에게
+  //     뇌우가 내리치고, 맞은 수만큼 그 기술의 재사용 대기가 준다 — gong9).
+  // Pictures at the original's own size (o_cl_*: 0.62 game pixels a capture pixel).
+  cl_cheonsin: { promo: 9, cls: 'celestial', req: 33, name: '천신의권역', kind: 'zone9', fx: 'o_cl_cheonsin', fxCast: undefined, fxHit: undefined, hit: undefined, tick: undefined,
+    cd: 20, duration: 8, reach: 90, stay: true, ward: 0.6, wardHits: [10, 0.6, 0.3], radius: undefined, buff: 'shield', ck: 'buff', pre: 'cl_defense', branch: 2,
+    desc: '시전한 자리에 천신의 권역을 8초 동안 펼친다. 권역 안에 있는 동안 받는 피해가 크게 준다 (열 번 맞을 때까지 60%, 그다음 30%)' },
+  cl_sunbo: { promo: 9, cls: 'celestial', req: 33, name: '순보선풍', kind: 'sunbo9', fx: 'o_cl_sunbo', fxCast: undefined, fx2: undefined, lingerFx: undefined, linger: undefined, lingerK: undefined,
+    dmg: 60, cd: 6, range: 6, radius: undefined, half: [92, 67], tick: 0.5, k: 0.3, guard: 0.5, guardT: 1, ck: 'blink', pre: 'cl_storm', branch: 1,
+    desc: '깃털보다 가볍게 바라보는 쪽 여섯 칸 안의 몬스터 무리로 순식간에 도약해 친다. 내려선 자리에 푸른 돌풍이 3초 동안 휘몰아쳐 든 몬스터를 거듭 휩쓸고, 내려서는 순간 1초 동안 받는 피해가 절반이 된다' },
+  cl_haeil: { promo: 9, cls: 'celestial', req: 33, name: '해일강타', kind: 'haeil9', fx: 'o_cl_haeil', fxHit: 'o_cl_haeilhit', dmg: 90, cd: 5, depth: 6, width: 1, ways: undefined, pulses: undefined,
+    curse: 4, mark: 8, ck: 'line', pre: 'cl_ego', branch: 0,
+    desc: '해일을 일으켜 앞쪽 여섯 칸, 폭 세 칸의 몬스터에게 얼음 기둥을 세워 크게 치고 풍랑의표식을 남긴다(받는 피해 증가). 해일이 그 길을 휩쓸고 지나간다' },
   // 마도사: 기공십자광선'쾌 (보조 공격), 광폭기사출 (광역), 광폭구슬'화 (그대로)
   md_crossq: { promo: 9, cls: 'magus', req: 33, name: "기공십자광선'쾌", kind: 'echo', echo: 'cross', fx: 'k_md_cross', fxCast: 'k_u_md_wing', fx2: 'k_md_cross', fxHit: 'k_u_md_storm', hit: 24, cd: 18,
     duration: 6, every: 0.5, range: 6, depth: 6, power: 0.2, buff: 'power', ck: 'buff', pre: 'md_cross', branch: 0,
@@ -1547,9 +1555,6 @@ const S9 = {
   a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'cheon9', fx: 'o_a_cheongung', fxCast: undefined, fxHit: undefined, auraSize: undefined,
     dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
     desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 둘레 3×3의 몬스터를 태운다(화상)' },
-  cl_gongmyeong: { promo: 9, cls: 'celestial', req: 33, name: '천공의공명', kind: 'echo', echo: 'mark', fx: 'o_cl_gongmyeong', fxHit: 'k_x_cl_thunder_1', hit: 16, cd: 18,
-    duration: 10, every: 0.6, shots: 3, range: 7, power: 0.15, buff: 'power', ck: 'buff', pre: 'cl_intrep', branch: 2,
-    desc: '10초 동안 하늘이 공명해 일곱 칸 안의 몬스터 셋에게 뇌우가 거듭 내리친다. 표식(저주)이 있는 몬스터는 더 아프다. 그동안 피해가 15% 는다' },
   md_mstorm: { promo: 9, cls: 'magus', req: 33, name: '마력폭풍', kind: 'aura9', fx: 'k_md_storm', fxCast: 'k_u_md_orb', fxHit: 'h_hit_light', hit: 12, cd: 15, duration: 6, radius: 2,
     tick: 0.4, stun: 0.2, ck: 'nova', pre: 'md_frenetic', branch: 2,
     desc: '몸 주변에 마력의 폭풍을 6초 동안 일으켜 둘레 두 칸의 몬스터에게 마력의 벼락을 거듭 내리친다' },
@@ -1626,6 +1631,15 @@ SKILLS.p_banhyang = { name: '치유의반향', kind: 'passive', retired: true, w
   desc: '9차 패시브. 체력이 가득 차 있으면 주는 피해가 30% 늘어난다', full9: { at: 0.98, k: 0.3 } };
 SKILL_ALIAS.p_banhyang = 'p_skyspirit';
 SKILLS.p_skyspirit.desc += '. 9차 패시브 치유의반향: 체력이 가득하면 주는 피해가 30% 는다';
+// 천공의공명: a passive in the original ([지속효과 마법], 설명창 IMG52; no scene of it in 2662): using a 천기 skill (회선풍·우레·백우
+// there; here the 천인's whirlwinds and thunder — 불가살이선풍·불가살이장군폭풍·뇌격룡·순보선풍) sets the 풍랑의표식 that
+// 해일강타 left ringing: a thunderbolt falls on every marked foe within reach, and that skill's wait shrinks by how many it
+// found. No picture of its own: only the small light of the blow on each. A saved slot of it is 해일강타.
+SKILLS.cl_gongmyeong = { name: '천공의공명', kind: 'passive', retired: true, was: 'celestial', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 불가살이선풍·불가살이장군폭풍·뇌격룡·순보선풍을 쓰면 풍랑의표식이 공명해, 표식이 있는 몬스터마다 뇌우가 내리쳐 피해를 주고 그 수만큼 그 기술의 재사용 대기가 준다 (하나에 5%, 최대 40%)',
+  gong9: { ids: ['cl_storm', 'cl_storm2', 'cl_thunder', 'cl_sunbo'], k: 0.5, reach: 20, max: 8, cut: 0.05, cutMax: 0.4, fx: 'h_hit_light' } };
+SKILL_ALIAS.cl_gongmyeong = 'cl_haeil';
+SKILLS.cl_haeil.desc += '. 9차 패시브 천공의공명: 선풍·뇌격 기술을 쓰면 풍랑의표식이 있는 몬스터에게 뇌우가 내리치고 그 기술이 빨리 돌아온다';
 for (const id of ['r_tudo', 'm_seonsim', 'cl_shatter', 'md_manafill', 'dk_wisp3', 'l_reflect', 'p_seongi']) Object.assign(SKILLS[id], { promo: 8, req: 30 });
 export const S9_IDS = Object.keys(S9).concat();
 
@@ -1742,7 +1756,7 @@ export const ULT_TIERS = {
     ult('celestial', 'cl_ult', '전의상실', { mech: 'mark', cast: 'k_cl_ult', frac: 0.6, main: 'k_u_cl_loss', hit: 'k_u_cl_losshit', stun: 0.8, delay: 1.0, boss: 'cl_moment', k: 1 }),
     ult('celestial', 'cl_thunder', '뇌격룡', { auraW: 150, mech: 'chain', cast: 'k_u_cl_dragon', castStages: false, frac: 0.95, main: 'k_x_cl_thunder_2', markScale: 0.5, shot: 'h_hit_light', stun: 0.4, boss: 'cl_acumen', k: 1.15 }),
     ult('celestial', 'cl_tiger', '범아귀', { echoN: 18, echoCap: 1.8, aura: 'k_cl_claw', openW: 0.45, echo2: 'k_cl_slam', auraW: 220, echoW: 230, open: 'k_cl_tiger', mech: 'dash', cast: 'k_u_cl_speed', castSize: 150, main: 'k_cl_tiger', mainSize: 170, hit: 'h_hit_tiger', n: 8, boss: 'cl_ego', k: 1.3 }),
-    ult('celestial', 'cl_cheonbyeon', '천변지이', { cutin: 'o_cl_ult9', desc: '천인의 경이로운 힘으로 하늘과 땅의 거대한 이변을 일으켜 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', echoN: 34, openCap: 4, echoCap: 2, aura: 'k_cl_bind', openW: 0.65, fin: 'k_cl_ego', mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
+    ult('celestial', 'cl_cheonbyeon', '천변지이', { cine9: 0.75, cutin: 'o_cl_ult9', desc: '천인의 경이로운 힘으로 하늘과 땅의 거대한 이변을 일으켜 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', echoN: 34, openCap: 4, echoCap: 2, aura: 'k_cl_bind', openW: 0.65, fin: 'k_cl_ego', mech: 'totem', main: 'k_cl_reindeer', mainScale: 3.2, lift: 70, hit: 'h_hit_tiger', n: 5, life: 2.6, boss: 'cl_shatter', k: 1.5 }),
   ],
   dokkaebi: [
     ult('dokkaebi', 'dk_ult', '금나와라,뚝딱', { mech: 'rain', cast: 'k_dk_ult', castSize: 200, drop: 'k_u_dk_gold', dropSize: 110, hit: 'k_dk_goldhit', boss: 'dk_punish', k: 1 }),

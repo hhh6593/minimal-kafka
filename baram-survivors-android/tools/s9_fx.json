@@ -1784,46 +1784,183 @@
  },
  "cl_cheonsin": {
   "src": "gif2662/IMG54.gif",
-  "mode": "diff",
+  "mode": "parts",
+  "key": "unmix",
   "bg": 0,
-  "frames": [
-   8,
-   112,
-   4
+  "k": 110,
+  "floor": 12,
+  "rot": [
+   1.06,
+   30
   ],
-  "box": [
-   20,
-   50,
-   330,
-   275
+  "rotsector": [
+   140,
+   230,
+   12
   ],
-  "t0": 30,
-  "t1": 100,
-  "ms": 90,
-  "mask": [
-   {
-    "box": [
-     0,
-     0,
-     1,
-     1
-    ],
-    "ellipse": [
-     172,
-     140,
-     58,
-     62,
-     0.35
-    ]
-   },
+  "eye": [
+   62,
+   92
+  ],
+  "radial": [
+   124,
+   146
+  ],
+  "cell": [
+   310,
+   300
+  ],
+  "origin": [
+   155,
+   150
+  ],
+  "ms": 80,
+  "scale": 0.62,
+  "holeexpr": [
+   "(r>g+30)&(r>b+30)",
+   "(mx<70)",
+   "(mx-mn<45)&(mx>110)",
+   "(g>r+50)&(g>b+50)",
+   "(r>g+8)&(r>b+8)&(abs(x-175)<16)"
+  ],
+  "why": "천신의권역: the blue vortex of the 권역 turning round the 천인 (2662 IMG54 frames 32-46, one turn of its loop (frame 47 is frame 32 again), the camera still; the hero stands in its middle, the centre dummy's stake through it, the buff list over its lower right): unmixed off the clean field (frame 0); a clean quarter of it on the left (140-230°, its four arms) carried round its middle (rotsector, the seams blended over 12°); its middle, where the hero stands, let fade (eye), its own round edge (radial)",
+  "cells": [
    [
-    135,
-    213,
-    207,
-    246
+    {
+     "f": 32,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 33,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 34,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 35,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 36,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 37,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 38,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 39,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 40,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 41,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 42,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 43,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 44,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 45,
+     "at": [
+      174,
+      188
+     ]
+    }
+   ],
+   [
+    {
+     "f": 46,
+     "at": [
+      174,
+      188
+     ]
+    }
    ]
-  ],
-  "why": "천신의권역's blue vortex round the hero (2662 IMG54, still camera; the hero masked out)"
+  ]
  },
  "l_sickle": {
   "src": "dl1320/25.gif",
@@ -2524,12 +2661,6 @@
   "scale": 0.62,
   "why": "천궁난사: one fire arrow's blast (2662 IMG42 frames 21-27 at the right dummy: white sphere, ring, burst, embers); the number, its star and the bar taken again from the burst turned round its middle (rot)"
  },
- "cl_gongmyeong": {
-  "src": "dl1320/23.gif",
-  "mode": "white",
-  "ms": 70,
-  "why": "천인 9차 천공의공명: the resonance striking down (1320 #23, by its look)"
- },
  "l_agong": {
   "src": "dl1320/26.gif",
   "mode": "white",
@@ -2921,53 +3052,56 @@
   "src": "gif2662/IMG56.gif",
   "mode": "cinema",
   "frames": [
-   11,
-   37,
+   8,
+   41,
    3
   ],
   "box": [
-   0,
-   0,
-   812,
+   4,
+   4,
+   808,
    632
   ],
-  "t0": 45,
-  "t1": 110,
-  "ms": 140,
+  "t0": 22,
+  "t1": 70,
+  "ms": 215,
   "k": 1,
   "max": 420,
   "cap": 420,
   "hero": [
-   406,
-   287,
-   34,
-   50
+   402,
+   283,
+   40,
+   56
   ],
   "field": [
-   406,
-   297,
+   402,
+   293,
    211,
    227
   ],
   "mask": [
    {
     "box": [
-     702,
-     212,
-     812,
-     266
-    ],
-    "from": [
      0,
-     -60
+     0,
+     1,
+     1
+    ],
+    "ellipse": [
+     404,
+     585,
+     26,
+     50,
+     0.3
     ]
    },
    {
     "box": [
-     256,
+     252,
      0,
-     556,
-     34
+     552,
+     30
     ],
     "from": [
      0,
@@ -2975,7 +3109,21 @@
     ]
    }
   ],
-  "why": "천변지이: the 원작 궁극's full-screen art (2662 IMG56 frames 10-39); the whole screen, its black see-through, the damage numbers and the hero filled from the art round them"
+  "why": "천변지이: the 원작 궁극's art (2662 IMG56 frames 8-38, every third: the storm clouds and golden bolts above, the great waves, the chain and the crossed blades below, the cyan lightning whirling round the hero in its white orb) — its black see-through, the damage numbers, hit stars, life bars and the hero filled from the art round them (only vivid colour kept in the middle where the dummies stood), the window's own border cut off, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)",
+  "vignette": [
+   1.0,
+   0.99,
+   0.12
+  ],
+  "grow": 13,
+  "stars": 2,
+  "bars": 1,
+  "cyan": [
+   240,
+   90,
+   570,
+   480
+  ]
  },
  "md_ult9": {
   "src": "gif2662/IMG64.gif",
@@ -7465,5 +7613,647 @@
   "scale": 0.62,
   "soft": 10,
   "why": "응축뇌전시: the lightning arrow (2662 IMG44 frame 2), off the clean frame; drawn going right, its pivot the head"
+ },
+ "cl_sunbo": {
+  "src": "gif2662/IMG49.gif",
+  "mode": "parts",
+  "key": "unmix",
+  "bg": 49,
+  "k": 110,
+  "floor": 12,
+  "rot": [
+   1.37,
+   30
+  ],
+  "radial": [
+   124,
+   148
+  ],
+  "cell": [
+   350,
+   250
+  ],
+  "origin": [
+   175,
+   125
+  ],
+  "ms": 150,
+  "scale": 0.62,
+  "badbox": [
+   [
+    140,
+    90,
+    240,
+    196
+   ],
+   [
+    233,
+    100,
+    337,
+    222
+   ],
+   [
+    255,
+    296,
+    322,
+    405
+   ]
+  ],
+  "holeexpr": [
+   "(r>180)&(g<200)&(b<130)&(r-b>80)",
+   "(g>r+50)&(g>b+50)",
+   "(r>165)&(g>150)&(b<r-18)",
+   "(g>=b)&(g>215)&(r>120)"
+  ],
+  "why": "순보선풍: the blue gale whirling where the 천인 landed (2662 IMG49 frames 4-44, the camera still from frame 2): unmixed off the clean field (frame 49); what lies over it — the caster's bars and the numbers, hit stars and sparks at its middle, the struck dummy's ice burst at its top, the bystander under its bottom — taken from the whirl's own pixels a turn on round its middle (rot); faded at its own round edge",
+  "cells": [
+   [
+    {
+     "f": 6,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 8,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 10,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 12,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 14,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 16,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 18,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 20,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 22,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 24,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 26,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 28,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 30,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 32,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 34,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 36,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 38,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 40,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ],
+   [
+    {
+     "f": 42,
+     "at": [
+      280,
+      273
+     ]
+    }
+   ]
+  ],
+  "eye": [
+   64,
+   90
+  ],
+  "rotdeg": [
+   90,
+   -90,
+   70,
+   -70,
+   110,
+   -110,
+   50,
+   -50,
+   130,
+   -130
+  ],
+  "fill": [
+   [
+    145,
+    285,
+    27,
+    54
+   ],
+   [
+    433,
+    285,
+    27,
+    54
+   ]
+  ],
+  "rotsector": [
+   116,
+   140,
+   7
+  ]
+ },
+ "cl_haeil": {
+  "src": "gif2662/IMG51.gif",
+  "mode": "parts",
+  "key": "unmix",
+  "bg": 18,
+  "k": 110,
+  "floor": 12,
+  "cell": [
+   520,
+   290
+  ],
+  "origin": [
+   515,
+   180
+  ],
+  "ms": 85,
+  "scale": 0.62,
+  "max": 420,
+  "cap": 420,
+  "soft": 26,
+  "smooth": 4,
+  "grain": false,
+  "badbox": [],
+  "holeexpr": [
+   "(g>r+50)&(g>b+50)",
+   "((r>g+22)|(mx<85)|((r>150)&(g>120)&(b<100)))&(x>178)&(x<382)&(y>70)&(y<232)",
+   "((r>g+22)|(mx<85)|((r>150)&(g>120)&(b<100)))&(x>428)&(y>90)&(y<350)",
+   "(r>180)&(g<200)&(b<140)&(r-b>70)",
+   "(d<10)&(((x>119)&(x<207)&(y>144)&(y<249))|((x>119)&(x<207)&(y>288)&(y<393))|((x>263)&(x<351)&(y>144)&(y<249))|((x>263)&(x<351)&(y>288)&(y<393))|((x>407)&(x<495)&(y>144)&(y<249))|((x>407)&(x<495)&(y>288)&(y<393)))",
+   "((r>g)&(r-b>40)|(mn>200)|((mx<120)&(b>r+10))|((b>225)&(g>170)&(r<140)))&(((x>97)&(x<213)&(y>117)&(y<197))|((x>97)&(x<213)&(y>261)&(y<341))|((x>241)&(x<357)&(y>117)&(y<197))|((x>241)&(x<357)&(y>261)&(y<341))|((x>385)&(x<501)&(y>117)&(y<197))|((x>385)&(x<501)&(y>261)&(y<341)))"
+  ],
+  "holegrow": 4,
+  "edgeblend": 0,
+  "why": "해일강타: the sheet of water the 천인 sends out ahead (2662 IMG51 frames 4-14, the camera still; the caster at the right, facing left): unmixed off the clean field (frame 18), its colour field smoothed; the dummies standing over it, their bars, the numbers and hit stars on them, the struck ones' ice pillars (frames 4-7), the bystander above and the caster's own body are covered boxes the water round them is carried into; the cell's edge faded (soft). Its pivot the caster's feet, the water going left",
+  "cells": [
+   [
+    {
+     "f": 4,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -29,
+      110
+     ],
+     "badbox": [
+      [
+       139,
+       59,
+       187,
+       251
+      ],
+      [
+       139,
+       203,
+       187,
+       395
+      ],
+      [
+       283,
+       59,
+       331,
+       251
+      ],
+      [
+       283,
+       203,
+       331,
+       395
+      ],
+      [
+       427,
+       59,
+       475,
+       251
+      ],
+      [
+       427,
+       203,
+       475,
+       395
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 5,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -39,
+      110
+     ],
+     "badbox": [
+      [
+       139,
+       59,
+       187,
+       251
+      ],
+      [
+       139,
+       203,
+       187,
+       395
+      ],
+      [
+       283,
+       59,
+       331,
+       251
+      ],
+      [
+       283,
+       203,
+       331,
+       395
+      ],
+      [
+       427,
+       59,
+       475,
+       251
+      ],
+      [
+       427,
+       203,
+       475,
+       395
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 6,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -59,
+      110
+     ],
+     "badbox": [
+      [
+       139,
+       59,
+       187,
+       251
+      ],
+      [
+       139,
+       203,
+       187,
+       395
+      ],
+      [
+       283,
+       59,
+       331,
+       251
+      ],
+      [
+       283,
+       203,
+       331,
+       395
+      ],
+      [
+       427,
+       59,
+       475,
+       251
+      ],
+      [
+       427,
+       203,
+       475,
+       395
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 7,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -67,
+      110
+     ],
+     "badbox": [
+      [
+       139,
+       59,
+       187,
+       251
+      ],
+      [
+       139,
+       203,
+       187,
+       395
+      ],
+      [
+       283,
+       59,
+       331,
+       251
+      ],
+      [
+       283,
+       203,
+       331,
+       395
+      ],
+      [
+       427,
+       59,
+       475,
+       251
+      ],
+      [
+       427,
+       203,
+       475,
+       395
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "f": 8,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -109,
+      110
+     ]
+    }
+   ],
+   [
+    {
+     "f": 9,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -134,
+      110
+     ]
+    }
+   ],
+   [
+    {
+     "f": 10,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -146,
+      110
+     ]
+    }
+   ],
+   [
+    {
+     "f": 11,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -187,
+      110
+     ]
+    }
+   ],
+   [
+    {
+     "f": 12,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -201,
+      110
+     ]
+    }
+   ]
+  ]
+ },
+ "cl_haeilhit": {
+  "src": "gif2662/IMG51.gif",
+  "mode": "parts",
+  "key": "bluediff",
+  "bg": 18,
+  "bt": [
+   10,
+   40
+  ],
+  "t0": 20,
+  "t1": 60,
+  "white": 190,
+  "cell": [
+   80,
+   62
+  ],
+  "origin": [
+   40,
+   56
+  ],
+  "ms": 90,
+  "scale": 0.62,
+  "soft": 18,
+  "why": "해일강타's blow: the ice pillar that rises on each one struck (2662 IMG51 frames 2-3, the lower left dummy's; the camera still): what moved off the clean field (frame 18) and is blue (bluediff, its white heart kept); only its part below the dummy's hit star and number (nothing filled in), its top faded (soft)",
+  "cells": [
+   [
+    {
+     "f": 2,
+     "at": [
+      163,
+      383
+     ],
+     "clip": [
+      -40,
+      -46,
+      40,
+      6
+     ]
+    }
+   ],
+   [
+    {
+     "f": 3,
+     "at": [
+      163,
+      383
+     ],
+     "clip": [
+      -40,
+      -46,
+      40,
+      6
+     ]
+    }
+   ]
+  ]
  }
 }

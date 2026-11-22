@@ -206,6 +206,11 @@ def keyed(frames, i, e, part=None):
             al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near)
         return np.dstack([a, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+    for fi, x0, y0, x1, y1 in part.get("bgpatch", e.get("bgpatch", [])):
+        # (the clean field put together: a box of it from another frame of the same still camera, where someone stood
+        # in "bg" — 순보선풍's caster before the leap)
+        bg = bg.copy()
+        bg[y0:y1, x0:x1] = np.asarray(frames[fi].convert("RGB")).astype(np.float32)[y0:y1, x0:x1]
     if key == "sub":
         # a glow over a still field (천선의영역's seal, 천신의기운's rings, 폭렬천뢰탄's sphere): the light it adds, what is
         # brighter than the clean field ("bg") — drawn added (the entry's "add": true). The bodies standing still drop out
@@ -370,6 +375,163 @@ def keyed(frames, i, e, part=None):
         m = np.abs(D).max(axis=2)
         al = np.clip((m - lo) / max(1.0, k - lo), 0, 1)
         F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+        if part.get("rot", e.get("rot")) or part.get("shiftfill", e.get("shiftfill")):
+            # a whirl turning round its middle (순보선풍's gale, 천신의권역's vortex) over bodies, numbers, bars and a caster
+            # standing in it: what lies over it ("badbox" boxes, "fill" ellipses [cx, cy, rx, ry] and "holeexpr" colours,
+            # all in the frame) is taken from the whirl's own pixels at the same place a turn on round its middle — "rot"
+            # [ys, r_min] (the ellipse squashed by ys vertically; the middle is the part's "at") — the nearest turn whose
+            # pixel is clean; inside r_min (every turn of it covered) from a little farther out. Its own dots, no blur.
+            from scipy import ndimage
+            ys_, rmin = (part.get("rot", e.get("rot")) or [1, 0])[:2]
+            cx, cy = part["at"]
+            H_, W_ = al.shape
+            yy_, xx_ = np.mgrid[0:H_, 0:W_].astype(np.float32)
+            hole = np.zeros((H_, W_), bool)
+            for x0, y0, x1, y1 in part.get("badbox", e.get("badbox", [])):
+                hole[max(0, y0):y1, max(0, x0):x1] = True
+            for ex_, ey_, rx_, ry_ in part.get("fill", e.get("fill", [])):
+                hole |= ((xx_ - ex_) / rx_) ** 2 + ((yy_ - ey_) / ry_) ** 2 <= 1
+            hx = part.get("holeexpr", e.get("holeexpr"))
+            if hx:
+                r_, g_, b_ = a[..., 0], a[..., 1], a[..., 2]
+                env = {"r": r_, "g": g_, "b": b_, "d": m, "mn": a.min(axis=2), "mx": a.max(axis=2), "np": np, "x": xx_, "y": yy_}
+                hm = np.zeros(al.shape, bool)
+                for ex in hx:
+                    hm |= eval(ex, {}, env)
+                for ex, px in part.get("holenear", e.get("holenear", [])):
+                    hm |= eval(ex, {}, env) & ndimage.binary_dilation(hm, iterations=px)
+                hole |= ndimage.binary_fill_holes(ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3))))
+            sf = part.get("shiftfill", e.get("shiftfill"))
+            if sf:
+                # (a sheet of water over the field — 해일강타's wave — whose caustics run on to every side: a covered pixel
+                # from the same frame "shiftfill" [[dx, dy] …] away, the first that is clean; its own dots, no blur)
+                todo = hole.copy()
+                src_al, src_F = al.copy(), F.copy()
+                # (each covered patch first moved over whole from one place beside it — a copy, not a smear — the
+                # nearest of the shifts, or of their multiples, that finds it all clean)
+                lab_, nl_ = ndimage.label(hole)
+                cands = sorted({(sdx * k, sdy * k) for sdx, sdy in sf for k in (1, 2, 3, 4, 6, 8)}, key=lambda v: abs(v[0]) + abs(v[1]))
+                if part.get("shiftexact", e.get("shiftexact")):
+                    # (the field's own period: bodies standing in a grid — the dummies two tiles apart — a patch from the
+                    # same place in the gap beside it, in the order given)
+                    cands = [tuple(v) for v in sf]
+                need_ = part.get("shiftmin", e.get("shiftmin", 0.98))
+                for li, sl in enumerate(ndimage.find_objects(lab_)):
+                    comp = np.zeros_like(hole)
+                    comp[sl] = lab_[sl] == li + 1
+                    n_ = comp.sum()
+                    for sdx, sdy in cands:
+                        sx = (xx_ + sdx).astype(int)
+                        sy = (yy_ + sdy).astype(int)
+                        inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                        sxc, syc = sx.clip(0, W_ - 1), sy.clip(0, H_ - 1)
+                        ok = comp & inside & ~hole[syc, sxc]
+                        if ok.sum() >= need_ * n_:
+                            al[ok] = src_al[syc[ok], sxc[ok]]
+                            F[ok] = src_F[syc[ok], sxc[ok]]
+                            todo &= ~ok
+                            break
+                for _ in range(1 if part.get("shiftexact", e.get("shiftexact")) else 3):
+                    for sdx, sdy in (cands if part.get("shiftexact", e.get("shiftexact")) else sf):
+                        if not todo.any():
+                            break
+                        sx = (xx_ + sdx).astype(int)
+                        sy = (yy_ + sdy).astype(int)
+                        inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                        sxc, syc = sx.clip(0, W_ - 1), sy.clip(0, H_ - 1)
+                        ok = todo & inside & ~todo[syc, sxc]
+                        al[ok] = src_al[syc[ok], sxc[ok]]
+                        F[ok] = src_F[syc[ok], sxc[ok]]
+                        src_al[ok], src_F[ok] = al[ok], F[ok]
+                        todo &= ~ok
+                al[todo] = 0
+                F[al <= 0] = 0
+                return np.dstack([F, al * 255]).astype(np.uint8)
+            dx_, dy_ = xx_ - cx, (yy_ - cy) * ys_
+            rr = np.hypot(dx_, dy_)
+            ang = np.arctan2(dy_, dx_)
+            rsec = part.get("rotsector", e.get("rotsector"))
+            if rsec:
+                # (or the whole of it from one clean slice, angles a0..a1, carried round: its rings go on, no patchwork;
+                # "rotsector" [a0, a1] in degrees, 0 to the right, 90 down)
+                a0, a1 = rsec[:2]
+                bl = rsec[2] if len(rsec) > 2 else 0
+                span = a1 - a0
+                dd = np.degrees(ang) % 360
+                o = (dd - a0) % span
+
+                def take(deg):
+                    # (a covered pixel of the slice — a spark's ray — from the same ring a few degrees on in it)
+                    oa, oF, need = np.zeros_like(al), np.zeros_like(F), np.ones_like(hole)
+                    for sh in (0, 5, -5, 10, -10, 15, -15):
+                        t = np.radians(np.clip(deg + sh, a0, a1 + bl))
+                        sx = np.clip(np.rint(cx + rr * np.cos(t)).astype(int), 0, W_ - 1)
+                        sy = np.clip(np.rint(cy + rr * np.sin(t) / ys_).astype(int), 0, H_ - 1)
+                        ok = need & ~hole[sy, sx]
+                        oa[ok] = al[sy[ok], sx[ok]]
+                        oF[ok] = F[sy[ok], sx[ok]]
+                        need &= ~ok
+                    return oa, oF
+                al1, F1 = take(a0 + o)
+                if bl:
+                    # (where one copy meets the next, the next fades in over `bl` degrees from the slice's own
+                    # continuation past a1 — the slice is taken that much clean beyond it — no step at the seam)
+                    al2, F2 = take(a1 + o)
+                    w = np.clip(o / bl, 0, 1)
+                    A = al1 * w + al2 * (1 - w)
+                    F1 = (F1 * (al1 * w)[..., None] + F2 * (al2 * (1 - w))[..., None]) / np.maximum(A, 1e-3)[..., None]
+                    al1 = A
+                al, F = al1, F1
+                hole = np.zeros_like(hole)
+            todo = hole.copy()
+            src_al, src_F = al.copy(), F.copy()
+            DEGS = part.get("rotdeg", e.get("rotdeg", (35, -35, 70, -70, 105, -105, 140, -140, 180)))
+
+            def turned(deg, rs):
+                t = ang + np.radians(deg)
+                sx = np.rint(cx + rs * np.cos(t)).astype(int)
+                sy = np.rint(cy + rs * np.sin(t) / ys_).astype(int)
+                inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                return sx.clip(0, W_ - 1), sy.clip(0, H_ - 1), inside
+            # (each covered patch first taken whole from one turn — no seams of a patchwork — where nearly all of it is clean)
+            lab_, nl_ = ndimage.label(hole)
+            for li, sl in enumerate(ndimage.find_objects(lab_)):
+                comp = np.zeros_like(hole)
+                comp[sl] = lab_[sl] == li + 1
+                for deg in DEGS:
+                    sx, sy, inside = turned(deg, rr)
+                    ok = comp & inside & ~hole[sy, sx]
+                    if ok.sum() >= 0.97 * comp.sum():
+                        al[ok] = src_al[sy[ok], sx[ok]]
+                        F[ok] = src_F[sy[ok], sx[ok]]
+                        todo &= ~ok
+                        break
+            for grow in (1.0, 1.15, 1.3, 1.5, 1.75, 2.0):
+                for deg in DEGS:
+                    if not todo.any():
+                        break
+                    rs = np.where(rr < rmin * 1.6, np.maximum(rr, 2.0) * grow, rr) if grow > 1 else rr
+                    t = ang + np.radians(deg)
+                    sx = np.rint(cx + rs * np.cos(t)).astype(int)
+                    sy = np.rint(cy + rs * np.sin(t) / ys_).astype(int)
+                    inside = (sx >= 0) & (sx < W_) & (sy >= 0) & (sy < H_)
+                    sxc, syc = sx.clip(0, W_ - 1), sy.clip(0, H_ - 1)
+                    ok = todo & inside & ~hole[syc, sxc]
+                    al[ok] = src_al[syc[ok], sxc[ok]]
+                    F[ok] = src_F[syc[ok], sxc[ok]]
+                    todo &= ~ok
+            al[todo] = 0
+            rd = part.get("radial", e.get("radial"))
+            if rd:
+                # (its own round edge: what lies past it in the frame is not the whirl's)
+                al = al * np.clip((rd[1] - rr) / max(1.0, rd[1] - rd[0]), 0, 1)
+            eye = part.get("eye", e.get("eye"))
+            if eye:
+                # (its eye: what stood and struck in its middle — the caster, its bars, the numbers, the hit sparks — is
+                # not the whirl's; the whirl's own see-through middle is let fade to nothing there, no fill)
+                al = al * np.clip((rr - eye[0]) / max(1.0, eye[1] - eye[0]), 0, 1)
+            F[al <= 0] = 0
+            return np.dstack([F, al * 255]).astype(np.uint8)
         sm = part.get("smooth", e.get("smooth"))
         if sm:
             # the fog's colour changes slowly: that colour field (each pixel the mean of its neighbours' colours, weighted
@@ -454,7 +616,8 @@ def keyed(frames, i, e, part=None):
                         fill[y0:y1, x0:x1] += g
                 # and its edge blended over 10 px into what lies round it (no straight line)
                 dist = ndimage.distance_transform_edt(hole)
-                t = np.clip(dist / 10, 0, 1)
+                # ("edgeblend" 0: a hole found by its colour is all contaminant, to its very edge)
+                t = np.clip(dist / max(1e-3, part.get("edgeblend", e.get("edgeblend", 10))), 0, 1)
                 ap = np.clip(np.where(hole, fill * t + ap * (1 - t), ap), 0, 1)
             al, F = ap, np.clip(Fs, 0, 255)
         F[al <= 0] = 0
@@ -642,7 +805,20 @@ def parts_cells(frames, e):
                     rr_ = np.hypot(xx_ - rcx, (yy_ - rcy) / ry_)
                     a[..., 3] = (a[..., 3] * np.clip((r1_ - rr_) / max(1.0, r1_ - r0_), 0, 1)).astype(np.uint8)
                     continue
-                if "mirror" in op:
+                if "vmirror" in op:
+                    # (a box filled from the rows on the other side of y = ay: a sheaf of vertical streaks — 해일강타's
+                    # pillar — goes on unbroken over the line, no seam)
+                    m = op["vmirror"]
+                    x0, y0, x1, y1 = box(m["box"])
+                    axis = ay + m["ay"]
+                    src = a.copy()
+                    for y in range(y0, y1):
+                        sy = int(round(2 * axis - y))
+                        if 0 <= sy < H:
+                            a[y, x0:x1] = src[sy, x0:x1]
+                        else:
+                            a[y, x0:x1, 3] = 0
+                elif "mirror" in op:
                     m = op["mirror"]
                     x0, y0, x1, y1 = box(m["box"])
                     axis = ax + m["ax"]
@@ -796,11 +972,25 @@ def build(spec, src_dir, out_dir, only=None):
                     a = a.copy()
                     a[y0:y1, x0:x1] = a[2 * cy - y1 + 1:2 * cy - y0 + 1, 2 * cx - x1 + 1:2 * cx - x0 + 1][::-1, ::-1]
                 r, g, bl = a[..., 0], a[..., 1], a[..., 2]
-                hole = ((bl > 170) & (r < 120) & (bl - r > 90)) | (a.min(axis=2) > e.get("white", 225))
+                digit = (bl > 170) & (r < 120) & (bl - r > 90)
+                if e.get("cyan"):
+                    # (천변지이's cyan lightning is as blue as the digits' highlights: out of the columns of numbers — the
+                    # "cyan" box [x0, y0, x1, y1] they stand in — a green-blue is the lightning, not a number)
+                    cx0, cy0, cx1, cy1 = e["cyan"]
+                    yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                    cols = (xx0 >= cx0) & (xx0 < cx1) & (yy0 >= cy0) & (yy0 < cy1)
+                    digit &= ~((g >= bl - 50) & ~cols)
+                hole = digit | (a.min(axis=2) > e.get("white", 225))
                 if e.get("bars"):  # the life bars' green and the DEAD labels' red over the field
                     hole |= ((g > 140) & (r < 110) & (bl < 110)) | ((r > 150) & (g < 40) & (bl < 40))
                 if e.get("stars"):  # the hit stars' orange round the damage numbers (질풍난무: not the bamboo's yellow)
                     hole |= (r > 190) & (g < 170) & (bl < 100) & (r - g > 60)
+                    if e.get("stars") == 2 and e.get("field"):
+                        # (and their darker rims, where the dummies stood: the golden bolts there are greener)
+                        fcx, fcy, frx, fry = e["field"]
+                        yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                        infield = ((xx0 - fcx) / frx) ** 2 + ((yy0 - fcy) / fry) ** 2 <= 1
+                        hole |= (r > 110) & (g < 150) & (r - g > 45) & (bl < 110) & infield
                 hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
                 if e.get("hero"):
                     cx, cy, rx, ry = e["hero"]
