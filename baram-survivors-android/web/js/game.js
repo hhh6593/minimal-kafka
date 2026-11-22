@@ -8577,23 +8577,25 @@ const TIER_KINDS = {
       let any = false;
       for (let k = 1; k <= deep && !any; k++) any = onTiles(row(k)).length > 0;
       if (!any) return 0.3;
-      const x0 = sx * TILE + TILE / 2, y0 = sy * TILE + TILE - 6;
-      addFx(fxid, x0, y0 - (fx ? 0 : 20), { anchor: 'bottom', must: true, flip: fx > 0, rot: fy < 0 ? Math.PI / 2 : fy > 0 ? -Math.PI / 2 : 0,
-        // (two tiles deep itself, it passes over all `deep` tiles of the path while it stands)
-        mv: deep > 2 ? [fx * (deep - 2) * TILE, fy * (deep - 2) * TILE, 0.3] : undefined });
-      // the charge: as far as the way is open (a wall, the ground's edge stop it), a foe on the last tile stepping aside
+      // the charge: as far as the way is open (the ground's edge stops it), a foe on the last tile stepping aside
+      let went = 0;
       if (!steering()) {
         let reach = 0;
         for (let k = 1; k <= deep; k++) { if (G.arena && !Hunt.open(sx + fx * k, sy + fy * k)) break; reach = k; }
-        for (let k = reach; k >= 1; k--) {
+        for (let k = reach; k >= 1 && !went; k--) {
           const tx = sx + fx * k, ty = sy + fy * k;
           for (const e of onTiles([[tx, ty]])) tkShove(e, tx + fy, ty + fx) || tkShove(e, tx - fy, ty - fx);
-          if (tkMoveHero(tx, ty)) { p.inv = Math.max(p.inv || 0, 0.4); break; }
+          if (tkMoveHero(tx, ty)) { p.inv = Math.max(p.inv || 0, 0.4); went = k; }
         }
       }
+      // the wall goes with the hero — its pivot the hero's feet, the rings half a tile before it — from where the charge
+      // began to where it ends; 이펙트=판정: it strikes the path and what the wall still covers at the end (two tiles more)
+      const rows = Math.max(deep, went + 2);
+      // (the hero is at the charge's end at once, the camera with it: the wall is held on the hero, not sent after it)
+      addFx(fxid, 0, fx ? 0 : -20, { follow: true, anchor: 'bottom', must: true, flip: fx > 0, rot: fy < 0 ? Math.PI / 2 : fy > 0 ? -Math.PI / 2 : 0 });
       G.shake = Math.max(G.shake, 0.06);
       const seen = new Set();
-      for (let k = 1; k <= deep; k++) later(0.04 + (k - 1) * (0.26 / deep), () => {
+      for (let k = 1; k <= rows; k++) later(0.04 + (k - 1) * (0.26 / rows), () => {
         if (G !== run) return;
         G.procHitting = true; // (no hit sparks of the blade's on them: the original shows none)
         for (const o of onTiles(row(k))) {
@@ -9371,9 +9373,9 @@ const ULT_MECH = {
 // In a war or a raid only the call (the party's spells are many there); 번쩍임 줄이기 halves the echoes.
 const ULT_GRAND = [
   { dark: 0.7, shake: 0.5 },
-  { openW: 0.32, aura: 2.6, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.35, 1.5], lateN: 3, lateAt: 1.9, dark: 0.9, shake: 0.55 },
-  { openW: 0.45, aura: 3.1, auraW: 160, echoN: 12, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.25, 1.6], lateN: 5, lateAt: 1.8, dark: 1.1, shake: 0.65 },
-  { openW: 0.5, aura: 3.8, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.2, 1.5], finAt: 1.5, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 2.2, dark: 1.4, shake: 0.8, cutT: 3.4 },
+  { openW: 0.32, aura: 1.1, auraW: 130, echoN: 3, echoW: 125, echoR: [[0.27, 0.3]], echoT: [0.1, 0.5], lateN: 3, lateAt: 0.6, dark: 0.9, shake: 0.55 },
+  { openW: 0.45, aura: 1.15, auraW: 160, echoN: 12, echoW: 150, echoR: [[0.2, 0.22], [0.34, 0.34], [0.46, 0.44]], echoT: [0.1, 0.55], lateN: 5, lateAt: 0.6, dark: 1.1, shake: 0.65 },
+  { openW: 0.5, aura: 1.2, auraW: 180, echoN: 20, echoW: 160, echoR: [[0.18, 0.2], [0.32, 0.32], [0.46, 0.44]], echoT: [0.1, 0.55], finAt: 0.6, finW: 0.55, edgeN: 8, lateN: 8, lateAt: 0.7, dark: 1.2, shake: 0.8, cutT: 1.1 },
 ];
 // (ways that already hang their main or cast picture over the screen: no second call of it)
 const ULT_SCREEN_OWN = { rain: 'main', mark: 'cast', chain: 'cast' };
@@ -9708,11 +9710,12 @@ function castUlt() {
     // held picture and late echoes), its way of striking over in about one: 30% of the blow comes in beats on the
     // whole screen while they stay (the same blow, spread), and the dark holds over the screen as long (2.2 / 2.9 / 3.4 s:
     // the last of a way's blows — 헬파이어's wave to the rest — fall by 2 s).
-    const band = ultBand(G.cls.id), span = cine ? 0 : G.war ? 1.2 : [2.2, 2.9, 3.4][Math.min(2, band)] || 2.2;
-    const beatN = cine || G.war ? 0 : Math.round((span - 0.3) / 0.35), beatK = 0.3 / Math.max(1, beatN);
+    // (사용자 결정 2026-11-22: 필살기는 빠르게 — every band's dark and held pictures about 1.2 s, its beats within the first 0.6 s)
+    const band = ultBand(G.cls.id), span = cine ? 0 : 1.2;
+    const beatN = cine || G.war ? 0 : 2, beatK = 0.3 / Math.max(1, beatN);
     const blow = cine ? (e, k) => strike(e, k * 0.6) : beatN ? (e, k) => strike(e, k * 0.7) : strike;
-    if (cine) for (let i = 0; i < CINE_N; i++) later(0.3 + i * 0.42, () => { if (!G.dead) for (const e of onScreen()) strike(e, cineK); });
-    for (let i = 1; i <= beatN; i++) later(0.3 + (i * (span - 0.3)) / beatN, () => { if (!G.dead) for (const e of onScreen()) strike(e, beatK); });
+    if (cine) for (let i = 0; i < CINE_N; i++) later(0.2 + i * 0.06, () => { if (!G.dead) for (const e of onScreen()) strike(e, cineK); });
+    for (let i = 1; i <= beatN; i++) later(0.3 + (i - 1) * 0.28, () => { if (!G.dead) for (const e of onScreen()) strike(e, beatK); });
     if (beatN) G.darkUntil = Math.max(G.darkUntil, G.t + span);
     if (seen.length || def.mech === 'sanctuary') run(quiet, seen, blow);
     if (seen.length || def.mech === 'sanctuary') ultGrand(def, ultBand(G.cls.id));
