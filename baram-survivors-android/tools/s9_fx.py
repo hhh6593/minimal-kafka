@@ -205,6 +205,16 @@ def keyed(frames, i, e, part=None):
             near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(11))).astype(np.float32) / 255
             al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near)
         return np.dstack([a, al * 255]).astype(np.uint8)
+    if key == "black":
+        # an 궁극's art over the client's own black (비전방진's gears and books, its orbs): unmix over pure black — how opaque
+        # from how bright ("k" the brightness that counts as solid, "floor" below it clear), its colour the frame's over that
+        k = part.get("k", e.get("k", 70))
+        lo = part.get("floor", e.get("floor", 14))
+        m = a.max(axis=2)
+        al = np.clip((m - lo) / max(1.0, k - lo), 0, 1)
+        F = np.clip(a / np.maximum(al, 1e-3)[..., None], 0, 255)
+        F[al <= 0] = 0
+        return np.dstack([F, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
     for fi, x0, y0, x1, y1 in part.get("bgpatch", e.get("bgpatch", [])):
         # (the clean field put together: a box of it from another frame of the same still camera, where someone stood
@@ -830,6 +840,110 @@ def parts_cells(frames, e):
                     ry_ = op.get("ry", 1.0)
                     rr_ = np.hypot(xx_ - rcx, (yy_ - rcy) / ry_)
                     a[..., 3] = (a[..., 3] * np.clip((r1_ - rr_) / max(1.0, r1_ - r0_), 0, 1)).astype(np.uint8)
+                    if op.get("hole"):
+                        # (and its middle left open, faded from h1 in to h0: the hero stands there — 기공십자광선'쾌's arm
+                        # rises out of the hero's own ornaments, which stay out)
+                        h0_, h1_ = op["hole"]
+                        a[..., 3] = (a[..., 3] * np.clip((rr_ - h0_) / max(1.0, h1_ - h0_), 0, 1)).astype(np.uint8)
+                    continue
+                if "ellipse" in op:
+                    # (only what lies in the drawing's own long round — a beam's spindle, [cx, cy, rx, ry, soft] from "at":
+                    # the bodies and ornaments above and below its root left out, faded over `soft` px of the radius)
+                    ecx, ecy, erx, ery, esoft = op["ellipse"]
+                    yy_, xx_ = np.mgrid[0:H, 0:W]
+                    er_ = np.hypot((xx_ - ax - ecx) / erx, (yy_ - ay - ecy) / ery)
+                    a[..., 3] = (a[..., 3] * np.clip((1 - er_) * min(erx, ery) / max(1.0, esoft), 0, 1)).astype(np.uint8)
+                    continue
+                if "keep" in op:
+                    # (only what lies in the drawing's own shapes: capsules [x0, y0, x1, y1, r] from "at" — a slanting beam
+                    # and the splash at its end, round — the other beams, the bodies and stars beside it left out, faded
+                    # over "soft" px)
+                    yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
+                    px_, py_ = xx_ - ax, yy_ - ay
+                    kd_ = np.full((H, W), 1e9, np.float32)
+                    for x0_, y0_, x1_, y1_, r_ in op["keep"]:
+                        vx_, vy_ = x1_ - x0_, y1_ - y0_
+                        t_ = np.clip(((px_ - x0_) * vx_ + (py_ - y0_) * vy_) / max(1e-6, vx_ * vx_ + vy_ * vy_), 0, 1)
+                        kd_ = np.minimum(kd_, np.hypot(px_ - x0_ - t_ * vx_, py_ - y0_ - t_ * vy_) - r_)
+                    a[..., 3] = (a[..., 3] * np.clip(-kd_ / max(1.0, op.get("soft", 4)), 0, 1)).astype(np.uint8)
+                    continue
+                if "vmirror" in op:
+                    # (a box filled from the frame's own pixels on the other side of the drawing's level axis y = ay (from
+                    # "at") — 공간전도's arcs, the same above and below: a label over its lower half from its upper half)
+                    m = op["vmirror"]
+                    x0, y0, x1, y1 = box(m["box"])
+                    axis = ay + m["ay"]
+                    src = a.copy()
+                    fe_ = m.get("feather", 0)
+                    for y in range(y0, y1):
+                        sy = int(round(2 * axis - y))
+                        if 0 <= sy < H:
+                            a[y, x0:x1] = src[sy, x0:x1]
+                        else:
+                            a[y, x0:x1, 3] = 0
+                    if fe_:
+                        # (its left and right sides blended over fe px into what was there: no straight seam)
+                        for j in range(fe_):
+                            t_ = (j + 0.5) / fe_
+                            for x in (x0 + j, x1 - 1 - j):
+                                a[y0:y1, x] = (a[y0:y1, x].astype(np.float32) * t_ + src[y0:y1, x].astype(np.float32) * (1 - t_)).astype(a.dtype)
+                    continue
+                if "fadebox" in op:
+                    # (a box made clear, softly: its alpha down to 0 within it, ramped over "soft" px inside its edge)
+                    x0, y0, x1, y1 = box(op["fadebox"])
+                    n_ = max(1, op.get("soft", 12))
+                    yy_, xx_ = np.mgrid[0:H, 0:W]
+                    dd_ = np.minimum(np.minimum(xx_ - x0, x1 - 1 - xx_), np.minimum(yy_ - y0, y1 - 1 - yy_))
+                    a[..., 3] = (a[..., 3] * np.clip(1 - dd_ / n_, 0, 1)).astype(np.uint8)
+                    continue
+                if "only" in op:
+                    # (only the drawing's own colours — a blue bolt's blue and white — the rest cleared: the bodies under it
+                    # are not its; "grow" px of their edge kept round them, the glow's fringe)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np}
+                    k_ = np.zeros((H, W), bool)
+                    for ex_ in op["only"]:
+                        k_ |= eval(ex_, {}, env_)
+                    if op.get("grow"):
+                        k_ = ndimage.binary_dilation(k_, iterations=op["grow"])
+                    a[~k_, 3] = 0
+                    continue
+                if "patch" in op:
+                    # (small marks of a body over the drawing — the hero's dark ornaments, a thin ring of its costume —
+                    # each pixel the expressions name in the box (relative to "at") taken from the nearest pixel they do
+                    # not name: the drawing's own dot beside it, no box seam; "grow" px round them too)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np}
+                    p_ = np.zeros((H, W), bool)
+                    for ex_ in op["where"]:
+                        p_ |= eval(ex_, {}, env_)
+                    if op.get("grow"):
+                        p_ = ndimage.binary_dilation(p_, iterations=op["grow"])
+                    inb_ = np.zeros((H, W), bool)
+                    for b in op["patch"]:
+                        x0, y0, x1, y1 = box(b)
+                        inb_[y0:y1, x0:x1] = True
+                    p_ &= inb_
+                    if p_.any():
+                        _, (iy_, ix_) = ndimage.distance_transform_edt(p_, return_indices=True)
+                        a[p_] = a[iy_[p_], ix_[p_]]
+                    continue
+                if "solid" in op:
+                    # (an opaque drawing's own dark colours — the deep red of a beam's core — read as see-through by unmix
+                    # over a lighter floor: those the expressions name made solid again, their colour the frame's own)
+                    from scipy import ndimage
+                    o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                    b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+                    env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                            "d": np.abs(o_ - b_).max(axis=2)}
+                    s_ = np.zeros((H, W), bool)
+                    for ex_ in op["solid"]:
+                        s_ |= eval(ex_, {}, env_)
+                    s_ = ndimage.binary_opening(s_, iterations=1)
+                    a[s_, :3] = o_[s_].astype(a.dtype)
+                    a[s_, 3] = 255
                     continue
                 if "vmirror" in op:
                     # (a box filled from the rows on the other side of y = ay: a sheaf of vertical streaks — 해일강타's
@@ -930,6 +1044,16 @@ def parts_cells(frames, e):
             # (a grey blade or post left in a coloured effect: dark and without colour — the effect's own pixels have it)
             mx_, mn_ = cell[..., :3].max(axis=2).astype(int), cell[..., :3].min(axis=2).astype(int)
             cell[(mx_ < e["nogray"]) & (mx_ - mn_ < 45), 3] = 0
+        if e.get("nodark"):
+            # (a dark dot left where unmix read a body's shadow as the light's own colour — a glow never so dark: the
+            # nearest dot of the glow round it in its place, colour and opacity; a dark dot alone in the clear goes)
+            from scipy import ndimage
+            dk_ = (cell[..., :3].max(axis=2) < e["nodark"]) & (cell[..., 3] > 0)
+            # (and pinholes: a dot gone clear in the middle of the solid glow — a body's dark dot unmix took out)
+            dk_ |= (cell[..., 3] < 90) & (ndimage.median_filter(cell[..., 3], 7) > 130)
+            if dk_.any():
+                _, (iy_, ix_) = ndimage.distance_transform_edt(dk_, return_indices=True)
+                cell[dk_] = cell[iy_[dk_], ix_[dk_]]
         for x0, y0, x1, y1 in e.get("clearcell", []):
             cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
         if e.get("opaque"):
@@ -939,6 +1063,14 @@ def parts_cells(frames, e):
             a_ = cell[..., 3].astype(np.float32) / 255
             cell[..., 3] = np.clip((1 - (1 - a_) ** e["opaque"]) * 255, 0, 255).astype(np.uint8)
         if e.get("despeck"):
+            if e.get("despeckfaint"):
+                # (the faint dots a bystander's number left round the drawing, too thin to count as specks: their own
+                # clumps measured from a lower alpha, the drawing's glow kept where it joins the drawing)
+                from scipy import ndimage
+                lab_, n_ = ndimage.label(cell[..., 3] > e["despeckfaint"])
+                if n_:
+                    sz_ = ndimage.sum(np.ones(lab_.shape), lab_, range(1, n_ + 1))
+                    cell[np.isin(lab_, 1 + np.nonzero(sz_ < e["despeck"])[0]), 3] = 0
             # (specks standing alone, a few pixels of a bystander's star: gone)
             from scipy import ndimage
             lab, n = ndimage.label(cell[..., 3] > 40)

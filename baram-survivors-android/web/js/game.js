@@ -7790,6 +7790,8 @@ function cast(skill, st) {
   if (used && def.wind9 && (promoOf(G.cls.id) >= 9 || G.training || window.__windAlways)) heukWind(def.wind9, skill);
   // 화살비폭격 (원작 9차 패시브): 염시투사·응축뇌전시·마탄 bring the rain of arrows before the hero
   if (used) hwasalbi9(skill, st);
+  // 마력폭풍 (원작 9차 패시브): 마력파장·기공신장 bring, three times in ten, bolts of 마력 down on the nearest
+  if (used) mstorm9(skill, st);
   // 전도체 (원작 9차 패시브): 천뢰마옥쌍구 or 뇌격구 brings 과전류, one time in two (9차 승급부터, 수련장에서는 늘)
   const oc = SKILLS.m_jeondo && SKILLS.m_jeondo.proc9;
   if (used && oc && oc.ids.includes(skill.id) && G.cls.id === 'mage' && (promoOf('mage') >= 9 || G.training) && (window.__overAlways || Math.random() < oc.chance)) {
@@ -7963,6 +7965,136 @@ function hwasalbi9(skill, st) {
     for (const e of G.enemies) if (tkFoe(e) && Math.abs(e.x - x) <= hx && Math.abs(e.y - 20 - y) <= hy) hurtEnemy(e, d);
     G.quietHit = false;
   });
+}
+
+// ---------------------------------------------------------------- 마도사 9차 (원작 2662 IMG58·60·62·64·66)
+/** The way the hero faces, one of the four: [dx, dy] (a line skill goes only that way — 사용자 결정). */
+function faceWay() {
+  const p = G.player;
+  if (p.fdx) return [Math.sign(p.fdx), 0];
+  if (p.fdy) return [0, Math.sign(p.fdy)];
+  return [p.face > 0 ? 1 : -1, 0];
+}
+/** 기공십자광선'쾌 (원작 2662 IMG58 #2-98): for `duration` seconds the mirrors round the hero shoot the cross of 열광선 — the four
+ *  arms (o_md_cross9 at the original's own size, drawn going right from the hero's middle, turned for the others) follow the hero;
+ *  every `tick` what stands on the hero's row or column within `reach` tiles is struck. A beam that strikes takes in 광폭기: the
+ *  blows are `power` stronger meanwhile. 이펙트=판정: the arms (one tile across, `reach` tiles long). */
+function cross9(skill, st, def) {
+  const p = G.player, run = G, life = st.duration || def.duration, d = tkHit(def, skill), R = def.reach || 5;
+  const near = G.enemies.some(e => tkFoe(e) && ((e.ty === p.ty && Math.abs(e.tx - p.tx) <= R) || (e.tx === p.tx && Math.abs(e.ty - p.ty) <= R)));
+  if (!near && !tkNear(p.tx, p.ty, R).length) return 0.4;
+  const alpha = 1;
+  for (const r of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const f = tkLoop(def.fx, 0, -24, life, { follow: true, anchor: 'bottom', alpha });
+    if (f) { f.rot = r; f.must = true; }
+  }
+  let took = false;
+  for (let k = 1; k <= Math.round(life / def.tick); k++) later(k * def.tick - 0.2, () => {
+    if (G !== run || G.dead) return;
+    G.quietHit = true;
+    for (const e of G.enemies) {
+      if (!tkFoe(e) || !((e.ty === p.ty && Math.abs(e.tx - p.tx) <= R) || (e.tx === p.tx && Math.abs(e.ty - p.ty) <= R))) continue;
+      hurtEnemy(e, d);
+      if (!took) {
+        // (광폭기 흡수: the first beam that strikes)
+        took = true;
+        G.buffs.powerK = Math.max(G.buffs.power > G.t ? G.buffs.powerK || 0 : 0, def.power || 0.2);
+        G.buffs.power = Math.max(G.buffs.power, G.t + life - k * def.tick + 0.2);
+      }
+    }
+    G.quietHit = false;
+  });
+  note(`${skillName(skill.id, skill.lv)}: 마력의 거울이 십자로 열광선을 쏩니다.`);
+}
+
+const SAECHUL_A = Math.atan2(190, -142), SAECHUL_L = 237 * 0.62;
+/** 광폭기사출 (원작 2662 IMG62): 광폭기 shot at the foes ahead (the way the hero faces, within `range` tiles), `count` at most,
+ *  the nearest first: each a beam from the hero to the foe and its pink burst there (o_md_saechul: the original's lower left beam,
+ *  its pivot the hero, turned to the foe and drawn to its distance). 이펙트=판정: the beam's end, where it bursts, on the foe. */
+function saechul9(st, def, smite) {
+  const p = G.player, [ux, uy] = faceWay(), r = st.range || def.range || 5;
+  const ahead = tkNear(p.tx, p.ty, r).filter(e => ux ? Math.sign(e.tx - p.tx) === ux && Math.abs(e.ty - p.ty) <= Math.abs(e.tx - p.tx) + 1
+    : Math.sign(e.ty - p.ty) === uy && Math.abs(e.tx - p.tx) <= Math.abs(e.ty - p.ty) + 1).slice(0, st.count || def.count || 8);
+  if (!ahead.length) return 0.3;
+  const run = G, x0 = p.x, y0 = p.y - 20;
+  ahead.forEach((t, i) => later(i * 0.03, () => {
+    if (G !== run) return;
+    const dx = t.x - x0, dy = t.y - 10 - y0, L = Math.hypot(dx, dy) || 1, sc = Math.max(0.55, Math.min(1.6, L / SAECHUL_L));
+    if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: fxLife(def.fx), scale: sc, rot: Math.atan2(dy, dx) - SAECHUL_A, anchor: 'bottom', alpha: 1, must: true });
+    later(0.12, () => {
+      if (G !== run || t.hp <= 0) return;
+      G.quietHit = true;
+      smite(t, st.dmg);
+      G.quietHit = false;
+    });
+  }));
+}
+
+/** 공간전도 (원작 2662 IMG66, PVP → monsters): the wave of 광폭 sent the way the hero faces, `depth` tiles in `dur` seconds — its
+ *  head (o_md_gongjeon, the black hole in its ring) runs ahead, its arcs (o_md_gongarc) left behind it a moment; what it passes
+ *  (its tile and one to each side) is struck and pushed on a tile (진영 파괴), and at its end what stands within `endR` tiles is
+ *  struck and held `stun` seconds (기절). 이펙트=판정: the head's way, the end. */
+function gong9(st, def, smite) {
+  const p = G.player, [ux, uy] = faceWay(), D = def.depth || 5;
+  const run = G, sx = p.tx, sy = p.ty, x0 = p.x, y0 = p.y - 20, len = D * TILE, steps = D;
+  const way = [];
+  for (let k = 1; k <= D; k++) for (let o = -1; o <= 1; o++) way.push([sx + ux * k + (uy ? o : 0), sy + uy * k + (ux ? o : 0)]);
+  if (!onTiles(way).length) return 0.4;
+  const rot = uy ? (uy > 0 ? Math.PI / 2 : -Math.PI / 2) : 0, flip = ux < 0;
+  if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: def.dur + 0.15, scale: 1, rot, flip, anchor: 'mid', alpha: 1, must: true, loop: true, mv: [ux * len, uy * len, def.dur] });
+  const seen = new Set();
+  // (the arcs laid every half tile behind the head, overlapping as in the original's tube, each a moment)
+  if (M.fx[def.fxArc]) for (let h = 1; h <= 2 * D - 1; h++) later((h / (2 * D)) * def.dur, () => {
+    if (G !== run) return;
+    const f = tkLoop(def.fxArc, x0 + ux * (h / 2 - 0.3) * TILE, y0 + uy * (h / 2 - 0.3) * TILE, 0.5, { alpha: 1, anchor: 'mid' });
+    if (f) { f.rot = rot; f.flip = flip; f.must = true; }
+  });
+  for (let s = 1; s <= steps; s++) later((s / steps) * def.dur, () => {
+    if (G !== run) return;
+    const cx = sx + ux * s, cy = sy + uy * s;
+    G.quietHit = true;
+    for (let o = -1; o <= 1; o++) for (const e of onTiles([[cx + (uy ? o : 0), cy + (ux ? o : 0)]])) {
+      if (seen.has(e)) continue;
+      seen.add(e);
+      smite(e, st.dmg * def.k);
+      tkShove(e, e.tx + ux, e.ty + uy);
+    }
+    G.quietHit = false;
+  });
+  later(def.dur, () => {
+    if (G !== run) return;
+    const ex = sx + ux * D, ey = sy + uy * D, R = def.endR || 1.5;
+    G.quietHit = true;
+    for (const e of G.enemies) if (tkFoe(e) && Math.hypot(e.tx - ex, e.ty - ey) <= R) {
+      smite(e, st.dmg);
+      tkAfflict(e, { stun: def.stun });
+      // (the formation broken: scattered a tile away from the end)
+      tkShove(e, e.tx + Math.sign(e.tx - ex || ux), e.ty + Math.sign(e.ty - ey || uy));
+    }
+    G.quietHit = false;
+  });
+}
+
+/** 마력폭풍 (마도사 9차 패시브; 원작 2662 IMG60): a cast of one of proc9.ids brings, `chance` of the time, a bolt of 마력 down on up
+ *  to `n` of the foes nearest within `range` (o_md_mstorm at the original's own size, its foot on the foe), striking what stands on
+ *  that tile. 이펙트=판정: the bolt's foot, one tile. */
+function mstorm9(skill, st) {
+  const c = SKILLS.md_mstorm && SKILLS.md_mstorm.proc9;
+  if (!c || !c.ids.includes(skill.id) || G.cls.id !== 'magus' || !(promoOf('magus') >= 9 || G.training || window.__mstormAlways)) return;
+  if (G.t < (G.mstormAt || 0) || (!window.__mstormAlways && Math.random() >= c.chance)) return;
+  G.mstormAt = G.t + (c.cd || 0.5);
+  const p = G.player, run = G, foes = tkNear(p.tx, p.ty, c.range).slice(0, c.n), d = (st.dmg || 30) * c.k;
+  foes.forEach((t, i) => later(0.15 + i * 0.08, () => {
+    if (G !== run) return;
+    const tx = t.tx, ty = t.ty;
+    G.fxs.push({ id: c.fx, x: tx * TILE + TILE / 2, y: ty * TILE + TILE - 8, t: 0, life: fxLife(c.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: 1, must: true });
+    later(0.08, () => {
+      if (G !== run) return;
+      G.quietHit = true;
+      for (const e of onTiles([[tx, ty]])) hurtEnemy(e, d);
+      G.quietHit = false;
+    });
+  }));
 }
 
 // ---------------------------------------------------------------- 차수별 고유 기술 (TIER_KINDS)
@@ -9325,6 +9457,10 @@ const TIER_KINDS = {
   // 궁사 9차 (원작 2662 IMG40, IMG42): see igi9, cheon9 above
   igi9({ st, def, smite }) { return igi9(st, def, smite); },
   cheon9({ st, def, smite }) { return cheon9(st, def, smite); },
+  // 마도사 9차 (원작 2662 IMG58, IMG62, IMG66): see cross9, saechul9, gong9 above
+  cross9({ skill, st, def }) { return cross9(skill, st, def); },
+  saechul9({ st, def, smite }) { return saechul9(st, def, smite); },
+  gong9({ st, def, smite }) { return gong9(st, def, smite); },
   fog9({ skill, st, def }) {
     const p = G.player, fx = p.fdx || (p.face || -1), fy = p.fdx ? 0 : p.fdy || 0;
     const ux = fy ? 0 : Math.sign(fx) || -1, uy = fy, [r0, r1] = def.reach, side = def.side;

@@ -1506,8 +1506,22 @@ const S9 = {
     duration: 6, every: 0.5, range: 6, depth: 6, power: 0.2, buff: 'power', ck: 'buff', pre: 'md_cross', branch: 0,
     desc: '6초 동안 몸 주변에 마력의 거울을 만들어 십자 방향으로 열광선을 빠르게 거듭 쏜다. 그동안 광폭기가 차올라 피해가 20% 는다' },
   md_frenzyshot: { promo: 9, cls: 'magus', req: 33, name: '광폭기사출', kind: 'spell', fx: 'k_md_bust', fxHit: 'k_u_md_storm', dmg: 60, cd: 3.2, range: 6, count: 6,
+  // 마도사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/magus.md). 시전 3 + 패시브 1 + 필살기:
+  //   기공십자광선'쾌 (IMG58 #2-98: 6초 동안 몸 둘레 거울에서 십자 네 방향으로 열광선이 거듭 — 다섯 칸, 폭 한 칸; 맞히면 광폭기 흡수:
+  //     피해 20%; 쿨 8초. 같은 장면 #111-201은 광폭화 상태 전용인 광폭십자광선'쾌(폭 세 칸) — 우리 기술 아님),
+  //   광폭기사출 (IMG62: 바라보는 쪽 앞의 몬스터 최대 여덟에게 광폭기 줄기, 닿은 자리에 분홍 폭발),
+  //   공간전도 (IMG66, PVP → 몬스터: 광폭의 파장이 바라보는 쪽으로 다섯 칸 나아가며 진영을 흩뜨리고, 끝에서 둘레를 3초 기절),
+  //   마력폭풍 = 패시브 (설명창 [지속효과 마법]: 마력파장·기공신장으로 칠 때 30% 확률로 대상 둘레에 마력의 벼락 — IMG60 #30-33의 벼락).
+  // Pictures at the original's own size (o_md_*: 0.62 game pixels a capture pixel).
+  md_crossq: { promo: 9, cls: 'magus', req: 33, name: "기공십자광선'쾌", kind: 'cross9', echo: undefined, fx: 'o_md_cross9', fxCast: undefined, fx2: undefined, fxHit: undefined,
+    hit: 16, cd: 8, duration: 6, tick: 0.5, reach: 5, power: 0.2, buff: undefined, every: undefined, range: undefined, depth: undefined, ck: 'nova', pre: 'md_cross', branch: 0,
+    desc: '6초 동안 몸 주변에 마력의 거울을 만들어 십자 네 방향으로 다섯 칸씩 열광선을 빠르게 거듭 쏜다. 광선이 몬스터에 닿으면 광폭기를 흡수해 그동안 피해가 20% 는다' },
+  md_frenzyshot: { promo: 9, cls: 'magus', req: 33, name: '광폭기사출', kind: 'saechul9', fx: 'o_md_saechul', fxHit: undefined, dmg: 60, cd: 3.2, range: 5, count: 8,
     ck: 'spell', pre: 'md_bust', branch: 1,
-    desc: '앞쪽의 몬스터 여섯(4·7단에 하나씩 더)에게 광폭기를 쏟아 낸다' },
+    desc: '바라보는 쪽 앞의 몬스터 최대 여덟에게 광폭기를 쏘아 보낸다. 광폭기가 닿은 자리에서 분홍빛 기운이 터진다' },
+  md_gongjeon: { promo: 9, cls: 'magus', req: 33, name: '공간전도', kind: 'gong9', fx: 'o_md_gongjeon', fxArc: 'o_md_gongarc', dmg: 50, cd: 18, depth: 5, dur: 0.45, k: 0.5,
+    endR: 1.5, stun: 3, ck: 'line', pre: 'md_frenetic', branch: 2,
+    desc: '바라보는 쪽으로 광폭의 파장을 다섯 칸 내보낸다. 파장은 지나는 길의 몬스터를 밀어내며 진영을 흩뜨리고, 끝에 이르러 둘레의 몬스터를 3초 동안 기절시킨다' },
   // 차사: 비사검 (아우라), 황천화 (광역·회복)
   rp_bisa: { promo: 9, cls: 'reaper', req: 33, name: '비사검', kind: 'aura9', fx: 'k_rp_spiral', fxHit: 'h_ml_slash', hit: 16, cd: 12, duration: 4, radius: 1, tick: 0.25,
     slow: 1, ck: 'nova', pre: 'rp_spiral', branch: 0,
@@ -1555,9 +1569,6 @@ const S9 = {
   a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'cheon9', fx: 'o_a_cheongung', fxCast: undefined, fxHit: undefined, auraSize: undefined,
     dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
     desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 둘레 3×3의 몬스터를 태운다(화상)' },
-  md_mstorm: { promo: 9, cls: 'magus', req: 33, name: '마력폭풍', kind: 'aura9', fx: 'k_md_storm', fxCast: 'k_u_md_orb', fxHit: 'h_hit_light', hit: 12, cd: 15, duration: 6, radius: 2,
-    tick: 0.4, stun: 0.2, ck: 'nova', pre: 'md_frenetic', branch: 2,
-    desc: '몸 주변에 마력의 폭풍을 6초 동안 일으켜 둘레 두 칸의 몬스터에게 마력의 벼락을 거듭 내리친다' },
   rp_galmuri: { promo: 9, cls: 'reaper', req: 33, name: '영혼갈무리', kind: 'echo', echo: 'sword', fx: 'k_u_rp_redeem', fx2: 'k_u_rp_reshit', shotSize: 60, fxHit: 'k_u_rp_ring',
     hit: 16, cd: 17, duration: 10, every: 0.5, shots: 2, range: 5, killCut: 0.125, power: 0.15, buff: 'power', ck: 'buff', pre: 'rp_eye', branch: 2,
     desc: '10초 동안 혼을 거둔다. 거둔 혼이 가까운 몬스터 둘에게 거듭 날아가고, 몬스터를 쓰러뜨릴 때마다 다른 기술의 재사용 대기가 줄어든다. 그동안 피해가 15% 는다' },
@@ -1624,6 +1635,13 @@ SKILLS.a_hwasalbi = { name: '화살비폭격', kind: 'passive', retired: true, w
   proc9: { ids: ['a_flame', 'a_eungchuk', 'a_bomb'], fx: 'o_a_hwasalbi', ahead: 2, scale: 1.3, half: [105, 65], k: 0.5, ticks: 4, cd: 1 } };
 SKILL_ALIAS.a_hwasalbi = 'a_eungchuk';
 SKILLS.a_eungchuk.desc += '. 9차 패시브 화살비폭격: 염시투사·응축뇌전시·마탄을 쓰면 앞에 화살비가 쏟아진다';
+// 마력폭풍: a passive in the original ([지속효과 마법]: 마력파장 or 기공신장 striking brings, three times in ten, a bolt of 마력
+// round the struck one) — its picture the blue bolt of 2662 IMG60 (frames 30-33). A saved slot of it is 공간전도.
+SKILLS.md_mstorm = { name: '마력폭풍', kind: 'passive', retired: true, was: 'magus', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 마력파장·기공신장을 쓸 때 30% 확률로 대상 둘레에 마력의 벼락이 내리친다',
+  proc9: { chance: 0.3, ids: ['md_wave', 'md_storm', 'md_stormfrenzy'], fx: 'o_md_mstorm', n: 3, range: 7, k: 0.8, cd: 0.5 } };
+SKILL_ALIAS.md_mstorm = 'md_gongjeon';
+SKILLS.md_gongjeon.desc += '. 9차 패시브 마력폭풍: 마력파장·기공신장을 쓰면 30% 확률로 대상 둘레에 마력의 벼락이 내리친다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
 // 치유의반향: a passive in the original ([지속효과 마법]: at full health (healed past it) the damage is 30% more) — no picture.
 // A saved slot of it is 천신의기운.
@@ -1750,7 +1768,7 @@ export const ULT_TIERS = {
     ult('magus', 'md_ult', '광폭구회격', { mech: 'barrage', cast: 'k_md_ult', castSize: 220, shot: 'k_u_md_orb', hit: 'k_u_md_storm', n: 3, darken: 0.9, boss: 'md_arrow', k: 1 }),
     ult('magus', 'md_exfrenzy', '광폭멸천강', { mech: 'meteor', main: 'k_md_exfrenzy', mainSize: 240, hit: 'k_u_md_storm', after: 'k_u_md_decay', n: 5, darken: 1, boss: 'md_bust', k: 1.15 }),
     ult('magus', 'md_bloodbat', '혈마광폭열파', { echoW: 190, aura: 'k_md_sphere', echo2: 'k_u_md_storm', mech: 'sweep', main: 'k_md_bloodbat', mainSize: 200, hit: 'k_u_md_decay', steps: 6, darken: 1, boss: 'md_ffire', k: 1.3 }),
-    ult('magus', 'md_bijeon', '비전방진', { cutin: 'o_md_ult9', desc: '마도사의 신비로운 비술로 화면의 모든 적에게 극한의 피해를 입히고, 잠시 어떤 공격도 받지 않는다', echoN: 26, echoW: 200, open: 'k_md_wavefrenzy', fin: 'k_md_bust', mech: 'rings', cast: 'k_u_md_wing', main: 'k_md_wavefrenzy', mainSize: 280, hit: 'k_u_md_storm', darken: 1.1, boss: 'md_ray', k: 1.5 }),
+    ult('magus', 'md_bijeon', '비전방진', { cine9: 0.75, cutin: 'o_md_ult9', guard: 3, desc: '마도사의 신비로운 비술로 화면의 모든 적에게 극한의 피해를 입히고, 잠시 어떤 공격도 받지 않는다', echoN: 26, echoW: 200, open: 'k_md_wavefrenzy', fin: 'k_md_bust', mech: 'rings', cast: 'k_u_md_wing', main: 'k_md_wavefrenzy', mainSize: 280, hit: 'k_u_md_storm', darken: 1.1, boss: 'md_ray', k: 1.5 }),
   ],
   celestial: [
     ult('celestial', 'cl_ult', '전의상실', { mech: 'mark', cast: 'k_cl_ult', frac: 0.6, main: 'k_u_cl_loss', hit: 'k_u_cl_losshit', stun: 0.8, delay: 1.0, boss: 'cl_moment', k: 1 }),
