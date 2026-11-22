@@ -1471,15 +1471,18 @@ const S9 = {
   p_thunderbomb: { kind: 'smite', fx: 'o_p_cheonroe9', fxShot: 'o_p_cheonroe9', fx2: undefined, fxHit: 'o_p_cheonroe', dmg: 110, cd: 4, range: 7, radius: 0, chain: 2, chainK: 0.5, shot: true,
     fxAfter: null, fxs: null, tint: null, modern: null, ck: 'spell',
     desc: '벼락의 힘을 담은 구체를 가장 강한 몬스터에게 쏘아 크게 치고, 방전하여 곁의 몬스터 둘에게 번개가 옮겨 붙는다' },
-  // 궁사: 화살비폭격 (보조 공격), 이기뇌멸시 (광역; 허공람시가 이 이름으로), 응축뇌전시 (강한 일격)
-  a_hwasalbi: { promo: 9, cls: 'archer', req: 33, name: '화살비폭격', kind: 'echo', echo: 'rain', fx: 'k_a_storm', fx2: 'k_a_storm', fxHit: 'k_a_shot', hit: 26, cd: 17,
-    duration: 10, every: 0.8, shots: 1, range: 7, radius: 1, power: 0.15, buff: 'power', ck: 'buff', pre: 'a_storm', branch: 1,
-    desc: '10초 동안 쏘는 화살마다 화살비가 따라와, 몬스터가 있는 곳에 화살비가 거듭 쏟아진다. 그동안 피해가 15% 는다' },
-  a_air: { name: '이기뇌멸시', fx2: 'k_a_thunder', radius: 1, stun: 1, n: 5, k: 0.45,
-    desc: '뇌 기운을 담은 뇌전시 다섯 발을 쏜다. 몬스터에 닿은 뇌전시는 폭발하며 둘레로 뇌기가 퍼져 섬멸하고 잠시 멈춘다' },
-  a_eungchuk: { promo: 9, cls: 'archer', req: 33, name: '응축뇌전시', kind: 'vortex', fx: 'o_a_eungchuk', fx2: 'k_a_thunder', fxHit: 'h_hit_light', dmg: 60, cd: 6, depth: 8, dur: 0.6,
-    k: 0.5, endBurst: 2.2, burstR: 1, fxCast: 'k_u_a_wind', ck: 'line', pre: 'a_chain', branch: 0,
-    desc: '거대한 뇌 기운을 담은 뇌전시가 여덟 칸을 날아가며 몬스터를 끌어당기고, 끝에서 크게 폭발한다' },
+  // 궁사 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/archer.md). 시전 3 + 패시브 1 + 필살기:
+  //   이기뇌멸시 (IMG40: 가까운 적 다섯에 뇌전시가 하늘에서 내리꽂히고, 맞은 자리 둘레로 뇌기가 웅덩이처럼 퍼진다; 경직 2초; 쿨 10초),
+  //   천궁난사 (IMG42: 1.25초 동안 앞의 적들에게 천궁의 불화살 — 맞은 적마다 큰 불꽃 폭발, 3×3; 쿨 2초 → 4초),
+  //   응축뇌전시 (IMG44 앞부분: 거대한 뇌전시가 8칸까지 날아가며 끌어당기고, 끝에서 푸른 진이 열려 둘레를 모아 터진다; 쿨 12초),
+  //   화살비폭격 = 패시브 (설명창 [지속효과 마법]: 투염시·응축뇌전시·폭발사격을 쓸 때 앞에 화살비 폭격 — IMG44 뒷부분의 흰 화살비).
+  // Pictures at the original's own size (o_a_*: 0.62 game pixels a capture pixel).
+  a_air: { name: '이기뇌멸시', kind: 'igi9', fx: 'o_a_igibolt', fxPool: 'o_a_igipool', fx2: undefined, fxCast: undefined, fxHit: undefined,
+    dmg: 60, cd: 10, range: 7, n: 5, k: undefined, poolK: 0.5, stun: 2, radius: undefined, count: undefined, depth: undefined, ck: 'spell',
+    desc: '뇌 기운을 담은 뇌전시 다섯 발을 가까운 몬스터 다섯에게 쏜다. 하늘에서 내리꽂힌 뇌전시가 폭발하며 그 자리와 상하좌우 한 칸으로 뇌기가 퍼져 섬멸하고, 맞은 몬스터는 2초 동안 경직된다' },
+  a_eungchuk: { promo: 9, cls: 'archer', req: 33, name: '응축뇌전시', kind: 'vortex', fx: 'o_a_eungbolt', fxEnd: 'o_a_eungvortex', fx2: undefined, fxHit: undefined, dmg: 60, cd: 12,
+    depth: 8, dur: 0.6, k: 0.5, endBurst: 2.2, endR: 92, fxCast: undefined, ck: 'line', pre: 'a_chain', branch: 0,
+    desc: '거대한 뇌 기운을 담은 뇌전시를 쏜다. 뇌전시는 여덟 칸까지 날아가며 지나는 길의 몬스터를 끌어당기고, 끝에서 뇌기의 진이 열려 둘레의 몬스터를 모아 크게 폭발한다' },
   // 천인: 천신의권역 (아우라·방어), 순보선풍 (광역), 해일강타 (전방 일격)
   cl_cheonsin: { promo: 9, cls: 'celestial', req: 33, name: '천신의권역', kind: 'aura9', fx: 'o_cl_cheonsin', fxCast: 'k_u_cl_soul', fxHit: 'h_hit_6', hit: 10, cd: 18, duration: 8, radius: 2, tick: 0.5,
     ward: 0.4, buff: 'shield', ck: 'buff', pre: 'cl_defense', branch: 2,
@@ -1541,9 +1544,9 @@ const S9 = {
   m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,
     slow: 2, curse: 2, ck: 'strike', pre: 'm_seonsim', branch: 2,
     desc: '앞에 환영 안개를 5초 동안 흩뿌린다. 안개에 든 몬스터는 길을 잃고 느려지며 받는 피해가 늘고 거듭 피해를 입는다' },
-  a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'aura9', fx: 'o_a_cheongung', auraSize: 0.6, fxCast: 'k_u_a_wind', fxHit: 'o_a_cheongung', hit: 9, cd: 9, duration: 2.5,
-    radius: 1, tick: 0.12, dot: 'burn', ck: 'nova', pre: 'a_firewall', branch: 1,
-    desc: '2.5초 동안 몸 둘레의 몬스터에게 천궁의 불화살을 쉴 새 없이 난사한다(화상)' },
+  a_cheongung: { promo: 9, cls: 'archer', req: 33, name: '천궁난사', kind: 'cheon9', fx: 'o_a_cheongung', fxCast: undefined, fxHit: undefined, auraSize: undefined,
+    dmg: 40, cd: 4, duration: 1.25, every: 0.25, range: 5, radius: 1, dot: 'burn', ck: 'strike', pre: 'a_firewall', branch: 1,
+    desc: '1.25초 동안 앞쪽 다섯 칸 안의 몬스터들에게 천궁의 불화살을 난사한다. 화살이 닿은 곳마다 큰 불꽃이 터져 둘레 3×3의 몬스터를 태운다(화상)' },
   cl_gongmyeong: { promo: 9, cls: 'celestial', req: 33, name: '천공의공명', kind: 'echo', echo: 'mark', fx: 'o_cl_gongmyeong', fxHit: 'k_x_cl_thunder_1', hit: 16, cd: 18,
     duration: 10, every: 0.6, shots: 3, range: 7, power: 0.15, buff: 'power', ck: 'buff', pre: 'cl_intrep', branch: 2,
     desc: '10초 동안 하늘이 공명해 일곱 칸 안의 몬스터 셋에게 뇌우가 거듭 내리친다. 표식(저주)이 있는 몬스터는 더 아프다. 그동안 피해가 15% 는다' },
@@ -1608,6 +1611,14 @@ SKILLS.m_jeondo = { name: '전도체', kind: 'passive', retired: true, was: 'mag
   proc9: { chance: 0.5, ids: ['m_twin', 'm_thunderball'], dur: 10, k: 0.5, fx: 'o_m_jeondo', reach: 200, every: 0.5 } };
 SKILL_ALIAS.m_jeondo = 'm_shards';
 SKILLS.m_shards.desc += '. 9차 패시브 전도체: 천뢰마옥쌍구·뇌격구를 쓰면 50% 확률로 10초 과전류 — 서리파편에 맞은 몬스터에게 번개가 흐른다';
+// 화살비폭격: a passive in the original ([지속효과 마법]: 투염시, 응축뇌전시 or 폭발사격 brings a rain of arrows before the caster,
+// sweeping all there) — its picture the white arrows and their dust of 2662 IMG44 after 응축뇌전시 (s9_stamps a_hwasalbi). Ours:
+// 염시투사 (투염시), 응축뇌전시, 마탄 (폭발사격). A saved slot of it is 응축뇌전시.
+SKILLS.a_hwasalbi = { name: '화살비폭격', kind: 'passive', retired: true, was: 'archer', cls: '-', promo: 9, req: 33,
+  desc: '9차 패시브. 염시투사·응축뇌전시·마탄을 쓸 때 앞에 화살비가 쏟아져 그곳의 몬스터를 모두 친다',
+  proc9: { ids: ['a_flame', 'a_eungchuk', 'a_bomb'], fx: 'o_a_hwasalbi', ahead: 2, half: [81, 50], k: 0.5, ticks: 3, cd: 1 } };
+SKILL_ALIAS.a_hwasalbi = 'a_eungchuk';
+SKILLS.a_eungchuk.desc += '. 9차 패시브 화살비폭격: 염시투사·응축뇌전시·마탄을 쓰면 앞에 화살비가 쏟아진다';
 // The 9차 that made way go down a 승급 (the 9차 is the original's now).
 // 치유의반향: a passive in the original ([지속효과 마법]: at full health (healed past it) the damage is 30% more) — no picture.
 // A saved slot of it is 천신의기운.
@@ -1707,7 +1718,7 @@ export const ULT_TIERS = {
     ult('archer', 'a_ult', '일환탄시', { mech: 'barrage', cast: 'k_a_ult', castSize: 200, shot: 'k_u_a_whip', shotScale: 2.4, hit: 'k_a_shot', n: 3, boss: 'a_aim', k: 1 }),
     ult('archer', 'a_allwhirl', '폭풍화우', { openCap: 2.5, echoW: 170, openW: 0.55, mech: 'vortex', main: 'k_a_allwhirl', burst: 'k_u_a_tornado', burstSize: 300, hit: 'h_hit_attack', hold: 1.2, boss: 'a_bomb', k: 1.15 }),
     ult('archer', 'a_eagle', '독수리소환', { open: 'k_a_eagle', openW: 0.8, openCap: 4.5, echoN: 20, echoW: 300, echoCap: 3.5, aura: 'k_a_eagle', auraW: 220, mech: 'totem', main: 'k_x_a_eagle_cast', mainScale: 4.6, lift: 90, cast: 'k_u_a_hawk', drop: 'k_a_eagle', dropSize: 150, hit: 'k_u_a_hawk', n: 5, life: 2.6, boss: 'a_breakair', k: 1.3 }),
-    ult('archer', 'a_mansi', '만시창공', { cutin: 'o_a_ult9', desc: '궁사의 날렵한 손놀림으로 하늘을 뒤덮는 무수한 화살비를 쏟아 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', auraW: 360, echoN: 28, echoCap: 2.5, aura: 'k_a_tuhyeol4', echo2: 'k_a_chase', echo: 'k_a_blood5', mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
+    ult('archer', 'a_mansi', '만시창공', { cine9: 0.75, cutin: 'o_a_ult9', guard: 3, desc: '궁사의 날렵한 손놀림으로 하늘을 뒤덮는 무수한 화살비를 쏟아 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다', auraW: 360, echoN: 28, echoCap: 2.5, aura: 'k_a_tuhyeol4', echo2: 'k_a_chase', echo: 'k_a_blood5', mech: 'mark', main: 'k_u_a_r5cast', markScale: 1.2, hit: 'k_a_blood5', delay: 1.2, boss: 'a_chase', k: 1.5, hpCost: 0.15 }),
   ],
   lancer: [
     ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'h_ml_thrust', hitScale: 0.6, len: 4, diag: true, boss: 'l_meteor', k: 1 }),

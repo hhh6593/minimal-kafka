@@ -580,6 +580,64 @@ def parts_cells(frames, e):
             ops = part.get("ops") or ([{"shift": m} for m in part.get("shift", [])] + [{"mirror": m} for m in part.get("mirror", [])]
                                       + [{"clear": b} for b in part.get("clear", [])])
             for op in ops:
+                if "rot" in op:
+                    # (a round burst with a number, a star or a body over part of it: those boxes (relative to "at") taken
+                    # again from the burst itself at the same distance from its middle ("rc" [dx, dy] from "at", default
+                    # 0), turned the least that finds a clean place — the original's own dots, a round burst's own turn)
+                    rcx, rcy = ax + op.get("rc", [0, 0])[0], ay + op.get("rc", [0, 0])[1]
+                    bad_ = np.zeros((H, W), bool)
+                    # (more than one kind of thing over it, each its own boxes and expressions: "also" [{rot, where, grow} …],
+                    # all filled together — none taken from another's place)
+                    for sub_ in [op] + op.get("also", []):
+                        m_ = np.zeros((H, W), bool)
+                        for b in sub_["rot"]:
+                            x0, y0, x1, y1 = box(b)
+                            m_[y0:y1, x0:x1] = True
+                        if sub_.get("where"):
+                            # (in those boxes only what the expression over the capture's own frame names — the digits'
+                            # blue, the star's white — grown by "grow": the burst round them kept, no square seam)
+                            from scipy import ndimage
+                            o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                            b_ = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
+                            # ("d": how far it moved from the clean frame — a marker drawn over the effect has not moved)
+                            env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                                    "d": np.abs(o_ - b_).max(axis=2)}
+                            hit_ = np.zeros((H, W), bool)
+                            for ex_ in sub_["where"]:
+                                hit_ |= eval(ex_, {}, env_)
+                            hit_ = ndimage.binary_dilation(hit_, iterations=sub_.get("grow", 3))
+                            m_ &= ndimage.binary_fill_holes(hit_)
+                        bad_ |= m_
+                    yy_, xx_ = np.mgrid[0:H, 0:W].astype(np.float32)
+                    dx_, dy_ = xx_ - rcx, yy_ - rcy
+                    todo_ = bad_.copy()
+                    src_ = a.copy()
+                    for ang in op.get("angles", (35, -35, 60, -60, 90, -90, 120, -120, 150, -150, 180)):
+                        if not todo_.any():
+                            break
+                        c_, s_ = np.cos(np.radians(ang)), np.sin(np.radians(ang))
+                        sx_ = np.rint(rcx + dx_ * c_ - dy_ * s_).astype(int)
+                        sy_ = np.rint(rcy + dx_ * s_ + dy_ * c_).astype(int)
+                        inb_ = (sx_ >= 0) & (sx_ < W) & (sy_ >= 0) & (sy_ < H)
+                        sxc_, syc_ = sx_.clip(0, W - 1), sy_.clip(0, H - 1)
+                        ok_ = todo_ & inb_ & ~bad_[syc_, sxc_]
+                        a[ok_] = src_[syc_[ok_], sxc_[ok_]]
+                        todo_ &= ~ok_
+                    if todo_.any():
+                        # (what no turn finds clean: the nearest clean pixel's own colour and alpha — a broken dot repaired)
+                        from scipy import ndimage
+                        _, (iy_, ix_) = ndimage.distance_transform_edt(todo_ | bad_, return_indices=True)
+                        a[todo_] = src_[iy_[todo_], ix_[todo_]]
+                    continue
+                if "radial" in op:
+                    # (only the burst's own round: what lies past r1 from its middle is not its — faded from r0)
+                    r0_, r1_ = op["radial"]
+                    rcx, rcy = ax + op.get("rc", [0, 0])[0], ay + op.get("rc", [0, 0])[1]
+                    yy_, xx_ = np.mgrid[0:H, 0:W]
+                    ry_ = op.get("ry", 1.0)
+                    rr_ = np.hypot(xx_ - rcx, (yy_ - rcy) / ry_)
+                    a[..., 3] = (a[..., 3] * np.clip((r1_ - rr_) / max(1.0, r1_ - r0_), 0, 1)).astype(np.uint8)
+                    continue
                 if "mirror" in op:
                     m = op["mirror"]
                     x0, y0, x1, y1 = box(m["box"])
@@ -596,11 +654,31 @@ def parts_cells(frames, e):
                     x0, y0, x1, y1 = box(m["box"])
                     dx, dy = m["d"]
                     if x1 > x0 and y1 > y0 and 0 <= y0 + dy and y1 + dy <= H and 0 <= x0 + dx and x1 + dx <= W:
-                        a[y0:y1, x0:x1] = a[y0 + dy:y1 + dy, x0 + dx:x1 + dx].copy()
+                        if m.get("where"):
+                            # (only the pixels the expressions name over the capture's own frame — a number's — grown by
+                            # "grow": the rest of the box keeps its own dots, no square seam)
+                            from scipy import ndimage
+                            o_ = np.asarray(frames[part["f"]].convert("RGB")).astype(np.float32)
+                            yy_, xx_ = np.mgrid[0:H, 0:W]
+                            env_ = {"r": o_[..., 0], "g": o_[..., 1], "b": o_[..., 2], "mn": o_.min(axis=2), "mx": o_.max(axis=2), "np": np,
+                                    "x": xx_, "y": yy_}
+                            hit_ = np.zeros((H, W), bool)
+                            for ex_ in m["where"]:
+                                hit_ |= eval(ex_, {}, env_)
+                            hit_ = ndimage.binary_fill_holes(ndimage.binary_dilation(hit_, iterations=m.get("grow", 2)))[y0:y1, x0:x1]
+                            a[y0:y1, x0:x1][hit_] = a[y0 + dy:y1 + dy, x0 + dx:x1 + dx][hit_].copy()
+                        else:
+                            a[y0:y1, x0:x1] = a[y0 + dy:y1 + dy, x0 + dx:x1 + dx].copy()
                 else:
                     x0, y0, x1, y1 = box(op["clear"])
                     if x1 > x0 and y1 > y0:
                         a[y0:y1, x0:x1, 3] = 0
+            if part.get("flipx"):
+                # (the same part mirrored about its own point: the half of a round thing the capture's edge cut, from the
+                # half it shows — the original's own pixels, mirrored)
+                a = a[:, ::-1].copy()
+                ax = W - 1 - ax
+                box = lambda b: (max(0, ax + b[0]), max(0, ay + b[1]), min(W, ax + b[2]), min(H, ay + b[3]))
             clip = part.get("clip", [-ox, -oy, cw - ox, ch - oy])
             # the part's kept box, in the frame and in the cell
             fx0, fy0 = max(0, ax + max(clip[0], -ox)), max(0, ay + max(clip[1], -oy))
@@ -711,6 +789,18 @@ def build(spec, src_dir, out_dir, only=None):
                     inside = np.clip(1.6 - np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2), 0, 1)
                     sat = a.max(axis=2) - a.min(axis=2)
                     vivid = np.clip((sat - 120) / 60, 0, 1) * np.clip((a.max(axis=2) - 120) / 60, 0, 1)
+                    if e.get("fieldbright"):
+                        # (and the art's own pale light — wind lines, a rain of arrows — bright and cool, not a body's brown)
+                        lo_ = e["fieldbright"]
+                        vivid = np.maximum(vivid, np.clip((a.min(axis=2) - lo_) / 40, 0, 1) * np.clip((bl - r + 10) / 20, 0, 1))
+                    if e.get("fieldcool"):
+                        # (an art of greens, teals, whites and yellows — 만시창공's scroll: in the middle all of it is kept but what
+                        # is warmer than it — the dummies' wood, the hero's armour, the brown the numbers were filled with, the
+                        # stars' orange — red standing over green)
+                        vivid = np.clip((g - r + e["fieldcool"]) / 10, 0, 1)
+                    if e.get("nored"):
+                        # (the hit stars' and the dummies' markers' red and orange left after the fill: not the art's — out)
+                        vivid = vivid * np.clip((e["nored"] - (r - np.maximum(g, bl))) / 20, 0, 1)
                     al = al * (1 - inside + inside * vivid)
                 if e.get("vignette"):
                     rx, ry, soft = e["vignette"]
@@ -719,6 +809,14 @@ def build(spec, src_dir, out_dir, only=None):
                     yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                     rr = np.sqrt(((xx - cx) / ((bx[2] - bx[0]) / 2 * rx)) ** 2 + ((yy - cy) / ((bx[3] - bx[1]) / 2 * ry)) ** 2)
                     al = al * np.clip((1 - rr) / soft, 0, 1)
+                if e.get("edge"):
+                    # (a frame of art round the screen — 만시창공's scroll: kept to the box's edge, faded over its last `edge`
+                    # pixels, so it ends softly, not on the capture's straight edge)
+                    n_ = e["edge"]
+                    bx = e.get("box") or [0, 0, a.shape[1], a.shape[0]]
+                    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                    dd = np.minimum(np.minimum(xx - bx[0], bx[2] - 1 - xx), np.minimum(yy - bx[1], bx[3] - 1 - yy))
+                    al = al * np.clip(dd / n_, 0, 1)
                 a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
                 # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the
