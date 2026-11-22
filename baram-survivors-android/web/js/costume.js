@@ -147,9 +147,20 @@ export function dyeImage(im, meta) {
     }
     g.putImageData(d, 0, 0);
   } catch (e) { return im; }
-  if (dyed.size >= 48) dyed.delete(dyed.keys().next().value);
+  if (dyed.size >= 12) dyed.delete(dyed.keys().next().value);
   dyed.set(key, c);
   return c;
+}
+/** A sheet let go (game.js layerDrop): its dyed copies with it (each as big as the sheet). */
+export function dropDyed(file) {
+  for (const k of dyed.keys()) if (k.startsWith(file + '|')) dyed.delete(k);
+}
+/** A screen left (game.js leaveScreen): the dress room's trial sheets and every dyed copy let go. */
+export function releaseCostume() {
+  // (not the sheet drawn this last moment: the pet at the hero's heel)
+  const now = performance.now();
+  if (!$('#coordi') || $('#coordi').hidden) for (const [k, e] of [...sheetCache]) if (now - e.used > 1500) sheetDrop(k);
+  dyed.clear();
 }
 
 /** Gives the 사신수 무신의 헤어 whose raids are all won (progress.raids); their names. */
@@ -641,6 +652,10 @@ export function openCoordi(at) {
 function closeCoordi() {
   $('#coordi').hidden = true;
   clearInterval(previewTimer);
+  // The trial sheets are let go with the window (the looks tried on are 4 to 10 MB a sheet).
+  const now = performance.now();
+  for (const [k, e] of [...sheetCache]) if (now - e.used > 1500 || !k.startsWith('p/')) sheetDrop(k);
+  dyed.clear();
   // Looked at: what was new is not new any more.
   const own = state().own;
   for (const id of seen) if (own[id] === 2) own[id] = 1;
@@ -1177,16 +1192,31 @@ function buildCollect(detail) {
     + `${b.next ? ` · 다음 ${b.next[0]}개` : ' · 모두 열림'}</small><br><small>일반·고급 코디는 전으로 언제든, 희귀·영웅은 상점 진열 때 레이드주화로 사고, 뽑기(전)와 레이드·대항전 승리, 사냥터 보스의 보물에서도 얻습니다. 전설은 뽑기와 보상에서만 나옵니다.</small></div>`;
 }
 
-const sheetCache = new Map();
+// The dress room's sheets (a trial look's layers, a pet's), each decoded into a bitmap of its own
+// and closed when it is let go: the trial look's own and a few more are kept (a look is five to nine
+// sheets of 4 to 10 MB decoded; kept as <img>, sixty at a time, a long browse held hundreds of MB,
+// and each drawn left a second decoded copy in the browser's cache).
+const sheetCache = new Map(), SHEET_KEEP = 14;
+function sheetDrop(k) {
+  const e = sheetCache.get(k);
+  if (!e) return;
+  sheetCache.delete(k);
+  if (e.bm && e.bm.close) e.bm.close();
+  dropDyed(k);
+}
 function sheet(path) {
-  let im = sheetCache.get(path);
-  if (!im) {
-    im = new Image();
-    im.src = 'assets/' + (path.startsWith('p/') ? 'ycostume/' : 'yhero2/') + path;
-    sheetCache.set(path, im);
-    if (sheetCache.size > 60) sheetCache.delete(sheetCache.keys().next().value);
-  }
-  return im.complete && im.naturalWidth ? im : null;
+  let e = sheetCache.get(path);
+  if (!e) {
+    e = { bm: null, used: 0 };
+    const url = 'assets/' + (path.startsWith('p/') ? 'ycostume/' : 'yhero2/') + path;
+    const got = bm => { if (sheetCache.get(path) === e) e.bm = bm; else if (bm && bm.close) bm.close(); };
+    if (window.createImageBitmap && window.fetch) fetch(url).then(r => (r.ok ? r.blob() : null)).then(bl => (bl ? createImageBitmap(bl) : null)).then(got).catch(() => {});
+    else { const im = new Image(); im.onload = () => got(im); im.src = url; }
+  } else sheetCache.delete(path); // (the least lately drawn goes first)
+  sheetCache.set(path, e);
+  e.used = performance.now();
+  while (sheetCache.size > SHEET_KEEP) sheetDrop(sheetCache.keys().next().value);
+  return e.bm && e.bm.width ? e.bm : null;
 }
 
 /** The hero in the trial look, in the four directions, walking (or the pose picked); its pet beside. */

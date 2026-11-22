@@ -8,9 +8,11 @@ every output is the same step. Armors keep the whole figure (they carry the body
 weapons and shields become layers drawn over it. A head layer also marks, with alpha 1,
 pixels of head 0's hair that its own hair does not cover, to be cleared.
 
-Output, per item: avatar/<kind>/<n>.png, a sheet of 8 columns (idle, attack, magic, sit,
-walk 0-3) by 4 rows (front, right, back, left), all in one cell size with the feet at one
-point; avatar/<kind>/<n>_icon.png for the gear slots; and the list in the manifest.
+Output, per item: avatar/<kind>/<n>_icon.png for the gear slots (the front standing cell,
+cropped), and the list in the manifest. The sheets themselves (8 columns by 4 rows a piece,
+avatar/<kind>/<n>.png) are no longer written: the game draws every hero from 연's own layers
+(tools/yeon_avatar.py), and the sheets were 20 MB of the APK and 268 MB decoded at every start.
+The icons stay for the few pieces 연 has no icon of.
 """
 import glob
 import json
@@ -139,10 +141,9 @@ def build(src, out, manifest, modern=None):
     for (kind, i), s in sheets.items():
         d = os.path.join(out, "avatar", kind)
         os.makedirs(d, exist_ok=True)
-        c = np.stack([np.stack([shrink(s[r, k, y0:y1, x0:x1], cw, ch) for k in range(8)]) for r in range(4)])
-        img = np.concatenate([np.concatenate(list(c[r]), axis=1) for r in range(4)], axis=0)
-        Image.fromarray(img).save(os.path.join(d, f"{i}.png"), optimize=True)
-        icon = Image.fromarray(np.where(c[0, 0, ..., 3:] > 1, c[0, 0], 0).astype(np.uint8))
+        # (only the front standing cell: the slot's icon)
+        c00 = shrink(s[0, 0, y0:y1, x0:x1], cw, ch)
+        icon = Image.fromarray(np.where(c00[..., 3:] > 1, c00, 0).astype(np.uint8))
         box = icon.getbbox()
         if box:
             icon.crop(box).save(os.path.join(d, f"{i}_icon.png"))

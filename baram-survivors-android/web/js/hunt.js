@@ -1729,7 +1729,7 @@ function goalSpot() {
 // ---------------- drawing
 
 function propImg(name) {
-  const im = name && A.images[`prop/${name}.png`];
+  const im = name && A.pic(`prop/${name}.png`);
   return im && im.width ? im : null;
 }
 
@@ -1894,13 +1894,12 @@ function arenaStart(G) {
   G.arena = { id: G.stage.id, map, walk, flow: new Int16Array(map.cols * map.rows), at: -1 };
   // The pieces as decoded bitmaps, kept for the hunt (drawn from an <img> a piece was decoded
   // again whenever the browser had let it go: a long frame on a slow phone, as the wars found).
-  for (const [k, bm] of arenaBms) if (!k.startsWith(`yhunt/${G.stage.id}_`)) { if (bm.close) bm.close(); arenaBms.delete(k); }
+  // (game.js loadImage decodes each into a bitmap of its own; another ground's are let go)
+  for (const k of Object.keys(A.images)) if (k.startsWith('yhunt/') && !k.startsWith(`yhunt/${G.stage.id}_`)) A.picDrop(k);
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
       const path = `yhunt/${G.stage.id}_${cx}_${cy}.png`;
-      if (arenaBms.has(path)) continue;
-      Promise.resolve(A.images[path] || A.loadImage(path)).then(im => (im && im.width && window.createImageBitmap ? createImageBitmap(im) : null))
-        .then(bm => { if (bm) arenaBms.set(path, bm); }).catch(() => {});
+      if (!A.images[path]) A.loadImage(path);
     }
   const p = G.player, [sx, sy] = map.start;
   p.x = sx * A.TILE + A.TILE / 2;
@@ -2244,6 +2243,8 @@ export function initHunt(api) {
     world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade, trainTried, firstPicks,
     tick(dt) { tick(dt); },
     PACE, PATHS,
+    /** The hunt is left (game.js enterTown): its walled ground's pieces are closed. */
+    release() { for (const k of Object.keys(patterns)) delete patterns[k]; },
   };
   window.__pace = () => { const G = A.G(); return G && G.pace; };
   window.__hunt = () => { const G = A.G(); return G && G.hunt; };

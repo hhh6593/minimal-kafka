@@ -1,12 +1,7 @@
-// Dressing the hero from the wardrobe layers (tools/avatar_assets.py): an armor sheet carries
-// the whole figure; head, weapon and shield layers are laid over it. Every sheet is 8 columns
-// (idle, attack, magic, sit, walk 0-3) by 4 rows (front, right, back, left) of one cell size.
-
-import { CLASSES } from './data.js';
-
-const ROWS = { front: 0, right: 1, back: 2, left: 3 };
-const COLS = { idle: 0, attack: 1, magic: 2, sit: 3, walk: 4 };
-export const WALK_MS = 135;
+// The classes' gear lines (what each wears, tier by tier, and the raids' sets), and the old
+// wardrobe's slot icons (tools/avatar_assets.py) for the few pieces 연 has no icon of.
+// The wardrobe's figures themselves (a sheet per piece, the hero dressed from them) are gone: every
+// hero is drawn from 연's own layers (game.js drawYhero2), and those sheets were 268 MB decoded.
 
 // What each class wears, tier by tier: chests in the hunting grounds hand out the next one.
 // Names are the wardrobe's.
@@ -242,38 +237,19 @@ export function plainTiers(cls, kind) {
   return plainList(cls, kind).length;
 }
 
-let M, images;
+let M;
 
-export function initAvatars(manifest, imgs) {
+export function initAvatars(manifest) {
   M = manifest.avatar;
-  images = imgs;
 }
 
+/** Whether the build has the old wardrobe's icons. */
 export function hasAvatars() {
   return !!M;
 }
 
-/** Image paths to load: every sheet the classes can wear, and their slot icons. */
-export function avatarPaths(manifest) {
-  const a = manifest.avatar;
-  if (!a) return [];
-  const out = [];
-  for (const c of CLASSES) {
-    const g = GEAR[c.id];
-    const pick = (kind, name) => {
-      const i = a[kind].findIndex(x => x.name === name);
-      if (i >= 0) out.push(`avatar/${kind}/${i}.png`, `avatar/${kind}/${i}_icon.png`);
-    };
-    pick('head', g.head);
-    for (const kind of ['armor', 'weapon', 'shield']) for (const n of g[kind]) pick(kind, n);
-  }
-  // Every hair the wardrobe has: any class may wear any of them (머리 모양 in the equip window).
-  a.head.forEach((h, i) => out.push(`avatar/head/${i}.png`, `avatar/head/${i}_icon.png`));
-  return [...new Set(out)];
-}
-
 function index(kind, name) {
-  return M[kind].findIndex(x => x.name === name);
+  return M[kind] ? M[kind].findIndex(x => x.name === name) : -1;
 }
 
 /** The name of a class's gear at a tier, or null when it has none there. */
@@ -282,144 +258,9 @@ export function gearName(cls, kind, tier) {
   return tier >= 0 && tier < list.length ? list[tier] : null;
 }
 
-/** Every hair style, by its wardrobe name, with its icon. */
-export function heads() {
-  return M ? M.head.map((h, i) => ({ name: h.name, icon: `assets/avatar/head/${i}_icon.png` })) : [];
-}
-
+/** The old wardrobe's icon of a piece (its path), or null. */
 export function gearIcon(cls, kind, tier) {
   const n = gearName(cls, kind, tier);
   const i = n ? index(kind, n) : -1;
-  return i >= 0 ? `assets/avatar/${kind}/${i}_icon.png` : null;
-}
-
-/**
- * One sheet of a dressed hero: the armor, then the head (which may clear some of the plain
- * head's hair: alpha 1), the shield and the weapon.
- */
-export function dress(cls, gear) {
-  const [cw, ch] = M.cell;
-  // gear.looks: today's dress-room look of a piece (its name), when its sheet is loaded.
-  const looks = gear.looks || {};
-  const pick = kind => (looks[kind] && lookReady(kind, looks[kind]) ? looks[kind] : gearName(cls, kind, gear[kind]));
-  // A class the wardrobe never dressed (the 궁사, drawn from 연's own layers) stands in the first
-  // armour another class wears, so this old sheet is still whole.
-  const armor = images[`avatar/armor/${index('armor', pick('armor'))}.png`]
-    || Object.values(GEAR).map(l => images[`avatar/armor/${index('armor', l.armor[0])}.png`]).find(im => im && im.width);
-  const c = document.createElement('canvas');
-  c.width = cw * 8;
-  c.height = ch * 4;
-  const g = c.getContext('2d', { willReadFrequently: true });
-  if (armor) g.drawImage(armor, 0, 0);
-  const out = g.getImageData(0, 0, c.width, c.height);
-  const lay = (kind, name) => {
-    const i = name ? index(kind, name) : -1;
-    const im = i >= 0 && images[`avatar/${kind}/${i}.png`];
-    if (!im || !im.width) return;
-    const t = document.createElement('canvas');
-    t.width = c.width;
-    t.height = c.height;
-    const tg = t.getContext('2d', { willReadFrequently: true });
-    tg.drawImage(im, 0, 0);
-    const src = tg.getImageData(0, 0, c.width, c.height).data, dst = out.data;
-    for (let p = 0; p < src.length; p += 4) {
-      const a = src[p + 3];
-      if (a === 0) continue;
-      if (a === 1) {
-        dst[p + 3] = 0;
-        continue;
-      }
-      dst[p] = src[p];
-      dst[p + 1] = src[p + 1];
-      dst[p + 2] = src[p + 2];
-      dst[p + 3] = a;
-    }
-  };
-  lay('cape', pick('cape'));
-  lay('head', gear.head || GEAR[cls].head);
-  lay('helmet', pick('helmet'));
-  lay('shield', pick('shield'));
-  lay('weapon', pick('weapon'));
-  g.putImageData(out, 0, 0);
-  return { sheet: c, cw, ch, fx: M.feet[0], fy: M.feet[1], top: bodyTop(out, cw, ch) };
-}
-
-/** Whether the build has today's dress-room look of that name (a sheet, maybe not loaded yet). */
-export function hasLook(kind, name) {
-  return !!M && !!M[kind] && index(kind, name) >= 0;
-}
-function lookReady(kind, name) {
-  const im = images[`avatar/${kind}/${index(kind, name)}.png`];
-  return index(kind, name) >= 0 && !!im && im.complete && im.naturalWidth > 0;
-}
-
-/**
- * Loads the sheets of today's looks when first worn (there are many; loading them all at the
- * start would take hundreds of MB), then calls done once if any was missing.
- */
-export function loadLooks(looks, done) {
-  const want = Object.entries(looks).filter(([k, n]) => n && hasLook(k, n) && !lookReady(k, n));
-  if (!want.length) return;
-  let left = want.length;
-  for (const [kind, name] of want) {
-    const path = `avatar/${kind}/${index(kind, name)}.png`;
-    const im = images[path] || new Image();
-    images[path] = im;
-    const end = () => { if (--left === 0) done(); };
-    if (im.src && !im.complete) { im.addEventListener('load', end); im.addEventListener('error', end); continue; }
-    im.onload = end;
-    im.onerror = end;
-    im.src = `assets/${path}`;
-  }
-}
-
-/** How far above the feet the figure's head is, in the front idle pose (for bars and bubbles). */
-function bodyTop(img, cw, ch) {
-  const d = img.data, w = img.width;
-  for (let y = 0; y < ch; y++) {
-    for (let x = Math.floor(cw * 0.35); x < cw * 0.65; x++) if (d[(y * w + x) * 4 + 3] > 1) return M.feet[1] - y;
-  }
-  return 48;
-}
-
-export function facing(dx, dy) {
-  if (dy > 0) return 'front';
-  if (dy < 0) return 'back';
-  return dx < 0 ? 'left' : 'right';
-}
-
-/** Draws a dressed hero with its feet at x, y. pose: idle, attack, magic, sit or walk. */
-export function drawAvatar(ctx, av, x, y, dir, pose, frame = 0, alpha = 1) {
-  const col = pose === 'walk' ? COLS.walk + (frame % 4) : COLS[pose];
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.drawImage(av.sheet, col * av.cw, ROWS[dir] * av.ch, av.cw, av.ch,
-    Math.round(x - av.fx), Math.round(y - av.fy), av.cw, av.ch);
-  ctx.restore();
-}
-
-/** The front idle figure as a picture, cropped, for menus and the side panel. */
-export function portrait(av) {
-  const c = document.createElement('canvas');
-  c.width = av.cw;
-  c.height = av.ch;
-  c.getContext('2d').drawImage(av.sheet, 0, 0, av.cw, av.ch, 0, 0, av.cw, av.ch);
-  const g = c.getContext('2d');
-  const d = g.getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
-  for (let y = 0; y < c.height; y++) {
-    for (let x = 0; x < c.width; x++) {
-      if (d[(y * c.width + x) * 4 + 3] > 1) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-    }
-  }
-  const o = document.createElement('canvas');
-  o.width = Math.max(1, x1 - x0 + 1);
-  o.height = Math.max(1, y1 - y0 + 1);
-  o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
-  return o.toDataURL();
+  return i >= 0 && M[kind][i].icon !== false ? `assets/avatar/${kind}/${i}_icon.png` : null;
 }

@@ -5,8 +5,8 @@
 #
 # IMAGES_DIR is the unpacked image download (the folder holding image/, magics/, itemImage/,
 # maps/ and _pages.json). AUDIO_DIR holds bgm/ and sfx/ sound files (default: ./audio); see README.
-# AVATAR_DIR is the unpacked wardrobe download (oldbaram_avatar_sprites): the hero is dressed
-# from it, with walking and casting frames. Without it the class pictures stand in.
+# AVATAR_DIR is the unpacked wardrobe download (oldbaram_avatar_sprites): only its slot icons go
+# into the build now (for the few pieces 연 has no icon of); the heroes are drawn from 연's layers.
 # SKILL_FX_DIR: the skill-icon download's numbered effect GIFs (사이트번호별/).
 # MODERN_DIR: today's client effects for the last spell of each tree, new_<skill id>.gif.
 # GEAR_DIR: today's client item pictures, <item name>.png (tools/fetch_gear.py downloads them).

@@ -34,11 +34,17 @@ const MIN_GAP = { hit: 0.12, kill: 0.09, crit: 0.18, pickup: 0.03, skill_aura: 0
 // Sounds that come many times a second play softer than spells.
 const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45, combo: 0.9 };
 
+// Decoded sound kept at most (mono float samples: about 80 seconds at 48 kHz).
+const SFX_BUDGET = 16e6;
+
 export class Audio {
   constructor(manifest) {
     this.files = manifest.sfx || {};
     this.bgmList = manifest.bgm || [];
-    this.buffers = {};
+    this.buffers = {}; // file key -> { buf, used, bytes }
+    this.pending = {};
+    this.bytes = 0;
+    this.clock = 0;
     this.last = {};
     this.sfxOn = true;
     this.bgmOn = true;
@@ -65,7 +71,48 @@ export class Audio {
   preview(n) {
     this.unlock();
     const [num, r] = String(n).split('@');
-    if (this.buffers[num]) this.start(this.buffers[num], 1, +r || 1);
+    const b = this.buffer(num);
+    if (b) this.start(b, 1, +r || 1);
+    else this.want(num, x => this.start(x, 1, +r || 1), 2);
+  }
+
+  // The sounds are decoded as they are first played, and the least lately played let go past a
+  // budget: all 844 decoded at the first tap were some 25 minutes of sound, 300 MB of samples on
+  // a phone (its renderer killed for memory with the pictures on top). A sound's first play comes
+  // as soon as it is decoded (a moment later; dropped if that took too long to still belong to
+  // the blow), every later one at once.
+  /** A decoded sound by its file key, or null (not decoded yet). */
+  buffer(key) {
+    const e = key && this.buffers[key];
+    if (!e) return null;
+    e.used = ++this.clock;
+    return e.buf;
+  }
+
+  /** Decodes a sound; `then(buffer)` if it is in within `late` seconds. */
+  want(key, then, late = 0.25) {
+    if (!this.ctx || !key || !this.has(key) || this.buffers[key]) return;
+    const t0 = this.ctx.currentTime;
+    let p = this.pending[key];
+    if (!p) {
+      p = this.pending[key] = fetch('assets/' + this.files[key]).then(r => r.arrayBuffer()).then(d => this.ctx.decodeAudioData(d)).then(buf => {
+        this.buffers[key] = { buf, used: ++this.clock, bytes: buf.length * buf.numberOfChannels * 4 };
+        this.bytes += this.buffers[key].bytes;
+        if (this.bytes > SFX_BUDGET) this.trim();
+        return buf;
+      }).catch(e => { console.warn('sound', this.files[key], e); return null; }).finally(() => { delete this.pending[key]; });
+    }
+    if (then) p.then(buf => { if (buf && this.sfxOn && !this.halted && this.ctx.currentTime - t0 <= late) then(buf); });
+  }
+
+  /** Past the budget: the least lately played let go, to three quarters of it. */
+  trim() {
+    const old = Object.keys(this.buffers).sort((x, y) => this.buffers[x].used - this.buffers[y].used);
+    for (const k of old) {
+      if (this.bytes <= SFX_BUDGET * 0.75) break;
+      this.bytes -= this.buffers[k].bytes;
+      delete this.buffers[k];
+    }
   }
 
   start(buffer, gain = 1, rate = 1) {
@@ -90,19 +137,20 @@ export class Audio {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.sfxVolume;
       this.master.connect(this.ctx.destination);
-      for (const [key, file] of Object.entries(this.files)) this.load(key, file);
+      // The sounds heard all the time, ready from the first blow; the rest as they are first played.
+      for (const k of ['hit', 'kill', 'crit', 'pickup', 'click', 'combo', 'levelup', 'enter']) { const f = this.fileOf(k); if (f) this.want(f); }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
     if (this.music && this.bgmOn && this.music.paused && !this.halted) this.music.play().catch(() => {});
   }
 
-  async load(key, file) {
-    try {
-      const res = await fetch('assets/' + file);
-      this.buffers[key] = await this.ctx.decodeAudioData(await res.arrayBuffer());
-    } catch (e) {
-      console.warn('sound', file, e);
-    }
+  /** The file key a game event plays now (its numbered sound, or its own named clip), or null. */
+  fileOf(k, level = 1) {
+    let n = this.map[k];
+    if (Array.isArray(n)) n = n[Math.min(level, n.length) - 1];
+    if (n === '-') return null;
+    const num = n ? String(n).split('@')[0] : null;
+    return num && this.has(num) ? num : this.has(k) ? k : null;
   }
 
   /** kind: the skill's kind, for fallbacks; level picks among several sounds (기원 tiers);
@@ -119,9 +167,11 @@ export class Audio {
       if (n === '-') return; // chosen: no sound
       // 'NNN@r': the sound at r times its speed (a spell sharing another's sound, pitched apart).
       const [num, r] = n ? String(n).split('@') : [];
-      const b = (num && this.buffers[num]) || this.buffers[k];
-      if (b) {
-        this.start(b, GAIN[key] ?? 1, (+r || 1) * rate);
+      const fk = num && this.has(num) ? num : this.has(k) ? k : null;
+      if (fk) {
+        const b = this.buffer(fk), g = GAIN[key] ?? 1, rt = (+r || 1) * rate;
+        if (b) this.start(b, g, rt);
+        else this.want(fk, x => this.start(x, g, rt));
         return;
       }
     }

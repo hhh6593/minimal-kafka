@@ -235,7 +235,25 @@ export function initWar(api) {
     }
     return best || [0, 0];
   };
+  War.release = releaseWar;
+  window.__memBoard = () => toggleBoard(); // test (memory): the war's 현황 (문파원 목록, their portraits)
+  window.__warMem = () => ({ frames: frames.size, maps: mapBms.size, labels: labels.size, plates: plates.size, portraits: portraits.size, hud: hudPics.size, glow: glowPics.size });
   return War;
+}
+/** The war is left (game.js enterTown; a hunt started): its field's pieces are closed, and its small
+ *  made pictures (names, plates, glows) let go. The fighters' frames stay for the next war of the
+ *  session (they are small, cropped: some 30 MB for every look) unless `all` (a hunt needs the room). */
+function releaseWar(all) {
+  warmGen++;
+  warming.clear();
+  for (const [path, bm] of mapBms) { if (bm && bm.close) bm.close(); mapBms.delete(path); }
+  for (const m of [labels, plates, hudPics, glowPics]) { for (const v of m.values()) { const pic = v && (v.pic || v.c || v); if (pic && pic.close) pic.close(); } m.clear(); }
+  portraits.clear();
+  if (all) {
+    for (const e of frames.values()) if (e && e.pic && e.pic.close) e.pic.close();
+    frames.clear();
+    lookAny.clear();
+  }
 }
 
 // ---------------------------------------------------------------- the war board (town)
@@ -471,7 +489,6 @@ async function startWar(id, cls, role, opts = {}) {
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
       const p = `ywar/${id}_${cx}_${cy}.png`;
-      if (!A.images[p]) loads.push(A.loadImage(p));
       if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
   // The fighters' looks (aiLooks), kept for the session: a later war's frames are made already (see warmLooks).
@@ -5983,7 +6000,6 @@ async function startJaeng(cls, role, opts = {}) {
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
       const p = `ywar/${def.id}_${cx}_${cy}.png`;
-      if (!A.images[p]) loads.push(A.loadImage(p));
       if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
   for (const n of ['war_sealstone1', 'war_sealstone2', 'war_sealstone3', 'war_sealring', 'war_bossmark', 'war_bossaltar', 'war_totem', 'war_totem_r', 'war_brazier'])
@@ -6728,7 +6744,7 @@ function drawJaengGround(G, W, ctx) {
     ctx.restore();
   };
   for (const t of W.teams) ring(t.spawn[0], t.spawn[1], JAENG.campR, t.color, 0.5);
-  const ringPic = A.images['prop/war_sealring.png'];
+  const ringPic = A.pic('prop/war_sealring.png');
   for (const s of W.seals) {
     const col = s.owner >= 0 ? W.teams[s.owner].color : '#d8d8d8';
     ring(s.x, s.y, 2.2, s.contest ? (Math.floor(G.t * 6) % 2 ? '#ffd040' : col) : col);
@@ -6760,7 +6776,7 @@ function jaengProps(W, out) {
   for (const t of W.teams) out.push({ war: true, wprop: 'jp', name: 'war_brazier', x: t.spawn[0] * TILE + TILE / 2 + TILE * 1.5, y: t.spawn[1] * TILE + TILE - 10, k: 0.7, label: `${t.name} 진영`, team: t.id });
 }
 function drawJaengProp(W, b) {
-  const ctx = A.ctx, im = A.images[`prop/${b.name}.png`];
+  const ctx = A.ctx, im = A.pic(`prop/${b.name}.png`);
   if (im && im.width) {
     const k = b.k || 1, w = Math.round(im.width * k), h = Math.round(im.height * k);
     ctx.drawImage(im, Math.round(b.x - w / 2), Math.round(b.flat ? b.y - h / 2 : b.y - h), w, h);
@@ -7180,7 +7196,7 @@ function drawBody(b) {
     ctx.drawImage(lab, Math.round(b.x - lab.width / 2), Math.round(b.y + 9 - 9));
   }
   if (b.carry) {
-    const im = A.images['prop/war_cart3.png'];
+    const im = A.pic('prop/war_cart3.png');
     drawLabel('보급', b.x, b.y - top - 18, '#ffd27a');
   }
   if (b.bubble && dh < 8 && G.t - b.bubble.t < 1.4 && G.t >= b.bubble.t) A.drawBubble(b.bubble.text, b.x, b.y - top - 14, G.t - b.bubble.t);
@@ -7572,7 +7588,7 @@ War.props = () => warProps();
 function drawWarProp(W, b) {
   const G = A.G(), ctx = A.ctx;
   const prop = (name, x, y, k = 1, alpha = 1) => {
-    const im = A.images[`prop/${name}.png`];
+    const im = A.pic(`prop/${name}.png`);
     if (!im || !im.width) return false;
     ctx.globalAlpha = alpha;
     ctx.drawImage(im, Math.round(x - im.width * k / 2), Math.round(y - im.height * k), Math.round(im.width * k), Math.round(im.height * k));

@@ -9,7 +9,7 @@ import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sou
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair, dropDyed, releaseCostume } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -19,7 +19,7 @@ import {
   sinsuCount, SINSU_GATE, needsMet, needsName, AKMA_DROP, FAMILY_TINT, SINSU_TINT, HEAVEN_DRESS, HEAVEN_COST,
 } from './items.js';
 import {
-  initAvatars, hasAvatars, avatarPaths, dress, hasLook, loadLooks, drawAvatar, facing, portrait, gearName, gearIcon, GEAR, WALK_MS, heads,
+  initAvatars, hasAvatars, gearName, gearIcon, GEAR,
   RAID_GEAR, plainTiers, plainList, gearPower, raidSet, raidTier, MOVED_TIERS, lookAt, CRAFT_GEAR, CRAFT_POWER, hasShield,
 } from './avatar.js';
 
@@ -35,10 +35,15 @@ const ctx = canvas.getContext('2d', { alpha: false });
 // trimmed and refilled all the time (a third of the field's drawing cost under a slow CPU). Each
 // <img> the field draws is decoded once into an ImageBitmap and drawn from that instead, and a
 // bitmap not drawn for a while is let go (sweepBitmaps) so a long session does not hoard them.
-// They are held to a budget (the least lately drawn let go past it), and a sheet past 8 MB decoded
-// (a few long effect strips) stays with the browser's own cache.
+// They are held to a budget (the least lately drawn let go past it).
+// The bitmap is the only decoded copy the game keeps: a picture is never drawn from its <img> where
+// a bitmap can be had (bmSrc for the small canvases too), and an effect sheet is made ready as a
+// bitmap (bmWarm), not by <img>.decode() — either left a second decoded copy in the browser's own
+// cache, which no budget here saw and nothing let go: 60 to 90 MB more for every class tried in 수련장.
 const bitmapOf = new WeakMap(), bitmapsLive = new Set();
-const BITMAP_BUDGET = 128e6, BITMAP_MAX = 8e6;
+// (test: ?bm=<MB> sets the budget, ?bmraw draws a picture from its <img> while its bitmap is made, as before)
+const BM_Q = new URLSearchParams(location.search);
+const BITMAP_BUDGET = BM_Q.has('bm') ? +BM_Q.get('bm') * 1e6 : 48e6, BITMAP_MAX = BM_Q.has('bmmax') ? +BM_Q.get('bmmax') * 1e6 : 16e6, BITMAP_RAW = BM_Q.has('bmraw');
 const rawDrawImage = ctx.drawImage;
 let bitmapClock = 0, bitmapBytes = 0;
 ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
@@ -57,19 +62,30 @@ ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
     }
   }
   if (CULL_CHECK) xfCheck(false);
+  // (a picture let go — a closed bitmap — or not in yet has no size: nothing to draw, and no throw)
+  if (!im.width) return;
   if (im instanceof HTMLImageElement && window.createImageBitmap) {
     const bm = bitmapOf.get(im);
     if (bm === undefined) {
       const bytes = im.naturalWidth * im.naturalHeight * 4;
       if (im.complete && bytes && bytes <= BITMAP_MAX) {
-        const rec = { bm: null, im, used: bitmapClock, bytes };
+        const rec = { bm: null, im, used: bitmapClock, bytes, wait: !BITMAP_RAW };
         bitmapOf.set(im, rec);
-        createImageBitmap(im).then(x => { rec.bm = x; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps(); }).catch(() => {});
+        createImageBitmap(im).then(x => {
+          rec.wait = false;
+          // (its picture let go meanwhile: picDrop, fxKeep)
+          if (bitmapOf.get(im) !== rec) { x.close(); return; }
+          rec.bm = x; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps();
+        }).catch(() => { rec.wait = false; });
+        // Not drawn from its <img> meanwhile (a frame or two): that draw decoded the picture a second
+        // time into the browser's own cache, where the copy stayed (unseen by the budget here) —
+        // every new sheet of a class tried in 수련장 left one, 60 to 90 MB a class.
+        if (rec.wait) return;
       }
     } else if (bm.bm) {
       bm.used = bitmapClock;
       im = bm.bm;
-    }
+    } else if (bm.wait) return;
   }
   switch (arguments.length) {
     case 3: return rawDrawImage.call(this, im, a, b);
@@ -163,6 +179,29 @@ function xfCheck(culled) {
   xfReset();
 })();
 
+/** The bitmap of a picture made ahead (an effect sheet loaded for a run): settles when it is ready. */
+function bmWarm(im) {
+  if (!(im instanceof HTMLImageElement) || !window.createImageBitmap) return Promise.resolve();
+  const had = bitmapOf.get(im);
+  if (had) return had.p || Promise.resolve();
+  const bytes = im.naturalWidth * im.naturalHeight * 4;
+  if (!im.complete || !bytes || bytes > BITMAP_MAX) return Promise.resolve();
+  const rec = { bm: null, im, used: bitmapClock, bytes, wait: !BITMAP_RAW, p: null };
+  bitmapOf.set(im, rec);
+  rec.p = createImageBitmap(im).then(x => {
+    rec.wait = false;
+    rec.p = null;
+    if (bitmapOf.get(im) !== rec) { x.close(); return; }
+    rec.bm = x; rec.used = bitmapClock; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps();
+  }).catch(() => { rec.wait = false; rec.p = null; });
+  return rec.p;
+}
+/** What to draw a picture from on a canvas of the game's own (a tint, a white copy): its bitmap when it has one. */
+function bmSrc(im) {
+  const rec = im instanceof HTMLImageElement ? bitmapOf.get(im) : null;
+  if (rec && rec.bm) { rec.used = bitmapClock; return rec.bm; }
+  return im;
+}
 function dropBitmap(rec) {
   bitmapsLive.delete(rec);
   bitmapOf.delete(rec.im);
@@ -173,16 +212,24 @@ function dropBitmap(rec) {
 function trimBitmaps() {
   const old = [...bitmapsLive].sort((x, y) => x.used - y.used);
   for (const rec of old) {
-    if (bitmapBytes <= BITMAP_BUDGET * 0.75) break;
+    // (never one drawn this last second: it would be made again at once, and blink meanwhile)
+    if (bitmapBytes <= BITMAP_BUDGET * 0.75 || bitmapClock - rec.used < 1) break;
     dropBitmap(rec);
   }
 }
 /** Once a second: the bitmaps not drawn for half a minute closed (made again when next drawn). */
 function sweepBitmaps(now) {
+  // (a long gap between frames — the app in the background — is not time a picture went unused)
+  const gap = now - bitmapClock;
+  if (gap > 2 && bitmapClock) {
+    for (const rec of bitmapsLive) rec.used += gap;
+    for (const L of heroLooks.values()) L.used += gap;
+  }
   bitmapClock = now;
   if (now - (sweepBitmaps.at || 0) < 1) return;
   sweepBitmaps.at = now;
   for (const rec of bitmapsLive) if (now - rec.used >= 30) dropBitmap(rec);
+  heroLooksSweep(now);
 }
 
 let M; // assets/manifest.json
@@ -250,16 +297,93 @@ function saveJson(key, v) {
 }
 
 let fxWebp = null;
+// The pictures a screen loads for itself, by folder: let go when the screen is left (picRelease;
+// fx/ by fxKeep). Each is decoded once into a bitmap of its own, off the main thread (fetch +
+// createImageBitmap), and closed when let go — memory given back there and then. As an <img> its
+// file stayed in the browser's memory after every reference was dropped (and src cleared): 68 MB
+// for the effects alone once each had been seen, 5 MB a class tried.
+// (Not here: the small ones every screen draws — item/, mon/, hud/, npc/, emote/, the title's art.)
+const PIC_LAZY = /^(icon|skillicon|yhero2|yhero|yunit|beast|prop|floor|ytown|gear|gicon|yitemicon|ycostume|yamb|ywar|yhunt|avatar)\//;
+const PIC_BITMAP = /^(fx|icon|skillicon|yhero2|yhero|yunit|beast|prop|floor|ytown|gear|gicon|yitemicon|ycostume|yamb|ywar|yhunt|avatar)\//;
 function loadImage(path) {
+  // An effect the build shrank to WebP (tools/webp_fx.py) keeps its .png key.
+  const webp = path.startsWith('fx/') && fxWebp && fxWebp.has(path.slice(3, -4));
+  const url = 'assets/' + (webp ? path.slice(0, -4) + '.webp' : path);
+  if (PIC_BITMAP.test(path) && window.createImageBitmap && window.fetch) {
+    // Until it is in: a stand-in with no size (what draws it skips it, as an <img> still loading).
+    const ph = { complete: false, width: 0, height: 0, naturalWidth: 0, naturalHeight: 0, src: url, p: null };
+    images[path] = ph;
+    ph.p = fetch(url).then(r => (r.ok ? r.blob() : null)).then(bl => (bl ? createImageBitmap(bl) : null)).catch(() => null).then(bm => {
+      // (let go meanwhile: picDrop, fxKeep)
+      if (images[path] !== ph) { if (bm) bm.close(); return null; }
+      if (!bm) { ph.complete = true; return null; } // (missing: as a broken <img>, there but with no size)
+      bm.complete = true;
+      bm.naturalWidth = bm.width;
+      bm.naturalHeight = bm.height;
+      bm.src = url;
+      bm.used = bitmapClock;
+      images[path] = bm;
+      return bm;
+    });
+    return ph.p;
+  }
   return new Promise(resolve => {
     const im = new Image();
     im.onload = () => resolve(im);
     im.onerror = () => resolve(null);
-    // An effect the build shrank to WebP (tools/webp_fx.py) keeps its .png key.
-    const webp = path.startsWith('fx/') && fxWebp && fxWebp.has(path.slice(3, -4));
-    im.src = 'assets/' + (webp ? path.slice(0, -4) + '.webp' : path);
+    im.src = url;
     images[path] = im;
   });
+}
+
+// ---- pictures loaded by the screen that draws them
+/** A picture loaded when it is first asked for: the <img> once it is in, null until then (never a
+ *  throw, never a wait: what draws it skips it until it is in). */
+function pic(path) {
+  const im = images[path];
+  if (im) return im.complete && im.naturalWidth ? im : null;
+  loadImage(path);
+  return null;
+}
+/** Loads these pictures; settles when they are in (or missing), or after `wait` ms at most. */
+function picWarm(paths, wait = 0) {
+  const all = Promise.all(paths.map(path => {
+    const im = images[path];
+    if (!im) return loadImage(path);
+    if (im.complete) return im;
+    if (im.p) return im.p;
+    return new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
+  }));
+  return wait ? Promise.race([all, new Promise(r => setTimeout(r, wait))]) : all;
+}
+
+/** A picture let go: its bitmap closed, what was made from it (tints, white copies) forgotten. */
+function picForget(im) {
+  if (!im) return;
+  tintCache.delete(im);
+  whiteCache.delete(im);
+  shadowCache.delete(im);
+  if (im instanceof HTMLImageElement) {
+    const rec = bitmapOf.get(im);
+    if (rec) { bitmapOf.delete(im); if (rec.bm) { bitmapsLive.delete(rec); bitmapBytes -= rec.bytes; rec.bm.close(); } }
+  } else if (im.close) im.close(); // a bitmap of its own: its memory back now
+}
+function picDrop(path) {
+  const im = images[path];
+  if (im === undefined) return;
+  delete images[path];
+  picForget(im);
+}
+/** Lets go of every lazily loaded picture but these (paths, or the start of some: a folder). */
+function picRelease(keep = []) {
+  const set = new Set(keep), dirs = keep.filter(k => !/\.\w+$/.test(k));
+  for (const path of Object.keys(images)) {
+    if (!PIC_LAZY.test(path) || set.has(path) || dirs.some(d => path.startsWith(d))) continue;
+    picDrop(path);
+  }
+  for (const c of yunitSeen.values()) c.r = null;
+  whiteFrames.clear();
+  propsSeen = null;
 }
 
 // ---- effect sheets, loaded as they are needed
@@ -272,22 +396,46 @@ const fxPending = new Map(), fxPinned = new Set();
 /** The decoded sheet of effect `id` (its own sheet, f.src), or null while it loads (and starts it). */
 function fxPic(id) {
   const f = M.fx[id], src = f ? f.src || id : id, im = images[`fx/${src}.png`];
-  if (im && im.__ok) return im;
+  if (im && im.__ok) { im.used = bitmapClock; return im; }
   if (f) fxLoad(src);
   return null;
 }
 function fxLoad(src) {
   const path = `fx/${src}.png`;
   if (images[path] && images[path].__ok) return Promise.resolve(images[path]);
+  if (images[path] && images[path].complete && !images[path].width) return Promise.resolve(null); // (the build lacks it)
   let p = fxPending.get(src);
   if (!p) {
     p = loadImage(path).then(im => {
       if (!im) return null;
-      return (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => { im.__ok = true; return im; });
+      // Ready to draw: a bitmap of its own already (loadImage), else its bitmap made now.
+      if (!(im instanceof HTMLImageElement)) { im.__ok = true; fxTrim(); return im; }
+      return bmWarm(im).then(() => { im.__ok = true; return im; });
     }).finally(() => fxPending.delete(src));
     fxPending.set(src, p);
   }
   return p;
+}
+// The effect sheets held at most (decoded): past it the least lately drawn are let go (never a common
+// one, nor one drawn these last seconds) and load again when next used. A hunt's own kit is 40 to
+// 60 MB; a long one with every 격 and proc going, or a war with every class's spells, stays under this.
+const FX_BUDGET = 110e6;
+function fxTrim() {
+  let total = 0;
+  const list = [];
+  for (const [path, im] of Object.entries(images)) {
+    if (!path.startsWith('fx/') || !im || !im.width) continue;
+    total += im.width * im.height * 4;
+    if (!fxPinned.has(path.slice(3, -4))) list.push([path, im]);
+  }
+  if (total <= FX_BUDGET) return;
+  list.sort((x, y) => (x[1].used || 0) - (y[1].used || 0));
+  for (const [path, im] of list) {
+    if (total <= FX_BUDGET * 0.8 || bitmapClock - (im.used || 0) < 5) break;
+    total -= im.width * im.height * 4;
+    delete images[path];
+    picForget(im);
+  }
 }
 /** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
 function fxWarm(ids, wait = 0) {
@@ -307,7 +455,7 @@ function fxKeep(ids) {
     if (keep.has(src) || fxPending.has(src)) continue;
     const im = images[path];
     delete images[path];
-    if (im) { tintCache.delete(im); const bm = bitmapOf.get(im); if (bm && bm.bm) { bitmapsLive.delete(bm); bitmapBytes -= bm.bytes; bm.bm.close && bm.bm.close(); } bitmapOf.delete(im); }
+    picForget(im);
   }
 }
 /** The effect ids an object names (a skill, a 필살기 tier, a look): its string values that are
@@ -346,6 +494,38 @@ function runFxIds(cls, stage) {
 
 const monsterById = {};
 
+/** The pictures a run on this ground draws from its start: its floor and props, its monsters' and
+ *  boss's 연 sheets, the 괴수 its boss or the class's calls bring. */
+function runPics(cls, stage) {
+  const out = new Set();
+  if (stage.terrain && (M.floor || []).includes(stage.terrain)) out.add(`floor/${stage.terrain}.png`);
+  for (const [n] of propKinds(stage.terrain)) out.add(`prop/${n}.png`);
+  let mons = null;
+  try { mons = stageMonsters(stage); } catch (e) { /* a war's ground has none */ }
+  for (const m of mons ? [...mons.pool, mons.boss && mons.boss.m, mons.mini && mons.mini.m] : []) if (m && M.yunit && M.yunit[m.id]) out.add(`yunit/${m.id}.png`);
+  if (mons && mons.boss && mons.boss.beast) out.add(`beast/${mons.boss.beast}.png`);
+  for (const d of Object.values(SKILLS)) if (d.beasts && d.cls === cls.id) for (const bk of d.beasts) if (bk && M.beast && M.beast[bk]) out.add(`beast/${bk}.png`);
+  if (M.yunit && M.yunit[TRAIN_MOB]) out.add(`yunit/${TRAIN_MOB}.png`);
+  return [...out];
+}
+/** The town's pictures for an area: its map and little map, its people, the statue. */
+function townPics(area) {
+  const yt = M.ui.ytown;
+  if (!yt) return M.ui.town ? ['ui/town.png'] : [];
+  const out = [`ytown/${area}.png`, `ytown/mm_${area}.png`, 'ytown/statue.png', 'ytown/sign.png'];
+  for (const n of TOWNSFOLK) { const sp = yt.spots[n.id], look = YTOWN_LOOK[n.id]; if (sp && sp.area === area && look && yt.folk[look]) out.push(`ytown/${look}.png`); }
+  return out;
+}
+/** A screen is left for another: what the old one loaded for itself is let go (the hero's own look
+ *  and `keep` aside), so the pictures held are the screen's own, not every screen's seen so far. */
+function leaveScreen(cls, gear, keep) {
+  heroLooksRelease(cls, gear);
+  picRelease(keep);
+  releaseCostume();
+  shadowPics.clear();
+  if (textPics.size > 300) textPics.clear();
+}
+
 async function boot() {
   M = await (await fetch('assets/manifest.json')).json();
   fxWebp = new Set(M.fxWebp || []);
@@ -363,22 +543,16 @@ async function boot() {
   for (const id of [...Object.values(FX), ...Object.values(SHOT_FX), ...Object.values(PROCS).map(p => p && p.fx), 'k_revive', '131', 'k_x_hero_foot']) {
     if (id && M.fx[id]) fxPinned.add(M.fx[id].src || id);
   }
+  // Only what the title and every screen draw: the small pictures (items, the old monsters, the
+  // HUD). The rest is loaded by the screen that draws it (pic, picWarm) and let go when it is left
+  // (picRelease): the town's maps, a ground's floor and props, the 괴수, the spells' icons. (The old
+  // wardrobe's figures, 268 MB decoded at every start, are gone: every hero is drawn in 연's layers.)
   const paths = [
-    // Hit sparks and the level-up burst are never in a spell slot: no icon of their own.
-    ...Object.keys(M.fx).filter(id => !id.startsWith('new_') && !id.startsWith('h_') && !id.startsWith('g_')).map(id => `icon/${id}.png`),
-    ...M.heroes.map(h => `hero/${h.id}.png`),
     ...Object.values(M.items).map(i => `item/${i.id}.png`),
     ...M.monsters.map(m => `mon/${m.id}.png`),
-    ...avatarPaths(M),
     ...(M.npc || []).map(n => `npc/${n}.png`),
-    ...(M.ui.town ? ['ui/town.png'] : []),
-    ...(M.ui.ytown ? [...Object.keys(M.ui.ytown.areas).map(k => `ytown/${k}.png`), ...Object.keys(M.ui.ytown.folk).map(k => `ytown/${k}.png`),
-      ...Object.keys(M.ui.ytown.areas).map(k => `ytown/mm_${k}.png`), 'ytown/sign.png', 'ytown/statue.png'] : []),
     ...(M.ui.ytitle ? ['ui/title_bg.jpg'] : []),
     ...Object.keys(M.emote || {}).map(k => `emote/${k}.png`),
-    ...Object.keys(M.beast || {}).map(k => `beast/${k}.png`),
-    ...(M.floor || []).map(k => `floor/${k}.png`),
-    ...Object.keys(M.prop || {}).map(k => `prop/${k}.png`),
     ...(M.hud && M.hud.font_damage ? ['hud/font_damage.png'] : []),
     ...(M.hud && M.hud.font_gold ? ['hud/font_gold.png'] : []),
     ...(M.hud && M.hud.font_dmgk_o ? ['hud/font_dmgk_o.png', 'hud/font_dmgk_r.png'] : []),
@@ -424,9 +598,10 @@ async function boot() {
   $('#loading').hidden = true;
   resize();
   menuGround = makeGround('field');
-  initAvatars(M, images);
+  initAvatars(M);
   $('#version').textContent = M.version ? `빌드 ${M.version}` : '';
-  $('#heroes').innerHTML = CLASSES.map(c => `<img src="${heroPicture(c)}" alt="${c.name}">`).join('');
+  // (연's own title art hides the drawn figures: they are made only without it)
+  if (!M.ui.ytitle) $('#heroes').innerHTML = CLASSES.map(c => `<img src="${heroPicture(c)}" alt="${c.name}">`).join('');
   // 연's own title art carries the name: the drawn title and figures make way for it.
   if (M.ui.ytitle) document.body.classList.add('ytitle');
   showScreen('title');
@@ -492,7 +667,7 @@ let propsSeen = null;
 function propsInView(camX, camY) {
   const kinds = propKinds(G.stage.terrain);
   if (!kinds.length) return [];
-  const list = kinds.filter(([n]) => M.prop[n] && images[`prop/${n}.png`] && images[`prop/${n}.png`].width);
+  const list = kinds.filter(([n]) => M.prop[n] && pic(`prop/${n}.png`));
   const total = list.reduce((a, [, w]) => a + w, 0);
   if (!total) return [];
   const x0 = Math.floor((camX - 220) / PROP_CELL), x1 = Math.floor((camX + VW + 220) / PROP_CELL);
@@ -526,7 +701,8 @@ function propsInView(camX, camY) {
 
 /** A prop with its foot at (x, y); a tree goes see-through while the hero is behind it. */
 function drawProp(b, p) {
-  const im = images[`prop/${b.prop}.png`];
+  const im = pic(`prop/${b.prop}.png`);
+  if (!im) return;
   const left = Math.round(b.x - im.width / 2), top = Math.round(b.y - im.height);
   const behind = b.prop.startsWith('tree') && p.x > left && p.x < left + im.width && p.y < b.y - 4 && p.y > top + 10;
   if (behind) ctx.globalAlpha = 0.5;
@@ -537,8 +713,18 @@ function drawProp(b, p) {
 /** A ground pattern for a terrain kind, drawn once per hunt. */
 function makeGround(kind) {
   // 연's own floor for the terrain, one game pixel per picture pixel.
-  const tile = images[`floor/${kind}.png`];
-  if (tile && tile.width) return ctx.createPattern(tile, 'repeat');
+  const fp = `floor/${kind}.png`, has = (M.floor || []).includes(kind), tile = has ? pic(fp) : null;
+  if (tile) return ctx.createPattern(tile, 'repeat');
+  // (not in yet: the drawn ground stands in, and 연's floor takes its place as soon as it is)
+  if (has && !makeGround.wait.has(kind)) {
+    makeGround.wait.add(kind);
+    picWarm([fp]).then(() => {
+      makeGround.wait.delete(kind);
+      if (!pic(fp)) return;
+      if (G && G.stage.terrain === kind) G.ground = makeGround(kind);
+      if (kind === 'field') menuGround = makeGround('field');
+    });
+  }
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');
@@ -663,6 +849,8 @@ function makeGround(kind) {
   return ctx.createPattern(c, 'repeat');
 }
 
+makeGround.wait = new Set();
+
 const DARK = { cave: 0.55, house: 0.6, sea: 0.45, lava: 0.35,
   // 연's grounds under the earth or the sea (tools/yeon_grounds.py).
   y_raid_hell: 0.45, y_wolf: 0.55, y_hwatang: 0.4, y_cheolsang: 0.5, y_greatwall: 0.55, y_qin: 0.5, y_spidercave: 0.55, y_baekdu4: 0.5, y_geohae: 0.45, y_wreck: 0.45, y_reef: 0.35 };
@@ -764,25 +952,30 @@ function buildSelect() {
 
 /** A class's look as saved (gear and 코디), standing facing down: a data URL, or null without 연's heroes. */
 const lookPics = new Map();
+let lookChain = Promise.resolve();
 async function lookPicture(cls) {
   const H = M.yhero2 && M.yhero2[cls.id];
   if (!H) return null;
   const want = yGearVariants(cls, savedGear(cls) || {});
   const key = cls.id + JSON.stringify(want);
-  if (!lookPics.has(key)) lookPics.set(key, drawLook(cls, H, want));
+  // (one class after another: each look's sheets are 40 to 80 MB while its picture is made)
+  if (!lookPics.has(key)) lookPics.set(key, (lookChain = lookChain.then(() => drawLook(cls, H, want)).catch(() => null)));
   return lookPics.get(key);
 }
 async function drawLook(cls, H, want) {
-  const sheets = {};
-  for (const [kind, v] of Object.entries(want)) {
-    const meta = H.layers[kind] && H.layers[kind][v];
-    if (!meta) continue;
-    const path = 'yhero2/' + meta.file;
-    let im = images[path];
-    if (!im) im = await loadImage(path);
-    else if (!im.complete) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
-    if (im && im.width) sheets[kind] = { im: dyeImage(sinsuDressed(savedGear(cls) || {}, kind, im, path), meta), meta };
+  const sheets = {}, parts = heroLookParts(H, want);
+  await Promise.all(parts.map(x => layerEntry(x[2]).p));
+  try {
+    for (const [kind, meta, path] of parts) {
+      const e = layerBms.get(path), im = e && e.bm;
+      if (im && im.width) sheets[kind] = { im: dyeImage(sinsuDressed(savedGear(cls) || {}, kind, im, path), meta), meta };
+    }
+    return lookFrame(H, sheets);
+  } finally {
+    layerDone(parts.map(x => x[2]));
   }
+}
+function lookFrame(H, sheets) {
   if (!sheets.body) return null;
   const a = H.anims.idle_down || H.anims.walk_down;
   const box = frameBox(H, Object.values(sheets).map(x => x.meta));
@@ -1256,20 +1449,27 @@ function tdist(a, b) {
 }
 
 function startRun(cls, stage, training = false) {
-  const hero = M.heroes.find(h => h.id === cls.hero);
   const gear = savedGear(cls);
   const mons = stageMonsters(stage);
   occ.clear();
   crowd.clear();
+  // The screen before (the town, another run) is let go; this run's own pictures loaded.
+  const pics = runPics(cls, stage);
+  leaveScreen(cls, gear, [...pics, `yhunt/${stage.id}_`, 'prop/war_']);
+  portalSprites.clear(); // (the town's gate swirls, 30 MB: made again when the town opens)
+  if (!stage.war) War.release(true);
+  picWarm(pics);
+  heroWarm(cls, gear);
   // The run's own effects, loaded and decoded now (goHunt waits for them; a war's kits are warmed by war.js).
-  fxWarm(runFxIds(cls, stage));
+  // (수련장: each spell's as it is picked, trainPick — the whole kit at once was 50 MB)
+  if (!training) fxWarm(runFxIds(cls, stage));
   G = {
     cls, stage, ...mons, level: stage.level !== undefined ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
     player: {
       hp: Math.round(cls.hp * (1 + 0.1 * up('life'))), maxHp: Math.round(cls.hp * (1 + 0.1 * up('life'))), mp: cls.mp * 0.5, maxMp: cls.mp, speed: cls.speed, armor: cls.armor,
       face: 1, fdx: 0, fdy: 1, phase: 0, lvl: 1, xp: 0, next: xpFor(1), inv: 0,
-      img: images[`hero/${hero.id}.png`], hero: true, gear, av: hasAvatars() ? dressed(cls, gear) : null,
+      hero: true, gear,
       pose: null, poseT: 0, walkT: 0,
     },
     skills: [], passives: Object.fromEntries(Object.keys(PASSIVES).map(k => [k, 0])),
@@ -2397,6 +2597,8 @@ function taechoIcon(cls, sp) {
   w.width = box.cw;
   w.height = box.ch;
   drawLayers(w.getContext('2d'), H, sheets, a, 0, box);
+  // (the icon is kept; the sheets it was cut from, and their recoloured copies, are not)
+  for (const k of Object.keys(sheets)) { const lp = 'yhero2/' + sheets[k].meta.file; picDrop(lp); sheetForget(lp); }
   let bb;
   try {
     const d = w.getContext('2d').getImageData(0, 0, w.width, w.height).data;
@@ -2500,39 +2702,6 @@ function pieceIcon(cls, kind, t, spId) {
   return t >= 0 && hasAvatars() ? gearIcon(cls.id, kind, t) : null;
 }
 
-/**
- * Today's dress-room look of each worn piece, when the build has it: a crafted legendary piece at
- * its star (금린천화갑5성), the 용무기 at its step (용천제삼검). The rest wear their old look.
- */
-function wornLooks(cls, gear) {
-  const looks = {};
-  for (const kind of ['armor', 'weapon', 'shield', 'helmet', 'cape']) {
-    const id = gear[kind + 'Sp'], sp = id && SPECIAL[id];
-    const name = sp ? craftPicture(sp, cls.id, starOf(cls, 'sp:' + id))
-      : kind === 'weapon' && gear.weapon === dragonTier(cls) ? dragonName(cls.id, starOf(cls, `weapon:${gear.weapon}`)) : null;
-    if (name && hasLook(kind, name)) looks[kind] = name;
-  }
-  return looks;
-}
-
-/** A hero dressed in its gear, today's looks loaded on first wear (the old look until then). */
-function dressed(cls, gear) {
-  const looks = wornLooks(cls, gear);
-  loadLooks(looks, refreshAvatars);
-  return dress(cls.id, { ...gear, looks });
-}
-
-/** Dress again everyone on screen, once a look has loaded. */
-function refreshAvatars() {
-  if (!hasAvatars()) return;
-  if (G) {
-    G.player.av = dressed(G.cls, G.player.gear);
-    for (const m of G.party) if (m.gear) m.av = dressed(m.cls, m.gear);
-  }
-  if (T) T.av = dressed(T.cls, savedGear(T.cls));
-  if (!$('#equip').hidden) buildEquip();
-}
-
 function gearImage(g) {
   // The wardrobe's armor icon is a whole figure wearing it: on the ground that looked like a
   // stranger standing in the hunt. Armor lies there as an item, as the client showed drops.
@@ -2545,8 +2714,9 @@ function gearImage(g) {
     if (images[k] && images[k].complete && images[k].width) return images[k];
   }
   if (g.kind === 'armor' && M.items.armor) return images[`item/${M.items.armor.id}.png`];
+  // (the old wardrobe's icon of the piece, where 연 has none: loaded when first dropped)
   const path = hasAvatars() && gearIcon(gc ? gc.id : G.cls.id, g.kind, g.tier);
-  return path ? images[path.slice('assets/'.length)] : images[`item/${M.items.chest.id}.png`];
+  return (path && pic(path.slice('assets/'.length))) || images[`item/${M.items.chest.id}.png`];
 }
 
 function pickGear(g) {
@@ -2634,9 +2804,8 @@ function wear(kind, tier, sp = null) {
   saveJson('bs_progress', progress);
   if (G) {
     G.player.gear = { ...g };
-    if (hasAvatars()) G.player.av = dressed(cls, g);
     applyGear();
-  } else if (T && T.cls === cls && hasAvatars()) T.av = dressed(cls, g);
+  }
 }
 
 /** 이동속도 of a class as the equipment window shows it (in a hunt with its 민첩 too), and its 경공. */
@@ -2836,7 +3005,6 @@ function companionWearBest(cls) {
   for (const m of (G && G.party) || []) {
     if (m.cls !== cls || !m.own) continue;
     m.gear = savedGear(cls);
-    if (hasAvatars()) m.av = dressed(cls, m.gear);
   }
   return out;
 }
@@ -2876,25 +3044,6 @@ function buildEquip() {
     hb.textContent = '헤어·얼굴 바꾸기 (코디)';
     hb.onclick = () => openCoordi('hair');
     box.append(hb);
-  } else if (hasAvatars()) {
-    // 머리 모양: any of the wardrobe's hair, kept per class, as the 미용실 did.
-    const h = document.createElement('h4');
-    h.textContent = '머리';
-    box.append(h);
-    const row = document.createElement('div');
-    row.className = 'equip-row';
-    const now = g.head || GEAR[cls.id].head;
-    heads().forEach((hd, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'equip' + (hd.name === now ? ' on' : '');
-      btn.innerHTML = `<img src="${hd.icon}" alt=""><span>${hd.name === GEAR[cls.id].head ? '기본' : `모양 ${i + 1}`}</span>`;
-      btn.onclick = () => {
-        wear('head', hd.name);
-        buildEquip();
-      };
-      row.append(btn);
-    });
-    box.append(row);
   }
   for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패'], ['helmet', '투구'], ['cape', '망토']]) {
     if (kind === 'shield' && !hasShield(cls.id)) continue; // 연's 궁사, 무사 ... carry none
@@ -3502,7 +3651,7 @@ function openCraft(sink = null) {
         saveJson('bs_progress', progress);
         if ($('#town-gold')) $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
         if (G) applyGear();
-        refreshAvatars();
+        if (!$('#equip').hidden) buildEquip();
       });
       sink.push(ent);
       icon = null;
@@ -3524,7 +3673,7 @@ function openCraft(sink = null) {
       saveJson('bs_progress', progress);
       if ($('#town-gold')) $('#town-gold').innerHTML = walletHTML(progress.gold, progress.coins);
       if (G) applyGear();
-      refreshAvatars();
+      if (!$('#equip').hidden) buildEquip();
       openCraft();
     };
     r.append(btn);
@@ -4111,8 +4260,16 @@ $('#close-tree').onclick = () => { $('#tree').hidden = true; };
 /** A class's figure in the gear it has found, for the menus. */
 function heroPicture(cls) {
   if (M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].portrait) return `assets/yhero2/${M.yhero2[cls.id].portrait}`;
-  if (!hasAvatars()) return `assets/hero/${cls.hero}.png`;
-  return portrait(dressed(cls, savedGear(cls)));
+  // (a class with no portrait of its own: nothing until its look is drawn from 연's layers, heroPic)
+  return M.yhero2 && M.yhero2[cls.id] ? BLANK_PIC : `assets/hero/${cls.hero}.png`;
+}
+const BLANK_PIC = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+/** Puts a class's figure in an <img>: its portrait at once, its look as worn (연's layers) once drawn. */
+function heroPic(el, cls) {
+  if (!el) return;
+  el.dataset.cls = cls.id;
+  if (!el.getAttribute('src') || el.dataset.look !== cls.id) el.src = heroPicture(cls);
+  lookPicture(cls).then(url => { if (url && el.dataset.cls === cls.id) { el.src = url; el.dataset.look = cls.id; } });
 }
 
 /** The hero calls out a spell, as players typed it: a bubble over the head. */
@@ -4700,8 +4857,8 @@ function bossSay(kind) {
   g.clearRect(0, 0, c.width, c.height);
   if (G.boss.beast) {
     // A 괴수: the top of its front-facing walk frame.
-    const d = M.beast[G.boss.beast], bi = images[`beast/${G.boss.beast}.png`], side = Math.min(d.cell[0], d.cell[1]);
-    g.drawImage(bi, (d.cell[0] - side) / 2, 0, side, side, 0, 0, c.width, c.height);
+    const d = M.beast[G.boss.beast], bi = pic(`beast/${G.boss.beast}.png`), side = Math.min(d.cell[0], d.cell[1]);
+    if (bi) g.drawImage(bi, (d.cell[0] - side) / 2, 0, side, side, 0, 0, c.width, c.height);
   } else {
     const side = Math.min(im.width, im.height);
     g.drawImage(im, (im.width - side) / 2, 0, side, side, 0, 0, c.width, c.height);
@@ -6809,7 +6966,7 @@ function fxOn(id, b, o = {}) {
   const f = M.fx[id];
   if (!f) return 0.3;
   const tall = f.h > f.w * 1.4;
-  const h = b.m ? b.m.h * b.scale : b.img.height;
+  const h = b.m ? b.m.h * b.scale : HERO_H;
   return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...o });
 }
 
@@ -7501,7 +7658,7 @@ function cast(skill, st) {
           hp: 1, flash: 0, mdx: 0, mdy: 1 };
         // From 3단 the call brings one of the client's 괴수 (the dress room's 괴수의상), stronger by 단.
         const bk = def.beasts && def.beasts[skill.lv - 1];
-        if (bk && M.beast && M.beast[bk] && images[`beast/${bk}.png`]) {
+        if (bk && M.beast && M.beast[bk] && pic(`beast/${bk}.png`)) {
           a.beast = bk;
           a.dmg = st.dmg * 1.3;
           if (i === 0) say(`${josa(M.beast[bk].name, '이', '가')} 나타났습니다!`, 'party');
@@ -9886,7 +10043,7 @@ function portalSprite(tint, size, upright) {
   if (c) return c;
   const f = M.fx[PORTAL_FX], im0 = f && fxPic(PORTAL_FX);
   if (!f || !im0 || !im0.complete || !im0.width) return null;
-  const im = tint ? tinted(im0, tint) : im0;
+  const im = tint ? tinted(im0, tint) : bmSrc(im0);
   const R = 2, top = upright ? size * 0.95 : size * 0.3, W = Math.ceil(size * R), H = Math.ceil((top + size * 0.3) * R);
   c = document.createElement('canvas');
   c.width = W * PORTAL_COLS;
@@ -9919,6 +10076,8 @@ function portalSprite(tint, size, upright) {
   c.fw = W;
   c.fh = H;
   c.top = top;
+  // (the sheet's tinted copy, 5 MB a colour, was only for this)
+  if (tint && tintCache.get(im0)) tintCache.get(im0).delete(tint);
   portalSprites.set(key, c);
   return c;
 }
@@ -10159,8 +10318,14 @@ function goArea(area, x, y, fdy) {
 
 function enterTown(cls) {
   chosenClass = cls;
-  // Out of a run: its effect sheets are let go (the next run loads its own).
+  // Out of a run: its effect sheets are let go (the next run loads its own), and its pictures
+  // (the ground, its monsters, the war's field and fighters); the town's own are loaded.
   fxKeep([]);
+  leaveScreen(cls, savedGear(cls), ['ytown/']);
+  War.release();
+  Hunt.release();
+  picWarm(townPics('market'));
+  heroWarm(cls, savedGear(cls));
   if (!M.ui.town && !M.ui.ytown) {
     showScreen('stages');
     return;
@@ -10168,7 +10333,7 @@ function enterTown(cls) {
   const gear = savedGear(cls);
   const yt = M.ui.ytown;
   const sp = yt ? townSpawn() : [7.5 * TOWN_TILE, 5 * TOWN_TILE - 6];
-  T = { cls, av: hasAvatars() ? dressed(cls, gear) : null, x: sp[0], y: sp[1], fdx: 0, fdy: yt ? -1 : 1, moving: false,
+  T = { cls, x: sp[0], y: sp[1], fdx: 0, fdy: yt ? -1 : 1, moving: false,
     walkT: 0, near: null, area: 'market' };
   T.folk = townFolk('market');
   T.walkers = yt ? makeWalkers() : [];
@@ -10275,7 +10440,7 @@ const DOOR_TINT = 'hue-rotate(185deg) saturate(1.3)';
 const PLATE_UP = 94; // every gate's name plate at one height over the row (above the statue's head)
 function drawWayOut(pt, now) {
   if (pt.art === 'statue') {
-    const im = images['ytown/statue.png'];
+    const im = pic('ytown/statue.png');
     const fy = pt.y - 12;
     if (im && im.width) {
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -10318,7 +10483,7 @@ function townMinimapRect() {
   return { x: canvas.width - w - 10 * d, y: 34 * d, w, h, d };
 }
 function drawTownMinimap() {
-  const a = townArea(), r = townMinimapRect(), im = a && images[`ytown/mm_${T.area}.png`];
+  const a = townArea(), r = townMinimapRect(), im = a && pic(`ytown/mm_${T.area}.png`);
   if (!r || !im || !im.width) return;
   const yt = M.ui.ytown, { x, y, w, h, d } = r, sx = w / a.w, sy = h / a.h;
   ctx.save();
@@ -10359,7 +10524,7 @@ function drawTownMinimap() {
 
 function drawTown(now) {
   const yt = M.ui.ytown, area = townArea();
-  const map = images[yt ? `ytown/${T.area}.png` : 'ui/town.png'];
+  const map = pic(yt ? `ytown/${T.area}.png` : 'ui/town.png');
   const mw = yt ? area.w : M.ui.town.w, mh = yt ? area.h : M.ui.town.h;
   let camX = Math.round(T.x - VW / 2), camY = Math.round(T.y - 30 - VH / 2);
   camX = VW >= mw ? Math.round((mw - VW) / 2) : Math.max(0, Math.min(mw - VW, camX));
@@ -10411,12 +10576,11 @@ function drawTown(now) {
     }
     if (b.hero) {
       // In town too, the hero in 연's own figure, in the gear it has on.
-      if (drawYhero2(T.cls, savedGear(T.cls), T, T.x, T.y, T.moving ? 'walk' : 'idle', 1)) continue;
-      if (T.av) drawAvatar(ctx, T.av, T.x, T.y, facing(T.fdx, T.fdy), T.moving ? 'walk' : 'idle', Math.floor(T.walkT / WALK_MS));
+      drawYhero2(T.cls, savedGear(T.cls), T, T.x, T.y, T.moving ? 'walk' : 'idle', 1);
       continue;
     }
     const n = b.n;
-    const f = yt && n.look && yt.folk[n.look], fim = f && images[`ytown/${n.look}.png`];
+    const f = yt && n.look && yt.folk[n.look], fim = f && pic(`ytown/${n.look}.png`);
     if (fim && fim.width) {
       // 연's NPC, its idle frames in turn, standing on its feet; a soft round shadow under it.
       const [cw, ch] = f.cell, [fx, fy] = f.foot, i = Math.floor(now * 1000 / f.ms) % f.n;
@@ -10594,12 +10758,29 @@ function trainReset(replace = true) {
   }
 }
 
+// 수련장 can cast every spell of the class: the sheets of the last few tried are kept (TRAIN_FX_KEEP),
+// the older let go (they load again if the spell is picked again), and the 필살기's after it is over.
+const TRAIN_FX_KEEP = 6;
+function trainFx(id) {
+  const tr = G.training;
+  tr.recent = (tr.recent || []).filter(x => x !== id);
+  if (id) tr.recent.push(id);
+  if (tr.recent.length > TRAIN_FX_KEEP) tr.recent.shift();
+  const keep = new Set();
+  for (const k of tr.recent) skillFxIds(k, keep);
+  fxRefs(MELEE_LOOK[G.cls.id], keep);
+  if (G.ultAt !== undefined && G.t - G.ultAt < 6) { try { fxRefs(ultTier(G.cls.id), keep); fxRefs(ultLook(G.cls.id), keep); } catch (e) { /* no tier */ } }
+  for (const f of G.fxs) if (f.id) keep.add(f.id);
+  fxKeep(keep);
+  if (id) fxWarm(skillFxIds(id));
+}
 /** Picks the spell to try (and its 단): it alone in the hero's hands, cast at once. */
 function trainPick(id, lv) {
   const tr = G.training, d = SKILLS[id];
   if (!d) return;
   tr.id = id;
   if (lv) tr.lv = lv;
+  trainFx(id);
   Hunt.trainTried(G.cls.id, id); // 사냥 기믹 (P1-10): the preset for the next hunt's first card
   const level = d.evolved ? 1 : Math.max(1, Math.min(MAX_SKILL_LEVEL, tr.lv));
   G.skills = [{ id, lv: level, timer: 0 }];
@@ -10756,9 +10937,17 @@ function trainGyeokLine() {
 }
 $('#train-ult').onclick = () => {
   if (!G || !G.training) return;
-  G.player.mp = G.player.maxMp;
-  G.ultAt = undefined;
-  castUlt();
+  const run = G, out = new Set();
+  try { fxRefs(ultTier(G.cls.id), out); fxRefs(ultLook(G.cls.id), out); } catch (e) { /* no tier */ }
+  // Its pictures first (a second at most), so the first one is seen too.
+  fxWarm(out, 1000).then(() => {
+    if (G !== run || !G.training) return;
+    G.player.mp = G.player.maxMp;
+    G.ultAt = undefined;
+    castUlt();
+    // (its sheets are let go once it is over)
+    setTimeout(() => { if (G === run && G.training && G.t - (G.ultAt || 0) >= 6) trainFx(null); }, 7500);
+  });
 };
 $('#train-close').onclick = () => { if (G && G.training) leaveTraining(); };
 
@@ -11329,7 +11518,7 @@ function joinParty(cls) {
   const gear = savedGear(cls);
   const slot = G.party.length;
   const m = {
-    cls, name, lv: 1, cl: 1, xp: 0, gear, own, promo, baseLv: own ? Math.min(6, 1 + Math.floor(promo / 2)) : 0, av: hasAvatars() ? dressed(cls, gear) : null, img: images[`hero/${cls.hero}.png`],
+    cls, name, lv: 1, cl: 1, xp: 0, gear, own, promo, baseLv: own ? Math.min(6, 1 + Math.floor(promo / 2)) : 0,
     // Walks in from the edge of the view, as another player would.
     x: p.x + (slot % 2 ? 1 : -1) * 220, y: p.y + 30, fdx: 0, fdy: 1, moving: false, walkT: 0, pose: null, poseT: 0,
     cd: { a: 1, b: 3, c: 6, d: 9, r: 0, e: 5, g: 0 }, bubble: null, slot, hp: 1, maxHp: 1, down: 0, flash: 0,
@@ -11631,17 +11820,19 @@ function updateStyle(dt) {}
  * to its next cast sweeping round it, its 단 in the corner. Bottom left, above the chat. */
 const iconCache = {};
 function skillIconImage(id) {
-  if (iconCache[id] !== undefined) return iconCache[id];
-  const def = SKILLS[id];
-  if (M.skillicon && M.skillicon.includes(id)) {
-    const im = new Image();
-    im.src = `assets/skillicon/${id}.png`;
-    return (iconCache[id] = im);
+  let path = iconCache[id];
+  if (path === undefined) {
+    const def = SKILLS[id], fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
+    if (M.skillicon && M.skillicon.includes(id)) path = `skillicon/${id}.png`;
+    // A plain weapon strike (이중공격) has no spell picture: its slot shows the weapon itself.
+    else if (!fx && def.kind === 'slash') path = 'weapon';
+    // (hit sparks, the level-up burst and the like have no icon of their own)
+    else path = !fx || !M.fx[fx] || /^(new_|h_|g_)/.test(fx) ? null : `icon/${fx}.png`;
+    iconCache[id] = path;
   }
-  const fx = def.fxs ? def.fxs[def.fxs.length - 1] : def.fx;
-  // A plain weapon strike (이중공격) has no spell picture: its slot shows the weapon itself.
-  if (!fx && def.kind === 'slash') return G ? (iconCache[id] = gearImage({ kind: 'weapon', tier: 1 }) || null) : null;
-  return (iconCache[id] = fx ? images[`icon/${fx}.png`] || null : null);
+  if (path === 'weapon') return G ? gearImage({ kind: 'weapon', tier: 1 }) || null : null;
+  // (each loaded when its spell is first in hand, and let go with the run: leaveScreen)
+  return path ? pic(path) : null;
 }
 /**
  * The spells' bar (2차 피드백: three rows of big slots hid too much of the field). 연: two rows of
@@ -12558,18 +12749,14 @@ function partyAct(m) {
 }
 
 function drawParty(m) {
-  const dir = facing(m.fdx, m.fdy);
   const alpha = m.down ? 0.4 : m.hidden > G.t ? 0.35 : 1, y = m.down ? m.y - 4 - Math.sin(G.t * 2) * 3 : m.y;
   const mPose = m.down ? 'dead' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
   if ((m.cls.id && drawYhero2(m.cls, m.gear, m, m.x, y, mPose, alpha)) || drawYhero(m.cls.id || m.cls, m.gear ? m.gear.armor : 0, m, m.x, y, mPose, alpha)) {
-    // drawn in 연's own figure
-  } else if (m.av) {
-    const pose = m.down ? 'idle' : m.poseT > 0 ? m.pose : m.moving ? 'walk' : 'idle';
-    drawAvatar(ctx, m.av, m.x, y, dir, pose, Math.floor(m.walkT / WALK_MS), alpha);
-  } else drawWalker(m.img, m.x, y, m.fdx < 0 ? -1 : 1, m.walkT / 100, m.moving, m.flash, 1, alpha);
+    // drawn in 연's own figure (nothing for the moment its layers are still loading)
+  }
   if (!m.down) {
     // A small bar over the head, as the client showed for a party.
-    const top = m.y - (m.av ? m.av.top : 50) - 4, k = m.hp / m.maxHp;
+    const top = m.y - HERO_TOP - 4, k = m.hp / m.maxHp;
     ctx.fillStyle = '#1e4a10';
     ctx.fillRect(Math.round(m.x - 12), Math.round(top), 24, 2);
     ctx.fillStyle = k > 0.5 ? '#4ad82a' : k > 0.25 ? '#e8d020' : '#e83a1a';
@@ -13031,13 +13218,6 @@ function skillIcon(id, fx) {
   return im;
 }
 
-function heroIcon() {
-  const im = document.createElement('img');
-  im.src = `assets/hero/${G.cls.hero}.png`;
-  im.className = 'item';
-  return im;
-}
-
 function itemIcon(role) {
   const im = document.createElement('img');
   im.src = `assets/item/${M.items[role].id}.png`;
@@ -13205,7 +13385,7 @@ function promoCeremony(list) {
   const fx = document.createElement('div');
   fx.id = 'promo-fx';
   fx.className = 'ffx ffx-live ok res' + (calm ? ' calm' : '');
-  fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card pc-card"><div class="ffx-ico"><img src="assets/hero/${cls.hero}.png" alt=""></div>`
+  fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card pc-card"><div class="ffx-ico"><img class="pc-hero" src="${heroPicture(cls)}" alt=""></div>`
     + `<b class="pc-n">${top.n}차 승급${title}</b><div class="ffx-name">${cls.name} · 승급 효과 피해 +${Math.round(PROMO_BONUS.dmg * 100 * top.n)}% · 체력 +${PROMO_BONUS.hp * top.n}</div>`
     + (icons ? `<div class="pc-sks">${icons}</div>` : '')
     + `<div class="ffx-msg">필살기: ${ult.name}</div><small class="pc-tap">눌러서 닫기</small></div>`;
@@ -13654,7 +13834,7 @@ function white(img) {
     c.width = img.width;
     c.height = img.height;
     const g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
+    g.drawImage(bmSrc(img), 0, 0);
     g.globalCompositeOperation = 'source-in';
     g.fillStyle = '#fff';
     g.fillRect(0, 0, c.width, c.height);
@@ -13701,7 +13881,8 @@ const SNAKES = new Set(['1016', '1018', '1019', '1020', '1021', '5015', '5016', 
 /** A monster as it moves: turned (top-down kinds), or leaning (upright kinds). */
 /** A summoned 괴수: its own four ways, walking or striking, from the dress-room sheet. */
 function drawBeast(b, alpha, ox = 0, oy = 0, k = 0.62) {
-  const d = M.beast[b.beast], im = images[`beast/${b.beast}.png`];
+  const d = M.beast[b.beast], im = pic(`beast/${b.beast}.png`);
+  if (!im) return;
   const [cw, ch] = d.cell;
   const row = b.mdy > 0 ? 0 : b.mdx > 0 ? 1 : b.mdy < 0 ? 2 : b.mdx < 0 ? 3 : 0;
   const struck = b.lunge > 0 ? G.t : b.hitT;
@@ -13729,7 +13910,7 @@ function tinted(img, filter) {
     c.height = img.height;
     const g = c.getContext('2d');
     g.filter = filter;
-    g.drawImage(img, 0, 0);
+    g.drawImage(bmSrc(img), 0, 0);
     byImg.set(filter, c);
   }
   return c;
@@ -13899,13 +14080,171 @@ function yGearVariants(cls, gear) {
   return costumeVariants(H, gear.cos, out);
 }
 
-/** Draws a hero from 연's layers in the frame's own order; false when the class has none. */
-function drawYhero2(cls, gear, b, x, y, pose, alpha) {
-  const H = M.yhero2 && M.yhero2[cls.id];
-  if (!H) return false;
-  const want = b.yv && b.yvGear === gear && b.yvCos === costumeVersion() ? b.yv
-    : (b.yvGear = gear, b.yvCos = costumeVersion(), b.yv = yGearVariants(cls, gear || {}));
-  const sheets = {};
+// ---- a hero's look: its frames made once from 연's layer sheets, the sheets then let go
+// A hero's layers are sheets of 4 to 10 MB decoded each, five to nine a look (the 도깨비's and the
+// 천인's 190-pixel cells; a 사신수 piece 30 MB): kept, as they were (an <img> each, for good), one
+// class's look held 40 to 80 MB, the town's passers-by 130 MB more, and every class tried added its
+// own (수련장 through three classes killed a phone's renderer). A look has forty frames (HERO_FRAMES):
+// they are composed once (the one asked for at once, the rest a little a frame, heroLooksTick) into
+// small pictures, and the sheets are closed (layerDrop) as soon as no look still being made needs
+// them. A look not drawn for a while is let go with its frames (heroLooksSweep, heroLooksRelease).
+const layerBms = new Map(); // 'yhero2/<file>' -> { bm, p, failed, at }
+/** A sheet decoded off the main thread into a bitmap of its own (closed when done with). */
+function decodeSheet(path) {
+  if (window.createImageBitmap && window.fetch) {
+    return fetch('assets/' + path).then(r => (r.ok ? r.blob() : null)).then(bl => (bl ? createImageBitmap(bl) : null)).catch(() => null);
+  }
+  return new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = 'assets/' + path; });
+}
+function layerEntry(path) {
+  let e = layerBms.get(path);
+  if (!e) {
+    e = { bm: null, failed: false, at: 0, p: null };
+    layerBms.set(path, e);
+    e.p = decodeSheet(path).then(bm => {
+      if (layerBms.get(path) !== e) { if (bm && bm.close) bm.close(); return null; }
+      e.bm = bm;
+      e.failed = !bm;
+      return bm;
+    });
+  }
+  return e;
+}
+function layerDrop(path) {
+  const e = layerBms.get(path);
+  if (!e) return;
+  layerBms.delete(path);
+  if (e.bm && e.bm.close) e.bm.close();
+  sheetForget(path);
+}
+/** What was made from a sheet (its recoloured, laid-over and dyed copies, each as big as the sheet). */
+function sheetForget(path) {
+  for (const k of dressSheets.keys()) if (k.startsWith(path + '|')) dressSheets.delete(k);
+  for (const k of classicSheets.keys()) if (k.startsWith(path + '|')) classicSheets.delete(k);
+  dropDyed(path.replace(/^yhero2\//, ''));
+}
+/** The sheets no look still being made needs are closed (one asked for a moment ago is kept: a warm). */
+function layerSweep(force, keep) {
+  const need = new Set(keep || []), now = performance.now();
+  for (const L of heroLooks.values()) if (!L.done) for (const [, , path] of L.parts) need.add(path);
+  for (const [path, e] of layerBms) if (!need.has(path) && (force || now - e.at > 4000)) layerDrop(path);
+}
+/** These sheets are done with (a card's picture made): closed unless a look being made needs them. */
+function layerDone(paths) {
+  const need = new Set();
+  for (const L of heroLooks.values()) if (!L.done) for (const [, , path] of L.parts) need.add(path);
+  for (const path of paths) if (!need.has(path)) layerDrop(path);
+}
+
+const heroLooks = new Map(); // look key -> { cls, H, want, gear, dz, cl, parts, frames, pts, box, ready, done, used, mine }
+const HERO_FRAME_MS = 2;
+let heroLoading = 0;
+function heroLookParts(H, want) {
+  const parts = [];
+  for (const [kind, v] of Object.entries(want)) {
+    const meta = H.layers[kind] && H.layers[kind][v];
+    if (meta) parts.push([kind, meta, 'yhero2/' + meta.file]);
+  }
+  return parts;
+}
+/** The look's sheets as they are drawn (dressed, dyed), or null while its body or head is not in.
+ *  L.ready once every layer is in (or missing for good). */
+function heroLookSheets(L) {
+  const { H, gear, dz, cls } = L, sheets = {};
+  let all = true;
+  for (const [kind, meta, path] of L.parts) {
+    const e = layerEntry(path), im = e.bm;
+    if (!im) {
+      if (!e.failed) all = false;
+      // Body and head first: without them nothing is drawn; a piece still loading waits.
+      if (kind === 'body' || kind === 'head') {
+        // (the build lacks it: the look is given up, so it does not hold a place among the looks loading)
+        if (e.failed && !L.done) { L.done = true; if (L.asked) heroLoading--; }
+        return null;
+      }
+      continue;
+    }
+    // 태초 of the first four: old 바람's picture laid where 연's weapon is held (classicSheet).
+    const cl = dz && kind === 'weapon' && L.cl;
+    const src = cl ? classicSheet(im, path, cl, H, meta) : null;
+    if (cl && !src) {
+      // (still loading; a picture the build lacks is not waited for)
+      const gp = images[`gear/${M.gear[cl].id}.png`];
+      if (!(gp && gp.complete && !gp.naturalWidth)) all = false;
+      continue;
+    }
+    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal, dz.water && waterRows(H, meta)) : dyeImage(armorDressed(gear, kind, im, path), meta), meta };
+  }
+  if (all && !L.ready) {
+    L.ready = true;
+    // (the frames made while a piece was still loading are made again with it)
+    for (const pic of L.frames.values()) if (pic.close) pic.close();
+    L.frames.clear();
+    L.pts.clear();
+  }
+  L.box = frameBox(H, Object.values(sheets).map(x => x.meta));
+  return sheets;
+}
+function heroFrameMake(L, sheets, a, f) {
+  const fk = a.row * 64 + f, c = document.createElement('canvas');
+  c.width = L.box.cw;
+  c.height = L.box.ch;
+  if (L.dz && sheets.weapon) L.pts.set(fk, dressFrame(c, L.H, sheets, a, f, L.box, L.dz));
+  drawLayers(c.getContext('2d'), L.H, sheets, a, f, L.box);
+  L.frames.set(fk, c);
+  if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (L.frames.get(fk) === c) L.frames.set(fk, bm); else bm.close(); }).catch(() => {});
+  return c;
+}
+function heroLookDrop(key) {
+  const L = heroLooks.get(key);
+  if (!L) return;
+  heroLooks.delete(key);
+  L.gone = true;
+  if (!L.done && L.asked) heroLoading--;
+  for (const pic of L.frames.values()) if (pic.close) pic.close();
+  L.frames.clear();
+}
+/** Once a drawn frame: the looks whose sheets are in get the rest of their frames, a little at a
+ *  time (the hero's own first), and their sheets are then closed. */
+function heroLooksTick() {
+  if (!heroLooks.size) return;
+  const t0 = performance.now();
+  let swept = false;
+  for (const mine of [true, false]) for (const L of heroLooks.values()) {
+    if (L.done || !L.ready || !!L.mine !== mine) continue;
+    const sheets = heroLookSheets(L);
+    if (!sheets) continue;
+    let left = false;
+    for (const a of L.anims) {
+      for (let f = 0; f < a.n; f++) {
+        if (L.frames.has(a.row * 64 + f)) continue;
+        if (performance.now() - t0 > HERO_FRAME_MS) { left = true; break; }
+        heroFrameMake(L, sheets, a, f);
+      }
+      if (left) break;
+    }
+    if (left) return;
+    L.done = true;
+    if (L.asked) heroLoading--;
+    swept = true;
+  }
+  if (swept) layerSweep(false);
+  else if (layerBms.size && !heroLoading) layerSweep(false);
+}
+/** The looks not drawn for a while are let go (a walker left behind, the gear worn before). */
+function heroLooksSweep(now) {
+  for (const [key, L] of heroLooks) if (now - L.used > (L.mine ? 20 : 8)) heroLookDrop(key);
+}
+/** A screen left: everyone's looks but the hero's own are let go at once, and every sheet. */
+function heroLooksRelease(cls, gear) {
+  for (const [key, L] of heroLooks) if (!L.mine || bitmapClock - L.used > 1) heroLookDrop(key);
+  const H = cls && M.yhero2 && M.yhero2[cls.id];
+  layerSweep(true, H ? heroLookParts(H, yGearVariants(cls, gear || {})).map(x => x[2]) : null);
+  dressSheets.clear();
+  classicSheets.clear();
+}
+/** The look a body wears now (made when first seen). */
+function heroLookOf(cls, H, gear, b, want) {
   // An abyss weapon worn: its layers dressed in black, blood and fire (by its rarity).
   let dz = !window.__noDress && gear && gear.weaponSp && SPECIAL[gear.weaponSp] && SPECIAL[gear.weaponSp].dress;
   // The 용무기 제십 after its 천상 각성 (선계의 기운): 선계's light (items.js HEAVEN_DRESS).
@@ -13922,21 +14261,31 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
     if (!spearDress.has(dz)) spearDress.set(dz, { ...dz, flames: Math.min(dz.flames, 2), fsc: dz.fsc * 0.6, glow: dz.glow * 0.7 });
     dz = spearDress.get(dz);
   }
-  for (const [kind, v] of Object.entries(want)) {
-    const meta = H.layers[kind][v], path = 'yhero2/' + meta.file;
-    if (!(path in images)) loadImage(path);
-    const im = images[path];
-    if (!im || !im.complete || !im.width) {
-      // Body and head first: without them the old sheet is drawn; a piece still loading waits.
-      if (kind === 'body' || kind === 'head') return false;
-      continue;
-    }
-    // 태초 of the first four: old 바람's picture laid where 연's weapon is held (classicSheet).
-    const cl = dz && kind === 'weapon' && classicOf(cls, gear);
-    const src = cl ? classicSheet(im, path, cl, H, meta) : null;
-    if (cl && !src) continue;
-    sheets[kind] = { im: dz && (kind === 'weapon' || kind === 'wback') ? dressedSheet(src || im, src ? path + '|' + cl : path, cl ? dz.classicTint : dz.tint, dz.pal, dz.water && waterRows(H, meta)) : dyeImage(armorDressed(gear, kind, im, path), meta), meta };
+  // (The worn looks' part of the key made once per look, not each frame: the town's walkers too.)
+  if (b.yvKeyOf !== want || b.yvKeyCls !== cls.id) { b.yvKeyOf = want; b.yvKeyCls = cls.id; b.yvKey = cls.id + JSON.stringify(want); }
+  const cl = dz ? classicOf(cls, gear) : null;
+  const key = b.yvKey + (dz ? '|d' + dz.tint + (dz.pal || '') + (cl ? '|' + cl : '') : '')
+    + (gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress ? '|a' + gear.armorSp + (gear.cos && gear.cos.armor && gear.cos.armor !== 'hide' ? 'c' : '') : '');
+  let L = heroLooks.get(key);
+  if (!L) {
+    L = { key, cls, H, want, gear, dz: dz || null, cl, parts: heroLookParts(H, want), frames: new Map(), pts: new Map(), box: null,
+      anims: Object.values(H.anims), ready: false, done: false, asked: false, used: bitmapClock, mine: false };
+    heroLooks.set(key, L);
   }
+  return L;
+}
+/** Draws a hero from 연's layers in the frame's own order; false when the class has none (or its
+ *  body is not in yet and it has shown nothing before). */
+function drawYhero2(cls, gear, b, x, y, pose, alpha) {
+  const H = M.yhero2 && M.yhero2[cls.id];
+  if (!H) return false;
+  let L = b.yvLook;
+  if (!L || L.gone || b.yvGear !== gear || b.yvCos !== costumeVersion() || b.yvCls !== cls.id) {
+    const want = (b.yvGear = gear, b.yvCos = costumeVersion(), b.yvCls = cls.id, b.yv = yGearVariants(cls, gear || {}));
+    L = b.yvLook = heroLookOf(cls, H, gear, b, want);
+  }
+  L.used = bitmapClock;
+  if (b.hero || b === T) L.mine = true;
   const fdx = b.fdx || 0, fdy = b.fdy === undefined ? 1 : b.fdy;
   const dir = fdx ? 'side' : fdy < 0 ? 'up' : 'down';
   // 'magic' (strikePose: a spell, a 기원, the casters' plain blow) is 연's cast clip; it fell to
@@ -13948,9 +14297,24 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   let f = 0;
   if (name === 'walk') f = Math.floor((b.walkT || 0) / a.ms) % a.n;
   else if (name === 'atk' || name === 'cast') f = Math.min(a.n - 1, Math.floor((1 - Math.max(0, b.poseT) / (name === 'atk' ? 0.22 : 0.3)) * a.n));
-  // The class's cell, grown where a 코디 reaches past it (wings, tall hats).
-  const box = frameBox(H, Object.values(sheets).map(s => s.meta));
-  const { cw, ch, fx, fy } = box, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
+  // The layers composited once per frame and kept: six draws from big sheets each frame (연's
+  // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
+  const fk = a.row * 64 + f;
+  let pic = L.frames.get(fk), S = L;
+  if (!pic && !L.done) {
+    // (the passers-by and companions one look at a time: a look's sheets are 40 to 80 MB while its frames are made)
+    if (!L.asked && (L.mine || heroLoading < 1)) { L.asked = true; heroLoading++; }
+    const sheets = L.asked ? heroLookSheets(L) : null;
+    if (sheets) pic = heroFrameMake(L, sheets, a, f);
+  }
+  if (!pic) {
+    // Its new look still loading (a piece just put on): the look it showed last, until then.
+    S = b.yvShown;
+    pic = S && !S.gone && S !== L ? S.frames.get(fk) || S.frames.values().next().value : null;
+    if (!pic) return false;
+    S.used = bitmapClock;
+  } else if (L.ready) b.yvShown = L;
+  const { fx, fy } = S.box, mirror = name !== 'dead' && dir === 'side' && fdx > 0;
   ctx.save();
   ctx.globalAlpha = 0.3 * alpha;
   ctx.fillStyle = '#000';
@@ -13958,31 +14322,22 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   ctx.ellipse(Math.round(x), Math.round(y - 1), 10, 3.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = alpha;
-  // The layers composited once per frame and kept: six draws from big sheets each frame (연's
-  // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
-  // (The worn looks' part of the key made once per look, not each frame: the town's walkers too.)
-  if (b.yvKeyOf !== want || b.yvKeyCls !== cls.id) { b.yvKeyOf = want; b.yvKeyCls = cls.id; b.yvKey = cls.id + JSON.stringify(want); }
-  const key = b.yvKey + '|' + a.row + '|' + f + (Object.keys(sheets).length === Object.keys(want).length ? '' : '~')
-    + (dz ? '|d' + dz.tint + (dz.pal || '') : '') + (gear && gear.armorSp && SPECIAL[gear.armorSp] && SPECIAL[gear.armorSp].dress ? '|a' + gear.armorSp : '');
-  let pic = heroFrames.get(key);
-  if (!pic) {
-    const c = document.createElement('canvas');
-    c.width = cw;
-    c.height = ch;
-    if (dz && sheets.weapon) dressFrame(c, H, sheets, a, f, box, dz, key);
-    drawLayers(c.getContext('2d'), H, sheets, a, f, box);
-    if (heroFrames.size > 300) heroFrames.delete(heroFrames.keys().next().value);
-    heroFrames.set(key, pic = c);
-    if (window.createImageBitmap) createImageBitmap(c).then(bm => { if (heroFrames.get(key) === c) heroFrames.set(key, bm); }).catch(() => {});
-  }
   ctx.translate(Math.round(x), Math.round(y));
   if (mirror) ctx.scale(-1, 1);
   ctx.drawImage(pic, -fx, -fy);
-  if (dz) drawBladeFlames(bladePts.get(key), -fx, -fy, dz);
+  if (S.dz) drawBladeFlames(S.pts.get(fk), -fx, -fy, S.dz);
   ctx.restore();
   return true;
 }
-const heroFrames = new Map();
+/** A look's sheets asked for ahead (a screen about to show the hero): settles when they are in. */
+function heroWarm(cls, gear) {
+  const H = M.yhero2 && M.yhero2[cls.id];
+  if (!H) return Promise.resolve();
+  const want = yGearVariants(cls, gear || {}), wk = JSON.stringify(want);
+  // (its frames made already: no sheet is needed)
+  for (const L of heroLooks.values()) if (L.done && L.cls === cls && L.frames.size && JSON.stringify(L.want) === wk) return Promise.resolve();
+  return Promise.all(heroLookParts(H, want).map(([, , path]) => { const e = layerEntry(path); e.at = performance.now(); return e.p; }));
+}
 
 // ---- the abyss weapons' dress (items.js ABYSS_DRESS): 연's weapon, the game's colours over it.
 // The weapon layer's sheet recoloured once (black, blood red, ember edges where it was brightest),
@@ -14182,10 +14537,9 @@ function dressedSheet(im, path, t, pal, swing) {
   dressSheets.set(k, c);
   return c;
 }
-const bladePts = new Map();
 // (the dress of the 창술사's long spear, by its family's: drawYhero2)
 const spearDress = new Map();
-function dressFrame(c, H, sheets, a, f, box, dz, key) {
+function dressFrame(c, H, sheets, a, f, box, dz) {
   // The weapon alone in this cell: its glow under the hero, and the spots its fire stands on.
   const w = document.createElement('canvas');
   w.width = c.width;
@@ -14211,8 +14565,6 @@ function dressFrame(c, H, sheets, a, f, box, dz, key) {
       }
     }
   } catch (e) { /* no fire on a tainted sheet */ }
-  bladePts.set(key, pts);
-  if (bladePts.size > 300) bladePts.delete(bladePts.keys().next().value);
   if (dz.glow > 0) {
     const g = c.getContext('2d');
     g.save();
@@ -14240,6 +14592,7 @@ function dressFrame(c, H, sheets, a, f, box, dz, key) {
     }
     g.restore();
   }
+  return pts;
 }
 // The fire: 연's archer 화염벽, each of its frames cut into its three tongues, deepened to blood orange.
 const flameSets = new Map();
@@ -14485,7 +14838,7 @@ function whiteFrame(im, sx, sy, w, h) {
     c.width = w;
     c.height = h;
     const g = c.getContext('2d');
-    g.drawImage(im, sx, sy, w, h, 0, 0, w, h);
+    g.drawImage(bmSrc(im), sx, sy, w, h, 0, 0, w, h);
     g.globalCompositeOperation = 'source-in';
     g.fillStyle = '#fff';
     g.fillRect(0, 0, w, h);
@@ -14762,6 +15115,7 @@ function sortByFeet(list) {
 }
 function render(now) {
   sweepBitmaps(now);
+  heroLooksTick();
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (!G) {
@@ -14959,7 +15313,8 @@ function render(now) {
     }
     if (e.beast && M.beast[e.beast]) {
       const d = M.beast[e.beast], k = 0.62 * e.scale;
-      ctx.drawImage(images[`beast/${e.beast}.png`], 0, 0, d.cell[0], d.cell[1], -d.feet[0] * k, -d.feet[1] * k, d.cell[0] * k, d.cell[1] * k);
+      const bi = pic(`beast/${e.beast}.png`);
+      if (bi) ctx.drawImage(bi, 0, 0, d.cell[0], d.cell[1], -d.feet[0] * k, -d.feet[1] * k, d.cell[0] * k, d.cell[1] * k);
     } else ctx.drawImage(tinted(im, 'brightness(0.7)'), -w / 2, -h, w, h);
     ctx.restore();
   }
@@ -15067,8 +15422,8 @@ function render(now) {
   drawEmote(p, p.x, p.y - heroHeight() - (G.bubble ? 36 : 10));
   for (const m of G.party) {
     if (m.war) continue; // a war's or raid's fighters draw their own (war.js)
-    if (m.bubble) drawBubble(m.bubble.text, m.x, m.y - (m.av ? m.av.top : 50) - 12, G.t - m.bubble.t);
-    drawEmote(m, m.x, m.y - (m.av ? m.av.top : 50) - (m.bubble ? 36 : 10));
+    if (m.bubble) drawBubble(m.bubble.text, m.x, m.y - HERO_TOP - 12, G.t - m.bubble.t);
+    drawEmote(m, m.x, m.y - HERO_TOP - (m.bubble ? 36 : 10));
   }
   let lost = 0;
   for (const e of G.enemies) {
@@ -15178,10 +15533,11 @@ function render(now) {
   drawJoystick();
 }
 
+// How far over its feet a hero's head is (the old wardrobe figure's, 51-52 in every class: bars and bubbles sit by it).
+const HERO_TOP = 51, HERO_H = 56;
 function heroHeight() {
-  const p = G.player;
   if (M.yhero && M.yhero[G.cls.id]) return 44;
-  return p.av ? p.av.top : p.img.height;
+  return HERO_TOP;
 }
 
 /** A material's icon, as a path under assets/: 연's own item (items.js MATS[].yeon, cut and set in
@@ -15264,9 +15620,7 @@ function drawHero(now, hidden) {
     // The ghost the dead become: the hero, pale and see-through, floating.
     const y = p.y - 4 - Math.sin(now * 2) * 3;
     if (drawYhero2(G.cls, p.gear, p, p.x, y, 'dead', 0.9)) return;
-    if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, y, 'idle', 0.45)) return;
-    if (p.av) drawAvatar(ctx, p.av, p.x, y, facing(p.fdx, p.fdy), 'idle', 0, 0.45);
-    else drawWalker(p.img, p.x, y, p.face, 0, false, 0, 1, 0.45);
+    drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, p.x, y, 'idle', 0.45);
     return;
   }
   // 연's ring at the player's own feet (FXs player_foot), turning under the hero all the while.
@@ -15295,17 +15649,8 @@ function drawHero(now, hidden) {
     hy += (p.ldy || 0) * 6 * k * lk;
   }
   if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
-  if (drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
-  // Struck, the hero does not flicker: the client showed a blow only in the health bar.
-  if (!p.av) {
-    drawWalker(p.img, p.x, p.y, p.face, p.phase, p.moving, 0, 1, hidden ? 0.35 : 1);
-    return;
-  }
-  // The wardrobe figure: four directions, four walking frames, attack and casting poses.
-  const dir = facing(p.fdx, p.fdy);
-  // Walking, the legs keep going while the spells fly (as in 연): the strike pose shows standing.
-  const pose = p.moving || p.stepping ? 'walk' : p.poseT > 0 ? p.pose : 'idle';
-  drawAvatar(ctx, p.av, p.x, p.y, dir, pose, Math.floor(p.walkT / WALK_MS), hidden ? 0.35 : 1);
+  // (a class 연's layers do not have falls back to 연's first figures; nothing for the moment a sheet is loading)
+  drawYhero(G.cls.id, p.gear ? p.gear.armor : 0, p, hx, hy, yPose, hidden ? 0.45 : 1);
 }
 
 // The colour a class shouts its spells in.
@@ -15611,7 +15956,8 @@ function syncUlt() {
   const look = JSON.stringify(p.gear);
   if (shown.hero !== look) {
     shown.hero = look;
-    $('#side-hero').src = $('#sd-face').src = p.av ? portrait(p.av) : `assets/hero/${G.cls.hero}.png`;
+    heroPic($('#side-hero'), G.cls);
+    heroPic($('#sd-face'), G.cls);
   }
   // The lettered list holds the learned spells, as the magic window lettered them.
   // The scroll's list: effects on the hero with the seconds left, as the client listed them,
@@ -15627,7 +15973,7 @@ function syncUlt() {
   // trained stats in the others, highest first.
   const g = p.gear || {};
   // The top slot is the helmet's; the armor shows on the figure itself.
-  const worn = ['helmet', 'weapon', 'shield'].map(k => (p.av && (g[k] >= 0 || g[k + 'Sp']) ? pieceIcon(G.cls, k, g[k], g[k + 'Sp']) : null));
+  const worn = ['helmet', 'weapon', 'shield'].map(k => (g[k] >= 0 || g[k + 'Sp'] ? pieceIcon(G.cls, k, g[k], g[k + 'Sp']) : null));
   const trained = Object.entries(G.passives).filter(([, lv]) => lv).sort((a, b) => b[1] - a[1]);
   const slots = SLOT_AT.map(([x, y, dark], i) => {
     let inner = '';
@@ -15767,7 +16113,7 @@ async function goHunt() {
   const go = $('#go');
   if (go) go.disabled = true;
   goingHunt = true;
-  try { await fxWarm(runFxIds(chosenClass, pickedStage), 3000); } finally { goingHunt = false; if (go) go.disabled = false; }
+  try { await Promise.race([Promise.all([fxWarm(runFxIds(chosenClass, pickedStage)), picWarm(runPics(chosenClass, pickedStage)), heroWarm(chosenClass, savedGear(chosenClass))]), new Promise(r => setTimeout(r, 3000))]); } finally { goingHunt = false; if (go) go.disabled = false; }
   startRun(chosenClass, pickedStage);
   if (G && G.hunt && G.hunt.mode === 'conquer' && pickedMode === 'sweep' && progress.cleared[G.stage.id]) Hunt.sweep(G); // 사냥 기믹: 소탕
 }
@@ -16515,7 +16861,36 @@ window.__silentSkills = () => {
     .map(([id, d]) => [id, d.name, d.kind, audio.map['skill_' + id] || null]);
 };
 window.__game = () => G;
+// test (memory): out of a run as a player leaves it; the class cards; the windows with long lists of pictures
+window.__leave = () => { if (G && G.training) leaveTraining(); else leaveHunt(); };
+window.__showSelect = () => showScreen('select');
+window.__memOpen = [() => openEquipWindow(), () => $('#open-codex').onclick(), () => openCraft(), () => openForge(), () => openTrade('shop'), () => openTrade('inn'),
+  () => openQuests(), () => openPartyPick(), () => openCards(), () => buildTree(chosenClass)];
 window.__images = () => images; // test: the loaded pictures
+// test: what is held in memory, in MB decoded (pictures by folder, the bitmaps made of them, the heroes' looks and sheets, the made copies, the sounds)
+window.__mem = () => {
+  const mb = (w, h) => (w || 0) * (h || 0) * 4 / 1048576, of = v => (v ? mb(v.naturalWidth || v.width, v.naturalHeight || v.height) : 0), r1 = x => Math.round(x * 10) / 10;
+  const img = {};
+  let imgN = 0;
+  for (const [k, v] of Object.entries(images)) { if (!v || !v.naturalWidth) continue; const c = k.split('/')[0]; img[c] = (img[c] || 0) + of(v); imgN++; }
+  for (const k of Object.keys(img)) img[k] = r1(img[k]);
+  const sum = (m, f = of) => { let t = 0; for (const v of m.values()) t += f(v); return r1(t); };
+  let frames = 0, frameMb = 0;
+  for (const L of heroLooks.values()) { frames += L.frames.size; for (const v of L.frames.values()) frameMb += of(v); }
+  let tintN = 0, tintMb = 0;
+  for (const m of tintCache.values()) for (const v of m.values()) { tintN++; tintMb += of(v); }
+  return {
+    img, imgN, imgMb: r1(Object.values(img).reduce((a, b) => a + b, 0)),
+    bitmaps: [bitmapsLive.size, r1(bitmapBytes / 1048576)],
+    layers: [layerBms.size, sum(layerBms, e => of(e.bm))],
+    looks: [heroLooks.size, frames, r1(frameMb), heroLoading],
+    dress: [dressSheets.size, sum(dressSheets)], classic: [classicSheets.size, sum(classicSheets)],
+    tint: [tintN, r1(tintMb)], white: [whiteCache.size, sum(whiteCache)], whiteFrames: whiteFrames.size, shadow: shadowCache.size,
+    text: textPics.size, icons: Object.keys(iconCache).length, lookPics: lookPics.size,
+    sfx: audio ? [Object.keys(audio.buffers).length, r1(audio.bytes / 1048576)] : null,
+    canvases: document.querySelectorAll('canvas').length, imgs: document.querySelectorAll('img').length,
+  };
+};
 window.__clear = () => clearStage();
 window.__tierKit = (id, tier) => tierKit(id, tier).map(k => SKILLS[k].promo + "차 " + SKILLS[k].name);
 window.__tierIds = (id, tier) => tierKit(id, tier); // test: a 승급 band's kit (ids)
@@ -16673,7 +17048,7 @@ const War = initWar({
   G: () => G, setG: v => { G = v; }, M: () => M, Z: () => Z, VW: () => VW, VH: () => VH, settings: () => settings,
   progress: () => progress, best: () => best, audio: () => audio, chosenClass: () => chosenClass, setChosenClass: c => { chosenClass = c; },
   saveProgress: () => saveJson('bs_progress', progress),
-  ctx, canvas, images, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
+  ctx, canvas, images, pic, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxOnArea, fxSquare, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, fxWarm, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
   applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
@@ -16695,7 +17070,7 @@ const Hunt = initHunt({
   G: () => G, settings: () => settings, progress: () => progress, saveSettings: () => saveJson('bs_settings', settings), audio: () => audio,
   say, banner, emote, josa, floatText, outline, lootFeed, addEnemy, pickMonster, floorCount, huntEvent, pactOn, PACTS,
   raidPattern, raidWave, raidMarks, killEnemy, clearStage, promoOf, nextChoice, rollMats, dropGear, levelCap, MAX_PASSIVE_LEVEL,
-  M: () => M, images, occ, TILE, MELEE, free, bodiesAt, heroTile, dashFrom, stats, hurtEnemy, applyStatus, around, later, addFx, fxBudget,
+  M: () => M, images, pic, picDrop, occ, TILE, MELEE, free, bodiesAt, heroTile, dashFrom, stats, hurtEnemy, applyStatus, around, later, addFx, fxBudget,
   walled: (tx, ty) => !!(G.arena && !Hunt.open(tx, ty)),
   heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
   VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, drawGroundCached, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
