@@ -1534,17 +1534,21 @@ const S9 = {
     desc: '둘레 일곱 칸 곳곳에 명계의 꽃 황천화 열 송이를 피운다. 꽃가루에 닿은 몬스터는 능력이 크게 떨어지고(받는 피해 증가·느려짐) 조금씩 베이며, 차사는 꽃 곁에서 체력과 마력이 빠르게 찬다. 3.4초 뒤 꽃마다 크게 피어 터지며 둘레를 친다' },
   // 무사·격투가·도깨비 (원작 바람에 없는 연 직업): 9차는 원작의 살수·흑화랑·영술사 9차를 이어받는다. 이들의 연 9차였던
   // 반탄강기·도깨비불 3성은 8차로 (아래), 그 밖의 8차(무형투창·점혈:통·권법의기원·마류귀체)는 그대로.
-  // 무사 ← 살수 9차 (낫을 던지고 거두는 근접 암살자 → 창을 던지고 휘두르는 무사): 차원개방 (보조 공격), 이계의침식 (광역),
-  // 극청룡참 (강한 일격). 그림: 1320의 살수 스프라이트(이계의낫, 침식의 검은 결정, 차원의 고리), 아이콘: 2662 툴팁.
-  l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'echo', echo: 'shard', fx: 'o_l_dimension', fxCast: 'k_u_l_pillar', fxLoop: 'o_l_dimension', loopSize: 130,
-    fxHit: 'h_ml_thrust', hit: 15, cd: 18, duration: 10, every: 0.5, shots: 3, splash: 0.3, range: 2, power: 0.15, buff: 'power', ck: 'buff', pre: 'l_union', branch: 2,
-    desc: '이계의 차원을 몸에 연다. 10초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터를 거듭 베고, 그동안 피해가 15% 는다' },
-  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'crosswave', fx: 'o_l_erosion', fxCast: 'k_u_l_bolt', trail: 'o_l_erosion', fxHit: 'h_ml_burst', dmg: 80, cd: 6, depth: 9,
-    width: 1, ways: 1, pulses: 1, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
-    desc: '이계에서 불러낸 기운을 앞으로 아홉 칸 쏘아 폭 세 칸의 몬스터를 치고 침식시킨다. 지나간 자리에 검은 결정이 솟고, 침식된 몬스터는 받는 피해가 는다' },
-  l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'smite', fx: 'o_l_sickle', fxShot: 'o_l_sickle', fxHit: 'h_ml_slash', dmg: 95, cd: 5, range: 4,
-    radius: 1, splash: 0.45, shot: true, again: 0.6, ck: 'cleave', pre: 'l_annihil', branch: 0,
-    desc: '청룡의 힘으로 앞의 가장 강한 몬스터를 크게 베어 내고, 던진 이계의낫이 되돌아오며 한 번 더 벤다. 둘레의 몬스터도 함께 베인다' },
+  // 무사 ← 살수 9차 (9차 재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/lancer.md). 시전 4 + 필살기 (원작에 패시브 없음):
+  //   극청룡참 (IMG86: 바라보는 쪽 앞을 푸른 초승달로 크게 벰 — 앞 두 칸, 폭 세 칸),
+  //   이계의침식 (IMG88: 바라보는 쪽 아홉 칸으로 이계의 기운 — 흰 폭발·빛기둥·검은 잔해 세 줄; 맞은 적은 침식·옆으로 밀쳐짐),
+  //   차원개방 (IMG90: 몸에 차원을 열고(검은 구체) 15초 동안 이계의낫 파편(푸른 원반)이 곁의 몬스터를 벰),
+  //   아공간전개 (IMG94, PVP → 몬스터: 선 자리에 청룡 문양 영역과 결정 울타리 8초 — 아래 l_agong).
+  // Pictures at the original's own size (o_l_*: 0.62 game pixels a capture pixel). 1320의 추정 그림(옛 o_l_sickle·erosion·dimension)은 뺌.
+  l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'dim9', echo: undefined, fx: 'o_l_dimshard', fxCast: 'o_l_dimcast', fxLoop: undefined, loopSize: undefined,
+    fxHit: undefined, hit: 15, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [46, 34], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
+    desc: '이계의 차원을 몸에 연다. 15초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터 둘에게 푸른 원반으로 거듭 날아들어 그 몬스터와 원반 안의 몬스터를 벤다' },
+  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 8, depth: 9,
+    width: undefined, ways: undefined, pulses: undefined, side: 36, sideV: 26, step: 0.06, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
+    desc: '바라보는 쪽으로 이계에서 불러낸 기운을 아홉 칸 쏘아 보낸다. 지나는 자리마다 빛기둥이 솟고 검은 잔해가 세 줄로 남으며, 맞은 몬스터는 침식되어(받는 피해 증가) 옆으로 밀쳐진다' },
+  l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 75, cd: 2.5, range: undefined,
+    radius: undefined, splash: undefined, shot: undefined, again: undefined, depth: 2, half: 1, ck: 'cleave', pre: 'l_annihil', branch: 0,
+    desc: '청룡의 힘을 빌려 바라보는 쪽 앞을 푸른 초승달로 크게 베어 낸다. 앞 두 칸, 폭 세 칸의 몬스터가 모두 베인다' },
   // 격투가 ← 흑화랑 9차 (마력의 화살과 검무 → 기의 화살과 권무): 마궁폭사 (보조 공격), 연옥'만월 (몸 주변), 진'투귀살 (강한 일격).
   mk_magung: { promo: 9, cls: 'monk', req: 33, name: '마궁폭사', kind: 'echo', echo: 'sword', fx: 'o_mk_magung', fx2: 'o_mk_magung', shotSize: 80, fxHit: 'h_hit_attack',
     hit: 28, cd: 18, duration: 10, every: 0.6, shots: 3, range: 5, power: 0.15, buff: 'power', ck: 'buff', pre: 'mk_origin', branch: 2,
@@ -1577,9 +1581,11 @@ const S9 = {
   // blue crescent (jeol9), and a second follows at once.
   rp_cut: { nine: { k: 1, at: 0.3 }, jeol9: { fx: 'o_rp_jeol', depth: 3, half: 1, max: 9 },
     desc: '정면을 크게 벤다. 9차 승급부터는 원작 9차의 절섬처럼 바라보는 쪽 앞 세 칸, 폭 세 칸을 푸른 초승달로 베고, 곧이어 한 번 더 벤다' },
-  l_agong: { promo: 9, cls: 'lancer', req: 33, name: '아공간전개', kind: 'aura9', fx: 'o_l_agong', fxHit: 'h_ml_thrust', hit: 9, cd: 16, duration: 8, radius: 2, tick: 0.5,
-    ward: 0.4, ck: 'buff', buff: 'shield', pre: 'l_reflect', branch: 2,
-    desc: '자신의 자리에 아공간을 8초 동안 펼친다. 아공간 안에서는 몸을 피해 받는 피해가 40% 줄고, 든 몬스터는 공간에 베인다' },
+  // 아공간전개 (원작 2662 IMG94; 설명창 IMG93, PVP → 몬스터): 선 자리에 아공간 영역 8초 (그림 = 영역, 약 다섯 칸 사방). 안에 있는 동안 받는 피해가
+  // 20%에서 50%까지 점점 더 줄고(명중회피 점차 증가), 든 몬스터는 느려짐. 벗어나면 즉시 풀림. 그 자체로는 치지 않음.
+  l_agong: { promo: 9, cls: 'lancer', req: 33, name: '아공간전개', kind: 'zone9', fx: 'o_l_agong', fxHit: undefined, hit: undefined, cd: 30, duration: 8, radius: 2, reach: 104, tick: undefined,
+    ward: 0.35, wardRamp: [0.2, 0.5], atFeet: true, slowIn: 1, ck: 'buff', buff: 'shield', pre: 'l_reflect', branch: 2,
+    desc: '자신의 자리에 청룡 문양의 아공간 영역을 8초 동안 펼친다. 영역 안에 있는 동안 받는 피해가 점점 더 줄고(20%→50%), 든 몬스터는 길을 잃고 느려진다. 영역을 벗어나면 즉시 풀린다' },
   mk_bujori: { promo: 9, cls: 'monk', req: 33, name: '부조리', kind: 'shieldburst', fx: 'k_mk_bujori', fx2: 'k_mk_bujori', fxCast: 'k_u_mk_energy', hit: 60, cd: 12, duration: 4,
     radius: 3, stun: 0.8, pre: 'mk_focus', branch: 2,
     desc: '부조리한 공격을 막아 4초 동안 받는 피해가 절반이 되고, 막이 풀릴 때 막아 둔 힘이 터져 둘레 세 칸을 치고 멈춘다' },
@@ -1769,7 +1775,7 @@ export const ULT_TIERS = {
     ult('lancer', 'l_ult', '백월난격', { mech: 'cross', cast: 'k_l_ult', castSize: 220, main: 'k_u_l_moonbeam', mainSize: 150, hit: 'h_ml_thrust', hitScale: 0.6, len: 4, diag: true, boss: 'l_meteor', k: 1 }),
     ult('lancer', 'l_genesis', '천지개벽', { mech: 'rain', main: 'k_l_genesis', frac: 0.75, drop: 'k_u_l_pillar', dropSize: 170, hit: 'k_u_l_bolt', boss: 'l_rush', k: 1.15 }),
     ult('lancer', 'l_dragon', '맹룡승천', { echoN: 22, echoCap: 2, open: 'k_l_annihil', echo: 'k_u_l_dragonhead', echoW: 220, aura: 'k_l_annihil', mech: 'meteor', main: 'k_l_dragon', mainSize: 330, hit: 'k_u_l_dragonhead', hitScale: 0.6, n: 5, gap: 0.25, boss: 'l_annihil', k: 1.3 }),
-    ult('lancer', 'l_rage9', '청룡의격노', { cutin: 'o_l_ult9', desc: '내면의 살기를 불러일으켜 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다 (원작 살수의 궁극)', openW: 0.65, openCap: 3, echoN: 30, echo2: 'k_l_spiral', aura: 'k_l_halfmoon', mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'h_ml_spark', steps: 7, boss: 'l_javelin', k: 1.5 }),
+    ult('lancer', 'l_rage9', '청룡의격노', { cine9: 0.75, guard: 3, cutin: 'o_l_ult9', desc: '내면의 살기를 불러일으켜 화면의 모든 몬스터에게 매우 큰 피해를 주고, 잠시 어떤 공격도 받지 않는다 (원작 살수의 궁극)', openW: 0.65, openCap: 3, echoN: 30, echo2: 'k_l_spiral', aura: 'k_l_halfmoon', mech: 'sweep', main: 'k_l_moonfull', mainSize: 200, hit: 'h_ml_spark', steps: 7, boss: 'l_javelin', k: 1.5 }),
   ],
   monk: [
     ult('monk', 'mk_ult', '필살권무', { mech: 'dash', main: 'k_mk_ult', mainSize: 190, hit: 'k_u_mk_bodyhit', hitScale: 0.7, n: 8, boss: 'mk_sudden', k: 1 }),
