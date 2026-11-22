@@ -24869,5 +24869,15 @@
   "max": 360,
   "white": 170,
   "why": "진'투귀살's homing arrows striking (2662 IMG96 frames 8-11, the top middle dummy): the golden swirl of light and its orange sparks — gold that moved from the clean frame 1, its white heart kept; the numbers above it out"
+ },
+ "dk_jangseal": {
+  "src": "gif2662/IMG75.gif",
+  "mode": "stamps",
+  "why": "장승영역 (영술사 9차, 2662 IMG75): the golden seal — built by tools/s9_stamps.py (dk_jang), kept in the index by s9_fx.py"
+ },
+ "dk_jangpole": {
+  "src": "gif2662/IMG75.gif",
+  "mode": "stamps",
+  "why": "장승영역 (영술사 9차, 2662 IMG75): the three jangseung, each cut once clean from the bottom row — built by tools/s9_stamps.py (dk_jang), kept in the index by s9_fx.py"
  }
 }
