@@ -532,12 +532,7 @@
  "m_hoeseon": {
   "src": "gif2662/IMG21.gif",
   "mode": "parts",
-  "key": "teal",
-  "gt": [
-   25,
-   85
-  ],
-  "white": 200,
+  "key": "unmix",
   "cell": [
    330,
    325
@@ -550,70 +545,16 @@
   "cells": [
    [
     {
-     "f": 11,
-     "at": [
-      460,
-      375
-     ],
-     "clip": [
-      -150,
-      -285,
-      180,
-      40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
-     ]
-    }
-   ],
-   [
-    {
-     "f": 12,
-     "at": [
-      460,
-      375
-     ],
-     "clip": [
-      -150,
-      -285,
-      180,
-      40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
-     ]
-    }
-   ],
-   [
-    {
      "f": 13,
      "at": [
       460,
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -625,18 +566,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -648,18 +581,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -671,18 +596,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -694,18 +611,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -717,18 +626,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -740,18 +641,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -763,18 +656,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -786,18 +671,10 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ],
@@ -809,25 +686,66 @@
       375
      ],
      "clip": [
-      -150,
+      -115,
       -285,
       180,
       40
-     ],
-     "unnum": [
-      [
-       -90,
-       -185,
-       80,
-       -20
-      ]
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 11-22; the camera still) — its green keyed off the sand and the client's red range grid, the damage numbers stacked over it painted over from the wind round them"
+  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 13-22; the camera still) — unmixed from the clean field with the grid (frame 8): its opacity and own colour; the hit stars (found by their orange rims) and the numbers beside them, and the target's name, filled with the wind round them",
+  "bg": 8,
+  "k": 120,
+  "smooth": 3,
+  "holeexpr": [
+   "(b > r + 60) & (b >= g) & (d > 30) & (y < 318)",
+   "(r > 190) & (g < 185) & (r > b + 50) & (d > 30)",
+   "(g < r + 10) & (mn < 200) & (d > 40) & (y < 318)"
+  ],
+  "holegrow": 5,
+  "holenear": [
+   [
+    "(mn > 200) & (d > 30)",
+    8
+   ],
+   [
+    "(mx < 70) & (d > 30)",
+    3
+   ]
+  ],
+  "starbox": [
+   "(r > 180) & (g < 190) & (r > b + 50) & (d > 30)",
+   [
+    6,
+    6,
+    52,
+    8
+   ]
+  ],
+  "badbox": [
+   [
+    315,
+    100,
+    445,
+    180
+   ],
+   [
+    285,
+    298,
+    420,
+    415
+   ],
+   [
+    565,
+    240,
+    660,
+    310
+   ]
+  ],
+  "grain": false
  },
  "m_seori": {
   "src": "gif2662/IMG23.gif",
@@ -2037,20 +1955,20 @@
  "m_hwanyeong": {
   "src": "gif2662/IMG29.gif",
   "mode": "parts",
-  "key": "blue",
+  "key": "unmix",
   "bt": [
    8,
    45
   ],
   "cell": [
-   360,
+   295,
    310
   ],
   "origin": [
    350,
    155
   ],
-  "soft": 12,
+  "soft": 16,
   "cells": [
    [
     {
@@ -2062,7 +1980,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2077,7 +1995,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2092,7 +2010,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2107,7 +2025,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2122,7 +2040,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2137,7 +2055,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2152,7 +2070,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2167,7 +2085,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2182,7 +2100,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2197,7 +2115,7 @@
      "clip": [
       -345,
       -150,
-      -30,
+      -55,
       150
      ]
     }
@@ -2205,7 +2123,30 @@
   ],
   "ms": 120,
   "scale": 0.62,
-  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded)"
+  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded); now unmixed: its opacity and own colour taken out of the clean carpet (frame 0), the target and its bar under it (tinted by the fog) filled from the fog round them",
+  "bg": 0,
+  "k": 110,
+  "smooth": 4,
+  "badbox": [
+   [
+    138,
+    160,
+    240,
+    300
+   ],
+   [
+    165,
+    170,
+    230,
+    185
+   ],
+   [
+    290,
+    300,
+    345,
+    335
+   ]
+  ]
  },
  "p_banhyang": {
   "src": "dl1320/22.gif",

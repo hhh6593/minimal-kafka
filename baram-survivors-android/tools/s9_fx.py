@@ -350,6 +350,115 @@ def keyed(frames, i, e, part=None):
             near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(15))).astype(np.float32) / 255
             al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near * np.clip((d - t0) / max(1.0, t1 - t0), 0, 1))
         return np.dstack([a, al * 255]).astype(np.uint8)
+    if key == "unmix":
+        # a see-through fog over a clean field (환영안개's purple over the carpet): how opaque it is from how far each pixel
+        # moved from the clean frame ("bg"; "k" the move that counts as solid), its own colour taken back out of the mix
+        # (O = a·F + (1−a)·B). Whoever stands still under it is in both and drops out — no silhouette, no carpet pattern
+        k = part.get("k", e.get("k", 110))
+        lo = part.get("floor", e.get("floor", 12))
+        if e.get("align"):
+            # (the client shakes the screen on the cast: the clean frame moved the few pixels that fit it best)
+            best = None
+            for sy in range(-4, 5):
+                for sx in range(-4, 5):
+                    sh = np.roll(np.roll(bg, sy, 0), sx, 1)
+                    sc = np.median(np.abs(a - sh).max(axis=2)[8:-8:3, 8:-8:3])
+                    if best is None or sc < best[0]:
+                        best = (sc, sh)
+            bg = best[1]
+        D = a - bg
+        m = np.abs(D).max(axis=2)
+        al = np.clip((m - lo) / max(1.0, k - lo), 0, 1)
+        F = np.clip(bg + D / np.maximum(al, 1e-3)[..., None], 0, 255)
+        sm = part.get("smooth", e.get("smooth"))
+        if sm:
+            # the fog's colour changes slowly: that colour field (each pixel the mean of its neighbours' colours, weighted
+            # by how solid they are), and how much of it lies over the floor by projecting the move onto it — the
+            # carpet's pattern stays in the floor, out of the fog
+            from scipy import ndimage
+            hole = np.zeros(al.shape, bool)
+            for x0, y0, x1, y1 in part.get("badbox", e.get("badbox", [])):
+                hole[y0:y1, x0:x1] = True  # (a body tinted by it, a bar changing: the fog round it carried in)
+            hx = part.get("holeexpr", e.get("holeexpr"))
+            if hx:
+                # (what passes over it by colour — the damage numbers' blue digits, the hit stars' orange rims and the
+                # white inside them — grown by "holegrow" and filled the same way)
+                r_, g_, b_ = a[..., 0], a[..., 1], a[..., 2]
+                yy_, xx_ = np.mgrid[0:al.shape[0], 0:al.shape[1]]
+                env = {"r": r_, "g": g_, "b": b_, "d": m, "mn": a.min(axis=2), "mx": a.max(axis=2), "np": np, "x": xx_, "y": yy_}
+                hm = np.zeros(al.shape, bool)
+                for ex in hx:
+                    hm |= eval(ex, {}, env)
+                for ex, px in part.get("holenear", e.get("holenear", [])):
+                    # (the white faces of the digits and the stars' hearts: white only beside what was found)
+                    hm |= eval(ex, {}, env) & ndimage.binary_dilation(hm, iterations=px)
+                hm = ndimage.binary_fill_holes(ndimage.binary_dilation(hm, iterations=part.get("holegrow", e.get("holegrow", 3))))
+                hole |= hm
+            sb = part.get("starbox", e.get("starbox"))
+            if sb:
+                # (a hit star found by its orange rim, and the box from it over the number written beside it:
+                # [expression, [left, top, right, bottom] margins])
+                r_, g_, b_ = a[..., 0], a[..., 1], a[..., 2]
+                env = {"r": r_, "g": g_, "b": b_, "d": m, "mn": a.min(axis=2), "mx": a.max(axis=2), "np": np}
+                st = ndimage.binary_opening(eval(sb[0], {}, env), iterations=1)
+                lab, n = ndimage.label(ndimage.binary_dilation(st, iterations=4))
+                L, T, R, B = sb[1]
+                for sl in ndimage.find_objects(lab):
+                    if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) < 60:
+                        continue
+                    hole[max(0, sl[0].start - T):sl[0].stop + B, max(0, sl[1].start - L):sl[1].stop + R] = True
+            w = np.where(hole, 0, al ** 2)
+            num = np.stack([ndimage.gaussian_filter(F[..., c] * w, sm) for c in range(3)], -1)
+            den = ndimage.gaussian_filter(w, sm)[..., None]
+            Fs = num / np.maximum(den, 1e-4)
+            # (deep in a box, or far from any fog, the near neighbours are none: the colour from farther round)
+            big = sm * 6
+            numb = np.stack([ndimage.gaussian_filter(F[..., c] * w, big) for c in range(3)], -1)
+            denb = ndimage.gaussian_filter(w, big)[..., None]
+            Fs = np.where(den > 0.03, Fs, numb / np.maximum(denb, 1e-6))
+            if hole.any():
+                # inside a box the colour grown in from its edge, ring by ring (the gradient round it carried on)
+                known = ~hole
+                Fh = Fs.copy()
+                for rad in (2, 4, 8, 16, 32, 64, 128):
+                    kf = known.astype(np.float32)
+                    num2 = np.stack([ndimage.gaussian_filter(Fh[..., c] * kf, rad) for c in range(3)], -1)
+                    den2 = ndimage.gaussian_filter(kf, rad)
+                    new_ = ~known & (den2 > 0.05)
+                    Fh[new_] = num2[new_] / den2[new_][:, None]
+                    known |= new_
+                Fs = np.where(hole[..., None], Fh, Fs)
+            V = Fs - bg
+            vv = (V ** 2).sum(-1)
+            ap = np.clip((D * V).sum(-1) / np.maximum(vv, 1.0), 0, 1)
+            ap = np.where(vv > 900, ap, al)  # (where the fog is the floor's own colour the projection says nothing)
+            ap[m < lo] = 0
+            if hole.any():
+                # (its opacity grown in from the edge ring by ring, as the colour is)
+                known = ~hole
+                fill = ap.copy()
+                for rad in (2, 4, 8, 16, 32, 64, 128):
+                    kf = known.astype(np.float32)
+                    num2 = ndimage.gaussian_filter(fill * kf, rad)
+                    den2 = ndimage.gaussian_filter(kf, rad)
+                    new_ = ~known & (den2 > 0.05)
+                    fill[new_] = num2[new_] / den2[new_]
+                    known |= new_
+                # its grain (the fine dither of the fog) from beside the box, so the patch is not smoother than round it
+                grain = ap - ndimage.gaussian_filter(ap, 2)
+                for x0, y0, x1, y1 in (part.get("badbox", e.get("badbox", [])) if e.get("grain", True) else []):
+                    wdt = x1 - x0
+                    sx0 = x0 - wdt if x0 - wdt >= 0 else x1
+                    g = grain[y0:y1, sx0:sx0 + wdt]
+                    if g.shape == fill[y0:y1, x0:x1].shape:
+                        fill[y0:y1, x0:x1] += g
+                # and its edge blended over 10 px into what lies round it (no straight line)
+                dist = ndimage.distance_transform_edt(hole)
+                t = np.clip(dist / 10, 0, 1)
+                ap = np.clip(np.where(hole, fill * t + ap * (1 - t), ap), 0, 1)
+            al, F = ap, np.clip(Fs, 0, 255)
+        F[al <= 0] = 0
+        return np.dstack([F, al * 255]).astype(np.uint8)
     if key == "pal":
         # an opaque drawing over a patterned floor whose colours come close (묵혈파광참's seal 斬: its cream is the floor's
         # light grey but warmer, its outline blacker than any of the floor's dark lines): the pixels its own colours name
