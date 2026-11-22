@@ -1500,7 +1500,7 @@ const S9 = {
     desc: '깃털보다 가볍게 바라보는 쪽 여섯 칸 안의 몬스터 무리로 순식간에 도약해 친다. 내려선 자리에 푸른 돌풍이 3초 동안 휘몰아쳐 든 몬스터를 거듭 휩쓸고, 내려서는 순간 1초 동안 받는 피해가 절반이 된다' },
   cl_haeil: { promo: 9, cls: 'celestial', req: 33, name: '해일강타', kind: 'haeil9', fx: 'o_cl_haeil', fxHit: 'o_cl_haeilhit', dmg: 90, cd: 5, depth: 6, width: 1, ways: undefined, pulses: undefined,
     curse: 4, mark: 8, ck: 'line', pre: 'cl_ego', branch: 0,
-    desc: '해일을 일으켜 앞쪽 여섯 칸, 폭 세 칸의 몬스터에게 얼음 기둥을 세워 크게 치고 풍랑의표식을 남긴다(받는 피해 증가). 해일이 그 길을 휩쓸고 지나간다' },
+    desc: '바라보는 쪽으로 해일을 일으켜 여섯 칸, 폭 세 칸의 몬스터에게 얼음 기둥을 세워 크게 치고 풍랑의표식을 남긴다(받는 피해 증가). 해일이 그 길을 휩쓸고 지나간다' },
   // 마도사: 기공십자광선'쾌 (보조 공격), 광폭기사출 (광역), 광폭구슬'화 (그대로)
   md_crossq: { promo: 9, cls: 'magus', req: 33, name: "기공십자광선'쾌", kind: 'echo', echo: 'cross', fx: 'k_md_cross', fxCast: 'k_u_md_wing', fx2: 'k_md_cross', fxHit: 'k_u_md_storm', hit: 24, cd: 18,
     duration: 6, every: 0.5, range: 6, depth: 6, power: 0.2, buff: 'power', ck: 'buff', pre: 'md_cross', branch: 0,

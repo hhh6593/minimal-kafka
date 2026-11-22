@@ -534,6 +534,7 @@ def keyed(frames, i, e, part=None):
             return np.dstack([F, al * 255]).astype(np.uint8)
         sm = part.get("smooth", e.get("smooth"))
         if sm:
+            al_raw, F_raw = al.copy(), F.copy()
             # the fog's colour changes slowly: that colour field (each pixel the mean of its neighbours' colours, weighted
             # by how solid they are), and how much of it lies over the floor by projecting the move onto it — the
             # carpet's pattern stays in the floor, out of the fog
@@ -620,6 +621,23 @@ def keyed(frames, i, e, part=None):
                 t = np.clip(dist / max(1e-3, part.get("edgeblend", e.get("edgeblend", 10))), 0, 1)
                 ap = np.clip(np.where(hole, fill * t + ap * (1 - t), ap), 0, 1)
             al, F = ap, np.clip(Fs, 0, 255)
+            if part.get("keepraw", e.get("keepraw")):
+                # (the smoothed colour field only inside the covered places: elsewhere the frame's own unmixed pixels —
+                # the water's sharp caustic lines, not a milky blur of them)
+                from scipy import ndimage as _nd
+                out_ = ~_nd.binary_dilation(hole, iterations=2)
+                inh = ~out_ & (al > 0.05)
+                ref = out_ & (al_raw > 0.5)
+                if inh.any() and ref.sum() > 50:
+                    # (the fill's colour, an average over bright caustics and dark water, comes out milky: brought to
+                    # the water's own typical colour, channel by channel)
+                    k_ = np.median(F_raw[ref], axis=0) / np.maximum(np.median(F[inh], axis=0), 1)
+                    F = np.where(inh[..., None], np.clip(F * k_, 0, 255), F)
+                    # (and as solid as the water round it: a covered place deep in the sheet is no thinner than the sheet)
+                    near_ = _nd.gaussian_filter(np.where(ref, al_raw, 0), 12) / np.maximum(_nd.gaussian_filter(ref.astype(np.float32), 12), 1e-3)
+                    al = np.where(inh, np.maximum(al, np.minimum(near_, np.median(al_raw[ref])) * np.clip((al - 0.25) * 4, 0, 1)), al)
+                al = np.where(out_, al_raw, al)
+                F = np.where(out_[..., None], F_raw, F)
         F[al <= 0] = 0
         return np.dstack([F, al * 255]).astype(np.uint8)
     if key == "pal":
@@ -906,6 +924,12 @@ def parts_cells(frames, e):
             cell[(mx_ < e["nogray"]) & (mx_ - mn_ < 45), 3] = 0
         for x0, y0, x1, y1 in e.get("clearcell", []):
             cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
+        if e.get("opaque"):
+            # (a see-through effect taken off the original's light grey floor reads as strong as it did there only over a
+            # floor as light; over our dark ground the same alpha shows the ground through and the effect looks pale: its
+            # own colour kept, its opacity raised, 1 − (1 − a)^opaque — what is clear stays clear, the solid stays solid)
+            a_ = cell[..., 3].astype(np.float32) / 255
+            cell[..., 3] = np.clip((1 - (1 - a_) ** e["opaque"]) * 255, 0, 255).astype(np.uint8)
         if e.get("despeck"):
             # (specks standing alone, a few pixels of a bystander's star: gone)
             from scipy import ndimage
@@ -990,7 +1014,15 @@ def build(spec, src_dir, out_dir, only=None):
                         fcx, fcy, frx, fry = e["field"]
                         yy0, xx0 = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                         infield = ((xx0 - fcx) / frx) ** 2 + ((yy0 - fcy) / fry) ** 2 <= 1
-                        hole |= (r > 110) & (g < 150) & (r - g > 45) & (bl < 110) & infield
+                        if e.get("cyan"):
+                            infield = infield | cols
+                        hole |= (r > 90) & (g < 160) & (r - g > 35) & (bl < 120) & infield
+                if e.get("cyan"):
+                    # (the numbers, stars and bars stand only in their columns: the waves' white crests and the lightning
+                    # outside them are the art's own — filled with grey they made the art pale); "holebox": UI text
+                    hole &= cols
+                    for x0_, y0_, x1_, y1_ in e.get("holebox", []):
+                        hole[y0_:y1_, x0_:x1_] |= a[y0_:y1_, x0_:x1_].min(axis=2) > 150
                 hole = np.asarray(Image.fromarray((hole * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(e.get("grow", 15)))) > 0
                 if e.get("hero"):
                     cx, cy, rx, ry = e["hero"]
