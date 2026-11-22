@@ -213,6 +213,14 @@ def keyed(frames, i, e, part=None):
         m = a.max(axis=2)
         al = np.clip((m - lo) / max(1.0, k - lo), 0, 1)
         F = np.clip(a / np.maximum(al, 1e-3)[..., None], 0, 255)
+        rfo = part.get("rotfill", e.get("rotfill"))
+        if rfo:
+            # (the dummies' columns, numbers, hero and bystanders taken from the same frame's art a turn on — 비전방진's
+            # ring of eight orbs is the same every 45° — see rotfill; what no turn gives, left soft)
+            a2, keep = rotfill(a, rfo, frames, i)
+            m = a2.max(axis=2)
+            al = np.clip((m - lo) / max(1.0, k - lo), 0, 1) * keep
+            F = np.clip(a2 / np.maximum(al / np.maximum(keep, 1e-3), 1e-3)[..., None], 0, 255)
         F[al <= 0] = 0
         return np.dstack([F, al * 255]).astype(np.uint8)
     bg = np.asarray(frames[part.get("bg", e.get("bg", 0))].convert("RGB")).astype(np.float32)
@@ -1104,6 +1112,90 @@ def parts_cells(frames, e):
     return out
 
 
+def rotfill(a, o, frames, fi):
+    """An 궁극's middle, where the dummies stand in columns under their damage numbers, hit stars and bars (질풍난무's gale,
+    겁화's spiral, 태극팔괘진's clouds, 만시창공's wind): inside "box" what is a number, a star, a bar, a dummy, a skull or the
+    hero ("bad" colours, grown by "grow" px; "fill" ellipses [cx, cy, rx, ry] always) is taken from the same frame's art a
+    turn on round the scene's middle ("at", the ellipse squashed by "ys"), the nearest turn whose pixel is clean — or from
+    another frame of the scene ("frames": offsets, the same place), for what turns round nothing. What neither gives is
+    left see-through, softened over "soft" px (one place soft, not the whole middle). Returns (frame, keep 0..1)."""
+    from scipy import ndimage
+    H, W = a.shape[:2]
+    x0, y0, x1, y1 = o["box"]
+    cx, cy = o["at"]
+    ys = o.get("ys", 1.0)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    inbox = (xx >= x0) & (xx < x1) & (yy >= y0) & (yy < y1)
+
+    def bad_of(q):
+        r, g, b = q[..., 0], q[..., 1], q[..., 2]
+        mn, mx = q.min(axis=2), q.max(axis=2)
+        env = {"r": r, "g": g, "b": b, "mn": mn, "mx": mx, "np": np, "x": xx, "y": yy}
+        m = np.zeros((H, W), bool)
+        for ex in o.get("bad", ["(b > 150) & (b - r > 70) & (b - g > 25)", "mn > 200", "(r > 170) & (r - g > 45) & (b < 140)",
+                                "(g > r + 50) & (g > b + 50)", "(mx - mn < 45) & (mx > 80)", "(r > 120) & (r - b > 60) & (g < 120)"]):
+            m |= eval(ex, {}, env)
+        if o.get("starbox"):
+            # (each number is written beside its hit star: the star found by its orange, and the box from it over the
+            # number, [left, up, right, down] px — the art's own blue light, as blue as the digits, kept elsewhere)
+            L_, U_, R_, D_ = o["starbox"]
+            st = ndimage.binary_opening((r > 170) & (r - g > 45) & (b < 140), iterations=1)
+            # (each star pixel spread over the rectangle round it — not one box per joined patch: the columns of stars
+            # touch through the hero's armour, and one box over them all was the whole middle)
+            k_ = np.zeros((U_ + D_ + 1, L_ + R_ + 1), bool)
+            k_[:, :] = True
+            m |= ndimage.binary_dilation(st, structure=k_, origin=((U_ + D_) // 2 - U_ if False else (U_ - D_) // 2, (L_ - R_) // 2))
+        m = ndimage.binary_dilation(m, iterations=o.get("grow", 6))
+        # (the pinholes inside a number or a star closed — only small ones: a ring of columns encloses art too)
+        gap = ndimage.binary_fill_holes(m) & ~m
+        gl, gn = ndimage.label(gap)
+        if gn:
+            gs = ndimage.sum(gap, gl, range(1, gn + 1))
+            m |= np.isin(gl, 1 + np.nonzero(gs <= o.get("pin", 300))[0])
+        for ex_, ey_, rx_, ry_ in o.get("fill", []):
+            m |= ((xx - ex_) / rx_) ** 2 + ((yy - ey_) / ry_) ** 2 <= 1
+        return m & inbox
+    hole = bad_of(a)
+    if os.environ.get("ROTFILL_DBG"):
+        Image.fromarray((hole * 255).astype(np.uint8)).save(os.environ["ROTFILL_DBG"])
+    out = a.copy()
+    todo = hole.copy()
+    dx, dy = xx - cx, (yy - cy) * ys
+    rr, ang = np.hypot(dx, dy), np.arctan2(dy, dx)
+    # ("radial": scales of the radius tried first, at the same angle — a whirl of streaks running in to its middle
+    # (만시창공's wind) goes on along its own streak; then the turns)
+    steps = [(0, k) for k in o.get("radial", [])] + [(deg, 1.0) for deg in o.get("degs", (25, -25, 50, -50, 75, -75, 100, -100, 130, -130, 160, -160, 180))]
+    for deg, sc in steps:
+        if not todo.any():
+            break
+        t = ang + np.radians(deg)
+        sx = np.rint(cx + rr * sc * np.cos(t)).astype(int)
+        sy = np.rint(cy + rr * sc * np.sin(t) / ys).astype(int)
+        ins = (sx >= 0) & (sx < W) & (sy >= 0) & (sy < H)
+        sxc, syc = sx.clip(0, W - 1), sy.clip(0, H - 1)
+        ok = todo & ins & ~hole[syc, sxc]
+        if o.get("srcbox"):
+            # (taken only from the middle's own art — not a crane or a fan of the frame round it turned in)
+            s0, s1, s2, s3 = o["srcbox"]
+            ok &= (sxc >= s0) & (sxc < s2) & (syc >= s1) & (syc < s3)
+        out[ok] = a[syc[ok], sxc[ok]]
+        todo &= ~ok
+    for off in o.get("frames", []):
+        if not todo.any():
+            break
+        j = fi + off
+        if 0 <= j < len(frames):
+            q = np.asarray(frames[j].convert("RGB")).astype(np.float32)
+            ok = todo & ~bad_of(q)
+            out[ok] = q[ok]
+            todo &= ~ok
+    keep = np.clip(ndimage.distance_transform_edt(~todo) / max(1, o.get("soft", 12)), 0, 1)
+    eye = o.get("eye")
+    if eye:
+        keep = keep * np.clip((rr - eye[0]) / max(1.0, eye[1] - eye[0]), 0, 1)
+    return out, keep
+
+
 def build(spec, src_dir, out_dir, only=None):
     os.makedirs(out_dir, exist_ok=True)
     index = {}
@@ -1147,6 +1239,9 @@ def build(spec, src_dir, out_dir, only=None):
                     x0, y0, x1, y1 = e["turn"]["box"]
                     a = a.copy()
                     a[y0:y1, x0:x1] = a[2 * cy - y1 + 1:2 * cy - y0 + 1, 2 * cx - x1 + 1:2 * cx - x0 + 1][::-1, ::-1]
+                rf_keep = None
+                if e.get("rotfill"):
+                    a, rf_keep = rotfill(a, e["rotfill"], frames, i)
                 r, g, bl = a[..., 0], a[..., 1], a[..., 2]
                 digit = (bl > 170) & (r < 120) & (bl - r > 90)
                 if e.get("cyan"):
@@ -1188,6 +1283,8 @@ def build(spec, src_dir, out_dir, only=None):
                 fill = bnum / np.maximum(bk, 0.05)[..., None]
                 a = np.where(hole[..., None], np.clip(fill, 0, 255), a)
                 al = np.clip((a.max(axis=2) - e.get("t0", 16)) / max(1.0, e.get("t1", 60) - e.get("t0", 16)), 0, 1) * 255
+                if rf_keep is not None:
+                    al = al * rf_keep  # (rotfill: what no clean turn could give, left soft — not the whole middle)
                 # in the middle, where the field's monsters stood in the capture, only the art's vivid colour stays
                 # (the vortex, the waves); the grey-brown of what was filled and the hit stars' white fade out
                 if e.get("field"):
@@ -1232,6 +1329,7 @@ def build(spec, src_dir, out_dir, only=None):
                     from scipy import ndimage
                     o_ = np.asarray(f.convert("RGB")).astype(np.float32)
                     r_, g_, b_ = o_[..., 0], o_[..., 1], o_[..., 2]
+                    wfade_ = 1.0
                     mn_, mx_ = o_.min(axis=2), o_.max(axis=2)
                     star_ = (r_ > 170) & (r_ - g_ > 45) & (b_ < 140)
                     bad_ = star_ | ((g_ > r_ + 40) & (g_ > b_ + 40)) | ((r_ > 150) & (g_ < 70))
@@ -1257,7 +1355,17 @@ def build(spec, src_dir, out_dir, only=None):
                                 hit2_ = np.unique(lab2_[(boxes_ | bad_) & (lab2_ > 0)])
                                 small_ = ndimage.sum(np.ones_like(lab2_), lab2_, range(1, n2_ + 1)) < e.get("wmin", 25)
                                 drop_ = np.isin(lab2_, hit2_) | np.isin(lab2_, 1 + np.nonzero(small_)[0])
-                                bad_ = drop_ | (lab2_ == 0)
+                                if e.get("wsoft"):
+                                    # (a long streak — the wind whirling round the hero — crossing the number columns: not
+                                    # dropped whole, which left the middle black and the art dim, but faded out over
+                                    # "wsoft" px as it comes near a number, a star or a bar, like a streak's own end)
+                                    near_ = ndimage.distance_transform_edt(~(boxes_ | bad_))
+                                    soft_ = np.clip((near_ - 2) / e["wsoft"], 0, 1)
+                                    big_ = np.isin(lab2_, hit2_) & ~np.isin(lab2_, 1 + np.nonzero(small_)[0])
+                                    wfade_ = np.where(big_, soft_, np.where(drop_, 0, 1)) * (lab2_ > 0)
+                                    bad_ = wfade_ <= 0
+                                else:
+                                    bad_ = drop_ | (lab2_ == 0)
                         else:
                             bad_ |= boxes_
                     else:
@@ -1266,6 +1374,14 @@ def build(spec, src_dir, out_dir, only=None):
                     # (the pale streaks by their least channel; the arrowheads' blue by their blue)
                     alw = np.maximum(np.clip((mn_ - lo_) / 60, 0, 1), np.clip((b_ - 150) / 50, 0, 1) * np.clip((b_ - r_ - 40) / 30, 0, 1)) \
                         * np.clip((b_ - r_ + 15) / 20, 0, 1) * ~bad_
+                    if e.get("wsoft"):
+                        alw = alw * np.where(bad_, 0, wfade_)
+                    if e.get("wteal"):
+                        # (and the dark teal whirl of wind round the hero, as green as it is blue — not a digit's blue; the
+                        # middle had gone black without it) — "wteal" [green over red, floor of the brightest channel]
+                        tg, tm = e["wteal"]
+                        teal_ = np.clip((g_ - r_ - tg) / 25, 0, 1) * np.clip((g_ - b_ + 35) / 20, 0, 1) * np.clip((mx_ - tm) / 30, 0, 1)
+                        alw = np.maximum(alw, teal_ * ~bad_ * (wfade_ if e.get("wsoft") else 1))
                     if e.get("hero"):
                         cx, cy, rx, ry = e["hero"]
                         yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]

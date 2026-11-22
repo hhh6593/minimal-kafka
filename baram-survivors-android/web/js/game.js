@@ -9053,12 +9053,18 @@ const TIER_KINDS = {
     const run = G, life = def.duration, n = Math.round(life / def.tick), d = tkHit(def, skill);
     if (def.ward) { G.buffs.ward9 = G.t + life; G.buffs.ward9K = def.ward; }
     if (def.reflect) G.buffs.reflect = Math.max(G.buffs.reflect, G.t + life);
-    // the aura's own picture held round the hero, as wide as what it reaches
-    tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    // the aura's own picture held round the hero, as wide as what it reaches — or (def.half: 천신의기운, 원작 2662 IMG33) the
+    // original's own picture at the original's size relative to the hero, and what it strikes the ellipse it draws
+    // (half: its half width and depth in game px), not grown with the 단
+    const own = def.half && M.fx[def.fx];
+    if (own) tkLoop(def.fx, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    else tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    const inAura = own ? () => G.enemies.filter(e => tkFoe(e) && ((e.x - p.x) / def.half[0]) ** 2 + ((e.y - 20 - (p.y - 14)) / def.half[1]) ** 2 <= 1)
+      : () => around(p.tx, p.ty, r);
     if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
     for (let k = 1; k <= n; k++) later(k * def.tick, () => {
       if (G !== run || G.dead) return;
-      const near = around(p.tx, p.ty, r);
+      const near = inAura();
       let got = 0;
       for (const e of near) {
         if (def.fxHit && got < 2 && k % 2) fxOn(def.fxHit, e, { scale: 0.6 });
