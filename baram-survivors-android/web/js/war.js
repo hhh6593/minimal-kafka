@@ -1663,7 +1663,7 @@ function thinkHealer(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { on: low })); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { self: true, on: low })); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1764,7 +1764,7 @@ function thinkHealerRaid(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { on: low })); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { self: true, on: low })); cue(b, 0.6); }
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -2455,7 +2455,7 @@ function heroRole(W, dt) {
     for (const m of W.alive[0]) if (!m.hero && !m.gate && d2(m, h) < 5 && hpk(m) < lk) { lk = hpk(m); low = m; }
     if (low) {
       const fx = SK.c_heal.fxs ? SK.c_heal.fxs[Math.min(7, Math.floor(p.lvl / 5))] : SK.c_heal.fx;
-      if (fx) A.addFx(fx, 0, -26, { scale: 0.9, on: low });
+      if (fx) A.addFx(fx, 0, -26, { scale: 0.9, self: true, on: low });
       healBody(W, h, low, low.maxHp * 0.08 * W.roleK);
       A.floatText(low.x, low.y - 70, '기원', '#fff', true);
       if (lk < 0.45) chat(W, low, 'thxHeal', ['힐 감사요!', '감사합니다 ㅎㅎ', '살았다 ㄳ'], { every: 25, p: 0.5, emo: Math.random() < 0.4 ? 'cute' : null });
@@ -2467,7 +2467,7 @@ function heroRole(W, dt) {
     const foes = enemiesNear(W, h, 3);
     for (const [e] of foes) e.curse = Math.max(e.curse, 4);
     if (mates.length > 1 || foes.length) {
-      A.addFx(A.FX.shield, 0, -26, { follow: true, scale: 0.8 });
+      A.addFx(A.FX.shield, 0, -26, { follow: true, self: true, scale: 0.8 });
       credit(h, 'obj', (mates.length > 1 ? 4 : 0) + (foes.length ? 3 : 0)); // as an AI supporter's 보호 and 저주 count
     }
   } else W.roleT = 5;
@@ -2500,7 +2500,7 @@ function heroHeal(n, fx, poet = false, skip = null) {
     if (m.dead || m === skip || d2(m, W.hero) > (healer ? 5 : 4)) continue;
     const hurt = m.hp < m.maxHp;
     healBody(W, W.hero, m, m.maxHp * k);
-    if (fx && hurt && shown < 8 && onScreen(m)) { shown++; A.addFx(fx, 0, -26, { scale: 1.1, on: m }); }
+    if (fx && hurt && shown < 8 && onScreen(m)) { shown++; A.addFx(fx, 0, -26, { scale: 1.1, self: true, on: m }); }
   }
 }
 
@@ -3261,7 +3261,7 @@ function castSkill(W, b, t, s) {
     if (s.kind === 'shield') b.shield = Math.max(b.shield || 0, G.t + 3);
     else if (d.buff === 'haste') b.hasteT = G.t + Math.min(5, d.duration || 4);
     else { b.powT = G.t + Math.min(5, d.duration || 4); b.powK = 1 + Math.min(0.3, (d.power || 0.4) * 0.4); }
-    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { on: b })); cue(b, 0.75); CS.shown++; }
+    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { self: true, on: b })); cue(b, 0.75); CS.shown++; }
     if (Math.random() < 0.4) shout(W, b, name);
     sound(W, b, 'skill_' + s.id, 'buff');
     pose(b, 'cast');
@@ -4096,7 +4096,7 @@ function castBuff(W, b, to, id) {
       G.buffs.power = Math.max(G.buffs.power, G.t + dur);
     } else if (d.buff === 'guard') G.buffs.guard = Math.max(G.buffs.guard, G.t + Math.min(1.5, d.duration || 1.5));
     else G.buffs[d.buff] = Math.max(G.buffs[d.buff] || 0, G.t + dur);
-    if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.8 });
+    if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, self: true, scale: 0.8 });
     A.floatText(p.x, p.y - 84, name, '#bfe8ff', true);
     supCount(W, 'buff');
     (W.sup.names[name] = (W.sup.names[name] || 0) + 1);
@@ -4104,7 +4104,7 @@ function castBuff(W, b, to, id) {
   } else {
     if (d.buff === 'power') { to.powT = G.t + dur; to.powK = 1.15; }
     else to.shield = Math.max(to.shield || 0, G.t + dur);
-    if (fx && fxOk() && onScreen(to)) A.addFx(fx, 0, -26, aiO(0.65, { on: to }));
+    if (fx && fxOk() && onScreen(to)) A.addFx(fx, 0, -26, aiO(0.65, { self: true, on: to }));
   }
   shout(W, b, name);
   pose(b, 'cast');
@@ -4114,7 +4114,7 @@ function castBuff(W, b, to, id) {
 /** A healer's mend has reached the hero: the 기원's picture over it, its name, a word now and then. */
 function heroMended(W, b, hid) {
   const G = A.G(), p = G.player, name = spellName(hid, b.lv), fx = spellFx(hid, b.lv);
-  if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, scale: 0.85 });
+  if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, self: true, scale: 0.85 });
   if (G.t - (W.mendSaidT || -99) > 2.5) { W.mendSaidT = G.t; A.floatText(p.x, p.y - 84, name, '#c8ffc0', true); }
   const names = supOf(W).names;
   names[name] = (names[name] || 0) + 1;
@@ -5698,7 +5698,7 @@ function taskTick(W, T, dt) {
         c.tick = 0.5;
         healBody(W, h, m, m.maxHp * 0.045 * W.roleK);
         const fx = SK.c_heal && (SK.c_heal.fxs ? SK.c_heal.fxs[Math.min(7, Math.floor(p.lvl / 5))] : SK.c_heal.fx);
-        if (fx && healFxOk()) A.addFx(fx, 0, -26, { scale: 0.9, on: m });
+        if (fx && healFxOk()) A.addFx(fx, 0, -26, { scale: 0.9, self: true, on: m });
       }
     }
     c.prog = hpk(m);
@@ -5716,7 +5716,7 @@ function taskTick(W, T, dt) {
         if (n >= 1) {
           m.curseMark = null;
           done++;
-          if (SK.c_heal && healFxOk()) A.addFx(A.FX.shield, 0, -26, { scale: 0.8, on: m });
+          if (SK.c_heal && healFxOk()) A.addFx(A.FX.shield, 0, -26, { scale: 0.8, self: true, on: m });
           A.floatText(m.x, m.y - 70, '정화', '#c8f0ff', true);
         }
       }
@@ -5755,7 +5755,7 @@ function taskTick(W, T, dt) {
     c.prog = near.length;
     if (left <= 0) {
       const ok = near.length >= c.need;
-      if (ok) { for (const m of near) guard(W, m, 4); A.addFx(A.FX.shield, 0, -26, { follow: true, scale: 1 }); }
+      if (ok) { for (const m of near) guard(W, m, 4); A.addFx(A.FX.shield, 0, -26, { follow: true, self: true, scale: 1 }); }
       raidPulse(W, ok ? 0.08 : 0.22);
       return taskEnd(W, T, ok);
     }
