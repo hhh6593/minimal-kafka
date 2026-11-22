@@ -460,7 +460,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 82-92: no damage number over it) — unmixed from the clean field (frame 0): the dummy under it stands still and drops out, the hero beside it on the left left out (the cell starts at its right shoulder and fades in), the dummy's bar and marker filled from the flame round them. (1320 #05 is not it.) The cast (frames 2-6) is only the hero's own body tinted violet — not used: it would carry the hero's outline",
+  "why": "묵혈독바르기: the blue-violet flame of 묵혈독 bursting on the one struck (2662 IMG17 frames 82-92: no damage number over it) — unmixed from the clean field (frame 0): the dummy under it stands still and drops out, the hero beside it on the left left out (the cell starts at its right shoulder and fades in), the dummy's bar and marker filled from the flame round them. (1320 #05 is not it.) The cast (frames 2-6) is only the hero's own body tinted violet — not used: it would carry the hero's outline [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
   "bg": 0,
   "k": 110,
   "smooth": 3,
@@ -472,7 +472,8 @@
     396,
     246
    ]
-  ]
+  ],
+  "opaque": 1.8
  },
  "m_hoeseon": {
   "src": "gif2662/IMG21.gif",
@@ -641,7 +642,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 13-22; the camera still) — unmixed from the clean field with the grid (frame 8): its opacity and own colour; the hit stars (found by their orange rims) and the numbers beside them, and the target's name, filled with the wind round them",
+  "why": "회선격풍: the great teal whirlwind raised on the one struck (2662 IMG21 frames 13-22; the camera still) — unmixed from the clean field with the grid (frame 8): its opacity and own colour; the hit stars (found by their orange rims) and the numbers beside them, and the target's name, filled with the wind round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
   "bg": 8,
   "k": 120,
   "smooth": 3,
@@ -690,7 +691,8 @@
     310
    ]
   ],
-  "grain": false
+  "grain": false,
+  "opaque": 1.6
  },
  "m_seori": {
   "src": "gif2662/IMG23.gif",
@@ -2200,7 +2202,7 @@
   ],
   "ms": 120,
   "scale": 0.62,
-  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded); now unmixed: its opacity and own colour taken out of the clean carpet (frame 0), the target and its bar under it (tinted by the fog) filled from the fog round them",
+  "why": "환영안개: the purple fog of phantoms spread ahead (2662 IMG29 frames 10-26: it rolls out from the hero, the phantom's face in it, a teal flash, dark again; the camera still) — its violet keyed off the carpet and the olive floor. Its pivot the hero's feet, the fog to its left as the hero faces left; the capture's left edge cuts its far end (faded); now unmixed: its opacity and own colour taken out of the clean carpet (frame 0), the target and its bar under it (tinted by the fog) filled from the fog round them [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
   "bg": 0,
   "k": 110,
   "smooth": 4,
@@ -2223,7 +2225,8 @@
     345,
     335
    ]
-  ]
+  ],
+  "opaque": 1.5
  },
  "p_banhyang": {
   "src": "dl1320/22.gif",
@@ -6823,10 +6826,10 @@
   ],
   "ms": 90,
   "scale": 0.62,
-  "why": "천선의영역: the golden seal of the zone round the hero (2662 IMG35 frames 10-26, the camera still), its gold keyed off the grey ground (gold)",
+  "why": "천선의영역: the golden seal of the zone round the hero (2662 IMG35 frames 10-26, the camera still), its gold keyed off the grey ground (gold) [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)]",
   "bg": 0,
   "gmin": 100,
-  "add": true,
+  "add": false,
   "fillzone": [
    261,
    248,
@@ -6848,7 +6851,11 @@
     58
    ]
   ],
-  "fzlo": 55
+  "fzlo": 55,
+  "unadd": [
+   125,
+   110
+  ]
  },
  "p_cheonsin9": {
   "src": "gif2662/IMG33.gif",
@@ -7006,11 +7013,11 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "천신의기운: each second's burst of golden spikes and the gold ring spreading from it round the hero (2662 IMG33 frames 16-28), gold keyed off the grey ground",
+  "why": "천신의기운: each second's burst of golden spikes and the gold ring spreading from it round the hero (2662 IMG33 frames 16-28), gold keyed off the grey ground [색 보정: drawn added it was as bright as the original only over its light grey floor, dull brown over ours: made a plain layer that over that grey gives the original pixels (unadd)]",
   "bg": 0,
   "gmin": 110,
   "noorange": true,
-  "add": true,
+  "add": false,
   "noblue": true,
   "nobars": true,
   "sector": [
@@ -7020,6 +7027,11 @@
    62,
    104,
    50
+  ],
+  "unadd": [
+   125,
+   130,
+   45
   ]
  },
  "p_cheonroe9": {
@@ -7325,7 +7337,8 @@
   ],
   "ms": 90,
   "scale": 0.62,
-  "why": "이기뇌멸시: the lightning spreading — one pool opening (2662 IMG40 frames 36-38)"
+  "why": "이기뇌멸시: the lightning spreading — one pool opening (2662 IMG40 frames 36-38) [색 보정: taken off the light grey floor, the same alpha over our dark ground let it through and read pale: opacity raised (opaque), its own colour kept]",
+  "opaque": 1.8
  },
  "a_eungvortex": {
   "src": "gif2662/IMG44.gif",
