@@ -3029,24 +3029,26 @@
      0,
      36
     ]
-   },
-   {
-    "box": [
-     0,
-     0,
-     0,
-     0
-    ],
-    "ellipse": [
-     388,
-     262,
-     262,
-     232,
-     0.25
-    ]
    }
   ],
-  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, the middle window of bodies and numbers left out (soft ellipse), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
+  "window": [
+   388,
+   262,
+   262,
+   232,
+   0.25
+  ],
+  "wgrow": 5,
+  "wlo": 120,
+  "wstars": [
+   8,
+   10,
+   78,
+   12
+  ],
+  "wcomp": 1,
+  "wmin": 25,
+  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, in the middle window only the arrows and wind lines' own pale light, nothing near a number, star, bar or body (no fill), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9)"
  },
  "cl_ult9": {
   "src": "gif2662/IMG56.gif",
@@ -6418,7 +6420,7 @@
   ],
   "ms": 200,
   "scale": 0.62,
-  "why": "이기뇌멸시: one 뇌전시 striking (2662 IMG40 frame 1): its lower part, under the number written over it — the zigzag, the arrowhead, the fan of light where it lands; the top faded round the landing point"
+  "why": "이기뇌멸시: one 뇌전시 striking (2662 IMG40 frame 1): its lower part, under the number written over it — the zigzag, the arrowhead, the fan of light where it lands; the top faded round the landing point (the part above the number joined on showed a straight seam: left out)"
  },
  "a_igipool": {
   "src": "gif2662/IMG40.gif",

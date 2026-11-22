@@ -7884,7 +7884,7 @@ function igi9(st, def, smite) {
     if (G !== run) return;
     const tx = t.tx, ty = t.ty, fx = tx * TILE + TILE / 2, fy = ty * TILE + TILE - 6;
     // the bolt falls the last stretch onto the spot, and stands a moment
-    if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: fx, y: fy - 60, t: 0, life: fall + 0.16, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, loop: true, mv: [0, 60, fall] });
+    if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: fx, y: fy - 60, t: 0, life: fall + 0.3, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, loop: true, mv: [0, 60, fall] });
     later(fall, () => {
       if (G !== run) return;
       G.quietHit = true;
@@ -7954,9 +7954,10 @@ function hwasalbi9(skill, st) {
   G.rain9At = G.t + (c.cd || 1);
   const p = G.player, fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = p.fdx ? 0 : p.fdy || 0;
   const x = p.x + Math.sign(fx) * c.ahead * TILE, y = p.y - 20 + fy * c.ahead * TILE, run = G, [hx, hy] = c.half;
-  tkLoop(c.fx, x, y, fxLife(c.fx), { alpha: settings.calmFx ? 0.75 : 1, anchor: 'bottom' });
+  const rf = tkLoop(c.fx, x, y, fxLife(c.fx) * 1.5, { alpha: settings.calmFx ? 0.8 : 1, anchor: 'bottom', scale: c.scale || 1 });
+  if (rf) rf.top = true;
   const d = (st.dmg || 30) * c.k;
-  for (let k = 0; k < c.ticks; k++) later(0.15 + k * (fxLife(c.fx) - 0.2) / c.ticks, () => {
+  for (let k = 0; k < c.ticks; k++) later(0.15 + k * (fxLife(c.fx) * 1.5 - 0.25) / c.ticks, () => {
     if (G !== run || G.dead) return;
     G.quietHit = true;
     for (const e of G.enemies) if (tkFoe(e) && Math.abs(e.x - x) <= hx && Math.abs(e.y - 20 - y) <= hy) hurtEnemy(e, d);
@@ -16054,7 +16055,9 @@ function render(now) {
   drawCheongrin(); // 청린수폭's 청룡 (before the splashes and orbs on it)
   // Spell effects over everything, at their own size.
   const trail = !G.war && p.trail, puffs = [];
-  for (const f of G.fxs) {
+  // (f.top: drawn over the rest — 화살비폭격's rain is not to be lost under the blasts of the skill that brings it)
+  const fxOrder = G.fxs.some(f => f.top) ? G.fxs.filter(f => !f.top).concat(G.fxs.filter(f => f.top)) : G.fxs;
+  for (const f of fxOrder) {
     if (f.t < 0) continue;
     let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
     if (f.mv) {

@@ -148,7 +148,7 @@ def white_pieces(fr, bg, frames, x_max=682):
                 continue
             y0, y1, x0, x1 = sl[0].start - 3, sl[0].stop + 3, sl[1].start - 3, sl[1].stop + 3
             reg = ndimage.binary_dilation(lab == k + 1, iterations=2)[y0:y1, x0:x1]
-            al = np.clip((d[y0:y1, x0:x1] - 14) / 90, 0, 1) * reg
+            al = np.clip((d[y0:y1, x0:x1] - 14) / 70, 0, 1) ** 0.7 * reg  # (the rain bright: its faint glow lifted)
             F = np.clip(bg[y0:y1, x0:x1] + D[y0:y1, x0:x1] / np.maximum(al, 0.05)[..., None], 0, 255)
             # (white: the ground's own tint taken out of what is left — no brown or grey haze round a white piece)
             F = np.where((al > 0)[..., None], np.maximum(F, F.max(2, keepdims=True) - 12), 0)
@@ -176,11 +176,11 @@ def hwasalbi(src_dir):
     puffs = sorted([p for p in uniq if p[0] == 'puff'], key=lambda p: -(p[1].width * p[1].height))
     cw, ch, ox, oy, hx, hy = 330, 300, 165, 190, 130, 80  # (room above for the streaks coming down)
     spots = []
-    for j in range(3):
-        cols = 5 if j % 2 == 0 else 4
+    for j in range(4):
+        cols = 6 if j % 2 == 0 else 5
         for i in range(cols):
-            x = ox - hx + 14 + (i + (0.5 if cols == 4 else 0)) * (2 * hx - 28) / 4
-            spots.append((x, oy - hy + 16 + j * (2 * hy - 32) / 2))
+            x = ox - hx + 12 + (i + (0.5 if cols == 5 else 0)) * (2 * hx - 24) / 5
+            spots.append((x, oy - hy + 12 + j * (2 * hy - 24) / 3))
     rng = np.random.RandomState(44)
     order = rng.permutation(len(spots))
     N = 12
@@ -191,24 +191,121 @@ def hwasalbi(src_dir):
         ph = int(order[si] * N / len(spots))
         for t in range(N):
             loc = (t - ph) % N
-            if loc < 2:
-                # the streak falling onto its spot (its foot 40, then 12 px above it)
+            if loc < 3:
+                # the streak falling onto its spot (its foot 56, 30, then 8 px above it)
                 img, bx, by = sk[1], sk[2], sk[3]
-                fy = y - (40 if loc == 0 else 12)
+                fy = y - {0: 56, 1: 30, 2: 8}[loc]
                 cells[t].alpha_composite(img, (int(round(x - bx)), int(round(fy - by))))
-            if 2 <= loc <= 5:
+            if 3 <= loc <= 6:
                 img, bx, by = pf[1], pf[2], pf[3]
                 arr = np.asarray(img).astype(np.float32).copy()
-                arr[..., 3] *= {2: 1.0, 3: 1.0, 4: 0.65, 5: 0.3}[loc]
+                arr[..., 3] *= {3: 1.0, 4: 1.0, 5: 0.65, 6: 0.3}[loc]
                 cells[t].alpha_composite(Image.fromarray(arr.astype(np.uint8)), (int(round(x - bx)), int(round(y + 6 - by))))
-                if loc == 2:
+                if loc == 3:
                     # (the streak still standing in the dust as it lands)
                     img, bx, by = sk[1], sk[2], sk[3]
                     cells[t].alpha_composite(img, (int(round(x - bx)), int(round(y - by))))
     return cells, {"cell": [cw, ch], "n": N, "ms": 80, "add": False, "cap": 420, "anchor": [ox, oy], "src": "gif2662/IMG44.gif", "k": 0.62}
 
 
+def rain_pieces(fr, frames, box):
+    """만시창공's rain (2662 IMG47): the clear pieces of its light in `frames` inside `box` — the falling arrows (blue heads,
+    pale shafts) and the long light streaks — each whole, kept only when no hit star's number box (the star and 80 px to
+    its right, where the number is written), no bar, no label and no skull lies on or beside it: [(kind, rgba, x, y)] with
+    (x, y) its top-left in the capture. Its own pixels on the black of the darkened screen: alpha by brightness."""
+    out = []
+    x0b, y0b, x1b, y1b = box
+    for f in frames:
+        a = fr[f].astype(np.float32)
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        mn, mx = a.min(2), a.max(2)
+        star = (r > 170) & (r - g > 45) & (b < 140)
+        bad = ndimage.binary_dilation(star | ((g > r + 40) & (g > b + 40)) | ((r > 150) & (g < 70)), iterations=5)
+        lab, n = ndimage.label(ndimage.binary_dilation(star, iterations=2))
+        for sl in ndimage.find_objects(lab):
+            if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) >= 30:
+                bad[max(0, sl[0].start - 10):sl[0].stop + 14, max(0, sl[1].start - 10):sl[1].stop + 82] = True
+        # (a fallen one's skull: white, dark-eyed, beside the ground — and the hero's own warm body: kept out by colour)
+        light = np.maximum(np.clip((mn - 120) / 60, 0, 1), np.clip((b - 150) / 50, 0, 1) * np.clip((b - r - 40) / 30, 0, 1)) \
+            * np.clip((b - r + 15) / 20, 0, 1)
+        lab, n = ndimage.label(ndimage.binary_dilation(light > 0.08, iterations=1))
+        for k, sl in enumerate(ndimage.find_objects(lab)):
+            comp = lab[sl] == k + 1
+            h, w = comp.shape
+            if sl[1].start < x0b or sl[1].stop > x1b or sl[0].start < y0b or sl[0].stop > y1b:
+                continue
+            reg = ndimage.binary_dilation(lab == k + 1, iterations=3)
+            if (reg & bad).any() or comp.sum() < 40:
+                continue
+            if h >= 24 and h <= 80 and w <= 40:
+                kind = "arrow"
+            elif h > 80 and w <= 30:
+                kind = "streak"
+            else:
+                continue
+            y0, y1, x0, x1 = sl[0].start - 2, sl[0].stop + 2, sl[1].start - 2, sl[1].stop + 2
+            m = ndimage.binary_dilation(lab == k + 1, iterations=1)[y0:y1, x0:x1]
+            al = np.clip((mx[y0:y1, x0:x1] - 25) / 70, 0, 1) * m
+            out.append((kind, Image.fromarray(np.dstack([a[y0:y1, x0:x1], al * 255]).astype(np.uint8)), x0, y0))
+    return out
+
+
+def ult9rain(src_dir, out_dir):
+    """만시창공 (궁사 9차 필살기): the rain of arrows is the heart of it (2662 IMG47 frames 29-44), but in the middle of the
+    capture it falls through columns of damage numbers. s9_fx.py's a_ult9 (the scroll round the screen, the middle left
+    out where it was not clean) gets it back here from clean pieces: the light streaks (frames 27-35) and the falling arrows
+    (frames 36-42), each whole, laid over the middle window — the streaks standing in its first cells, the arrows falling
+    (each moved down a stretch a cell along its own slant) after — at the capture's scale × the sheet's. Runs after s9_fx.py."""
+    fr = frames_of(os.path.join(src_dir, "gif2662/IMG47.gif"))
+    ps = rain_pieces(fr, range(27, 43), (60, 40, 740, 600))
+    arrows = [p for p in ps if p[0] == "arrow"]
+    streaks = [p for p in ps if p[0] == "streak"]
+    idx = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))
+    e = idx["a_ult9"]
+    cw, ch = e["cell"]
+    n = e["n"]
+    sheet = Image.open(os.path.join(out_dir, "a_ult9.png")).convert("RGBA")
+    cells = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+    z = cw / 796.0
+    rng = np.random.RandomState(47)
+    # the window (capture px): the ellipse the scroll leaves open round the hero
+    cx, cy, rx, ry = 388, 262, 250, 220
+    def spots(k):
+        pts = []
+        while len(pts) < k:
+            x, y = rng.uniform(-1, 1, 2)
+            if x * x + y * y <= 1:
+                pts.append((cx + x * rx, cy + y * ry))
+        return pts
+    # cells: frames 14, 17, … 44 — streaks from frame 29 (cell 5), arrows from frame 35 (cell 7) to the end, fading in the last
+    plan = {5: (20, 0, 1.0), 6: (24, 14, 1.0), 7: (14, 30, 1.0), 8: (6, 36, 1.0), 9: (0, 36, 1.0), 10: (0, 22, 0.55)}
+    arrow_spots = spots(36)
+    for ci, (ns, na, fade) in plan.items():
+        if ci >= n:
+            continue
+        layer = Image.new("RGBA", (796, 644))
+        for j, (x, y) in enumerate(spots(ns) if streaks else []):
+            kind, img, _, _ = streaks[(j + ci * 3) % len(streaks)]
+            layer.alpha_composite(img, (int(x - img.width / 2), int(y - img.height / 2)))
+        for j in range(min(na, len(arrow_spots))):
+            if not arrows:
+                break
+            kind, img, _, _ = arrows[j % len(arrows)]
+            x, y = arrow_spots[j]
+            y = y - 60 + (ci - 7) * 40  # (falling: each a stretch lower a cell)
+            layer.alpha_composite(img, (int(x - img.width / 2), int(y - img.height / 2)))
+        arr = np.asarray(layer).astype(np.float32)
+        yy, xx = np.mgrid[0:644, 0:796]
+        rr = np.sqrt(((xx - cx) / (rx + 30)) ** 2 + ((yy - cy) / (ry + 30)) ** 2)
+        arr[..., 3] *= np.clip((1.15 - rr) / 0.25, 0, 1) * fade  # (the rain's own round, soft at its edge: no straight cut)
+        layer = Image.fromarray(arr.astype(np.uint8)).resize((cw, ch), Image.LANCZOS)
+        cells[ci] = Image.alpha_composite(cells[ci], layer)
+    print("rain pieces: %d arrows, %d streaks" % (len(arrows), len(streaks)))
+    return cells, e
+
+
 BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi}
+POST = {"a_ult9": ult9rain}  # (re-drawing an s9_fx.py sheet: run after it)
 
 
 def main():
@@ -218,7 +315,7 @@ def main():
     ipath = os.path.join(out_dir, "index.json")
     index = json.load(open(ipath, encoding="utf-8")) if os.path.isfile(ipath) else {}
     for sid in only:
-        cells, entry = BUILDERS[sid](src_dir)
+        cells, entry = POST[sid](src_dir, out_dir) if sid in POST else BUILDERS[sid](src_dir)
         cw, ch = entry["cell"]
         sheet = Image.new("RGBA", (cw * len(cells), ch))
         for i, c in enumerate(cells):

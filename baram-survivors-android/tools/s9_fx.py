@@ -796,6 +796,14 @@ def parts_cells(frames, e):
                         _, (iy_, ix_) = ndimage.distance_transform_edt(todo_ | bad_, return_indices=True)
                         a[todo_] = src_[iy_[todo_], ix_[todo_]]
                     continue
+                if "vfade" in op:
+                    # (a straight join softened: alpha ramped from 1 at y0 to `to` at y1, relative to "at")
+                    y0_, y1_ = op["vfade"]
+                    to_ = op.get("to", 0.0)
+                    yy_ = np.arange(H)[:, None] - ay
+                    t_ = np.clip((yy_ - y0_) / (y1_ - y0_ or 1), 0, 1)
+                    a[..., 3] = (a[..., 3] * (1 - t_ * (1 - to_))).astype(np.uint8)
+                    continue
                 if "radial" in op:
                     # (only the burst's own round: what lies past r1 from its middle is not its — faded from r0)
                     r0_, r1_ = op["radial"]
@@ -1040,6 +1048,61 @@ def build(spec, src_dir, out_dir, only=None):
                     yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                     dd = np.minimum(np.minimum(xx - bx[0], bx[2] - 1 - xx), np.minimum(yy - bx[1], bx[3] - 1 - yy))
                     al = al * np.clip(dd / n_, 0, 1)
+                if e.get("window"):
+                    # (the middle, where the bodies and the thick numbers stand — 만시창공's rain of arrows and wind lines
+                    # fall there: inside the ellipse [cx, cy, rx, ry, soft] no fill at all, the frame's own pixels kept only
+                    # where they are the art's pale cool light (bright, blue at least as red: the arrows, the wind) and
+                    # nothing of a number, a star, a bar or a label lies within `wgrow` px; the rest see-through)
+                    from scipy import ndimage
+                    o_ = np.asarray(f.convert("RGB")).astype(np.float32)
+                    r_, g_, b_ = o_[..., 0], o_[..., 1], o_[..., 2]
+                    mn_, mx_ = o_.min(axis=2), o_.max(axis=2)
+                    star_ = (r_ > 170) & (r_ - g_ > 45) & (b_ < 140)
+                    bad_ = star_ | ((g_ > r_ + 40) & (g_ > b_ + 40)) | ((r_ > 150) & (g_ < 70))
+                    bad_ = ndimage.binary_dilation(bad_, iterations=e.get("wgrow", 7))
+                    if e.get("wstars"):
+                        # (each damage number is written to the right of its hit star: the box from the star over its
+                        # number, [left, up, right, down] px — the arrowheads' blue elsewhere kept, it is the art's)
+                        L_, U_, R_, D_ = e["wstars"]
+                        lab_, n_ = ndimage.label(ndimage.binary_dilation(star_, iterations=2))
+                        boxes_ = np.zeros_like(bad_)
+                        for sl in ndimage.find_objects(lab_):
+                            if (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start) < 30:
+                                continue
+                            boxes_[max(0, sl[0].start - U_):sl[0].stop + D_, max(0, sl[1].start - L_):sl[1].stop + R_] = True
+                        # (and the skull markers of the fallen: white with dark eyes, small, low — out with their own box)
+                        if e.get("wcomp"):
+                            # (not cut on the boxes' straight edges: each piece of the art's light — an arrow, a streak, a
+                            # wind line — kept whole when it touches neither a box nor a number/star/bar, else left out whole)
+                            pre_ = np.maximum(np.clip((mn_ - e.get("wlo", 120)) / 60, 0, 1), np.clip((b_ - 150) / 50, 0, 1) * np.clip((b_ - r_ - 40) / 30, 0, 1)) \
+                                * np.clip((b_ - r_ + 15) / 20, 0, 1)
+                            lab2_, n2_ = ndimage.label(ndimage.binary_dilation(pre_ > 0.08, iterations=1))
+                            if n2_:
+                                hit2_ = np.unique(lab2_[(boxes_ | bad_) & (lab2_ > 0)])
+                                small_ = ndimage.sum(np.ones_like(lab2_), lab2_, range(1, n2_ + 1)) < e.get("wmin", 25)
+                                drop_ = np.isin(lab2_, hit2_) | np.isin(lab2_, 1 + np.nonzero(small_)[0])
+                                bad_ = drop_ | (lab2_ == 0)
+                        else:
+                            bad_ |= boxes_
+                    else:
+                        bad_ |= ndimage.binary_dilation(((b_ > 140) & (b_ - r_ > 60) & (r_ < 120)) | ((b_ - r_ > 25) & (b_ - g_ > 10) & (mx_ < 130)), iterations=e.get("wgrow", 7))
+                    lo_ = e.get("wlo", 120)
+                    # (the pale streaks by their least channel; the arrowheads' blue by their blue)
+                    alw = np.maximum(np.clip((mn_ - lo_) / 60, 0, 1), np.clip((b_ - 150) / 50, 0, 1) * np.clip((b_ - r_ - 40) / 30, 0, 1)) \
+                        * np.clip((b_ - r_ + 15) / 20, 0, 1) * ~bad_
+                    if e.get("hero"):
+                        cx, cy, rx, ry = e["hero"]
+                        yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                        alw = alw * (((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 > 1.6)
+                    cx, cy, rx, ry, fw = e["window"]
+                    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                    rr = np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2)
+                    wo = np.clip((rr - 1) / fw, 0, 1)
+                    wi = 1 - wo
+                    A1, A2 = al * wo, alw * 255 * wi
+                    tot = np.maximum(A1 + A2, 1e-3)
+                    a = (a * A1[..., None] + o_ * A2[..., None]) / tot[..., None]
+                    al = np.clip(A1 + A2, 0, 255)
                 a = np.dstack([a, al]).astype(np.uint8)
             elif mode == "cutin":
                 # an 궁극's full-screen art: its black (the client's own darkening) taken out, so the
