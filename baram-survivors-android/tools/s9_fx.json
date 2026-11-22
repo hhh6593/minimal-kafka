@@ -6757,7 +6757,7 @@
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "천궁난사: one fire arrow's blast (2662 IMG42 frames 21-27 at the right dummy: white sphere, ring, burst, embers); the number, its star and the bar taken again from the burst turned round its middle (rot)"
+  "why": "천궁난사: one fire arrow's blast (2662 IMG42 frames 21-27 at the right dummy: white sphere, ring, burst, embers); the number, its star and the bar taken again from the burst turned round its middle (rot) [s9_stamps.py POST a_cheongung: the first cell's upper half its own lower half mirrored (a bite and a seam there), the last two the fifth fading (their fill marks)]"
  },
  "w_ult9": {
   "src": "gif2662/IMG09.gif",
@@ -7125,8 +7125,8 @@
    796,
    644
   ],
-  "t0": 45,
-  "t1": 110,
+  "t0": 14,
+  "t1": 44,
   "ms": 215,
   "k": 1,
   "max": 420,
@@ -7137,7 +7137,12 @@
    34,
    50
   ],
-  "edge": 36,
+  "edge": [
+   36,
+   80,
+   36,
+   36
+  ],
   "bars": 1,
   "stars": 1,
   "grow": 17,
@@ -7153,25 +7158,13 @@
      0,
      -60
     ]
-   },
-   {
-    "box": [
-     248,
-     0,
-     548,
-     34
-    ],
-    "from": [
-     0,
-     36
-    ]
    }
   ],
   "window": [
    388,
+   285,
    262,
-   262,
-   232,
+   212,
    0.25
   ],
   "wgrow": 5,
@@ -7184,11 +7177,27 @@
   ],
   "wcomp": 1,
   "wmin": 25,
-  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, in the middle window only the arrows and wind lines' own pale light, nothing near a number, star, bar or body (no fill), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9) [가운데 복원: the wind streaks that cross a number column faded out near it (wsoft) instead of dropped whole, and the dark teal whirl kept (wteal) — the rain of arrows laid over it after by s9_stamps.py POST a_ult9]",
+  "why": "만시창공: the 원작 궁극's art (2662 IMG47 frames 14-44, every third: the scroll of pines and waves, the wind lines, the rain of arrows) — its black see-through, in the middle window only the arrows and wind lines' own pale light, nothing near a number, star, bar or body (no fill), faded at its edge: drawn centred on the hero at three quarters of the screen's height (cine9) [가운데 복원: the wind streaks that cross a number column faded out near it (wsoft) instead of dropped whole, and the dark teal whirl kept (wteal) — the rain of arrows laid over it after by s9_stamps.py POST a_ult9] [색 세기: the scroll's own pixels opaque (t0 14, t1 44) and its white clouds and green pines no longer taken for numbers and stars (white 256; the holes only in the number columns' box, cyan) — they had been filled with a blur and read 37 % darker than the original; the window's top at y 73 (the cloud over it kept whole); the top, the capture's straight edge, faded over 80 px (edge [36, 80, 36, 36]) instead of a strip copied from below (its square seams); frame 14's middle (only the hit stars' white and the bars' blue) not taken (wskip); round the hero's feet, where the hero cut out of its whirl left a flat blue bar, nothing (wnot); the rain laid thicker after (s9_stamps.py POST)]",
   "wsoft": 10,
   "wteal": [
    15,
    45
+  ],
+  "white": 256,
+  "cyan": [
+   180,
+   75,
+   590,
+   425
+  ],
+  "wnot": [
+   398,
+   372,
+   125,
+   48
+  ],
+  "wskip": [
+   14
   ]
  },
  "cl_ult9": {
@@ -7205,8 +7214,8 @@
    808,
    632
   ],
-  "t0": 22,
-  "t1": 70,
+  "t0": 14,
+  "t1": 44,
   "ms": 215,
   "k": 1,
   "max": 420,
@@ -7238,21 +7247,9 @@
      50,
      0.3
     ]
-   },
-   {
-    "box": [
-     252,
-     0,
-     552,
-     30
-    ],
-    "from": [
-     0,
-     36
-    ]
    }
   ],
-  "why": "천변지이: the 원작 궁극's art (2662 IMG56 frames 8-38, every third: the storm clouds and golden bolts above, the great waves, the chain and the crossed blades below, the cyan lightning whirling round the hero in its white orb) — its black see-through, the damage numbers, hit stars, life bars and the hero filled from the art round them (only vivid colour kept in the middle where the dummies stood), the window's own border cut off, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9)",
+  "why": "천변지이: the 원작 궁극's art (2662 IMG56 frames 8-38, every third: the storm clouds and golden bolts above, the great waves, the chain and the crossed blades below, the cyan lightning whirling round the hero in its white orb) — its black see-through, the damage numbers, hit stars, life bars and the hero filled from the art round them (only vivid colour kept in the middle where the dummies stood), the window's own border cut off, faded out towards an ellipse's edge: drawn centred on the hero at three quarters of the screen's height (cine9) [the dummies' stakes in the middle filled like the numbers (holeexpr); the art's own pixels opaque (t0 14, t1 44); the top faded over 70 px (edge) instead of a strip copied from below; the white orb round the hero and the cyan lightning laid back after by s9_stamps.py POST cl_ult9]",
   "vignette": [
    1.0,
    0.99,
@@ -7274,7 +7271,17 @@
     812,
     270
    ]
-  ]
+  ],
+  "edge": [
+   1,
+   70,
+   1,
+   1
+  ],
+  "holeexpr": [
+   "(r > g + 10) & (g > bl + 5) & (r - bl > 35) & (r < 230) & (y > 150) & (y < 475) & ((abs(x - 256) < 20) | (abs(x - 405) < 20) | (abs(x - 547) < 20))"
+  ],
+  "holegrow": 3
  },
  "md_ult9": {
   "src": "gif2662/IMG64.gif",
@@ -7671,7 +7678,7 @@
   "max": 420,
   "cap": 420,
   "soft": 40,
-  "why": "비전방진: the 원작 궁극's art (2662 IMG64 frames 13-44: the tomes in their wheels, the gears, the crystals, the orbs of 마력, the purple storm, the bolts) over the client's black; the dummies' columns with their numbers, the hero and the other characters taken again from the same frame's art turned round the hero's middle; faded at its edge [가운데 복원: the vertically mirrored orb and the faded upper band replaced — the number, star, bar and dummy columns, the hero and the bystanders filled from the same frame's ring of eight orbs turned by 45° (rotfill), what none gives left soft]",
+  "why": "비전방진: the 원작 궁극's art (2662 IMG64 frames 13-44: the tomes in their wheels, the gears, the crystals, the orbs of 마력, the purple storm, the bolts) over the client's black; the dummies' columns with their numbers, the hero and the other characters taken again from the same frame's art turned round the hero's middle; faded at its edge [가운데 복원: the vertically mirrored orb and the faded upper band replaced — the number, star, bar and dummy columns, the hero and the bystanders filled from the same frame's ring of eight orbs turned by 45° (rotfill), what none gives left soft] [s9_stamps.py POST md_ult9: faded out towards a rounded box at its edge — no straight cut]",
   "rotfill": {
    "at": [
     400,
@@ -11829,54 +11836,8 @@
  },
  "a_igibolt": {
   "src": "gif2662/IMG40.gif",
-  "mode": "parts",
-  "key": "unmix",
-  "bg": 0,
-  "cell": [
-   70,
-   130
-  ],
-  "origin": [
-   35,
-   116
-  ],
-  "soft": 4,
-  "cells": [
-   [
-    {
-     "f": 1,
-     "at": [
-      414,
-      312
-     ],
-     "clip": [
-      -34,
-      -108,
-      32,
-      12
-     ],
-     "ops": [
-      {
-       "clear": [
-        -34,
-        -108,
-        -24,
-        -20
-       ]
-      },
-      {
-       "radial": [
-        72,
-        106
-       ]
-      }
-     ]
-    }
-   ]
-  ],
-  "ms": 200,
-  "scale": 0.62,
-  "why": "이기뇌멸시: one 뇌전시 striking (2662 IMG40 frame 1): its lower part, under the number written over it — the zigzag, the arrowhead, the fan of light where it lands; the top faded round the landing point (the part above the number joined on showed a straight seam: left out)"
+  "mode": "stamps",
+  "why": "이기뇌멸시: one 뇌전시 striking, whole (2662 IMG40 frame 1: its two clean parts above and below the number written over it, joined where the zigzag turns) — built by tools/s9_stamps.py (igibolt), kept in the index by s9_fx.py"
  },
  "a_igipool": {
   "src": "gif2662/IMG40.gif",
@@ -13096,7 +13057,7 @@
    175,
    125
   ],
-  "ms": 158,
+  "ms": 219,
   "scale": 0.62,
   "badbox": [
    [
@@ -13124,7 +13085,7 @@
    "(r>165)&(g>150)&(b<r-18)",
    "(g>=b)&(g>215)&(r>120)"
   ],
-  "why": "순보선풍: the blue gale whirling where the 천인 landed (2662 IMG49 frames 4-44, the camera still from frame 2): unmixed off the clean field (frame 49); what lies over it — the caster's bars and the numbers, hit stars and sparks at its middle, the struck dummy's ice burst at its top, the bystander under its bottom — taken from the whirl's own pixels a turn on round its middle (rot); faded at its own round edge; frame 34 (a faint flicker of the capture) left out",
+  "why": "순보선풍: the blue gale whirling where the 천인 landed (2662 IMG49 frames 4-44, the camera still from frame 2): unmixed off the clean field (frame 49); what lies over it — the caster's bars and the numbers, hit stars and sparks at its middle, the struck dummy's ice burst at its top, the bystander under its bottom — taken from the whirl's own pixels a turn on round its middle (rot); faded at its own round edge; frame 34 (a faint flicker of the capture) left out [the five smeared frames (the capture blurred between two turns: cells 2, 7, 8, 13, 15) left out; the 13 left held longer (219 ms) — the gale still its 3 s]",
   "cells": [
    [
     {
@@ -13138,15 +13099,6 @@
    [
     {
      "f": 8,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
-     "f": 10,
      "at": [
       280,
       273
@@ -13191,24 +13143,6 @@
    ],
    [
     {
-     "f": 20,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
-     "f": 22,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
      "f": 24,
      "at": [
       280,
@@ -13245,25 +13179,7 @@
    ],
    [
     {
-     "f": 32,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
      "f": 36,
-     "at": [
-      280,
-      273
-     ]
-    }
-   ],
-   [
-    {
-     "f": 38,
      "at": [
       280,
       273
@@ -13341,7 +13257,7 @@
    515,
    180
   ],
-  "ms": 85,
+  "ms": 95,
   "scale": 0.62,
   "max": 420,
   "cap": 420,
@@ -13359,7 +13275,7 @@
   ],
   "holegrow": 4,
   "edgeblend": 0,
-  "why": "해일강타: the sheet of water the 천인 sends out ahead (2662 IMG51 frames 4-14, the camera still; the caster at the right, facing left): unmixed off the clean field (frame 18), its colour field smoothed; the dummies standing over it, their bars, the numbers and hit stars on them, the struck ones' ice pillars (frames 4-7), the bystander above and the caster's own body are covered boxes the water round them is carried into; the cell's edge faded (soft). Its pivot the caster's feet, the water going left",
+  "why": "해일강타: the sheet of water the 천인 sends out ahead (2662 IMG51 frames 4-14, the camera still; the caster at the right, facing left): unmixed off the clean field (frame 18), its colour field smoothed; the dummies standing over it, their bars, the numbers and hit stars on them, the struck ones' ice pillars (frames 4-7), the bystander above and the caster's own body are covered boxes the water round them is carried into; the cell's edge faded (soft). Its pivot the caster's feet, the water going left [the water's fading frame 13 kept too and its pace the original's (10 frames, 0.95 s; was 0.77 s); the first four (frames 4-7, the ice pillars over every dummy: filled bands, straight seams) re-made by s9_stamps.py POST cl_haeil from frame 9's clean water, opened from the caster's side; the caster's and bystanders' brown and red taken out]",
   "cells": [
    [
     {
@@ -13636,6 +13552,21 @@
    [
     {
      "f": 12,
+     "at": [
+      545,
+      305
+     ],
+     "clip": [
+      -515,
+      -180,
+      -201,
+      110
+     ]
+    }
+   ],
+   [
+    {
+     "f": 13,
      "at": [
       545,
       305
@@ -15442,7 +15373,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15511,7 +15443,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15580,7 +15513,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15649,7 +15583,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15718,7 +15653,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15787,7 +15723,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -15856,145 +15793,8 @@
         "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
         "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
        ],
-       "grow": 1
-      },
-      {
-       "keep": [
-        [
-         -34,
-         45,
-         -142,
-         190,
-         11
-        ],
-        [
-         -142,
-         188,
-         -142,
-         192,
-         36
-        ]
-       ],
-       "soft": 6
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        44,
-        60
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 11,
-     "at": [
-      307,
-      280
-     ],
-     "key": "unmix",
-     "bg": 2,
-     "k": 70,
-     "clip": [
-      -215,
-      -30,
-      30,
-      245
-     ],
-     "ops": [
-      {
-       "patch": [
-        [
-         -215,
-         -30,
-         30,
-         245
-        ]
-       ],
-       "where": [
-        "(b > r + 20) & (b > g + 20)",
-        "(r > 140) & (b < 90) & (g < 90)",
-        "(mx < 70)",
-        "(b > r + 8) & (mx < 170)",
-        "(b > r + 40) & (g > r + 10)",
-        "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
-        "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
-       ],
-       "grow": 1
-      },
-      {
-       "keep": [
-        [
-         -34,
-         45,
-         -142,
-         190,
-         11
-        ],
-        [
-         -142,
-         188,
-         -142,
-         192,
-         36
-        ]
-       ],
-       "soft": 6
-      },
-      {
-       "radial": [
-        900,
-        1000
-       ],
-       "hole": [
-        44,
-        60
-       ]
-      }
-     ]
-    }
-   ],
-   [
-    {
-     "f": 12,
-     "at": [
-      307,
-      280
-     ],
-     "key": "unmix",
-     "bg": 2,
-     "k": 70,
-     "clip": [
-      -215,
-      -30,
-      30,
-      245
-     ],
-     "ops": [
-      {
-       "patch": [
-        [
-         -215,
-         -30,
-         30,
-         245
-        ]
-       ],
-       "where": [
-        "(b > r + 20) & (b > g + 20)",
-        "(r > 140) & (b < 90) & (g < 90)",
-        "(mx < 70)",
-        "(b > r + 8) & (mx < 170)",
-        "(b > r + 40) & (g > r + 10)",
-        "(r > 170) & (g > 80) & (b < 80) & (r - b > 110)",
-        "(r > g) & (g > b) & (r - b < 100) & (mx < 210)"
-       ],
-       "grow": 1
+       "grow": 1,
+       "reach": 5
       },
       {
        "keep": [
@@ -16034,7 +15834,7 @@
   "nodark": 60,
   "despeck": 40,
   "despeckfaint": 6,
-  "why": "광폭기사출: one beam of 광폭기 and its splash (2662 IMG62 frames 4-12, the lower left one: from the hero's feet (307, 280) to (165, 470)), unmix over the clean frame 2; the other beams and the stars beside it left out. The game turns and scales it from the hero to each struck foe (its pivot the hero's feet; the original's length 237 px)"
+  "why": "광폭기사출: one beam of 광폭기 and its splash (2662 IMG62 frames 4-12, the lower left one: from the hero's feet (307, 280) to (165, 470)), unmix over the clean frame 2; the other beams and the stars beside it left out. The game turns and scales it from the hero to each struck foe (its pivot the hero's feet; the original's length 237 px) [frames 11-12 (the fading end, all but a body and a marker there) left out; a body under the splash no longer filled from its neighbours as flat wedges, but faded (patch reach)]"
  },
  "md_mstorm": {
   "src": "gif2662/IMG60.gif",

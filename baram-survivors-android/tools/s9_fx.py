@@ -1209,6 +1209,11 @@ def parts_cells(frames, e):
                     if p_.any():
                         _, (iy_, ix_) = ndimage.distance_transform_edt(p_, return_indices=True)
                         a[p_] = a[iy_[p_], ix_[p_]]
+                        if op.get("reach"):
+                            # (only the small marks: a pixel farther than `reach` from the drawing's own — a whole body
+                            # under it — filled so came out as flat wedges: there, faded out instead)
+                            d_ = ndimage.distance_transform_edt(p_)
+                            a[..., 3] = np.where(p_, a[..., 3] * np.clip((op["reach"] - d_) / 3, 0, 1), a[..., 3])
                     continue
                 if "solid" in op:
                     # (an opaque drawing's own dark colours — the deep red of a beam's core — read as see-through by unmix
@@ -1581,11 +1586,13 @@ def build(spec, src_dir, out_dir, only=None):
                 if e.get("edge"):
                     # (a frame of art round the screen — 만시창공's scroll: kept to the box's edge, faded over its last `edge`
                     # pixels, so it ends softly, not on the capture's straight edge)
-                    n_ = e["edge"]
+                    # ([left, top, right, bottom]: each side its own width — the capture's top is the screen's edge,
+                    # the art cut straight there: faded over a longer stretch, as the art would go on above it)
+                    n_ = e["edge"] if isinstance(e["edge"], list) else [e["edge"]] * 4
                     bx = e.get("box") or [0, 0, a.shape[1], a.shape[0]]
                     yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
-                    dd = np.minimum(np.minimum(xx - bx[0], bx[2] - 1 - xx), np.minimum(yy - bx[1], bx[3] - 1 - yy))
-                    al = al * np.clip(dd / n_, 0, 1)
+                    dd = np.minimum(np.minimum((xx - bx[0]) / n_[0], (bx[2] - 1 - xx) / n_[2]), np.minimum((yy - bx[1]) / n_[1], (bx[3] - 1 - yy) / n_[3]))
+                    al = al * np.clip(dd, 0, 1) ** (1.5 if isinstance(e["edge"], list) else 1)
                 if e.get("window"):
                     # (the middle, where the bodies and the thick numbers stand — 만시창공's rain of arrows and wind lines
                     # fall there: inside the ellipse [cx, cy, rx, ry, soft] no fill at all, the frame's own pixels kept only
@@ -1651,6 +1658,15 @@ def build(spec, src_dir, out_dir, only=None):
                         cx, cy, rx, ry = e["hero"]
                         yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                         alw = alw * (((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 > 1.6)
+                    if e.get("wnot"):
+                        # (round the hero's feet [cx, cy, rx, ry]: what the hero cut out of its whirl left — a flat blue
+                        # bar under it — out, softly)
+                        ncx, ncy, nrx, nry = e["wnot"]
+                        yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+                        alw = alw * np.clip((np.sqrt(((xx - ncx) / nrx) ** 2 + ((yy - ncy) / nry) ** 2) - 1) / 0.2, 0, 1)
+                    if i in e.get("wskip", []):
+                        # (a frame whose middle light is the hit stars' white and the bars' blue, not the art's: none)
+                        alw = alw * 0
                     cx, cy, rx, ry, fw = e["window"]
                     yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
                     rr = np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2)
