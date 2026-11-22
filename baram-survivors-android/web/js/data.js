@@ -1579,7 +1579,7 @@ const S9 = {
     trailSize: undefined, dmg: 44, cd: 3, depth: 6, ahead: 2, half: 1, width: undefined, ways: undefined, pulses: undefined, dash: undefined, dot: 'burn', ck: 'line', pre: 'dk_firebat', branch: 2,
     desc: '대장군의 힘으로 바라보는 쪽으로 여섯 칸 돌진하며 지나온 길과 그 양옆, 앞 두 칸을 치고, 요괴혼의 푸른 불길이 태운다(화상)' },
   dk_simpan: { promo: 9, cls: 'dokkaebi', req: 33, name: '천신의심판', kind: 'smite', fx: 'o_dk_simpan', fxPull: undefined, fxHit: undefined, own: true, dmg: 105, cd: 7,
-    range: 6, radius: 2, splash: 0.8, densest: true, pull: true, delay: 0.65, size: undefined, ck: 'strike', pre: 'dk_nemesis', branch: 0,
+    range: 6, radius: 2, splash: 0.8, densest: true, pull: true, delay: 1.15, size: undefined, ck: 'strike', pre: 'dk_nemesis', branch: 0,
     desc: '몬스터가 가장 많은 곳의 둘레(5×5)를 붉은 소용돌이로 가운데에 끌어모은 뒤, 분노한 거대한 천신의 주먹이 빛기둥으로 내리꽂혀 짓이긴다' },
   // ---- 네 번째 9차 (모든 직업 4개: 보조 공격·몸 주변·광역·강한 일격 하나씩). 원작의 패시브는 켜는 기술로, PVP 기술은 몬스터 상대로.
   m_hwanyeong: { promo: 9, cls: 'mage', req: 33, name: '환영안개', kind: 'fog9', fx: 'o_m_hwanyeong', hit: 14, cd: 20, duration: 5, tick: 0.5, reach: [10, 214], side: 93,

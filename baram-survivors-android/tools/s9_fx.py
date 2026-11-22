@@ -1141,6 +1141,9 @@ def parts_cells(frames, e):
                         m_ = k_ & (dist_ <= op["mend"])
                         a[m_] = a[iy_[m_], ix_[m_]]
                         k_ &= ~m_
+                    if op.get("soft"):
+                        # (the drawing round them fading out over "soft" px towards them: no hard rim where a number lay)
+                        a[..., 3] = (a[..., 3] * np.clip(ndimage.distance_transform_edt(~k_) / op["soft"], 0, 1)).astype(a.dtype)
                     a[k_, 3] = 0
                     continue
                 if "only" in op:
