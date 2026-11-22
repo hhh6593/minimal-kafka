@@ -4649,9 +4649,16 @@ function update(dt) {
       if (s.timer <= 0) {
         // A blow with no foe in its own reach is not thrown (in a 대항전 the hero swung 초혼비무
         // at empty ground while walking between the fights): it waits, ready, for the first foe
-        // to come within that skill's reach. Heals, buffs and summons still go out.
+        // to come within that skill's reach. Heals and summons still go out (buffs: below).
         const st0 = stats(s), rch = st0.dmg && !SKILLS[s.id].heal ? skillReach(SKILLS[s.id], st0) : 0;
-        if (rch && !G.enemies.some(e => tdist(e, p) <= rch)) {
+        if (rch && !G.enemies.some(e => tkFoe(e) && tdist(e, p) <= rch)) {
+          s.timer = 0;
+          continue;
+        }
+        // A buff is for a fight too (사용자 피드백: 빈 들판에 기술이 계속 나감): not thrown with no foe within six tiles —
+        // a guard or a shield also when the hero is hurt. (A 기원 still goes out: it mends.)
+        const d0 = SKILLS[s.id];
+        if (d0.kind === 'buff' && d0.buff !== 'stealth' && !(['shield', 'guard'].includes(d0.buff) && p.hp < p.maxHp * 0.9) && !G.enemies.some(e => tkFoe(e) && tdist(e, p) <= 6)) {
           s.timer = 0;
           continue;
         }
@@ -7194,9 +7201,9 @@ function cast(skill, st) {
   // what stays a moment where it landed — the high tiers are several pictures in turn, not one.
   const castPic = def.fxCast || 'k_x_' + skill.id + '_cast', shotPic = def.fxShot || 'k_x_' + skill.id + '_shot';
   const hitPic = def.fxHit && M.fx[def.fxHit] ? def.fxHit : M.fx['k_x_' + skill.id + '_hit'] ? 'k_x_' + skill.id + '_hit' : null;
-  if (M.fx[castPic] && (def.fxCast ? def.kind !== 'heal' : ['spell', 'strike', 'nova', 'line'].includes(def.kind))) {
-    addFx(def.fxCast ? bigFx(castPic, def.castSize || 150, 'cast') : castPic, 0, -30, { follow: true, scale: def.fxCast ? 1 : 1.3 });
-  }
+  // (drawn once the spell is cast (after the switch below): a spell with no foe in its reach waits (retry) and
+  // shows nothing — its call over the hero went up every 0.3 s while it waited, a blade swung at an empty field)
+  const castAt = G.fxs.length, castOk = M.fx[castPic] && (def.fxCast ? def.kind !== 'heal' : ['spell', 'strike', 'nova', 'line'].includes(def.kind));
   let hitN = 0;
   const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: def.hitScale || 1.1 }); };
   let afterN = 0;
@@ -7768,7 +7775,7 @@ function cast(skill, st) {
       const hfx = casterBig(fxReach, 'heal', skill.lv) || fxid;
       // (연's own big 기원 pictures — 운공체식's water sphere — drawn at their size were two and a half
       // heroes high round a hero who heals every few seconds: about one and a half now.)
-      if (hfx) addFx(hfx, 0, -26, { follow: true, scale: hfx !== fxid && /^y_/.test(hfx) ? 0.65 : 1 });
+      if (hfx) addFx(hfx, 0, -26, { follow: true, self: true, scale: hfx !== fxid && /^y_/.test(hfx) ? 0.65 : 1 });
       audio.play('skill_' + skill.id, def.kind, skill.lv);
       note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
       used = false;
@@ -7806,7 +7813,7 @@ function cast(skill, st) {
       // 이펙트=판정: a buff that strikes round the hero (def.aura) keeps its picture round the hero, as wide as
       // what it strikes, as long as it strikes (it was one flash at the start and seconds of blows unseen)
       if (def.aura) tkLoopAt(fxSquare(uf, (def.auraR || 1) * 2 + 1, 'au'), 0, -24, Math.round(st.duration / 0.5) * 0.5 + 0.2, { follow: true, alpha: settings.calmFx ? 0.4 : 0.6 });
-      else addFx(uf, 0, -26, { follow: true, flip: uflip });
+      else addFx(uf, 0, -26, { follow: true, self: true, flip: uflip });
       break;
     }
     default: {
@@ -7820,6 +7827,12 @@ function cast(skill, st) {
       if (again) return retry(again);
       break;
     }
+  }
+  // the call over the hero, under what the spell drew, now that it went off
+  if (castOk && !skill.waiting) {
+    const n = G.fxs.length;
+    addFx(def.fxCast ? bigFx(castPic, def.castSize || 150, 'cast') : castPic, 0, -30, { follow: true, scale: def.fxCast ? 1 : 1.3 });
+    if (G.fxs.length > n && castAt < n) G.fxs.splice(castAt, 0, G.fxs.pop());
   }
   // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
   if (used && def.nine && !st.nine && (promoOf(G.cls.id) >= 9 || (def.jeol9 && G.training))) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
@@ -7860,6 +7873,7 @@ function cast(skill, st) {
   }
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
+  if ((used || def.kind === 'heal') && window.__castLog) window.__castLog.push([skill.id, def.kind, +G.t.toFixed(2), Math.min(99, ...G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === 0)).map(e => tdist(e, p)))]); // test: casts with no foe about
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
     // (The field goes dark only under a 필살기 (castUlt): a plain skill comes round every few seconds,
@@ -8324,6 +8338,18 @@ function fxFit(id, tiles, tag = 'f') {
   if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
   return key;
 }
+/** 이펙트=판정 for what strikes nothing — a 기원, a buff, a shield on a body (the hero's, a companion's, a raid or war
+ *  fighter's): its drawn part never more than SELF_TILES across (a tall one by its width), shrunk only. (사용자 피드백:
+ *  구름의 기원's ring stood about five heroes high round a hero it only mends; 완력 on a raid's 도깨비 four tiles wide.)
+ *  The scale factor (≤ 1) for the picture at `scale`. */
+const SELF_TILES = 2.2;
+function selfCapK(id, scale = 1) {
+  const f = id && M.fx[id];
+  if (!f) return 1;
+  const u = fxUnion(id), tall = f.h > f.w * 1.4;
+  const ext = (u ? (tall ? u.mw : Math.max(u.mw, u.mh)) : tall ? f.w : Math.max(f.w, f.h)) * (f.k || 1) * scale;
+  return ext > SELF_TILES * TILE ? (SELF_TILES * TILE) / ext : 1;
+}
 /** 이펙트=판정: where a picture's drawn part (the union of its frames' boxes) has its middle, from its cell's middle,
  *  in game pixels at its size: [x, y]. */
 const fxMids = new Map();
@@ -8695,7 +8721,7 @@ const TIER_KINDS = {
     for (let k = 3; k >= 2 && !moved; k--) moved = tkMoveHero(p.tx + dx * k, p.ty + dy * k);
     if (!moved) return 0.6;
     G.buffs.guard = Math.max(G.buffs.guard, G.t + (def.guard || 0.6));
-    addFx(fxid, 0, -26, { follow: true });
+    addFx(fxid, 0, -26, { follow: true, self: true });
     const d = tkHit(def, skill);
     if (def.after) {
       later(0.25, () => {
@@ -9099,7 +9125,7 @@ const TIER_KINDS = {
     for (let k = 1; k <= n; k++) later(k * 0.5, () => { if (G === run && !G.dead) heal(each, false, true); });
     if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
     if (def.mana) p.mp = Math.min(p.maxMp, p.mp + p.maxMp * def.mana);
-    tkLoop(fxid, 0, -26, Math.min(st.duration, 3), { follow: true, alpha: 0.7 });
+    tkLoop(fxid, 0, -26, Math.min(st.duration, 3), { follow: true, alpha: 0.7, scale: selfCapK(fxid) });
     note(`${skillName(skill.id, skill.lv)}의 효과를 받습니다.`);
   },
   // 호기방출: a wind round the hero for a while: every tick it strikes and drives back what is beside it;
@@ -9145,7 +9171,7 @@ const TIER_KINDS = {
     if (!tkNear(p.tx, p.ty, 3).length) return 0.4;
     const run = G;
     G.buffs.shield = Math.max(G.buffs.shield, G.t + st.duration);
-    tkLoop(fxid, 0, -26, st.duration, { follow: true, alpha: 0.65 });
+    tkLoop(fxid, 0, -26, st.duration, { follow: true, alpha: 0.65, scale: selfCapK(fxid) });
     later(st.duration, () => {
       if (G !== run || G.dead) return;
       if (def.fx2) addFx(fxTiles(def.fx2, (st.radius || 2) * 2 + 1, 'sbu'), 0, -26, { follow: true });
@@ -10122,7 +10148,10 @@ const ECHO = {
     const e = (pool.length ? pool : near)[Math.floor(Math.random() * (pool.length || near.length))];
     G.dropLast = e;
     const tx = e.tx, ty = e.ty;
-    addFx(def.fx, e.x, e.y + 2, { anchor: 'bottom', must: true });
+    // 이펙트=판정 (사용자 피드백: 레이드에서 날개 달린 푸른 소용돌이가 화면 삼분의 일): the sheet at its own size was 4.2 tiles
+    // wide (its swirl and wings) over a blow of three (the struck one and a tile round it) — drawn as wide as it strikes
+    const f = M.fx[def.fx], u = f && fxUnion(def.fx), sc = f ? Math.min(1, (3 * TILE) / ((u ? u.mw : f.w) * (f.k || 1))) : 1;
+    addFx(def.fx, e.x, e.y + 2, { anchor: 'bottom', must: true, scale: sc });
     later(0.08, () => {
       for (const o of around(tx, ty, 1)) hurtEnemy(o, o === e ? d : d * (def.splash || 0.5));
     });
@@ -15037,6 +15066,9 @@ function addFx(id, x, y, o = {}) {
   if (!M.fx[id]) return 0;
   const life = durs(id).reduce((a, b) => a + b, 0);
   if (G.fxs.length > 260) return life; // a phone draws only so many at once
+  // a picture that strikes nothing, on a body (o.self: a 기원, a buff, a shield on the hero, a companion, a raid or war
+  // fighter): no larger than the body and a little round it (selfCapK)
+  if (o.self) { const c = selfCapK(id, o.scale || 1); if (c < 1) o = { ...o, scale: (o.scale || 1) * c }; }
   // A screen-filling effect (연's 포효검황, 혈겁만파 ...) is shown once at a time, and no more
   // than two of them together: stacked they hid the field and slowed a phone to a crawl.
   // (the drawn part of its frames — packed sheets know each frame's box — not the empty cell round it: a
@@ -15066,8 +15098,8 @@ function addFx(id, x, y, o = {}) {
  */
 function fxOnBody(id, b, dy = -26, o = {}) {
   if (!b) return 0;
-  if (b === G.player || b.hero) return addFx(id, 0, dy, { ...o, follow: true });
-  return addFx(id, 0, dy, { ...o, on: b });
+  if (b === G.player || b.hero) return addFx(id, 0, dy, { ...o, follow: true, self: true });
+  return addFx(id, 0, dy, { ...o, on: b, self: true });
 }
 function fxDone(f) {
   const b = f.on;
@@ -18221,6 +18253,8 @@ window.__utilState = () => ({ id: utilOf(G.cls), wait: utilWait(), used: G.utilU
 window.__benchRead = () => ({ dealt: G.dealt, gyeok: G.gyeokCount, burst: G.burstN || 0, hp: G.player.hp / G.player.maxHp, t: G.t });
 // For measuring: the hero grown to a level with its build (as a raid starts it), now.
 // For measuring single-target damage: the field cleared and the ground's boss alone, unkillable.
+// test (빈 들판 시전): the field emptied and kept empty (no spawns): what the hero casts at nothing (window.__castLog)
+window.__emptyField = () => { G.dummy = true; G.bossDue = false; for (const e of G.enemies.slice()) { G.enemies.splice(G.enemies.indexOf(e), 1); leave(e); } return G.enemies.length; };
 window.__dummyBoss = () => {
   G.dummy = true;
   G.bossDue = false;
