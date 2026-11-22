@@ -4934,17 +4934,17 @@
  "r_zan": {
   "src": "gif2662/IMG11.gif",
   "mode": "parts",
-  "key": "diff",
+  "key": "pal",
   "bg": 25,
   "t0": 34,
   "t1": 80,
   "cell": [
-   190,
-   190
+   240,
+   240
   ],
   "origin": [
-   95,
-   95
+   120,
+   120
   ],
   "soft": 6,
   "cells": [
@@ -4953,34 +4953,15 @@
      "f": 1,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
+      -120,
+      -120,
+      120,
+      120
      ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
-     ],
-     "t0": 60,
-     "t1": 110
+     "layers": []
     }
    ],
    [
@@ -4988,31 +4969,13 @@
      "f": 4,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5021,31 +4984,13 @@
      "f": 5,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5054,31 +4999,13 @@
      "f": 6,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5087,31 +5014,13 @@
      "f": 7,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5120,31 +5029,13 @@
      "f": 8,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5153,31 +5044,13 @@
      "f": 9,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ],
@@ -5186,38 +5059,52 @@
      "f": 10,
      "at": [
       514,
-      502
+      512
      ],
      "clip": [
-      -95,
-      -95,
-      95,
-      95
-     ],
-     "ops": [
-      {
-       "clear": [
-        -95,
-        -95,
-        -70,
-        -38
-       ]
-      },
-      {
-       "clear": [
-        -95,
-        -95,
-        -40,
-        -64
-       ]
-      }
+      -120,
+      -120,
+      120,
+      120
      ]
     }
    ]
   ],
   "ms": 80,
   "scale": 0.62,
-  "why": "묵혈파광참: the shadow's red slashes and the great seal 斬 it leaves — red, then pale with its ring, then gone (2662 IMG11 frames 1-10, the lowest of the three: no one stands under it; frames 2-3, where the client darkens the screen, left out) — what moved from the clean floor of frame 25; the dummy at its top-left corner cleared, frame 1 (the screen starting to darken) keyed harder"
+  "why": "묵혈파광참: the shadow's red slashes and the great seal 斬 it leaves — red, then pale with its ring, then gone (2662 IMG11 frames 1-10, frames 2-3, where the client darkens the screen, left out) — held by its own colours (cream, white, reds, and the black outline beside them): the tiled floor's light grey, its key-pattern border and its dark lines are not one of them; the lowest seal cut by the capture's bottom and stood over by no one but where it is cut, there the middle seal (−157, −197), the same frame of the same seal",
+  "pal": [
+   "(r > 235) & (g > 225) & (b > 140)",
+   "(r > 150) & (r > g + 70)",
+   "(r > 90) & (r > 2.5 * g + 20)",
+   "(r > 200) & (r > g + 40) & (r > b + 40)"
+  ],
+  "near": [
+   "mx < 20",
+   3
+  ],
+  "layers": [
+   [
+    -157,
+    -197
+   ],
+   [
+    0,
+    -388
+   ]
+  ],
+  "pad": 140,
+  "disc": 116,
+  "minpx": 40,
+  "badbox": [
+   [
+    380,
+    305,
+    495,
+    478
+   ]
+  ],
+  "despeck": 25
  },
  "r_swaefly": {
   "src": "gif2662/IMG13.gif",

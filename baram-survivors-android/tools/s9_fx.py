@@ -350,6 +350,61 @@ def keyed(frames, i, e, part=None):
             near = np.asarray(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(15))).astype(np.float32) / 255
             al = np.maximum(al, np.clip((a.min(axis=2) - wt) / 25, 0, 1) * near * np.clip((d - t0) / max(1.0, t1 - t0), 0, 1))
         return np.dstack([a, al * 255]).astype(np.uint8)
+    if key == "pal":
+        # an opaque drawing over a patterned floor whose colours come close (묵혈파광참's seal 斬: its cream is the floor's
+        # light grey but warmer, its outline blacker than any of the floor's dark lines): the pixels its own colours name
+        # ("pal": numpy expressions over r, g, b, mn, mx), and the outline ("near": [expression, px]) only next to them;
+        # what that leaves as pinholes inside closed in the nearest kept colour
+        from scipy import ndimage
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        mn, mx = a.min(axis=2), a.max(axis=2)
+        env = {"r": r, "g": g, "b": b, "mn": mn, "mx": mx, "np": np}
+        core = np.zeros(a.shape[:2], bool)
+        for ex in part.get("pal", e.get("pal")):
+            core |= eval(ex, {}, env)
+        near = part.get("near", e.get("near"))
+        keep = core.copy()
+        if near:
+            keep |= eval(near[0], {}, env) & ndimage.binary_dilation(core, iterations=near[1])
+        keep = ndimage.binary_opening(keep, iterations=1) | core  # (lone dots of the floor that matched: gone)
+        lab, n = ndimage.label(keep)
+        if n:
+            sizes = ndimage.sum(keep, lab, range(1, n + 1))
+            keep &= np.isin(lab, 1 + np.nonzero(sizes >= part.get("minpx", e.get("minpx", 12)))[0])
+        gap = ndimage.binary_fill_holes(ndimage.binary_closing(keep, iterations=1)) & ~keep
+        gl, gn = ndimage.label(gap)
+        if gn:
+            # (only pinholes: the seal's own counters and the inside of its ring are open, the floor seen through them)
+            gs = ndimage.sum(gap, gl, range(1, gn + 1))
+            gap &= np.isin(gl, 1 + np.nonzero(gs <= 30)[0])
+        rgb = a.copy()
+        if gap.any():
+            _, (iy, ix) = ndimage.distance_transform_edt(~keep, return_indices=True)
+            rgb[gap] = a[iy[gap], ix[gap]]
+        out = np.dstack([rgb, (keep | gap) * 255]).astype(np.uint8)
+        layers = part.get("layers", e.get("layers"))
+        if layers:
+            # the same drawing shown more than once in the frame, in step (the three seals 斬): where this one is cut by
+            # the capture's edge or has someone standing over it (neither its colours nor the clean floor of "bg"), the
+            # same place on the next copy ("layers": [[dx, dy] …] from this one to it); the canvas grown by "pad" below
+            pad = part.get("pad", e.get("pad", 0))
+            H, W = a.shape[:2]
+            floor = np.abs(a - bg).max(axis=2) < 20
+            valid = (keep | gap | floor)
+            for x0, y0, x1, y1 in part.get("badbox", e.get("badbox", [])):
+                valid[y0:y1, x0:x1] = False  # (where a bystander stands over that copy: never taken from it)
+            res = np.zeros((H + pad, W, 4), np.uint8)
+            done = np.zeros((H + pad, W), bool)
+            yy, xx = np.mgrid[0:H + pad, 0:W]
+            for dx, dy in [[0, 0]] + layers:
+                sy, sx = yy + dy, xx + dx
+                inside = (sy >= 0) & (sy < H) & (sx >= 0) & (sx < W)
+                syc, sxc = sy.clip(0, H - 1), sx.clip(0, W - 1)
+                ok = ~done & inside & valid[syc, sxc]
+                res[ok] = out[syc[ok], sxc[ok]]
+                done |= ok
+            return res
+        return out
     if key == "orb":
         # a solid sphere over the hero, a number and a bar (폭렬천뢰탄): inside the circle "orb" [cx, cy, R] the frame's
         # own pixels, but those that are not the sphere's — warm (the hero, the dummy's marker), green (a bar) or in
@@ -453,6 +508,20 @@ def parts_cells(frames, e):
             rgb = (dst[..., :3] * da + src[..., :3] * sa * (1 - da)) / np.maximum(oa, 1e-3)
             dst[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
             dst[..., 3:4] = np.clip(oa * 255, 0, 255).astype(np.uint8)
+        for x0, y0, x1, y1 in e.get("clearcell", []):
+            cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
+        if e.get("despeck"):
+            # (specks standing alone, a few pixels of a bystander's star: gone)
+            from scipy import ndimage
+            lab, n = ndimage.label(cell[..., 3] > 40)
+            if n:
+                sz = ndimage.sum(np.ones(lab.shape), lab, range(1, n + 1))
+                cell[np.isin(lab, 1 + np.nonzero(sz < e["despeck"])[0]), 3] = 0
+        if e.get("disc"):
+            # (only what lies in the drawing's own round — 묵혈파광참's ring — the bystanders' markers and stars outside it)
+            yy, xx = np.mgrid[0:ch, 0:cw]
+            rr = np.hypot(xx - ox, yy - oy)
+            cell[..., 3] = (cell[..., 3] * np.clip((e["disc"] + 1.5 - rr) / 2.5, 0, 1)).astype(np.uint8)
         if e.get("soft"):
             # the cell's own edge faded (a part cut by the capture's edge ends softly, not on a line)
             n = e["soft"]
