@@ -20,8 +20,8 @@
 
 import { frameBox, drawLayers, dyeImage, dropCostume, aiCostume, loadCostumes } from './costume.js';
 import { gwoeWeek, isMend, MEND_FX, RAID_TASKS, RAID_TASK_DEF, WAR_COMMANDS, WAR_COMMAND_EVERY, WAR_COMMAND_PICK } from './data.js';
-import { SPECIAL, specialBase, DRAGON_LOOK, ABYSS_BASE } from './items.js';
-import { GEAR as GEAR_LINES, RAID_GEAR, raidTier, hasShield } from './avatar.js';
+import { SPECIAL, specialBase, specialName, DRAGON_LOOK, ABYSS_BASE, STAR_MAX } from './items.js';
+import { GEAR as GEAR_LINES, RAID_GEAR, raidTier, hasShield, gearName } from './avatar.js';
 
 let A = null; // game.js internals (initWar)
 const TILE = 48;
@@ -44,11 +44,11 @@ const squadsOf = mode => (bigOn(mode) ? BIG : SMALL)[mode];
 // (It was by 승급: +2.4% a 승급 to 5차, the same 1.12 for a hero of 1.7만 as for one of 7.5만 — the first lost
 // two wars in three, the second won 9 of 10 청룡전 and its guild took 5 of 6 in every mode: balance runs.)
 // By mode (FOE_MODE, on the part over 1): where the war is won on the ground — a 거점 held, the cart's ring — a hero
-// that seldom falls counts for most (its guild won 6 of 6 청룡전 at 1.29); in the 대장전's race of kills least
-// (1 of 6 at 1.29).
+// that seldom falls counts for most; in the 대장전's race of kills it is one blade among seventy, and a few percent
+// decide it (a hero of 7.5만: 청룡전 won 6 of 6 at 1.29 and 1 of 6 at 1.39; 대장전 6 of 6 at 1, 0 of 6 at 1.15: balance runs).
 const FIELD_CP = 34500, FOE_HERO = 0.25, FOE_MIN = 1.06, FOE_MAX = 1.32;
-const FOE_MODE = { capture: 1.35, escort: 1.35, commander: 0.5, siege: 1, bosspk: 1 };
-const foeKOf = (cp, mode) => 1 + (clamp(1 + FOE_HERO * (cp / FIELD_CP - 1), FOE_MIN, FOE_MAX) - 1) * (FOE_MODE[mode] || 1);
+const FOE_MODE = { capture: 1.1, escort: 1.35, commander: 0.25, siege: 1, bosspk: 1 };
+const foeKOf = (cp, mode) => 1 + (clamp(1 + FOE_HERO * (cp / FIELD_CP - 1), FOE_MIN, FOE_MAX) - 1) * (FOE_MODE[mode] ?? 1);
 const ROLES = {
   tank: { name: '탱커', desc: '앞줄에서 적을 붙잡고 도발한다. 받은 피해와 막아 낸 공격이 기여도가 된다.', bonus: '체력 +35% · 받는 피해 -20% · 6초마다 주변 적 도발' },
   healer: { name: '힐러', desc: '가장 위태로운 아군을 살린다. 회복량과 부활이 기여도가 된다.', bonus: '회복 +60% · 4초마다 주변 아군 기원 · 쓰러진 아군 위에 서면 부활' },
@@ -1520,7 +1520,7 @@ function think(W, b) {
   if (!t && order.kind === 'assault' && alive(order.obj) && d2(b, order.obj) < 12 && (b.role !== 'tank' || !nearest(W, b, 2))) { t = order.obj; why = 'obj'; }
   // 공성: the squads sent to the gate strike it once they stand before it (their blades and casters; the tank and the
   // healer keep the defenders off them). Struck only when it was the one meant (aiCast), it was left standing while
-  // the crowd before it fought on, and the attack never won (balance runs: 0 of 6 gates down).
+  // the crowd before it fought on: the gate held to the end in every war (balance runs).
   if (!t && order.kind === 'gate' && (b.role === 'dps' || b.role === 'support') && alive(order.obj) && order.obj.gate && gateDist(order.obj, b) <= Math.max(2, b.kit.range) + 2) { t = order.obj; why = 'obj'; }
   // Taunted: the taunter, while the taunt lasts.
   if (!t && b.taunt && b.taunt.until > G.t && alive(b.taunt.by) && d2(b, b.taunt.by) < 9) { t = b.taunt.by; why = 'taunt'; }
@@ -2173,6 +2173,7 @@ function hit(W, src, t, dmg) {
   }
   if (src.team === 0 && !src.hero && A.auraK) dmg *= A.auraK(src); // 주작의 기운 (game.js auraK): the hero's aura on its side
   if (W.cmds && W.cmds.cur && !W.raid && !W.jaeng) dmg *= commandK(W, src, t);
+  if (src.starLean) dmg *= 1 + src.starLean; // (강화: the weapon's ★ over the armour's, aiStars)
   if ((W.raid || W.mobs) && !t.war && !t.hero) return raidHit(W, src, t, dmg);
   if (src.dead && !src.cmdr) dmg *= 0.5;
   if (W.diag && src.team >= 1 && !t.gate) {
@@ -2778,9 +2779,11 @@ function escort(W, dt) {
   }
 }
 
-// 현무전: the gate gives way to the guild's blows in no less than GATE_SEC seconds (hit) — about two minutes of a
-// whole attack on it with the 공성 화약 carried in, longer when the defence holds them off it.
-const GATE_SEC = 160;
+// 현무전: the gate gives way to the guild's blows in no less than GATE_SEC seconds (hit) — about three and a half
+// minutes of a whole attack on it with the 공성 화약 carried in, longer when the defence holds them off it, a minute
+// and a half left for the 수성대장 (at 160 the gate fell at 2:40~2:55 and the attack won 9 of 12 wars; at 200, at
+// 3:15~3:30 and the attack won 17 of 24).
+const GATE_SEC = 240;
 function siege(W, dt) {
   // The commander of the defence can be reached only once the gate is down.
   const def = 1 - W.attacker, c = W.teams[def].cmd;
@@ -2951,12 +2954,12 @@ const AI_TIERS = {
   // 6.88만 without (AI_MAX_CP; no fighter above its class's). Their levels likewise to the game's top,
   // Lv 60 (no cap: a whole hunt with every 승급 ends about Lv 55~58), the 절정 Lv 56~60. A hero half way through (청룡신검,
   // 4.7만) was the first of every 문파 against the old 4.2만 top.
-  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 54000, top: 75500, lv: [56, 60], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3 },
-  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 54000, lv: [50, 57], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2 },
-  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 34500, top: 43000, lv: [44, 51], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2 },
-  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 27000, top: 34500, lv: [37, 45], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1 },
-  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 19500, top: 27000, lv: [30, 38], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1 },
-  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 12500, top: 19500, lv: [22, 31], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0 },
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 54000, top: 75500, lv: [56, 60], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3, star: 4.3 },
+  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 54000, lv: [50, 57], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2, star: 3.8 },
+  upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 34500, top: 43000, lv: [44, 51], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2, star: 3.3 },
+  mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 27000, top: 34500, lv: [37, 45], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1, star: 2.8 },
+  low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 19500, top: 27000, lv: [30, 38], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1, star: 2.3 },
+  newbie: { name: '입문자', short: '입문', col: '#9fe08a', cp: 0, bot: 12500, top: 19500, lv: [22, 31], promo: [1, 2], sl: [2, 4], g: [2, 4.5], gcd: 1.08, n: 3, ult: 24, heal: 3.8, dodge: -0.06, edge: -0.12, step: 0, star: 1.8 },
 };
 const TIER_ORDER = ['server', 'high', 'upper', 'mid', 'low', 'newbie'];
 // The 전투력 of the best gear and 승급 there is (about a hero's at 9차 in the 용무기 제십 and the 사신수).
@@ -3078,7 +3081,7 @@ function applyPersonas(W) {
       // little over or under the field (FLAVOUR): each guild by its own mean against the hero, 상위권 탄탄
       // (4.1만) met 삼류 중심 (3.1만) 10% stronger in blows and life alike, the same make winning most wars.)
       const sideK = clamp(Math.pow(fieldCp / W.heroCp, 0.35), 0.8, 1.35) * Math.pow(meanCp / fieldCp, FLAVOUR) * (team !== 0 && !W.raid ? W.foeK || 1 : 1);
-      own.forEach((b, i) => { b.pw = ind[i] / mi * sideK; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; });
+      own.forEach((b, i) => { b.pw = ind[i] / mi * sideK; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw * (1 - (b.starLean || 0)); });
     }
     for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
     warmKitFx(W);
@@ -3106,6 +3109,21 @@ function rankTitles(W) {
   const r = W.hero && W.hero.rank;
   if (r) A.say(`칭호: ${W.raid ? '공격대' : '문파'} 전투력 ${r}위 ★`, 'sys');
 }
+/**
+ * 강화: each fighter's weapon and armour at a ★ of its own (1 … STAR_MAX, as the hero's pieces), drawn about its
+ * 급's middle (AI_TIERS.star) and wide, so a 급 holds both a ★2 sword on a ★5 coat and the other way round, and the
+ * 급 overlap. Its 전투력 moves with them inside its 급's band (STAR_CP for each ★ over or under the middle), which its
+ * strength follows (applyPersonas: by 전투력 against its guild's mean, so a guild's strength stays as it was and only
+ * the spread grows); the weapon's ★ over the armour's leans it to the blow, the other way to life (STAR_LEAN a ★).
+ */
+const STAR_CP = 0.045, STAR_LEAN = 0.04;
+function aiStars(b, T) {
+  const draw = () => clamp(Math.round(T.star + (Math.random() + Math.random() + Math.random() - 1.5) * 2.2), 1, STAR_MAX);
+  const st = b.stars = { weapon: draw(), armor: draw() };
+  const off = st.weapon + st.armor - 2 * T.star;
+  b.cp = Math.round(clamp(b.cp * (1 + STAR_CP * off), T.bot || T.cp || 1, Math.min(T.top, aiMaxCp(b.cls))));
+  b.starLean = (st.weapon - st.armor) * STAR_LEAN;
+}
 function setPersona(W, b, slot) {
   const heroCp = W.heroCp;
   let tier, promo, lv, g;
@@ -3130,12 +3148,13 @@ function setPersona(W, b, slot) {
   if (!slot.alt) {
     b.gear = aiGear(W, b.cls, tier, g);
     b.name = styledName(tier, b.name);
+    aiStars(b, T);
     // Its strength against the hero's (전장 보정 keeps a little of the pull toward the field).
     const rel = clamp(Math.sqrt(b.cp / heroCp), 0.55, 1.8);
     b.pw = (1 + (rel - 1) * 0.85) * (b.team !== 0 && !W.raid ? W.foeK || 1 : 1);
     b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw;
   }
-  b.gearDesc = b.gearDesc || (b.gear && b.gear.desc) || (slot.alt ? '내 장비' : '일반 장비');
+  b.gearDesc = b.stars ? `${b.gear.wName} ★${b.stars.weapon} · ${b.gear.aName} ★${b.stars.armor}` : b.gearDesc || (b.gear && b.gear.desc) || (slot.alt ? '내 장비' : '일반 장비');
   b.yvKey = null;
   b.dodge = clamp(b.dodge + T.dodge, 0.3, 0.98);
   b.skill = clamp(b.skill + T.edge, 0.45, 1.4);
@@ -3233,6 +3252,7 @@ function aiGear(W, cls, tier, g) {
       else if (fam === 'jujak' && sp('cr_sinsu_jujak', null)) { gear.glow = '#ff7a2a'; desc.unshift('주작선장'); }
       else if (fam === 'akma' && sp('cr_judge_weapon3', null)) { gear.glow = '#d0101a'; desc.unshift('악마 심판의낫'); }
       if (!gear.glow && layer('s_tc_' + c)) { gear.glow = '#ffd75a'; desc.unshift('태초의 무기'); }
+      if (gear.glow) gear.wLabel = desc[0];
       // Its armour: 현무불괴갑 (wings), a 무신 set with its 기운, or the 용 파천갑.
       const r = Math.random(), s = pick(['cheong', 'baekho', 'jujak', 'hyeonmu']);
       if (r < 0.35 && sp('cr_sinsu_hyeonmu', '현무불괴갑')) gear.cape = plain('cape', 1);
@@ -3249,6 +3269,10 @@ function aiGear(W, cls, tier, g) {
     if (Object.keys(cos).length) gear.cos = cos;
   }
   gear.desc = desc.join(' · ');
+  // The weapon and the armour by their names (살펴보기, 명단: each with its wearer's own ★, aiStars).
+  const nm = kind => (gear[kind + 'Sp'] && SPECIAL[gear[kind + 'Sp']] ? specialName(SPECIAL[gear[kind + 'Sp']], c) : gearName(c, kind, gear[kind])) || (kind === 'weapon' ? '무기' : '갑옷');
+  gear.wName = gear.wLabel || nm('weapon');
+  gear.aName = nm('armor');
   pool.push(gear);
   return gear;
 }
@@ -4944,6 +4968,7 @@ function membersHtml(W) {
       <div class="nm">${b.name}${starHtml(W, b)}</div>
       <div>${T ? `<span style="color:${T.col}">${T.short}</span> · ` : ''}${b.cls.name} · ${ROLES[b.role] ? ROLES[b.role].name : ''}</div>
       <div>Lv${sp ? sp.lv : '?'} · ${sp ? sp.promo : 0}차 · ${sp ? sp.cp.toLocaleString() : ''}</div>
+      ${b.stars ? `<div title="${b.gearDesc}">무기 ★${b.stars.weapon} · 갑옷 ★${b.stars.armor}</div>` : ''}
       <div class="hp"><span style="width:${Math.round(clamp(hp, 0, 1) * 100)}%"></span></div>
       <div class="st">${dead ? '전사' : b.leader ? '분대장' : ''}</div>
     </div>`;
