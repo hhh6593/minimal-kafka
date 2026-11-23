@@ -1225,7 +1225,8 @@ const REWORK = {
   w_frenzy: { power: 0.6, alsoHaste: true, desc: '광폭해져 잠시 공격력이 오르고 모든 기술이 빨리 돈다' },
   w_roar: { up: 'w_roar3', desc: '체력을 깎아 바치며 정면 한 칸의 몬스터에게 아주 큰 피해를 준다. 8단 + 3차 승급이면 동귀어진\'첨이 된다' },
   w_roar3: { evolved: true, desc: '동귀어진 8단 + 3차 승급. 많은 체력을 바쳐 정면 한 칸의 몬스터에게 치명적인 피해를 주고 잠시 기절시킨다' },
-  w_fly: { kind: 'line', depth: 4, max: undefined, desc: '검을 날려 몬스터가 가장 많은 쪽 일렬 네 칸을 꿰뚫는다' },
+  // (사용자 2026-11-23: 근접기인데 투사체로 나갔다 — 앞쪽 베기(cleave)로)
+  w_fly: { kind: 'cleave', depth: 2, max: 4, desc: '검기를 휘둘러 앞쪽 네 칸의 몬스터를 벤다' },
   w_rush: { fxHit: 'k_u_w_wave', fxAfter: 'k_w_tiger', desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 꿰뚫고, 지난 자리에 검기가 남는다' },
   // (사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다 → 연의 보라 사슬 하나를 가장 몰린 곳에 3칸으로 놓고,
   // 그 안으로 둘레 두 칸의 몬스터를 모아 묶는다: game.js snare)
@@ -1643,6 +1644,9 @@ const PICS1320 = {
 for (const [id, o] of Object.entries(PICS1320)) Object.assign(SKILLS[id], o, { fxs: null, tint: null, modern: null, yeon: true });
 // 사용자 2026-11-23: 너무 크다 — 판정은 그대로, 그림만 (노도성황 화면의 0.9 → 0.5, 선기전도 11칸 → 5.5칸, 혼마염 불꽃 90 → 60px)
 Object.assign(SKILLS.m_nodo, { frac: 0.5 });
+// 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
+Object.assign(SKILLS.r_formless, { kind: 'cleave', depth: 2, max: 4 });
+Object.assign(SKILLS.m_coldveil, { fxHit: null, frac: 0.45 });
 Object.assign(SKILLS.p_seongi, { fxK: 0.5 });
 // 흑룡검풍: a passive in the original ([지속효과 마법]) — not a spell of the bar: 흑룡광참 brings it (wind9), and a saved
 // slot of it is 흑룡광참.
