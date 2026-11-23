@@ -980,6 +980,21 @@ def white_sheet(src_dir, path):
     return [Image.fromarray(c[y0:y1, x0:x1]) for c in cells], x1 - x0, y1 - y0
 
 
+def venomstar(src_dir):
+    """맹독표창 (도적 5차; 사용자 2026-11-23 제공 원작 GIF, SRC_DIR/user/venom_star.gif = blog.kakaocdn.net …/btq8RUd5ZNE):
+    a spinning 표창 with its trail, flying right in the capture; unmixed off its white ground and turned to fly up (the
+    game turns a shot to its way from up: atan2 + 90°)."""
+    pics, w, h = white_sheet(src_dir, "user/venom_star.gif")
+    pics = [p.rotate(90, expand=True) for p in pics]
+    # (its pale trail and lines read faint over our dark ground: opacity raised, 1 − (1 − a)^2.2, colour kept)
+    for i, p in enumerate(pics):
+        a = np.asarray(p).astype(np.float32)
+        a[..., 3] = np.clip((1 - (1 - a[..., 3] / 255) ** 2.2) * 255, 0, 255)
+        pics[i] = Image.fromarray(a.astype(np.uint8))
+    w, h = pics[0].size
+    return pics, {"cell": [w, h], "n": len(pics), "ms": 60, "add": False, "anchor": [w // 2, h // 2], "src": "user/venom_star.gif"}
+
+
 def heukaura(src_dir):
     """흑룡검풍 (전사 9차 패시브; 사용자 결정 2026-11-23): 연's own grey whirl of 흑룡광참 (Skill_Effect_Warrior_5th_03, as the
     earlier APK holds it: SRC_DIR/yeon/k_w_blackdragon.webp + .json, its manifest entry) made 흑적색 — its brightness laid on
@@ -1083,7 +1098,7 @@ def chain1320(src_dir):
     pics, _ = _fit_cells(pics, 200)
     return _entry(pics, 70, "dl1320/20.gif")
 
-BUILDERS = {"w_heukgwang": heukgwang, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang,
+BUILDERS = {"w_heukgwang": heukgwang, "r_venomstar": venomstar, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang,
             "md_gong1320": gongjeon1320, "m_seonsim": seonsim1320, "l_javelin1320": javelin1320,
             "mk_stack": stack1320, "rp_chain": chain1320}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
