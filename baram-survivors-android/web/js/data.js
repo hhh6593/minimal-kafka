@@ -2306,6 +2306,11 @@ export function skillName(id, level) {
 }
 
 /** What a skill does at a level: base values grown by level and the hero's passives. */
+/** How many tiles a spell's own area grows by at this 단 (see skillStats). */
+function radiusGrow(s, level) {
+  return s.kind === 'mark' || (s.count || 1) > 1 ? 0 : Math.floor(level / 8);
+}
+
 export function skillStats(id, level, p) {
   const s = SKILLS[id];
   const s0 = SKILLS[id];
@@ -2322,7 +2327,9 @@ export function skillStats(id, level, p) {
     // Tiles: reach grows by one every three levels, and with 공력.
     range: (s.range || 0) + Math.floor(l / 3) + Math.floor(p.area / 2),
     // Only a spell that already strikes an area grows it; a single blow stays single.
-    radius: !s.radius ? 0 : s.radius + Math.floor(level / 4) + Math.floor(p.area / 3),
+    // (one more tile only at 8단, and none for a spell that already lays several areas at once — 투도멸진's
+    // marks, a rain of bursts: grown each at 4단 and 8단 they covered the screen, 사용자: 터무니없이 큼)
+    radius: !s.radius ? 0 : s.radius + radiusGrow(s, level) + Math.floor(p.area / 3),
     count: (s.count || 1) + (level >= 4) + (level >= 7),
     duration: (s.duration || 0) * (1 + 0.1 * l),
     heal: (s.heal || 0) * (1 + 0.45 * l),
@@ -2345,7 +2352,7 @@ export function levelText(id, level) {
     parts.push(s.kind === 'summon' ? '소환 +1' : '대상 +1');
   if (s.range && (level - 1) % 3 === 0) parts.push('거리 +1칸');
   if (s.kind === 'cleave' && !s.depth && level % 4 === 0) parts.push('앞쪽 역삼각형이 한 줄 깊어진다');
-  else if (s.shape === 'plus' && level % 4 === 0) parts.push('+자 팔이 한 칸 길어진다');
-  else if (s.radius && level % 4 === 0) parts.push('범위 +1칸');
+  else if (s.shape === 'plus' && level === 8 && radiusGrow(s, 8)) parts.push('+자 팔이 한 칸 길어진다');
+  else if (s.radius && level === 8 && radiusGrow(s, 8)) parts.push('범위 +1칸');
   return parts.join(', ');
 }
