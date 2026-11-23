@@ -8308,7 +8308,10 @@ function hwasalbi9(skill, st) {
   G.rain9At = G.t + (c.cd || 1);
   const p = G.player, fx = p.fdx || (p.fdy ? 0 : p.face || 1), fy = p.fdx ? 0 : p.fdy || 0;
   const x = p.x + Math.sign(fx) * c.ahead * TILE, y = p.y - 20 + fy * c.ahead * TILE, run = G, [hx, hy] = c.half;
-  const rf = tkLoop(c.fx, x, y, fxLife(c.fx) * 1.5, { alpha: settings.calmFx ? 0.8 : 1, anchor: 'bottom', scale: c.scale || 1 });
+  // (보이는 범위 = 맞는 범위: the rain within the box it strikes, 2·half × 1.25 — at scale 1.3 its streaks stood 5 tiles tall
+  // over a ground of 2.7)
+  const rid = fxIn(c.fx, (2 * hx) / TILE * 1.25, (2 * hy) / TILE * 1.25, 'hb', false);
+  const rf = tkLoop(rid, x, y, fxLife(c.fx) * 1.5, { alpha: settings.calmFx ? 0.8 : 1, anchor: 'bottom' });
   if (rf) rf.top = true;
   const d = (st.dmg || 30) * c.k;
   for (let k = 0; k < c.ticks; k++) later(0.15 + k * (fxLife(c.fx) * 1.5 - 0.25) / c.ticks, () => {
@@ -8538,7 +8541,9 @@ function mstorm9(skill, st) {
   foes.forEach((t, i) => later(0.15 + i * 0.08, () => {
     if (G !== run) return;
     const tx = t.tx, ty = t.ty;
-    G.fxs.push({ id: c.fx, x: tx * TILE + TILE / 2, y: ty * TILE + TILE - 8, t: 0, life: fxLife(c.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: 1, must: true });
+    // (보이는 범위 = 맞는 범위: the bolt strikes its one tile — a body across by its longer side, ONE_TILES; at its own size it
+    // stood 1.8 tiles over it)
+    G.fxs.push({ id: c.fx, x: tx * TILE + TILE / 2, y: ty * TILE + TILE - 8, t: 0, life: fxLife(c.fx), scale: capK(c.fx, 1, ONE_TILES), rot: 0, anchor: 'bottom', alpha: 1, must: true });
     later(0.08, () => {
       if (G !== run) return;
       G.quietHit = true;
@@ -9935,7 +9940,9 @@ const TIER_KINDS = {
       hit.sort((a, b) => (b === t) - (a === t)).slice(0, def.winds || 3).forEach((e, i) => {
         for (let k = 0; k < (def.windN || 3); k++) later(0.85 + k * 0.85 + i * 0.07, () => {
           if (G !== run || e.hp <= 0) return;
-          if (def.fxWind && M.fx[def.fxWind]) addFx(def.fxWind, 0, 4, { on: e, anchor: 'bottom' });
+          // (보이는 범위 = 맞는 범위: the swirl strikes the one it is on — a body across, bodyTiles; at its own size it stood
+          // 2.5 tiles over one body)
+          if (def.fxWind && M.fx[def.fxWind]) addFx(def.fxWind, 0, 4, { on: e, anchor: 'bottom', body: bodyTiles(e) });
           later(0.17, () => {
             if (G !== run || e.hp <= 0) return;
             G.quietHit = true;
@@ -10720,7 +10727,9 @@ function coatInfect(e) {
   const c = G.coat9;
   if (e.venom9 && e.venom9.until > G.t + 1) return;
   e.venom9 = { until: G.t + c.infect, burst: c.burst, k: c.taken };
-  if (M.fx[c.fx] && fxBudget('venom9h', 6)) addFx(c.fx, e.x, e.y - 10, { anchor: 'bottom' });
+  // (보이는 범위 = 맞는 범위: the flame of taking hold strikes nothing — on its one body, a body across, bodyTiles; at its own
+  // size, 1.9 tiles, it was the burst's, which strikes what it covers: venomBurst)
+  if (M.fx[c.fx] && fxBudget('venom9h', 6)) addFx(c.fx, e.x, e.y - 10, { anchor: 'bottom', body: bodyTiles(e) });
 }
 /** 묵혈독바르기: a foe falling with 묵혈독 on it bursts, striking those round it. */
 function venomBurst(e) {
