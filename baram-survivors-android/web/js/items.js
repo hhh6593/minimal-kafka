@@ -575,6 +575,13 @@ export function starMats(sp, star) {
     // 제구 → 제십: three 은나무 가지 (was one), only from the last raids and the 끝없는 지옥 (MATS.silver3).
     return { mats: { silver3: 3, pearl: 2, essence: 10 }, gold: 50000 };
   }
+  // (a 고유 — 심연·태초, never crafted, never dropped twice — climbs as a legendary does, on 겁화의 파편, dearer:
+  // 사용자 2026-11-23, 심연·태초도 당연히 강화가 되어야)
+  if (!sp.craft) {
+    const need = { kalpa: 3 * star + 3 };
+    if (star >= 3) need.scroll = 1;
+    return { mats: need, gold: 3000 * star };
+  }
   if (sp.craft.legend) {
     const need = { kalpa: (sp.craft.from ? 3 : 2) * star + 2 };
     if (star === 4) need.scroll = 1;

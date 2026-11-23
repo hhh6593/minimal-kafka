@@ -3360,6 +3360,8 @@ function openPiecePop(kind, t, spId = null) {
   else if (canOff && !none) btns.push(['해제', 'primary', () => equipFromPop(kind, -1, null), 'ep-wear']);
   else btns.push(['착용 중', 'primary', null, 'ep-wear']);
   if (!none) btns.push([isFav(cls, key) ? '찜 해제' : '찜', '', () => { toggleFav(cls, key); openPiecePop(kind, t, spId); buildEquip(); }, 'ep-fav']);
+  // 강화: straight to the forge's 강화 tab (사용자 2026-11-23: 장비를 누르면 장착 외에 강화도 있어야)
+  if (!none && !G) btns.push(['강화', '', () => { closePiecePop(); forgeTab = '강화'; openForge(); }, 'ep-go']);
   // where to get / make it
   if (!none && !G) {
     if (sp && sp.craft) btns.push(['조합하러', '', () => { closePiecePop(); openForge(); }, 'ep-go']);
@@ -3916,7 +3918,8 @@ function openCraft(sink = null) {
     const name = sp0 ? (sp0.craft ? '◆' : '★') + specialName(sp0, cls.id) : pieceName(cls, kind, +t);
     const top = starMaxOf(cls, key), dragon = isDragonKey(cls, key);
     // Crafted pieces (and the 용무기) never drop twice: their stars are paid in materials.
-    const csp = key.startsWith('sp:') && SPECIAL[key.slice(3)] && SPECIAL[key.slice(3)].craft ? SPECIAL[key.slice(3)] : null;
+    // (and the 고유 — 심연·태초 —: one of a kind, its stars paid in materials as a crafted piece's)
+    const csp = key.startsWith('sp:') && SPECIAL[key.slice(3)] && (SPECIAL[key.slice(3)].craft || SPECIAL[key.slice(3)].rarity) ? SPECIAL[key.slice(3)] : null;
     const crafted = !!csp || key === `weapon:${GEAR[cls.id].weapon.indexOf(CRAFT_GEAR[cls.id])}`;
     if (crafted) {
       any = true;
@@ -3946,7 +3949,7 @@ function openCraft(sink = null) {
           st[key] = star + 1;
           forgeOut = { t: 'ok', from: star, to: star + 1, name: dragon ? dragonName(cls.id, star + 1) : name, dragon };
           say(dragon ? `${dragonName(cls.id, star + 1)} 승급!` : `${name} ★${star + 1} 강화!`, 'sys');
-          if (dragon || (csp && csp.craft.legend)) banner(dragon ? `승급 성공 · ${dragonName(cls.id, star + 1)}` : `강화 성공 · ${name} ★${star + 1}`);
+          if (dragon || (csp && (!csp.craft || csp.craft.legend))) banner(dragon ? `승급 성공 · ${dragonName(cls.id, star + 1)}` : `강화 성공 · ${name} ★${star + 1}`);
         });
       continue;
     }
