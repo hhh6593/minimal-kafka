@@ -3080,7 +3080,7 @@ function buildEquip() {
   if (better) {
     const bb = document.createElement('button');
     bb.className = 'btn wear-best';
-    bb.textContent = '최강 장비 일괄 장착';
+    bb.textContent = '자동 장착';
     bb.id = 'equip-best';
     bb.onclick = () => (window.__equipInstant ? (wearBest(cls), buildEquip()) : openBestPop());
     box.append(bb);
@@ -3425,7 +3425,7 @@ function openBestPop() {
   if (!out.length) { eqToast('이미 가장 강한 장비입니다'); return; }
   const A = gearStats(cls, savedGear(cls)), B = gearStats(cls, after);
   const rows = out.map(s => `<tr><th>${EQ_LABEL[s.kind]}</th><td>${s.from} <span class="arrow">→</span> <b>${s.to}</b></td></tr>`).join('');
-  epopShow('최강 장비 일괄 장착', `<div class="ep-cur">다음과 같이 바뀝니다.</div><table class="ep-cmp ep-swaps">${rows}</table>`
+  epopShow('자동 장착', `<div class="ep-cur">다음과 같이 바뀝니다.</div><table class="ep-cmp ep-swaps">${rows}</table>`
     + `<table class="ep-cmp"><tr><th>전투력</th><td>${epDelta(A.power, B.power)}</td></tr><tr><th>공격력</th><td>${epDelta(A.atk, B.atk, '%')}</td></tr>`
     + `<tr><th>체력</th><td>${epDelta(A.hp, B.hp)}</td></tr><tr><th>방어</th><td>${epDelta(A.def, B.def)}</td></tr></table>`,
   [['적용', 'primary', () => {
