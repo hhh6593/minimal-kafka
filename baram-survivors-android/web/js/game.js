@@ -7768,7 +7768,9 @@ function castNow(skill, st) {
       // what it strikes is the triangle, while the picture stays.
       // (보이는 범위 = 맞는 범위: as deep as the triangle and as wide as its far row — at least a body, ONE_TILES)
       const along = Math.max(ONE_TILES, depth + 0.2), across = Math.max(ONE_TILES, depth * 2 - 1);
-      const clife = fxAt(dx ? fxRect(cf, along, across, 'cv') : fxRect(cf, across, along, 'cv'), p.x + dx * mid * TILE, p.y - 24 + dy * mid * TILE, { flip: cflip });
+      // (def.noMain: no picture stretched over the triangle — 필살검강's dark stroke filled its 3×5 box, 사용자: 너무 커;
+      // the cut on each one struck, fxHit, shows the blow)
+      const clife = def.noMain ? 0.45 : fxAt(dx ? fxRect(cf, along, across, 'cv') : fxRect(cf, across, along, 'cv'), p.x + dx * mid * TILE, p.y - 24 + dy * mid * TILE, { flip: cflip });
       const cbeats = beatsUnder(clife - 0.12);
       const cx0 = p.tx, cy0 = p.ty;
       for (const [dt, k] of cbeats.slice(1)) later(0.12 + dt, () => { for (const e of onTiles(triTiles(cx0, cy0, dx, dy, depth)).slice(0, def.max || 99)) smite(e, (st.dmg + (def.scaleHp ? p.maxHp * def.scaleHp : 0)) * k); });

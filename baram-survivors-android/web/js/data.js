@@ -1633,7 +1633,7 @@ const PICS1320 = {
   // 맹독표창: 사용자가 준 원작 표창 GIF가 몬스터 셋에게 날아가 박힌다 (s9_stamps.py venomstar)
   r_venom: { fxShot: 'o_r_venomstar', shotTiles: 1.4 },
   // 필살검강: 근접기인데 다섯 칸을 날아가는 검기였다 (사용자 2026-11-23) → 앞쪽 역삼각형(아홉 칸)을 벤다, 뛰어들어
-  r_pilgeom: { kind: 'cleave', radius: 0, max: 9, depth: undefined, desc: '검강을 실어 앞쪽 역삼각형(아홉 칸)의 몬스터를 단숨에 벤다' },
+  r_pilgeom: { kind: 'cleave', radius: 0, max: 9, depth: undefined, fxAfter: null, noMain: true, desc: '검강을 실어 앞쪽 역삼각형(아홉 칸)의 몬스터를 단숨에 벤다' },
   l_javelin: { fx: 'o_l_javelin', fxShot: 'o_l_javelinshot', fxTurn: true, shotTiles: 3.4 }, // #11 청록 창끝 빛줄기: 날아가 꽂힘, 나는 쪽을 향해
   mk_stack: { fx: 'o_mk_stack' }, // #21 파란 기 구슬이 맺혀 튐 (흐린 파란 원판 대신)
   rp_chain: { fx: 'o_rp_chain' }, // #20 청록 사슬이 묶인 몬스터마다 몸 크기로
