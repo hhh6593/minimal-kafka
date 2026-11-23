@@ -629,6 +629,42 @@ function namedMonster(d) {
   return old ? { ...m, area: old.area } : m;
 }
 
+/** A monster's picture for a card (the ground list, the raid list, a ground's monsters): cropped
+ *  to what is drawn. 연's unit frames keep the empty room round a body where the sheet's anchor
+ *  needs it (고원 기마병: a rider whose spear runs off one side, the frame left of him empty), and
+ *  such a face sat off to one side of its card. */
+const monFaces = new Map();
+function monFace(id) {
+  const path = `assets/mon/${id}.png`;
+  if (monFaces.has(id)) return monFaces.get(id) || path;
+  let out = null;
+  const im = images[`mon/${id}.png`];
+  if (im && im.width) {
+    try {
+      const c = document.createElement('canvas');
+      c.width = im.width;
+      c.height = im.height;
+      const g = c.getContext('2d');
+      g.drawImage(im, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+      // (only where the empty room is more than a few pixels: the old monsters are drawn edge to edge)
+      if (x1 >= 0 && (x0 > 3 || y0 > 3 || c.width - 1 - x1 > 3 || c.height - 1 - y1 > 3)) {
+        const t = document.createElement('canvas');
+        t.width = x1 - x0 + 1;
+        t.height = y1 - y0 + 1;
+        t.getContext('2d').drawImage(c, x0, y0, t.width, t.height, 0, 0, t.width, t.height);
+        out = t.toDataURL();
+      }
+    } catch (e) { out = null; }
+    monFaces.set(id, out);
+  }
+  return out || path;
+}
+
 /** The monsters of a hunting ground, weakest first, with its boss and middle boss. */
 function stageMonsters(stage) {
   let list;
@@ -1069,7 +1105,7 @@ function buildStages() {
       const { pool, boss } = stageMonsters(s);
       // The boss's picture where the build has one, else the ground's strongest monster.
       const face = monsterById[boss.id] ? boss.id : (pool[pool.length - 1] || {}).id;
-      b.innerHTML = `<img src="assets/mon/${face}.png" alt=""><div><b>${s.name} <small>Lv ${s.lv}</small></b>`
+      b.innerHTML = `<img src="${monFace(face)}" alt=""><div><b>${s.name} <small>Lv ${s.lv}</small></b>`
         + `<span class="st ${done ? 'done' : open ? 'open' : 'shut'}">${done ? '정복' : open ? '도전 가능' : '잠김'}</span>`
         + `<span>${open ? s.intro : lockReason(i)}</span></div>`;
       b.onclick = () => { pickedStage = s; buildStages(); };
@@ -1087,7 +1123,7 @@ function buildStages() {
       const b = document.createElement('button');
       b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
       const done = (progress.raids || {})[r.id];
-      b.innerHTML = `<img src="assets/mon/${(namedMonster(r.boss) || r.boss).id}.png" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
+      b.innerHTML = `<img src="${monFace((namedMonster(r.boss) || r.boss).id)}" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
         + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : raidLock(r)}</span></div>`;
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
@@ -1148,7 +1184,7 @@ function stageInfo() {
   const show = [pool[0], pool[Math.floor(pool.length / 2)], pool[pool.length - 1]].filter((m, k, a) => m && a.indexOf(m) === k);
   $('#stage-info').innerHTML = `<h3>${s.name}</h3><div class="lv">난이도 ${'★'.repeat(Math.min(5, 1 + Math.floor(i / 3)))} · 원작 적정 Lv ${s.lv}</div>
     <p>${s.intro}</p>
-    <div class="mons">${show.map(m => `<img src="assets/mon/${m.id}.png" alt="">`).join('')}</div>
+    <div class="mons">${show.map(m => `<img src="${monFace(m.id)}" alt="">`).join('')}</div>
     <div class="boss">보스: <b>${boss.name}</b></div>
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
       : open ? '도전할 수 있는 사냥터' : `잠김: ${lockReason(i)}`}</div>`;
@@ -1250,7 +1286,7 @@ function raidInfo(r) {
   const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · ${RAID_LIMIT / 60}분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
-    <div class="mons"><img src="assets/mon/${(namedMonster(r.boss) || r.boss).id}.png" alt=""></div>
+    <div class="mons"><img src="${monFace((namedMonster(r.boss) || r.boss).id)}" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 공격대 25명${party.length ? ` · 내 다른 직업: ${party.slice(0, 4).join(', ')}` : ''}</div>
     <div class="party raid-roles">역할 ${Object.entries(War.ROLES).map(([id, x]) => `<button data-rrole="${id}" title="${x.desc}" style="font:11px G9,sans-serif;padding:0 5px;margin:0 1px;border:1px solid ${id === role ? '#c08a10' : '#8a7050'};background:${id === role ? '#ffe9a8' : '#f4e6c4'};color:${id === role ? '#7a3a00' : '#4a3a28'}${roles.includes(id) ? '' : ';opacity:0.7'}">${x.name}</button>`).join('')} <small>· 보상 등급은 역할별 기여로</small></div>
     <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${won(120 * r.level)} · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>
@@ -4646,7 +4682,14 @@ function update(dt) {
       const ox = p.x, oy = p.y;
       p.x += dx * heroSpeed() * dt;
       p.y += dy * heroSpeed() * dt;
-      if (G.arena && !Hunt.open(Math.floor(p.x / TILE), Math.floor((p.y - TILE / 2 + 6) / TILE))) { p.x = ox; p.y = oy; } // 사냥 기믹: the map's walls
+      // 사냥 기믹: the map's walls. A slant into one slides along it (the other way's half kept), as
+      // the tiles' walk does, rather than stopping the hero dead at every cliff's edge.
+      const shut = (x, y) => !Hunt.open(Math.floor(x / TILE), Math.floor((y - TILE / 2 + 6) / TILE));
+      if (G.arena && shut(p.x, p.y)) {
+        if (dx && dy && !shut(p.x, oy)) p.y = oy;
+        else if (dx && dy && !shut(ox, p.y)) p.x = ox;
+        else { p.x = ox; p.y = oy; }
+      }
       p.walkT += dt * 1000;
       p.phase += (heroSpeed() * dt / (TILE / 2)) * Math.PI;
       heroTile();
@@ -12990,6 +13033,7 @@ function joinParty(cls) {
   m.hp = m.maxHp;
   m.tx = Math.floor(m.x / TILE);
   m.ty = Math.floor((m.y - TILE / 2 + 6) / TILE);
+  [m.tx, m.ty] = arenaNear([m.tx, m.ty]);
   m.x = m.tx * TILE + TILE / 2;
   m.y = m.ty * TILE + TILE - 6;
   m.lv = Math.max(1, m.baseLv);
@@ -13118,7 +13162,17 @@ function memberAnchor(m) {
       .find(([x, y]) => !G.marks.some(mk => mk.tiles.some(([a, b]) => a === x && b === y)));
     if (free2) at = free2;
   }
-  return at;
+  return arenaNear(at);
+}
+
+/** 사냥 기믹: on a ground fought on 연's own map, the open tile the hero can walk to nearest a spot
+ *  (a companion's place, where it walks in from): never on a cliff, in the void or past the edge. */
+function arenaNear(at) {
+  if (!G.arena || Hunt.reach(at[0], at[1])) return at;
+  for (let r = 1; r <= 6; r++)
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && Hunt.reach(at[0] + dx, at[1] + dy)) return [at[0] + dx, at[1] + dy];
+  return [G.player.tx, G.player.ty];
 }
 
 function updateParty(dt) {
@@ -13198,8 +13252,20 @@ function stepMember(m, dt) {
       [m.tx, m.ty] = m.anchor;
     }
     const ddx = m.anchor[0] - m.tx, ddy = m.anchor[1] - m.ty;
+    let way = null;
     if (ddx || ddy) {
-      const [sx, sy] = Math.abs(ddx) >= Math.abs(ddy) ? [Math.sign(ddx), 0] : [0, Math.sign(ddy)];
+      const a = [Math.sign(ddx), 0], b = [0, Math.sign(ddy)];
+      way = Math.abs(ddx) >= Math.abs(ddy) ? [a, b] : [b, a];
+      // 사냥 기믹: the map's walls hold the companions too: the other way round, else round the wall
+      // by the monsters' road to the hero.
+      if (G.arena) {
+        way = way.filter(([x, y]) => (x || y) && Hunt.open(m.tx + x, m.ty + y));
+        if (!way.length) way = Hunt.flowDirs(m, p.tx, p.ty) || [];
+      }
+      way = way[0];
+    }
+    if (way) {
+      const [sx, sy] = way;
       m.sfx = m.tx;
       m.sfy = m.ty;
       m.tx += sx;

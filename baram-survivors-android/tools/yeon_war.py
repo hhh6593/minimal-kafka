@@ -198,7 +198,7 @@ def floor_open(data, crop):
     return [[(x, y) in shut for x in range(x0, x1)] for y in range(y0, y1)]
 
 
-def blocked32(data, crop):
+def blocked32(data, crop, unseen=True):
     """연's 32-pixel tiles in the crop a body may not stand on: not movable, or under the eaves.
 
     The eaves: 연 draws its roof layer over the walkers, so a movable tile under a roof's edge is
@@ -220,6 +220,9 @@ def blocked32(data, crop):
     # stands a map object (a tree, a lantern, a statue) this field does not draw. An unseen wall
     # held the bodies back for no reason the player could see, and the timid hid behind thin air:
     # such a tile is opened.
+    # (unseen=False: not on a map whose void, chasms and cliff faces are that same bare ground —
+    # 연's hell maps, 화탕지옥: there the rule opened some 1900 tiles of void past the cliffs, and the
+    # hero and the monsters walked off the map.)
     ground = data['tileLayers'][0]['tiles']
     gid = lambda x, y: ground[(y0 + y) * W + x0 + x]['aioTileID']
     on_floor = {}
@@ -229,7 +232,7 @@ def blocked32(data, crop):
                 on_floor[gid(x, y)] = on_floor.get(gid(x, y), 0) + 1
     for y in range(h):
         for x in range(w):
-            if blk[y][x] and on_floor.get(gid(x, y), 0) >= 8 and not any(
+            if unseen and blk[y][x] and on_floor.get(gid(x, y), 0) >= 8 and not any(
                     L['tiles'][(y0 + y) * W + x0 + x]['aioTileID'] >= 0 for L in data['tileLayers'][1:]):
                 blk[y][x] = False
     out = [row[:] for row in blk]

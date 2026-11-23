@@ -67,6 +67,14 @@ def main():
             shutil.copyfile(os.path.join(idir, n), os.path.join(assets, "skillicon", n))
             if n[:-4] not in man["skillicon"]:
                 man["skillicon"].append(n[:-4])
+    # Hunting-ground walk grids made again since that APK (tools/yhunt_walk.json, from
+    # tools/yeon_grounds.py arena: 화탕지옥's void and cliffs closed), over the old ones.
+    fix = json.load(open(os.path.join(HERE, "yhunt_walk.json"), encoding="utf-8"))
+    for gid, v in fix.items():
+        old_g = man.get("yhunt", {}).get(gid)
+        if old_g and (old_g["cols"], old_g["rows"]) == (v["cols"], v["rows"]):
+            old_g["walk"], old_g["start"] = v["walk"], v["start"]
+            print(f"walk grid of {gid} replaced")
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
 

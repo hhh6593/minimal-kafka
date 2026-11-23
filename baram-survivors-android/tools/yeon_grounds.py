@@ -319,6 +319,9 @@ ARENAS = {
     'wreck': ('Maps_409180.unity3d', 'kow_ship_dragonpalace_07_04_shipgraveyard_01', (9, 6, 52, 50)),
     'sandolim': ('Maps_415501.unity3d', 'kow_skybelow_01_first_01_01_sandolim_canyon_01', (14, 10, 78, 64)),
 }
+# Arenas whose void, chasms and cliff faces are bare floor ground (연's hell): yeon_war.blocked32's
+# unseen-blocker rule would open them (화탕지옥: the hero and the monsters walked off the cliffs).
+NO_UNSEEN = {'hwatang'}
 
 
 def arena(dec, gear, only=None):
@@ -349,7 +352,7 @@ def arena(dec, gear, only=None):
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
                     os.path.join(d, f'{gid}_{cx}_{cy}.png'), optimize=True)
         cols, rows = w // G, h // G
-        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1)), cols, rows)
+        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1), gid not in NO_UNSEEN), cols, rows)
         cells = [(x, y) for y in range(rows) for x in range(cols) if walk[y][x] == '.']
         start = min(cells, key=lambda c: (c[0] - cols / 2) ** 2 + (c[1] - rows / 2) ** 2)
         index[gid] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'start': list(start),
