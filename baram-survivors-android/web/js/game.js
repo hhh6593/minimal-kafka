@@ -7528,8 +7528,9 @@ function castNow(skill, st) {
       }
       if (!near.length) return under ? undefined : retry(0.12);
       // The blow goes the way the hero faces when a monster is there, else to the one beside;
-      // the hero's own facing is left alone, so walking stays the player's.
-      const [ax, ay] = near.find(([dx, dy]) => dx === fx0 && dy === fy0) || near[0];
+      // the hero's own facing is left alone, so walking stays the player's. (보스 우선: the boss beside first)
+      const [ax, ay] = near.find(([dx, dy]) => (bodiesAt(p.tx + dx, p.ty + dy) || []).some(b => b.kind === 'boss'))
+        || near.find(([dx, dy]) => dx === fx0 && dy === fy0) || near[0];
       p.lungeAt = G.t;
       p.lungeK = 1;
       p.ldx = ax;
