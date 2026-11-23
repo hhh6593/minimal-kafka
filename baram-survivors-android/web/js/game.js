@@ -13777,6 +13777,14 @@ function drawSkillBar() {
 // 주술사 and 도사 fill the field from afar with the game's own spell pictures on many foes.
 
 const THUNDER = /뢰|뇌|천둥|번개|섬광/;
+/** A close-in technique the hero leaps in for (연: only what strikes round the body or the tile before it). A thrown
+ *  or shot one (무형투창, 표창, 암기 — spell, line, a strike from afar, the whole screen) is cast from where the hero stands:
+ *  사용자 2026-11-23, 무형투창이 돌진기처럼 뛰어들고 도적의 원거리 기술도 돌진했다. */
+function closeIn(def) {
+  if (def.fxShot || def.shotTiles) return false;
+  if (def.kind === 'cleave' || def.kind === 'nova') return true;
+  return def.kind === 'strike' && (def.range || 6) <= 2;
+}
 function classFlourish(def, skill, st) {
   if (SH) return; // (the hero's own dash and flourish)
   const p = G.player, cls = G.cls.id;
@@ -13785,7 +13793,7 @@ function classFlourish(def, skill, st) {
   if (MELEE.has(cls)) {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
     const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === SIDE); });
-    if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > (G.dashUsed ? 3 : 1.5) && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
+    if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > (G.dashUsed ? 3 : 1.5) && tdist(near, p) <= 5 && closeIn(def)) {
       const spot = leapSpot(near);
       if (spot) {
         G.dashAt = G.t;
