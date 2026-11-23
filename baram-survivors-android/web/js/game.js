@@ -1773,7 +1773,7 @@ function gearProc(on, t) {
     cd.shock = G.t + P.cd;
     if (M.fx[P.fx]) addFx(P.fx, p.x, p.y - 10, { scale: 0.9 });
     G.procHitting = true;
-    for (const e of G.enemies) if (e.hp > 0 && !(e.war && e.team === 0) && Math.abs(e.tx - p.tx) <= P.area && Math.abs(e.ty - p.ty) <= P.area) hurtEnemy(e, base * P.dmg);
+    for (const e of G.enemies) if (e.hp > 0 && !(e.war && e.team === SIDE) && Math.abs(e.tx - p.tx) <= P.area && Math.abs(e.ty - p.ty) <= P.area) hurtEnemy(e, base * P.dmg);
     G.procHitting = false;
     floatText(p.x, p.y - 78, P.name, '#ffd27a', true);
   }
@@ -1960,7 +1960,7 @@ function gyWays(g, m, t, hits, base, lv) {
       const len = Math.max(Math.abs(t.tx - p.tx), Math.abs(t.ty - p.ty)) + m.line.len + lv;
       for (let i = 1; i <= len; i++) {
         const bs = bodiesAt(p.tx + dx * i, p.ty + dy * i);
-        if (bs) for (const e of bs.slice()) if (e.m && !e.ally && e.hp > 0 && e !== t && !(e.war && e.team === 0)) {
+        if (bs) for (const e of bs.slice()) if (e.m && !e.ally && e.hp > 0 && e !== t && !(e.war && e.team === SIDE)) {
           dealt += hurtEnemy(e, D * m.line.k, [dx, dy]) || 0;
           if (m.line.push) gyShove(e, dx, dy);
         }
@@ -4286,7 +4286,7 @@ function heroPic(el, cls) {
 
 /** The hero calls out a spell, as players typed it: a bubble over the head. */
 function shout(name, plain = false) {
-  if (plain) return;
+  if (plain || SH) return;
   if (G.bubble && G.t - G.bubble.t < 0.8) return; // one at a time, so they can be read
   G.bubble = { text: `${name}!`, t: G.t };
 }
@@ -6071,6 +6071,7 @@ function flashRoom() {
 }
 
 function hurtEnemy(e, dmg, push = null) {
+  if (SH) return SH.hurt(e, dmg, push); // an AI's cast (castAs): its own blow
   e.provoked = true;
   if (e.hp <= 0) return 0;
   if (e.guardT > G.t) return 0; // a boss speaking at its entrance or a phase
@@ -6979,7 +6980,7 @@ function onTiles(tiles) {
   const out = [];
   for (const [x, y] of tiles) {
     const bs = bodiesAt(x, y);
-    if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0) && !out.includes(b)) out.push(b);
+    if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === SIDE) && !out.includes(b)) out.push(b);
   }
   return out;
 }
@@ -7014,7 +7015,7 @@ function around(tx, ty, r) {
   for (let x = tx - r; x <= tx + r; x++) {
     for (let y = ty - r; y <= ty + r; y++) {
       const bs = bodiesAt(x, y);
-      if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === 0)) out.push(b);
+      if (bs) for (const b of bs) if (b.m && b.hp > 0 && !b.ally && !(b.war && b.team === SIDE)) out.push(b);
     }
   }
   return out;
@@ -7170,6 +7171,150 @@ function seenReach(fxid, scale = 1) {
   return (Math.min(f.w * r[0], f.h * r[1] * 1.6) * (f.k || 1) * scale) / 2 / TILE * 0.85;
 }
 
+// ---------------------------------------------------------------- 같은 기술은 같은 그림 (AI의 시전)
+// 사용자 피드백: "왜 다르냐, 같은 기술인데" — an AI ally's skill (a companion's in a hunt, a raid's or a war's fighter's)
+// was drawn by code of its own (war.js fitArea·aiFx·AI_FX_AREA, its old class routines' raw pictures × 1.1~1.4, the
+// companions' fxFit·memberFx), at sizes of its own: 백호참 a third of the screen in a 쟁, 사슬벼락·비영승보 far
+// larger than the hero's. Now every AI cast goes through the hero's own cast (cast, TIER_KINDS) — castAs: the
+// same picture, scale, anchor and the same area struck as the hero's cast of that skill at that 단. Only its
+// see-through (aiFxAlpha) and the budgets of how many are drawn are an AI's own.
+//
+// The hero's cast runs for the caster in a shadow of the game (SH): G is an object over the real one (its fields read
+// through; what the cast sets — buffs, shakes, flags — kept to the shadow), its hero a stand-in where the caster
+// stands, its foes the caster's; a blow it strikes goes to the caster's own hit (its own power: ctx.hit), and nothing
+// of the hero's own is touched (its life, buffs, words, sounds, pose). What the cast draws goes on the field as the
+// hero's would, a picture over "the hero" kept on the caster. Its later steps (later) run in the same shadow.
+let SH = null; // the shadow cast running now (castAs), or null
+let SIDE = 0; // the side whose fighters are not struck (a war's or raid's own side, team 0; a caster's own in castAs)
+const SILENT = new Proxy({}, { get: () => () => {} });
+/** fn() inside the shadow cast ctx; what it put on the field marked as the caster's (castAs). */
+function inShadow(ctx, fn) {
+  const real = ctx.real;
+  if (G !== real && G !== ctx.sh) return; // (that hunt is over)
+  const g0 = G, s0 = SH, side0 = SIDE, a0 = audio, n0 = real.fxs.length;
+  G = ctx.sh;
+  SH = ctx;
+  SIDE = ctx.team;
+  audio = SILENT;
+  try {
+    return fn();
+  } catch (err) {
+    // (a step of the hero's code that cannot run for another: that cast's step is lost, the game goes on — tests read it)
+    ctx.failed = true;
+    (window.__castAsErr = window.__castAsErr || []).push(`${ctx.id}: ${err && err.message}`);
+  } finally {
+    G = g0;
+    SH = s0;
+    SIDE = side0;
+    audio = a0;
+    // (a cast struck unseen — out of sight, over the AI's budget —: what it put up taken down at once)
+    for (let i = real.fxs.length - 1; i >= n0; i--) if (ctx.mark(real.fxs[i])) real.fxs.splice(i, 1);
+  }
+}
+/** fn() out of the shadow (a blow struck by the caster's own hit: war.js and the party read the real game). */
+function outShadow(fn) {
+  const ctx = SH;
+  if (!ctx) return fn();
+  const g0 = G, side0 = SIDE, a0 = audio;
+  G = ctx.real;
+  SH = null;
+  SIDE = 0;
+  audio = ctx.audio;
+  try {
+    return fn();
+  } finally {
+    G = g0;
+    SH = ctx;
+    SIDE = side0;
+    audio = a0;
+  }
+}
+/**
+ * One skill of an AI ally cast by the hero's own code (see above). by: the caster (x, y, tx, ty, fdx, fdy, cls; a war
+ * fighter's team), id and lv (its 단). o: { foes: its foes (default the hero's), team: its side (0), hit(e, share, dmg,
+ * push): a blow it struck — share the part of one whole blow of the skill (st.dmg) — at: the one it means (it turns
+ * to it), on: the body a picture over "the hero" goes on (default by), alpha (aiFxAlpha), draw: false to strike without
+ * drawing (a cast out of sight or over the budget) }. Returns true when it went off (false: nothing in its reach).
+ */
+function castAs(by, id, lv, o = {}) {
+  const def = SKILLS[id];
+  if (!G || !by || !def || ['ult', 'summon', 'none'].includes(def.kind)) return false;
+  lv = Math.max(1, Math.min(MAX_SKILL_LEVEL, lv || 1));
+  const real = G, pass = {};
+  for (const k of Object.keys(real.passives || {})) pass[k] = 0;
+  // (its reach as the hero's at that 단 on this field: the hero's 공력 (passive area) widens a spread spell's square, and the
+  // same spell of an ally beside it is drawn and strikes as wide — the hero's blow and pace stay the hero's own)
+  pass.area = (real.passives && real.passives.area) || 0;
+  const st = skillStats(id, lv, { power: 0, haste: 0, ...pass });
+  const on = o.on || by, onHero = on === real.player || on.hero;
+  const p = {
+    x: by.x, y: by.y, tx: by.tx, ty: by.ty, fdx: by.fdx || 0, fdy: by.fdx ? 0 : by.fdy || 1, face: by.face || by.fdx || 1,
+    hp: def.kind === 'heal' || def.ck === 'heal' || isMend(def) ? 50 : 100, maxHp: 100, // (a mend is cast on one hurt) mp: 1e9, maxMp: 1e9, lvl: real.player.lvl, gear: by.gear, gearPower: 1, bonus: {},
+  };
+  if (o.at && o.at !== by && (o.at.tx !== by.tx || o.at.ty !== by.ty)) {
+    const dx = o.at.tx - by.tx, dy = o.at.ty - by.ty;
+    if (Math.abs(dx) >= Math.abs(dy)) { p.fdx = Math.sign(dx); p.fdy = 0; p.face = p.fdx; } else { p.fdx = 0; p.fdy = Math.sign(dy); }
+  }
+  const buffs = {};
+  for (const k of Object.keys(real.buffs)) buffs[k] = 0;
+  const sh = Object.create(real);
+  Object.assign(sh, {
+    player: p, cls: o.cls || by.cls || real.cls, buffs, passives: { power: 0, haste: 0, area: 0, ...pass }, enemies: o.foes || real.enemies, party: [], skills: [], allies: [],
+    dead: false, shake: 0, bubble: null, binfo: [], ghosts: [], ambush: null, coat9: null, chainRun: null, blast: null, quietHit: false,
+  });
+  const base = st.dmg || def.hit || 1, draw = o.draw !== false, alpha = o.alpha === undefined ? 1 : o.alpha;
+  const ctx = {
+    real, sh, team: o.team || 0, by, audio, id,
+    hurt: (e, d, push) => outShadow(() => (o.hit ? o.hit(e, d / base, d, push) : 0)) || 0,
+    draw,
+    mark: f => {
+      if (f.by) return false;
+      f.by = by;
+      f.cast = id + '@' + lv; // (tests: whose cast it is)
+      if (!draw) return true;
+      if (f.follow && !onHero) { f.follow = false; f.on = on; }
+      if (f.life === Infinity) f.life = 1.5; // (a ward kept round the hero while it holds: once, a moment)
+      if (alpha < 1) f.alpha = (f.alpha === undefined ? 1 : f.alpha) * alpha;
+    },
+  };
+  const skill = { id, lv, timer: 0 };
+  inShadow(ctx, () => cast(skill, st));
+  return !skill.waiting && !ctx.failed;
+}
+window.__castAs = (b, id, lv, o) => castAs(b, id, lv, o); // test: an AI cast of a skill
+window.__joinParty = ids => { for (const id of ids) joinParty(CLASSES.find(c => c.id === id)); return G.party.map(m => [m.name, m.cls.id, m.own, m.cl, memberSkillLv(m)]); }; // test: companions now
+// test (같은 기술은 같은 그림): each picture up now, its drawn extent in tiles (the union of its frames' boxes, at its scale)
+// [id, w, h, an AI's cast ('id@lv') or '' for the hero's, alpha]
+window.__fxExt = () => G.fxs.filter(f => f.t >= 0 && M.fx[f.id]).map(f => {
+  const d = M.fx[f.id], u = fxUnion(f.id), k = (d.k || 1) * (f.scale || 1), ky = d.ky || 1;
+  const w = (u ? u.x1 - u.x0 : d.w) * k, h = (u ? u.y1 - u.y0 : d.h) * k * ky;
+  return [String(f.id), +(w / TILE).toFixed(3), +(h / TILE).toFixed(3), f.cast || '', f.alpha === undefined ? 1 : +f.alpha.toFixed(2)];
+});
+/** The sheets a skill's cast at a 단 draws from (to be decoded before a fighter casts it in view): its picture at that 단
+ *  and its stages (fxCast, fxShot, fxHit, fxAfter, fx2, 연's k_x_<id>_*). */
+function skillSheets(id, lv) {
+  const d = SKILLS[id];
+  if (!d) return [];
+  const base = d.yeon ? d.fx : d.modern && M.fx[d.modern] ? d.modern : d.promo === 4 && M.fx['new_' + id] ? 'new_' + id
+    : d.fxs ? d.fxs[Math.min(lv || 1, d.fxs.length) - 1] : M.fx['s_' + id] ? 's_' + id : d.fx;
+  const ids = [base, d.fx, d.fx2, d.fxCast, d.fxShot, d.fxHit, d.fxAfter, 'k_' + id, 'k_x_' + id + '_cast', 'k_x_' + id + '_hit', 'k_x_' + id + '_shot'];
+  return [...new Set(ids.filter(f => f && M.fx[f]))];
+}
+/** A fighter's plain blow seen as the hero's own is (plainAttack): a close-in class's slash on the struck, a far one's
+ *  first spell's picture small on it. (A war's fighters drew their first technique's whole picture on every other blow.) */
+function plainLook(cls, t, alpha = 1, from = null) {
+  if (!cls || !t) return;
+  const look = MELEE_LOOK[cls.id];
+  if (look) {
+    if (!M.fx[look.slash] || !fxBudget('slash', 6)) return;
+    const dx = from ? Math.sign(t.tx - from.tx) : 0, dy = from ? Math.sign(t.ty - from.ty) : 1, along = Math.atan2(dy || 0, dx || 0.0001);
+    addFx(look.slash, t.tx * TILE + TILE / 2, t.ty * TILE + TILE / 2 - 4, { scale: look.ss, rot: look.turn ? along + Math.PI / 2 - 0.5 : -0.3, alpha });
+    return;
+  }
+  const start = plainSpell(cls.id), fxid = start && !MEND_FX.has(start.fx) ? start.fx : null;
+  if (fxid && M.fx[fxid]) fxOn(fxid, t, { scale: 0.55, alpha });
+}
+
 function cast(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
@@ -7254,7 +7399,7 @@ function cast(skill, st) {
         if (fxid) fxOn(fxid, under);
         smite(under, st.dmg);
       }
-      const foeAt = (dx, dy) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); };
+      const foeAt = (dx, dy) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === SIDE); };
       const fx0 = p.fdx || 0, fy0 = fx0 ? 0 : p.fdy || 1;
       let near = DIRS.filter(([dx, dy]) => foeAt(dx, dy));
       if (!near.length && def.dash) {
@@ -7262,14 +7407,14 @@ function cast(skill, st) {
         let k = 2;
         while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k)) && (!G.war || G.war.raid || War.open(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
-        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && holdGround(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
+        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === SIDE) && holdGround(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
           // Held (a war's point, the red floor, 제자리): the flurry reaches the foe; the hero stays.
           if (fxid) fxOn(fxid, b);
           smite(b, st.dmg * 1.6, [fx0, fy0]);
           meleeSlash(b.tx, b.ty, fx0, fy0, 0);
           break;
         }
-        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === 0) && !occ.has(key(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1)))) {
+        if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === SIDE) && !occ.has(key(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1)))) {
           addFx(fxid, p.x, p.y - 26, { scale: 0.6 });
           const x0 = p.x, y0 = p.y;
           p.tx += fx0 * (k - 1);
@@ -7332,7 +7477,7 @@ function cast(skill, st) {
         return e.hp > 0 && f >= 1 && f <= st.range && side <= 1;
       }).sort((a, b) => tdist(a, p) - tdist(b, p));
       // Nothing ahead: strike one beside the hero where it stands, without moving.
-      const e = ahead[0] || DIRS.map(([dx, dy]) => occ.get(key(p.tx + dx, p.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
+      const e = ahead[0] || DIRS.map(([dx, dy]) => occ.get(key(p.tx + dx, p.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === SIDE) && b.hp > 0);
       if (!e) return retry(0.25);
       const bx = e.tx + fx0, by = e.ty + fy0;
       // 연's picture for the way it goes (up, down, left; right the left turned over).
@@ -7406,7 +7551,7 @@ function cast(skill, st) {
       for (const [dx, dy] of DIRS) {
         for (let k = 1; k <= st.range; k++) {
           const b = occ.get(key(p.tx + dx * k, p.ty + dy * k));
-          if (b && b.m && !b.ally && !(b.war && b.team === 0)) {
+          if (b && b.m && !b.ally && !(b.war && b.team === SIDE)) {
             any = true;
             // (이펙트=판정: a picture on every one struck — a burning row's sixth had none, past addFx's four of one
             // picture — a body across, its blow spread over it while it stays)
@@ -7625,7 +7770,7 @@ function cast(skill, st) {
       // 이펙트=판정: a screen picture that stays strikes the screen while it stays (the same blow, spread in beats)
       const screenBeats = (end, at) => {
         const bs = beatsUnder(end - at);
-        for (const [dt, k] of bs.slice(1)) later(at + dt, () => { if (!G.dead) for (const e of onScreen()) if (e.hp > 0 && !e.ally && !(e.war && e.team === 0)) smite(e, st.dmg * far(e) * k); });
+        for (const [dt, k] of bs.slice(1)) later(at + dt, () => { if (!G.dead) for (const e of onScreen()) if (e.hp > 0 && !e.ally && !(e.war && e.team === SIDE)) smite(e, st.dmg * far(e) * k); });
         return bs[0][1];
       };
       if (pat === 'flat') {
@@ -7763,7 +7908,7 @@ function cast(skill, st) {
       heal(st.heal, false);
       if (low && low !== p) healMember(low, st.heal, fxid);
       // 대항전·쟁·공대: the 기원 reaches the allies near (a 도사's as a healer's), its picture on each.
-      if (G.war) War.heroHeal(st.heal, fxReach, G.cls.id === 'poet', low);
+      if (G.war && !SH) War.heroHeal(st.heal, fxReach, G.cls.id === 'poet', low);
       // A 도사 hero in a raid is the party's healer: its 기원 reach everyone standing.
       if (G.stage.raid && !G.war && G.cls.id === 'poet') for (const m of G.party) if (m !== low && !m.down) healMember(m, m.maxHp * st.heal / p.maxHp * 0.6);
       if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
@@ -7790,7 +7935,7 @@ function cast(skill, st) {
       if (def.buff === 'stealth') {
         // 투명: the 잠행 begins (AMBUSH); the monsters about lose the hero.
         G.ambush = { at: G.t, k: AMBUSH.k + AMBUSH.kLv * (skill.lv - 1) };
-        for (const e of G.enemies) if (!e.kind && tdist(e, p) <= 8) e.lostAt = G.t;
+        if (!SH) for (const e of G.enemies) if (!e.kind && tdist(e, p) <= 8) e.lostAt = G.t;
       }
       if (def.buff === 'power') G.buffs.powerK = def.power;
       // 스킬 2차 개편: what each class's buff brings besides (no two alike): 흡혈 (drain: a share of the
@@ -7834,6 +7979,7 @@ function cast(skill, st) {
     addFx(def.fxCast ? bigFx(castPic, def.castSize || 150, 'cast') : castPic, 0, -30, { follow: true, scale: def.fxCast ? 1 : 1.3 });
     if (G.fxs.length > n && castAt < n) G.fxs.splice(castAt, 0, G.fxs.pop());
   }
+  if (SH) return; // (an AI's cast: what follows is the hero's own — its passives, words, sounds, pose)
   // 9차 절섬 (data.js S9: nine): from the 9차 승급, a second cut follows the first
   if (used && def.nine && !st.nine && (promoOf(G.cls.id) >= 9 || (def.jeol9 && G.training))) later(def.nine.at || 0.3, () => { if (!G.dead) cast(skill, { ...st, dmg: st.dmg * def.nine.k, nine: true }); });
   // 명천검파 (원작 9차; 2662에 장면이 없어 패시브, 그림 없음 — data.js mcheon9): every third cast of a 검기 skill goes
@@ -7873,7 +8019,7 @@ function cast(skill, st) {
   }
   if (used || def.kind === 'heal') shout(skillName(skill.id, skill.lv), def.kind === 'slash');
   if (used) battleInfo('cast', null, () => `[${skillName(skill.id, skill.lv)}]을(를) 외웠습니다.`);
-  if ((used || def.kind === 'heal') && window.__castLog) window.__castLog.push([skill.id, def.kind, +G.t.toFixed(2), Math.min(99, ...G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === 0)).map(e => tdist(e, p)))]); // test: casts with no foe about
+  if ((used || def.kind === 'heal') && window.__castLog) window.__castLog.push([skill.id, def.kind, +G.t.toFixed(2), Math.min(99, ...G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === SIDE)).map(e => tdist(e, p)))]); // test: casts with no foe about
   if (used && (def.dmg || def.kind === 'nova')) G.lastHit = G.t;
   if (used) {
     // (The field goes dark only under a 필살기 (castUlt): a plain skill comes round every few seconds,
@@ -8456,7 +8602,7 @@ function beatsUnder(span) {
 }
 /** A foe of the hero's (not its war's or raid's own side, not an ally). */
 function tkFoe(e) {
-  return e && e.m && e.hp > 0 && !e.ally && !(e.war && e.team === 0);
+  return e && e.m && e.hp > 0 && !e.ally && !(e.war && e.team === SIDE);
 }
 /** Foes within `r` tiles of a tile, nearest first. */
 function tkNear(tx, ty, r) {
@@ -10413,7 +10559,7 @@ function plainTarget(reach) {
   const p = G.player;
   let best = null, bd = 1e9;
   for (const e of G.enemies) {
-    if (e.hp <= 0 || e.ally || (e.war && e.team === 0)) continue;
+    if (e.hp <= 0 || e.ally || (e.war && e.team === SIDE)) continue;
     const d = tdist(e, p);
     if (d < bd && d <= reach) { bd = d; best = e; }
   }
@@ -11091,7 +11237,7 @@ function castUlt() {
   }
   const lvl = p.lvl, pw = (1 + 0.1 * G.passives.power) * (1 + 0.15 * promoOf(G.cls.id));
   const v = viewTiles();
-  const onScreen = () => G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === 0) && Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
+  const onScreen = () => G.enemies.filter(e => e.hp > 0 && !e.ally && !(e.war && e.team === SIDE) && Math.abs(e.tx - p.tx) <= v.w && Math.abs(e.ty - p.ty) <= v.h);
   // The 필살기's two ways, switched by the player at the button: 사냥 strikes everything on the
   // screen, 보스 puts eight times the blow into the strongest foe in sight (and a little around it).
   const base = (G.cls.id === 'warrior' ? p.maxHp * 0.9 : 60 + lvl * 12) * pw * (def.k || 1);
@@ -11226,8 +11372,10 @@ function heapNear() {
 }
 const timers = [];
 function later(delay, fn) {
-  if (delay <= 0) fn();
-  else timers.push({ at: G.t + delay, fn, run: G });
+  if (delay <= 0) return void fn();
+  // (a step of an AI's cast (castAs) runs in its shadow again, on the real hunt's clock)
+  if (SH) { const ctx = SH, f0 = fn; fn = () => inShadow(ctx, f0); }
+  timers.push({ at: G.t + delay, fn, run: SH ? SH.real : G });
 }
 
 function runTimers() {
@@ -11368,7 +11516,7 @@ function updateAllies(dt) {
     if (a.moving) continue;
     a.cd -= dt;
     a.atk -= dt;
-    const beside = DIRS.map(([dx, dy]) => occ.get(key(a.tx + dx, a.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === 0) && b.hp > 0);
+    const beside = DIRS.map(([dx, dy]) => occ.get(key(a.tx + dx, a.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === SIDE) && b.hp > 0);
     if (beside) {
       a.face = beside.tx >= a.tx ? 1 : -1;
       faceTo(a, beside.tx, beside.ty);
@@ -13348,12 +13496,13 @@ function drawSkillBar() {
 
 const THUNDER = /뢰|뇌|천둥|번개|섬광/;
 function classFlourish(def, skill, st) {
+  if (SH) return; // (the hero's own dash and flourish)
   const p = G.player, cls = G.cls.id;
   if (!def || def.kind === 'ult' || def.kind === 'buff' || def.kind === 'aura') return;
   const near = nearestEnemies(1, 6)[0];
   if (MELEE.has(cls)) {
     // 돌진: to the nearest foe out of reach, once a second and a half, when no blow lands by the hero.
-    const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === 0); });
+    const beside = DIRS.some(([dx, dy]) => { const b = occ.get(key(p.tx + dx, p.ty + dy)); return b && b.m && !b.ally && !(b.war && b.team === SIDE); });
     if (near && !beside && !p.stepping && !steering() && G.t - (G.dashAt || -9) > (G.dashUsed ? 3 : 1.5) && tdist(near, p) <= 5 && ['strike', 'cleave', 'nova', 'line', 'spell', 'screen'].includes(def.kind)) {
       const spot = leapSpot(near);
       if (spot) {
@@ -13481,6 +13630,7 @@ function drawLootFeed() {
  * key: lines of a kind that come close together are added into one (amount n, words from text(n)).
  */
 function battleInfo(key, n, text) {
+  if (SH) return;
   const L = G.binfo || (G.binfo = []), last = L[L.length - 1];
   if (last && last.key === key && G.t - last.t < 1.5 && n !== null) {
     last.n += n;
@@ -13558,7 +13708,7 @@ function drawBattleInfo() {
 
 /** The hero's own stun on a raid boss gathering its blast cuts it short, as the 주술사's 마비 does. */
 function cutBlast(e) {
-  if (e.kind !== 'boss' || !G.blast) return;
+  if (SH || e.kind !== 'boss' || !G.blast) return;
   G.blast = null;
   banner('기술로 광역기를 끊었다!');
   emote('gains', G.player);
@@ -13616,6 +13766,34 @@ function memberFx(id, sl) {
     : d.fxs ? d.fxs[Math.min(sl, d.fxs.length) - 1] : M.fx['s_' + id] ? 's_' + id : d.fx;
   return grownFx(base, sl);
 }
+/** A companion's blow from its cast (castAs): its own, counted as a companion's. */
+function memberHit(e, n, push) {
+  const was = G.allyHitting;
+  G.allyHitting = true;
+  hurtEnemy(e, n, push);
+  G.allyHitting = was;
+  return 0;
+}
+/** A companion's 단 for its old routine's skills (its 승급 kit's: memberSkillLv). */
+function partyLv(m) { return m.own ? memberSkillLv(m) : Math.max(1, Math.min(8, m.lv || 1)); }
+/** A skill of a companion's old routine, as the hero casts it (castAs): its picture, size and area; n its blow for one
+ *  whole blow of it; also(e) on each struck. A 필살기 (kind ult, the hero's a scene of its own) a body across on t. */
+function memberSkill(m, id, n, t, also) {
+  if (SKILLS[id] && SKILLS[id].kind === 'ult') {
+    fxOnArea(fxFit(SKILLS[id].fx, ONE_TILES, 'mu'), t);
+    later(0.25, () => { if (t.hp > 0) { memberHit(t, n); if (also) also(t); } });
+    return true;
+  }
+  return castAs(m, id, partyLv(m), { at: t, hit: (e, sh, d, push) => { memberHit(e, n * sh, push); if (also) also(e); return 0; } });
+}
+/** A skill of a companion seen only (its own rule does what it does): the hero's cast of it — on `at` for a 기원, a ward
+ *  or a buff (cast as on that one), else at `at` among foes (default the field's). */
+function memberShow(m, id, at, foes = null, lv = 0) {
+  const d = SKILLS[id];
+  if (!d || !at) return false;
+  if (['heal', 'buff', 'aura'].includes(d.kind) || at === m || at === G.player || !at.m) return castAs(at, id, lv || partyLv(m), { cls: m.cls, on: at });
+  return castAs(m, id, lv || partyLv(m), { at, foes: foes || undefined });
+}
 /** One tier skill of an own companion, if one is ready: returns true when it cast (the old routine rests). */
 function memberTierCast(m, near, face, pose) {
   if (!m.own) return false;
@@ -13629,57 +13807,29 @@ function memberTierCast(m, near, face, pose) {
     const d = tierDef(id);
     if (m.cl < Math.floor((d.req || 1) * 0.5) || G.t < (m.sk[id] || 0)) continue;
     const cd = d.cd * Math.pow(0.93, sl - 1) * 1.5;
-    const k = (d.evolved ? Math.pow(1.15, 4) : Math.pow(1.15, sl - 1)) * TIER_K * (m.power || 1) * auraK(m)
-      * ((m.buffUntil || 0) > G.t ? 1 + (m.buffK || 0.4) : 1);
-    const dmg = (d.dmg || 0) * k, fxid = memberFx(id, sl);
+    // its blow: the hero's formula for the skill at its 단 (castAs strikes what the hero's cast strikes) at TIER_K
+    const k = TIER_K * (m.power || 1) * auraK(m) * ((m.buffUntil || 0) > G.t ? 1 + (m.buffK || 0.4) : 1);
     const t = near(3)[0];
     let done = false;
+    // 같은 기술은 같은 그림: every skill of it cast by the hero's own code (castAs) — the hero's picture at that 단, its
+    // size, place and the area it strikes. (It drew memberFx's picture fitted by kinds of its own: 비영승보's cloud,
+    // 사슬벼락's dragon far larger than the hero's.)
     if (d.kind === 'buff') {
       if (d.buff === 'shield' ? m.hp >= m.maxHp * 0.7 : !t) continue;
       if (d.buff === 'power') { m.buffUntil = G.t + (d.duration || 4) * 1.2; m.buffK = (d.power || 0.4) * 0.5; }
       else if (d.buff === 'shield') m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.15);
-      fxOnBody(fxid, m, -26, { anchor: 'center' });
+      castAs(m, id, sl, { at: t, hit: (e, sh, dd, push) => memberHit(e, dd * k, push) });
       done = true;
     } else if (d.kind === 'heal') {
       const low = partyBodies().filter(b => b.hp < b.maxHp * 0.6).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
       if (!low) continue;
       const n = low.maxHp * Math.min(0.3, 0.1 + 0.02 * sl);
       if (low === p) heal(n, true); else low.hp = Math.min(low.maxHp, low.hp + n);
-      fxOnBody(fxid, low, -26, { anchor: 'center' });
+      castAs(low, id, sl, { cls: m.cls, on: low });
       done = true;
     } else if (t) {
-      const reach = d.kind === 'cleave' || d.kind === 'line' || d.kind === 'slash' || d.kind === 'nova' ? 2.2 : 7;
-      if (tdist(t, m) > reach) continue;
       face(t);
-      const hit = (e, f = 1) => hurtEnemy(e, dmg * f);
-      const status = e => { if (d.stun) e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? Math.min(d.stun, 0.6) : d.stun); if (d.slow) e.slow = d.slow; if (d.curse) e.curse = d.curse; };
-      // 이펙트=판정: a companion's spells too — its picture as wide as what it strikes, all inside it struck (a cap
-      // of a few kept as a share of the blow over them, not bodies left unstruck), striking while it stays.
-      const capK = (n, cap) => Math.min(1, cap / Math.max(1, n));
-      if (d.kind === 'screen') {
-        const all = onScreen().slice(0, 40), end = screenFx(fxid, id, 0.7), bs = beatsUnder(end - 0.35);
-        const fall = e => (d.falloff ? Math.max(0.2, 1 - d.falloff * tdist(e, p)) : 1);
-        for (const [dt, k] of bs) later(0.35 + dt, () => { for (const e of dt ? onScreen().slice(0, 40) : all) { if (e.hp <= 0 || e.ally) continue; if (!dt) status(e); hit(e, fall(e) * k); } });
-      } else if (d.kind === 'nova' || d.kind === 'cleave' || d.kind === 'line') {
-        const r = Math.min(3, Math.round(d.kind === 'nova' ? (d.radius || 1) + 0.5 : Math.min(d.depth || 2, 3) + 0.5));
-        const life = fxAtSquare(fxid, r * 2 + 1, m.x, m.y - 24, {}, 'mb'), mx = m.tx, my = m.ty;
-        for (const [dt, k] of beatsUnder(life - 0.12)) later(0.12 + dt, () => { const all = around(mx, my, r), q = capK(all.length, d.max || 9); for (const e of all) { if (!dt) status(e); hit(e, q * k); } });
-      } else if (d.kind === 'slash') {
-        const life = fxOnArea(fxFit(fxid, ONE_TILES, 'ms'), t), gap = Math.max(0.12, Math.min(0.4, life * 0.8 / 3));
-        for (let i = 0; i < 3; i++) later(i * gap, () => { if (t.hp > 0) hit(t, 0.4); });
-      } else {
-        // spell / strike / spell4 / blink: on the nearest few, and round each as the spell's radius says
-        const R = d.radius ? Math.min(2, d.radius) : 0, pic = fxFit(fxid, ONE_TILES, 'mp');
-        near(Math.min(3, d.count || 1)).forEach((e, i) => later(i * 0.1, () => {
-          if (e.hp <= 0) return;
-          const life = R ? fxAtSquare(fxid, R * 2 + 1, e.x, e.y - 24, {}, 'mp') : fxOnArea(pic, e), at = d.hitAt || 0.3, ex = e.tx, ey = e.ty;
-          for (const [dt, k] of beatsUnder(life * (1 - at))) later(life * at + dt, () => {
-            const set = R ? around(ex, ey, R) : e.hp > 0 ? [e] : [], q = capK(set.length, 6);
-            for (const o of set) { if (!dt) status(o); hit(o, q * k); }
-          });
-        }));
-      }
-      done = true;
+      done = castAs(m, id, sl, { at: t, hit: (e, sh, dd, push) => memberHit(e, dd * k, push) });
     }
     if (!done) continue;
     m.sk[id] = G.t + cd * haste;
@@ -13731,8 +13881,8 @@ function partyAct(m) {
         m.cd.g = 10;
         for (const x of partyBodies()) addShot(m, x, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => {
           const n = x.maxHp * 0.25;
-          if (x === p) { heal(n, false); addFx(SKILLS.p_sky.fx, 0, -26, { follow: true, scale: 0.7 }); }
-          else healMember(x, n, SKILLS.p_sky.fx);
+          if (x === p) heal(n, false); else healMember(x, n);
+          memberShow(m, 'p_sky', x);
         } });
         audio.play('skill_p_sky', 'heal');
         partySay(m, '천공의희원');
@@ -13743,7 +13893,7 @@ function partyAct(m) {
         m.cd.e = 16;
         addShot(m, p, { color: '#9a68ff', glow: '#d6c0ff', size: 4, speed: 380, onHit: () => {
           p.mp = Math.min(p.maxMp, p.mp + p.maxMp * 0.4);
-          addFx(SKILLS.m_gongryeok.fx, 0, -26, { follow: true, scale: 0.6 });
+          memberShow(m, 'm_gongryeok', p);
         } });
         audio.play('skill_m_gongryeok', 'heal');
         partySay(m, '공력주입');
@@ -13756,7 +13906,8 @@ function partyAct(m) {
         addShot(m, low, { color: '#58e868', glow: '#b8ffb0', size: 4, speed: 420, onHit: () => {
           const dd = m.deeds = m.deeds || {};
           dd.heal = (dd.heal || 0) + Math.min(n, low.maxHp - low.hp);
-          if (low === p) { heal(n, false); addFx(fx, 0, -26, { follow: true }); } else healMember(low, n, fx);
+          if (low === p) heal(n, false); else healMember(low, n);
+          memberShow(m, 'c_heal', low, null, tier + 1);
         } });
         audio.play('skill_c_heal', 'heal', tier + 1);
         partySay(m, KIWON[tier]);
@@ -13776,7 +13927,7 @@ function partyAct(m) {
         if (!t) break;
         m.cd.c = 7;
         for (const e of around(t.tx, t.ty, 1 + (m.lv >= 3))) e.curse = 4;
-        fxOn(SKILLS.m_curse.fx, t);
+        memberShow(m, 'm_curse', t, around(t.tx, t.ty, 1));
         audio.play('skill_m_curse', 'strike');
         partySay(m, '저주');
         face(t);
@@ -13793,7 +13944,7 @@ function partyAct(m) {
         m.cd.b = 9;
         G.blast = null;
         boss.stun = 1.2;
-        fxOn(SKILLS.m_para.fx, boss);
+        memberShow(m, 'm_para', boss, [boss]);
         audio.play('skill_m_para', 'strike');
         partySay(m, '마비');
         partyTalk(m, ['마비 걸었어요! 광역 끊김!', '마비! 지금 몰아쳐요!']);
@@ -13803,24 +13954,20 @@ function partyAct(m) {
       } else if (boss && m.cd.d <= 0) {
         // 헬파이어 on the boss: the big one.
         m.cd.d = 16;
-        fxOn(SKILLS.m_ult.fx, t);
-        later(0.3, () => hurtEnemy(t, 70 * pw));
+        memberSkill(m, 'm_ult', 70 * pw, t);
         audio.play('skill_m_ult', 'ult');
         partySay(m, '헬파이어');
         pose('magic');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.3;
-        addShot(m, t, { color: '#ff8a20', glow: '#ffd060', size: 4, speed: 460, onHit: () => {
-          fxOn(SKILLS.m_fire.fxs ? SKILLS.m_fire.fxs[Math.min(7, m.lv)] : SKILLS.m_fire.fx, t);
-          hurtEnemy(t, 8 * pw);
-        } });
+        memberSkill(m, 'm_fire', 8 * pw, t);
         audio.play('skill_m_fire', 'spell', Math.min(8, m.lv * 2));
         if (Math.random() < 0.3) partySay(m, ['화염주', '화영열주', '화열참주'][Math.min(2, m.lv - 1)]);
         pose('magic');
       } else if (m.cd.b <= 0) {
         m.cd.b = 8;
         for (const e of around(t.tx, t.ty, 1)) e.stun = e.kind === 'boss' ? 0.6 : 2;
-        fxOn(SKILLS.m_para.fx, t);
+        memberShow(m, 'm_para', t, around(t.tx, t.ty, 1));
         audio.play('skill_m_para', 'strike');
         partySay(m, '마비');
         pose('magic');
@@ -13843,8 +13990,7 @@ function partyAct(m) {
       face(t);
       if (boss && t === boss && m.cd.d <= 0) {
         m.cd.d = 18;
-        fxOn(SKILLS.w_roar.fx, t);
-        later(0.2, () => hurtEnemy(t, 60 * pw));
+        memberSkill(m, 'w_roar', 60 * pw, t);
         audio.play('skill_w_roar', 'nova');
         partySay(m, '동귀어진');
         G.shake = Math.max(G.shake, 0.2);
@@ -13856,8 +14002,7 @@ function partyAct(m) {
         pose('attack');
         if (m.cd.b <= 0) {
           m.cd.b = 10;
-          for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 15 * pw);
-          fxOn(SKILLS.w_tiger.fx, t);
+          memberSkill(m, 'w_tiger', 15 * pw, t);
           audio.play('skill_w_tiger', 'spell');
           partySay(m, '백호참');
         }
@@ -13872,30 +14017,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 15;
-        addFx(SKILLS.l_guard.fx, m.x, m.y - 20, { scale: 0.8 });
+        memberShow(m, 'l_guard', m);
         audio.play('skill_l_guard', 'buff');
         partySay(m, '진기보호');
         healMember(m, m.maxHp * 0.15);
       }
       if (boss && t === boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.l_meteor.fx, t);
-        later(0.25, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'l_meteor', 45 * pw, t);
         audio.play('skill_l_meteor', 'strike');
         partySay(m, '유성창');
         if (Math.random() < 0.5) partyTalk(m, ['창끝을 받아라!', '보스 앞은 제가 막죠!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(t.tx, t.ty, 1).length >= 3) {
         m.cd.b = 7;
-        fxOn(SKILLS.l_halfmoon.fx, t);
-        later(0.15, () => { for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'l_halfmoon', 14 * pw, t);
         audio.play('skill_l_halfmoon', 'cleave');
         partySay(m, '반월참');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 0.9;
-        fxOn(SKILLS.l_moon.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'l_moon', 10 * pw, t);
         audio.play('skill_l_moon', 'line');
         if (Math.random() < 0.2) partySay(m, '월하일섬');
         pose('attack');
@@ -13910,30 +14052,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 15;
-        addFx(SKILLS.mk_diamond.fx, m.x, m.y - 20, { scale: 0.8 });
+        memberShow(m, 'mk_diamond', m);
         audio.play('skill_mk_diamond', 'buff');
         partySay(m, '금강불괴');
         healMember(m, m.maxHp * 0.15);
       }
       if (boss && t === boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.mk_sudden.fx, t);
-        later(0.2, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'mk_sudden', 45 * pw, t);
         audio.play('skill_mk_sudden', 'blink');
         partySay(m, '전광석화');
         if (Math.random() < 0.5) partyTalk(m, ['급소를 찌른다!', '주먹 맛 좀 봐라!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
         m.cd.b = 7;
-        addFx(SKILLS.mk_quake.fx, m.x, m.y - 20);
-        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'mk_quake', 14 * pw, t);
         audio.play('skill_mk_quake', 'nova');
         partySay(m, '천지파동');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 0.7;
-        fxOn(SKILLS.mk_bung.fx, t);
-        hurtEnemy(t, 9 * pw);
+        memberSkill(m, 'mk_bung', 9 * pw, t);
         audio.play('skill_mk_bung', 'slash');
         if (Math.random() < 0.2) partySay(m, '붕권');
         pose('attack');
@@ -13948,30 +14087,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 15;
-        addFx(SKILLS.md_boundary.fx, m.x, m.y - 20, { scale: 0.8 });
+        memberShow(m, 'md_boundary', m);
         audio.play('skill_md_boundary', 'buff');
         partySay(m, '질서결계');
         healMember(m, m.maxHp * 0.15);
       }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.md_arrow.fx, t);
-        later(0.25, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'md_arrow', 45 * pw, t);
         audio.play('skill_md_arrow', 'spell');
         partySay(m, '마력화살');
         if (Math.random() < 0.5) partyTalk(m, ['금기의 화살이다!', '보스에 집중!']);
         pose('magic');
       } else if (m.cd.b <= 0 && around(t.tx, t.ty, 1).length >= 3) {
         m.cd.b = 7;
-        fxOn(SKILLS.md_orblight.fx, t);
-        later(0.3, () => { for (const e of around(t.tx, t.ty, 1)) { hurtEnemy(e, 12 * pw); e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? 0.3 : 1); } });
+        memberSkill(m, 'md_orblight', 12 * pw, t, e => { e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? 0.3 : 1); });
         audio.play('skill_md_orblight', 'spell');
         partySay(m, "기공구슬'뇌");
         pose('magic');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.1;
-        fxOn(SKILLS.md_sphere.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'md_sphere', 10 * pw, t);
         audio.play('skill_md_sphere', 'spell');
         if (Math.random() < 0.2) partySay(m, '마력구회격');
         pose('magic');
@@ -13986,30 +14122,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 16;
-        addFx(SKILLS.cl_wall.fx, m.x, m.y - 20, { scale: 0.8 });
+        memberShow(m, 'cl_wall', m);
         audio.play('skill_cl_wall', 'buff');
         partySay(m, '철옹벽');
         healMember(m, m.maxHp * 0.15);
       }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.cl_moment.fx, t);
-        later(0.2, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'cl_moment', 45 * pw, t);
         audio.play('skill_cl_moment', 'blink');
         partySay(m, '찰나');
         if (Math.random() < 0.5) partyTalk(m, ['파고든다!', '뒤를 잡았어요!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
         m.cd.b = 7;
-        addFx(SKILLS.cl_brilliant.fx, m.x, m.y - 20);
-        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'cl_brilliant', 14 * pw, t);
         audio.play('skill_cl_brilliant', 'nova');
         partySay(m, '빙글번쩍');
         pose('magic');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.1;
-        fxOn(SKILLS.cl_boom.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'cl_boom', 10 * pw, t);
         audio.play('skill_cl_boom', 'spell');
         if (Math.random() < 0.2) partySay(m, '염화');
         pose('magic');
@@ -14024,30 +14157,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 14;
-        fxOnBody(SKILLS.dk_body.fx, m, -20, { scale: 0.8 });
+        memberShow(m, 'dk_body', m);
         audio.play('skill_dk_body', 'heal');
         partySay(m, '귀체');
         healMember(m, m.maxHp * 0.2);
       }
       if (boss && t === boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.dk_punish.fx, t);
-        later(0.25, () => hurtEnemy(t, 50 * pw));
+        memberSkill(m, 'dk_punish', 50 * pw, t);
         audio.play('skill_dk_punish', 'strike');
         partySay(m, "일격필살'징벌");
         if (Math.random() < 0.5) partyTalk(m, ['방망이 맛 좀 봐라!', '뚝딱!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
         m.cd.b = 7;
-        addFx(SKILLS.dk_whirl.fx, m.x, m.y - 20);
-        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'dk_whirl', 14 * pw, t);
         audio.play('skill_dk_whirl', 'nova');
         partySay(m, '회전회오리');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 0.9;
-        fxOn(SKILLS.dk_repel.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'dk_repel', 10 * pw, t);
         audio.play('skill_dk_repel', 'cleave');
         if (Math.random() < 0.2) partySay(m, '퇴격');
         pose('attack');
@@ -14062,30 +14192,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 13;
-        fxOnBody(SKILLS.rp_drain.fx, m, -20, { scale: 0.8 });
+        memberShow(m, 'rp_drain', m);
         audio.play('skill_rp_drain', 'heal');
         partySay(m, '흡기공');
         healMember(m, m.maxHp * 0.2);
       }
       if (boss && t === boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.rp_flash.fx, t);
-        later(0.2, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'rp_flash', 45 * pw, t);
         audio.play('skill_rp_flash', 'blink');
         partySay(m, "진섬'연");
         if (Math.random() < 0.5) partyTalk(m, ['저승길로 모신다!', '명부에 이름이 올랐다!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(m.tx, m.ty, 1).length >= 3) {
         m.cd.b = 7;
-        addFx(SKILLS.rp_spiral.fx, m.x, m.y - 20);
-        later(0.15, () => { for (const e of around(m.tx, m.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'rp_spiral', 14 * pw, t);
         audio.play('skill_rp_spiral', 'nova');
         partySay(m, '나선회륜');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 0.8;
-        fxOn(SKILLS.rp_cut.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'rp_cut', 10 * pw, t);
         audio.play('skill_rp_cut', 'cleave');
         if (Math.random() < 0.2) partySay(m, '절섬');
         pose('attack');
@@ -14100,30 +14227,27 @@ function partyAct(m) {
       face(t);
       if (m.hp < m.maxHp * 0.4 && m.cd.e <= 0) {
         m.cd.e = 14;
-        addFx(SKILLS.a_weebo.fx, m.x, m.y - 20, { scale: 0.8 });
+        memberShow(m, 'a_weebo', m);
         audio.play('skill_a_weebo', 'buff');
         partySay(m, '위위비보');
         healMember(m, m.maxHp * 0.15);
       }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 10;
-        fxOn(SKILLS.a_aim.fx, t);
-        later(0.25, () => hurtEnemy(t, 45 * pw));
+        memberSkill(m, 'a_aim', 45 * pw, t);
         audio.play('skill_a_aim', 'spell');
         partySay(m, '조준 활쏘기');
         if (Math.random() < 0.5) partyTalk(m, ['급소 조준!', '보스 집중 사격!']);
         pose('attack');
       } else if (m.cd.b <= 0 && around(t.tx, t.ty, 1).length >= 3) {
         m.cd.b = 7;
-        fxOn(SKILLS.a_bomb.fx, t);
-        later(0.3, () => { for (const e of around(t.tx, t.ty, 1)) hurtEnemy(e, 14 * pw); });
+        memberSkill(m, 'a_bomb', 14 * pw, t);
         audio.play('skill_a_bomb', 'strike');
         partySay(m, '마탄');
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.1;
-        fxOn(SKILLS.a_shot.fx, t);
-        hurtEnemy(t, 10 * pw);
+        memberSkill(m, 'a_shot', 10 * pw, t);
         audio.play('skill_a_shot', 'spell');
         if (Math.random() < 0.2) partySay(m, '활쏘기');
         pose('attack');
@@ -14140,7 +14264,7 @@ function partyAct(m) {
         m.cd.c = 12;
         m.hidden = G.t + 4;
         m.stalk = G.t + AMBUSH.stalk;
-        addFx(SKILLS.r_stealth.fx, m.x, m.y - 26, { scale: 0.7 });
+        memberShow(m, 'r_stealth', m);
         audio.play('skill_r_stealth', 'buff');
         partySay(m, '투명');
       }
@@ -14148,12 +14272,12 @@ function partyAct(m) {
       const amb = m.hidden > G.t ? AMBUSH.k : 1;
       if (amb > 1 && ((boss && m.cd.d <= 0) || m.cd.a <= 0)) {
         m.hidden = 0;
-        if (M.fx.k_r_amsal) fxOn('k_r_amsal', t, { scale: 0.6 });
+        memberShow(m, 'r_amsal', t, [t]);
         partySay(m, '암습');
       }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 15;
-        fxOn(SKILLS.r_ult.fx, t);
+        fxOnArea(fxFit(SKILLS.r_ult.fx, ONE_TILES, 'ru'), t);
         for (let i = 0; i < 4; i++) later(0.1 + i * 0.1, () => hurtEnemy(t, 15 * pw * (i === 0 ? amb : 1)));
         audio.play('skill_r_ult', 'ult');
         partySay(m, '필살검무');
@@ -14169,8 +14293,7 @@ function partyAct(m) {
         pose('attack');
       } else if (m.cd.a <= 0) {
         m.cd.a = 1.6;
-        fxOn(SKILLS.r_blink.fx, t);
-        hurtEnemy(t, 12 * pw * amb);
+        memberSkill(m, 'r_blink', 12 * pw * amb, t);
         audio.play('skill_r_blink', 'blink');
         if (Math.random() < 0.25) partySay(m, '비영승보');
         pose('attack');
@@ -14259,6 +14382,7 @@ function updatePickups(dt) {
 }
 
 function heal(n, sound, quiet = false) {
+  if (SH) return; // (an AI's cast mends by its own rule)
   const p = G.player;
   n = Math.min(n, p.maxHp - p.hp);
   if (n <= 0) return;
@@ -14975,6 +15099,7 @@ function banner(text) {
 /** A line in the message window, like the game's system messages. */
 /** A line in the side panel's message window: effects received, things picked up. */
 function note(text) {
+  if (SH) return;
   const box = $('#vert');
   // The client wrote a repeated message once.
   if (box.lastChild && box.lastChild.dataset.t === text) return;
@@ -15066,6 +15191,7 @@ function addFx(id, x, y, o = {}) {
   if (!M.fx[id]) return 0;
   const life = durs(id).reduce((a, b) => a + b, 0);
   if (G.fxs.length > 260) return life; // a phone draws only so many at once
+  if (SH && !SH.draw) return life; // (an AI's cast struck unseen: castAs)
   // a picture that strikes nothing, on a body (o.self: a 기원, a buff, a shield on the hero, a companion, a raid or war
   // fighter): no larger than the body and a little round it (selfCapK)
   if (o.self) { const c = selfCapK(id, o.scale || 1); if (c < 1) o = { ...o, scale: (o.scale || 1) * c }; }
@@ -18519,6 +18645,7 @@ const War = initWar({
   // AI 동료 (war.js personas): the hero's 전투력 (the spread of the fighters' specs), a skill's own
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
   combatPower: c => combatPower(c), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
+  castAs, skillSheets, plainLook,
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
