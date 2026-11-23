@@ -166,7 +166,11 @@ function strengthTick() {
   const G = A.G(), H = G.hunt, S = PACE.strength;
   if (H.act !== 2 || H.mode === 'rush' || G.t < S.from || G.t - (H.strT || 0) < 1) return;
   H.strT = G.t;
-  const dps = dpsEstimate();
+  // 힘지수 is the hero's own blow: with 동료 모드 the companions' blows on champions counted too, so
+  // the gauge's ceiling came sooner (화탕지옥, 9차 주술사: the boss at 1:42 against 2:37 alone) and the
+  // hunt ended before the hero had grown. Their kills still fill the gauge; the boss's life keeps
+  // the whole party's blow (dpsEstimate).
+  const dps = H.bigTime >= 4 ? (H.ownDmg || 0) / H.bigTime : 0;
   if (!dps) return;
   H.str = dps * PACE.boss.fight / Math.max(1, bossLifeOld());
   H.k = Math.max(S.lo, Math.min(S.hi, Math.pow(H.str / S.mid, -S.pow))) * (H.paths.swift ? 0.85 : 1);
@@ -661,7 +665,10 @@ function hurt(e, dmg) {
     const heavy = G.castCd >= 2.5 || G.heavyHit;
     e.gro += dmg / (e.maxHp * PACE.groggy.fill) * (heavy ? 2 : 1) / e.groNeed;
     if (e.gro >= 1) groggy(e);
-  } else if (e.kind === 'champ' || e.kind === 'mini') H.bigDmg += dmg;
+  } else if (e.kind === 'champ' || e.kind === 'mini') {
+    H.bigDmg += dmg;
+    if (!G.allyHitting) H.ownDmg = (H.ownDmg || 0) + dmg; // the hero's own (힘지수): not its 동료's
+  }
 }
 
 /** 그로기: three seconds stunned, taking half again as much; it calls no one meanwhile. */
