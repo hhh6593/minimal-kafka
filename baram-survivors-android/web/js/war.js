@@ -114,6 +114,8 @@ const KITS = {
 };
 
 let SK = null; // SKILLS
+/** The 전사's class (a commander, classless, sweeps with its 백호참). */
+const WARRIOR = () => A.CLASSES.find(c => c.id === 'warrior');
 const CLOSE_KIT = new Set(['lancer', 'monk', 'dokkaebi', 'reaper', 'celestial']);
 // The classes whose blows are their weapon's (blade, spear, fist, bow): the attack clip, not the cast.
 const STRIKERS = new Set(['warrior', 'rogue', 'lancer', 'monk', 'dokkaebi', 'reaper', 'archer']);
@@ -1647,7 +1649,7 @@ function thinkHealer(W, b, order) {
     b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
-    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
+    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b);
     shout(W, b, gid ? SK[gid].name : '천공의희원');
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
@@ -1663,7 +1665,7 @@ function thinkHealer(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { self: true, on: low })); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk() && aiCast(W, b, SK[hid] ? hid : 'c_heal', { by: low, on: low, lv: Math.min(8, 1 + Math.floor(b.lv / 6)) })) cue(b, 0.6);
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1748,7 +1750,7 @@ function thinkHealerRaid(W, b, order) {
     b.mp -= 0.12;
     const gid = b.kit.group || b.kit.heal;
     // A field of light on the ground under the squad (연's 선인의영역), the heal falling on all in it.
-    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b, 1.2);
+    castFx(W, b, SK.p_realm ? 'p_realm' : gid, b);
     shout(W, b, gid ? SK[gid].name : '천공의희원');
     for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) healBody(W, b, m, m.maxHp * 0.12);
     pose(b, 'cast');
@@ -1764,7 +1766,7 @@ function thinkHealerRaid(W, b, order) {
     if (onScreen(b)) {
       const d = SK[hid];
       const fx = d && d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d && d.fx;
-      if (fx && !low.hero && healFxOk()) { A.addFx(fx, 0, -26, aiO(0.95, { self: true, on: low })); cue(b, 0.6); }
+      if (fx && !low.hero && healFxOk() && aiCast(W, b, SK[hid] ? hid : 'c_heal', { by: low, on: low, lv: Math.min(8, 1 + Math.floor(b.lv / 6)) })) cue(b, 0.6);
       if (Math.random() < 0.25) shout(W, b, d ? (d.names ? d.names[Math.min(7, Math.floor(b.lv / 6))] : d.name) : '기원');
       sound(W, b, 'skill_c_heal', 'heal');
     }
@@ -1805,7 +1807,7 @@ function supportBuffs(W, b) {
       for (const m of mates) guard(W, m, 5);
       shout(W, b, pick(['보호', '무장', '의지의 외침']));
       // 차폐's ground ward round the supporter: the squad within takes less.
-      castFx(W, b, SK.p_barrier ? 'p_barrier' : null, b, 1.2);
+      castFx(W, b, SK.p_barrier ? 'p_barrier' : null, b);
       credit(b, 'obj', 4);
       pose(b, 'cast');
     }
@@ -1817,7 +1819,7 @@ function supportBuffs(W, b) {
       tally(b, 'aoe');
       const ids = b.kit.curse || 'm_curse';
       for (const [e] of packNear(W, t, 1.5)) { e.curse = Math.max(e.curse, 4); if (Math.random() < 0.35) e.slow = Math.max(e.slow, 2); }
-      castFx(W, b, ids, t, 0.9);
+      castFx(W, b, ids, t, [t]);
       shout(W, b, pick(['저주', '타락공포', '혼마술']));
       credit(b, 'obj', 3);
       pose(b, 'cast');
@@ -1849,7 +1851,7 @@ function thinkCmdr(W, b) {
       b.atkAt = G.t;
       A.faceTo(b, near[0][0].tx, near[0][0].ty);
       for (const [e] of near) hit(W, b, e, W.U * 1.6 * (b.pw || 1));
-      if (onScreen(b) && fxOk(true)) A.fxOn(SK.w_tiger.fx, near[0][0], aiO(1.1));
+      if (onScreen(b) && fxOk(true)) aiCast(W, b, 'w_tiger', { at: near[0][0], foes: near.map(x => x[0]), lv: 8, cls: WARRIOR() });
     }
     if (b.cd.d <= 0 && near.length >= 3 && !b.wind) {
       // The great one is wound up first: the floor round it flashes red (연's danger telegraph)
@@ -1866,7 +1868,8 @@ function thinkCmdr(W, b) {
         hit(W, b, e, W.U * 3.5 * (b.pw || 1));
         if (!e.hero) e.stun = Math.max(e.stun, 1);
       }
-      if (onScreen(b) && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, aiO(1.4));
+      // (its own call, not a skill: drawn over the seven tiles across it strikes)
+      if (onScreen(b) && fxOk(true)) A.fxOnArea(A.fxSquare(SK.w_roar.fx, w.r * 2 + 1, 'cmd'), b, { alpha: aiAlpha() });
       if (onScreen(b)) G.shake = Math.max(G.shake, 0.25);
     }
     b.dest = null;
@@ -1900,7 +1903,7 @@ function act(W, b, t) {
       b.cd.a = kit.basic[2] * rnd(0.9, 1.1);
       tally(b, 'single');
       hit(W, b, t, kit.basic[1] * W.U * 2.2 * b.pw * 3);
-      if (onScreen(t) && fxOk(true) && SK.r_amsal) A.fxOn(SK.r_amsal.fx, t, aiO(0.75));
+      if (onScreen(t) && fxOk(true) && SK.r_amsal) aiCast(W, b, 'r_amsal', { at: t, foes: [t] });
       if (Math.random() < 0.5) shout(W, b, '암습');
       sound(W, b, 'skill_r_amsal', 'strike');
       pose(b, 'attack');
@@ -1910,7 +1913,7 @@ function act(W, b, t) {
       b.stealthAt = G.t + rnd(12, 16);
       b.hidden = G.t + 4;
       b.stalk = G.t + 1.2;
-      if (onScreen(b) && fxOk() && SK[kit.stealth]) A.addFx(SK[kit.stealth].fx, b.x, b.y - 26, aiO(0.7));
+      if (onScreen(b) && fxOk() && SK[kit.stealth]) aiCast(W, b, kit.stealth);
       sound(W, b, 'skill_' + kit.stealth, 'buff');
       return;
     }
@@ -1924,9 +1927,14 @@ function act(W, b, t) {
     if (b.cls.id === 'poet') {
       // 태양의희원 / its like: everyone near is mended and guarded.
       for (const m of W.alive[b.team]) if (!m.gate && !m.cmdr && d2(m, b) < 5) { healBody(W, b, m, m.maxHp * 0.3); guard(W, m, 4); }
-      castFx(W, b, id, b, 1.0);
+      if (SK[id] && SK[id].kind === 'ult') ultFx(W, b, id, b, 2.5); else castFx(W, b, id, b);
+    } else if (SK[id] && SK[id].kind !== 'ult') {
+      // a skill (동귀어진, 조준 활쏘기): the hero's cast of it, its blow on what that strikes
+      const fall = kit.ult[1] * W.U * b.pw, seen = (onScreen(b) || onScreen(t)) && fxOk(true);
+      if (!W.raid) scatterFrom(W, t, 1.5);
+      if (aiCast(W, b, id, { at: t, n: fall, draw: seen, onHit: (e, k) => { if (k === 1) burstAt(W, t); } }) && seen) cue(b, 1);
     } else {
-      const cf = castFx(W, b, id, t, 1.0, 1.5);
+      const cf = ultFx(W, b, id, t, 1.5);
       const fall = kit.ult[1] * W.U * b.pw;
       if (!W.raid) scatterFrom(W, t, 1.5);
       // (이펙트=판정: all in its drawn area struck, the two-others' half shared among them; spread over the picture)
@@ -1948,20 +1956,11 @@ function act(W, b, t) {
     b.cd.c = kit.aoe[2] * rnd(0.9, 1.15);
     tally(b, 'aoe');
     const id = kit.aoe[0];
-    const cf = castFx(W, b, id, t, 0.9, 1.5);
-    const n = kit.aoe[1] * W.U * 2 * b.pw;
-    if (t.gate) hit(W, b, t, n * 1.2);
-    else {
-      // (이펙트=판정: all in its drawn area, the blow of three shared among them; spread over the picture)
-      const vs = aoeAll(W, t, cf.r), bk = aiBeats(cf.life), per = m => n * Math.min(1, AOE_CAP / Math.max(1, m));
-      for (const [dt, k] of bk.slice(1)) A.later(dt, () => { if (W.over) return; const v2 = aoeAll(W, t, cf.r); for (const [e] of v2) hit(W, b, e, per(v2.length) * k); });
-      for (const [e] of vs) {
-        hit(W, b, e, per(vs.length) * bk[0][1]);
-        if (id === 'm_para' || id === 'w_roar') e.stun = Math.max(e.stun, 1);
-        if (id === 'm_curse') e.curse = Math.max(e.curse, 4);
-      }
-      if (!W.raid && vs.length >= 3) { scatterFrom(W, t, 1.5); burstAt(W, t); }
-    }
+    const n = kit.aoe[1] * W.U * 2 * b.pw, seen = (onScreen(b) || onScreen(t)) && fxOk(true);
+    // the hero's cast of it (its area, its holds), the blow of three shared among what it strikes
+    const went = aiCast(W, b, id, { at: t, n: n * (t.gate ? 1.2 : 1), draw: seen, onHit: (e, k) => { if (k === 3 && !W.raid) { scatterFrom(W, t, 1.5); burstAt(W, t); } } });
+    if (!went) b.cd.c = 0.6;
+    else if (seen) cue(b, 0.75);
     if (Math.random() < 0.5) shout(W, b, SK[id] ? SK[id].name : '광역');
     sound(W, b, 'skill_' + id, 'spell');
     pose(b, blowPose(b, true));
@@ -1972,24 +1971,17 @@ function act(W, b, t) {
   tally(b, 'basic');
   const id = kit.basic[0], n = kit.basic[1] * W.U * 2.2 * b.pw * (t.gate ? 1.3 : 1) * (b.skills && b.skills.length ? BASIC_K : 1);
   if (kit.range > 1) {
-    const d = id && SK[id];
-    const fx = d ? (d.fxs ? d.fxs[Math.min(7, Math.floor(b.lv / 6))] : d.fx) : null;
     if ((onScreen(b) || onScreen(t)) && G.shots.length < 14) {
       // (A 궁사's shot was gold, game.js's 신령의기원 ring (131): a 기원 flying at the foe. An arrow now.)
       A.addShot(b, t, { color: b.cls.id === 'poet' ? '#5aa8ff' : b.cls.id === 'archer' ? '#e8c060' : '#ff8a20', fx: b.cls.id === 'archer' ? ARROW() : undefined, size: 3, speed: 460,
-        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fx && fxOk() && onScreen(t)) A.fxOn(fx, t, aiO(0.8)); } } });
+        onHit: () => { if (!W.over) { hit(W, b, t, n); if (fxOk() && onScreen(t)) A.plainLook(b.cls, t, aiAlpha()); } } });
     } else A.later(0.25, () => { if (!W.over) hit(W, b, t, n); });
     if (id) sound(W, b, 'skill_' + id, 'spell');
     pose(b, blowPose(b)); // a 궁사's shot is its bow's draw
   } else {
     hit(W, b, t, n);
-    if (onScreen(t) && hitFxOk()) {
-      const fx = id && SK[id] && SK[id].fx;
-      // Its class's own blow on the struck (연's picture of its first technique) every other blow,
-      // the plain spark else (the big pictures on every blow of a crowd cost a phone too much).
-      if (fx && A.M().fx[fx] && Math.random() < 0.5) A.fxOn(fx, t, aiO(0.65));
-      else if (A.M().fx.h_hit_tiger) A.fxOn('h_hit_tiger', t, aiO(0.55));
-    }
+    // (the hero's own plain blow's look: its class's slash on the struck, or the spark; not a skill's picture)
+    if (onScreen(t) && hitFxOk()) A.plainLook(b.cls, t, aiAlpha(), b);
     sound(W, b, 'hit', null);
     pose(b, 'attack');
   }
@@ -2012,7 +2004,8 @@ function taunt(W, b) {
 }
 /** A tank's 도발 seen: 연's roar (w_roar) round it, small, and the swing of its weapon. */
 function tauntFx(b) {
-  if (onScreen(b) && SK.w_roar && fxOk(true)) A.addFx(SK.w_roar.fx, b.x, b.y - 30, aiO(0.7));
+  const W = A.G().war;
+  if (W && onScreen(b) && SK.w_roar && fxOk(true)) { const t = nearest(W, b, 2); if (t) aiCast(W, b, 'w_roar', { at: t, foes: [t] }); }
   pose(b, 'attack');
 }
 function guard(W, m, sec) {
@@ -2026,13 +2019,11 @@ function onScreen(b) {
   const G = A.G(), c = window.__warCam, x = c ? c[0] : G.player.x, y = c ? c[1] : G.player.y;
   return Math.abs(b.x - x) < A.VW() / 2 + 60 && Math.abs(b.y - y) < A.VH() / 2 + 80;
 }
-// The fighters' spells were drawn small (half the hero's size) and a dozen at most in 0.6 s for the
-// whole field: in a crowd hardly one in four showed, and those as specks. Now they are drawn near
-// the hero's own size (aiFx), the great ones (광역기·필살기) from a budget of their own so the
-// blows of fifty never crowd them out, and the caster lights up under its feet as it casts (cue),
-// so who cast what reads at a glance.
-// (a raid's twenty-four strike one boss: a little smaller there, or they hide it)
-const aiFx = () => (A.G().war && A.G().war.raid ? 1.05 : 1.2);
+// The fighters' skills are drawn by the hero's own cast (aiCast → game.js castAs): the same pictures at the same size
+// as the hero's cast of the skill at the fighter's 단 (사용자 피드백: "같은 기술인데 왜 다르냐" — they had sizes of
+// their own: aiFx 1.05~1.2, AI_FX_AREA, fitArea, the old routines' raw pictures × 1.1~1.4). What is an AI's own is
+// only how many are drawn (the budgets below: the great ones (광역기·필살기) from a budget of their own so the blows of
+// fifty never crowd them out), their see-through, and the caster lit under its feet as it casts (cue).
 // The fighters' pictures see-through (메뉴 「AI 이펙트 투명도」, settings.aiFxAlpha: 0.8 opaque by default): every
 // blow of the field can be drawn and still the field shows through; the hero's own stay solid.
 // The budgets were 14 small and 9 great a 0.6 s for the whole field (in a fight they were spent
@@ -2040,9 +2031,8 @@ const aiFx = () => (A.G().war && A.G().war.raid ? 1.05 : 1.2);
 // CPU x4), and the 기원 a budget of their own.
 const AI_ALPHA = 0.8;
 function aiAlpha() { const v = A.settings().aiFxAlpha; return typeof v === 'number' && v > 0 && v <= 1 ? v : AI_ALPHA; }
-/** An AI picture's options: its size (by aiFx) and the see-through (a 기원 or buff also { on: body }:
- * game.js addFx keeps it on that body as it moves). */
-const aiO = (scale, o) => ({ scale: scale * aiFx(), alpha: aiAlpha(), ...o });
+/** An AI picture's options (what is not a skill's: a kill's mark, a stage's): its scale and the see-through. */
+const aiO = (scale, o) => ({ scale, alpha: aiAlpha(), ...o });
 function fxOk(big) { const r = A.G().war && A.G().war.raid ? 1 : 0; return !(window.__dbgWar && window.__dbgWar.nofx) && (big ? A.fxBudget('warBig', AI_FX_BIG[r]) : A.fxBudget('war', AI_FX[r])); }
 /** A plain blow's spark (a budget of its own, so the skills' pictures show first). */
 function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHit', A.G().war && A.G().war.raid ? 3 : 4); }
@@ -2051,13 +2041,44 @@ function hitFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBu
 const AI_FX = [16, 14], AI_FX_BIG = [10, 8];
 /** A 기원 on a fighter: never crowded out by the blows. */
 function healFxOk() { return !(window.__dbgWar && window.__dbgWar.nofx) && A.fxBudget('warHeal', 10); }
-function castFx(W, b, id, at, scale, r = 0) {
-  // (이펙트=판정: with a reach r, the picture drawn 2r tiles across — capped, the reach following it — fitArea)
-  const fx = id && SK[id] && SK[id].fx, fit = r ? fitArea(fx, { kind: 'aoe', r }) : null;
-  const out = { life: 0, r: fit ? fit.r : r };
-  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !(SK[id].kind === 'heal' ? healFxOk() : fxOk(true))) return out;
-  cue(b, scale >= 1 ? 1 : 0.75);
-  if (fx && A.M().fx[fx]) out.life = fit ? A.fxOnArea(fit.pic, at, aiO(fit.scale)) : A.fxOn(fx, at, aiO(scale));
+/** A fighter's spell seen, its picture only (the fighter's own logic strikes): the hero's cast of it, drawn only
+ *  (aiCast). A 기원 is drawn on the one it mends (at). foes: what it may land on (default the fighter's foes). */
+function castFx(W, b, id, at, foes) {
+  if (!id || !SK[id] || !(onScreen(b) || onScreen(at)) || !(SK[id].kind === 'heal' ? healFxOk() : fxOk(true))) return false;
+  const mend = SK[id].kind === 'heal' || SK[id].kind === 'buff';
+  if (!aiCast(W, b, id, mend && at ? { by: at, on: at } : { at, foes })) return false;
+  cue(b, 1);
+  return true;
+}
+/**
+ * 같은 기술은 같은 그림: a fighter's skill cast by the hero's own code (game.js castAs) — the same pictures, size, anchor
+ * and area struck as the hero's cast of it at the fighter's 단 (b.skl, or o.lv). n: its blow in the field's units for
+ * one whole blow of the skill (none: drawn only, nothing struck) — the first AOE_CAP struck in full, more sharing;
+ * draw: false strikes unseen (out of sight, over the budget); by: where it is cast from (a 기원 or buff: the one it
+ * goes on), on: the body a picture over "the hero" goes on; foes; at (the one meant: it turns to it); cls (a
+ * commander's: no class). Returns true when it went off (false: nothing in the hero's reach of it).
+ */
+function aiCast(W, b, id, o = {}) {
+  const G = A.G(), pos = o.by || b, struck = new Set(), n = o.n;
+  const foes = o.foes || (b.team ? foesOf(W, b.team).filter(e => alive(e)) : null);
+  return A.castAs(pos, id, o.lv || b.skl || 1, {
+    cls: o.cls || b.cls || pos.cls, foes: foes || undefined, team: b.team || 0, at: o.at, on: o.on || pos, alpha: aiAlpha(), draw: o.draw !== false,
+    hit: n === undefined ? null : (e, share) => {
+      if (W.over || !alive(e)) return 0;
+      struck.add(e);
+      hit(W, b, e, n * share * (struck.size <= AOE_CAP ? 1 : AOE_CAP / struck.size));
+      if (o.onHit) o.onHit(e, struck.size);
+      return 0;
+    },
+  });
+}
+/** A 필살기 (kind ult: the hero's is a scene of its own, castUlt, not played by a fighter): its picture over the square it
+ *  strikes, 2r tiles across (보이는 범위 = 맞는 범위). { life, r }. */
+function ultFx(W, b, id, at, r) {
+  const fx = id && SK[id] && SK[id].fx, out = { life: 0, r };
+  if (!fx || !A.M().fx[fx] || !(onScreen(b) || onScreen(at)) || !fxOk(true)) return out;
+  cue(b, 1);
+  out.life = A.fxOnArea(A.fxSquare(fx, r * 2, 'ult'), at, { alpha: aiAlpha() });
   return out;
 }
 /** The caster's cue: a glow of its side's colour under its feet for a moment. */
@@ -3199,21 +3220,14 @@ function aiKit(cls, promo, lv, sl, n) {
   if (shield && out.length < n + 1) out.push({ id: shield[0], kind: 'shield', cd: Math.max(12, (shield[1].cd || 14) * AI_CD), d: shield[1] });
   return out;
 }
-/** A skill's picture as the fighter knows it: its own picture at its 단 (the spell's fxs), not the
- *  hero's enlarged modern one (thirty-five fighters each with its own big modern sheets decoded mid-fight
- *  cost a phone its frames in a raid: measured, the effects alone). */
+/** The sheets a fighter's skill draws from (the hero's cast of it at the fighter's 단: game.js skillSheets). */
 function aiSkillFx(b, id) {
-  const d = SK[id], M = A.M();
-  if (!d) return null;
-  const own = d.fxs ? d.fxs[Math.min(d.fxs.length - 1, (b.skl || 1) - 1)] : d.fx;
-  if (own && M.fx[own]) return own;
-  const fx = A.memberFx ? A.memberFx(id, 1) : null;
-  return fx && M.fx[fx] ? fx : null;
+  return SK[id] ? A.skillSheets(id, b.skl || 1) : [];
 }
 /** How many sheets the field's kits draw from (a test's count: they load as fighters come near, nearKitFx). */
 function warmKitFx(W) {
   const seen = new Set();
-  for (const b of W.bodies) for (const s of b.skills || []) { const fx = aiSkillFx(b, s.id); if (fx) seen.add(A.M().fx[fx].src || fx); }
+  for (const b of W.bodies) for (const s of b.skills || []) for (const fx of aiSkillFx(b, s.id)) seen.add(A.M().fx[fx].src || fx);
   W.kitFx = seen.size;
   W.kitFxAt = 0;
 }
@@ -3228,7 +3242,7 @@ function nearKitFx(W) {
   const ids = new Set();
   for (const b of W.bodies) {
     if (b.dead || !b.skills || Math.abs(b.x - x) > mx || Math.abs(b.y - y) > my) continue;
-    for (const s of b.skills) { const fx = aiSkillFx(b, s.id); if (fx) ids.add(fx); }
+    for (const s of b.skills) for (const fx of aiSkillFx(b, s.id)) ids.add(fx);
   }
   if (ids.size && A.fxRoom()) A.fxWarm(ids);
 }
@@ -3247,84 +3261,45 @@ function castSkills(W, b, t, many, big) {
     if (s.kind === 'aoe' && !(many >= 2 || big) && b.skills.some(x => x.kind === 'single' && G.t >= (sk[x.id] || 0))) continue;
     sk[s.id] = G.t + s.cd * rnd(0.9, 1.15) * haste;
     b.gcdT = G.t + b.gcd * (b.role === 'healer' ? 1.7 : 1) * (b.play === 'chatter' ? 2 : 1) * rnd(0.85, 1.2) * haste;
-    castSkill(W, b, t, s);
-    return true;
+    // (nothing in the hero's reach of it — a blink with no foe ahead —: not cast, the next one tried)
+    if (castSkill(W, b, t, s)) return true;
+    sk[s.id] = G.t + 0.5;
+    b.gcdT = G.t;
   }
   return false;
 }
 function castSkill(W, b, t, s) {
-  const G = A.G(), d = s.d, fx = aiSkillFx(b, s.id), name = spellName(s.id, b.lv);
-  tally(b, s.kind === 'shield' ? 'buff' : s.kind);
+  const G = A.G(), d = s.d, name = spellName(s.id, b.lv);
   const CS = W.castStat || (W.castStat = { cast: 0, vis: 0, shown: 0, nofx: 0 });
-  CS.cast++; if (!fx) CS.nofx++; if (onScreen(b) || (t && onScreen(t))) CS.vis++;
   if (s.kind === 'buff' || s.kind === 'shield') {
     if (s.kind === 'shield') b.shield = Math.max(b.shield || 0, G.t + 3);
     else if (d.buff === 'haste') b.hasteT = G.t + Math.min(5, d.duration || 4);
     else { b.powT = G.t + Math.min(5, d.duration || 4); b.powK = 1 + Math.min(0.3, (d.power || 0.4) * 0.4); }
-    if (fx && onScreen(b) && fxOk()) { A.addFx(fx, 0, -26, aiO(0.7, { self: true, on: b })); cue(b, 0.75); CS.shown++; }
+    if (onScreen(b) && fxOk() && aiCast(W, b, s.id, { at: t })) { cue(b, 0.75); CS.shown++; }
+    tally(b, s.kind === 'shield' ? 'buff' : s.kind);
+    CS.cast++;
     if (Math.random() < 0.4) shout(W, b, name);
     sound(W, b, 'skill_' + s.id, 'buff');
     pose(b, 'cast');
-    return;
+    return true;
   }
-  const n = W.U * b.pw * SK_K * s.k;
-  // 이펙트=판정: the picture drawn exactly over what the blow strikes — a spread one 2r tiles across round
-  // the struck (r the kit's reach; where the phone's cap on an AI picture holds it smaller, the reach
-  // follows the picture), a single blow a body across — and a picture that stays strikes while it stays:
-  // half at once, the rest in beats (fitArea, aiBeats). Every one inside it is struck (the cap of three a
-  // spell holds as a share of the blow, spread over all of them, not as bodies left unstruck).
-  const fit = fitArea(fx, s);
-  let life = 0;
+  const n = W.U * b.pw * SK_K * s.k * (t.gate ? (s.kind === 'aoe' ? 1.6 : 1.1) : 1);
+  // 같은 기술은 같은 그림 · 이펙트=판정: the hero's own cast of the skill at the fighter's 단 (aiCast) — its pictures, their
+  // size and place, and what it strikes (a spread one: the first three struck in full, more sharing their blow).
   // (On a boss the pictures of a whole raid land on the same few tiles: a few at a time there, the
-  // rest only the caster's cue; drawn over each other they were most of a phone's frame.)
-  if (fx && (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 8)) && fxOk(s.kind === 'aoe')) {
-    cue(b, s.kind === 'aoe' ? 1 : 0.75);
-    CS.shown++;
-    life = A.fxOnArea(fit.pic, t, aiO(fit.scale));
-  }
-  const beats = aiBeats(life);
-  if (window.__aiProbe && life) window.__aiProbe({ id: s.id, kind: s.kind, r: fit.r, life, beats: beats.map(x => +x[0].toFixed(2)), n: s.kind === 'aoe' ? aoeAll(W, t, fit.r).length : 1, fx: A.G().fxs.length - 1 }); // test (이펙트=판정)
-  if (t.gate) hit(W, b, t, n * (s.kind === 'aoe' ? 1.6 : 1.1));
-  else if (s.kind === 'aoe') {
-    const vs = aoeAll(W, t, fit.r);
-    const share = (e, m) => (e === t ? n : n * Math.min(0.6, (0.6 * (AOE_CAP - 1)) / Math.max(1, m - 1)));
-    for (const [dt, k] of beats.slice(1)) A.later(dt, () => { if (W.over) return; const v2 = aoeAll(W, t, fit.r); for (const [e] of v2) hit(W, b, e, share(e, v2.length) * k); });
-    for (const [e] of vs) {
-      hit(W, b, e, share(e, vs.length) * beats[0][1]);
-      if (e.war && !e.cmdr) {
-        if (d.stun && Math.random() < 0.35) e.stun = Math.max(e.stun, Math.min(1, d.stun));
-        if (d.curse) e.curse = Math.max(e.curse, Math.min(4, d.curse));
-        if (d.slow) e.slow = Math.max(e.slow, Math.min(2, d.slow));
-      }
-    }
-    if (!W.raid && vs.length >= 3 && Math.random() < 0.5) { scatterFrom(W, t, s.r); burstAt(W, t); }
-  } else {
-    for (const [dt, k] of beats.slice(1)) A.later(dt, () => { if (!W.over && !t.dead && t.hp > 0) hit(W, b, t, n * k); });
-    hit(W, b, t, n * beats[0][1]);
-    if (t.war && !t.cmdr && d.curse) t.curse = Math.max(t.curse, Math.min(4, d.curse));
-  }
+  // rest struck unseen with the caster's cue; drawn over each other they were most of a phone's frame.)
+  const seen = (onScreen(b) || onScreen(t)) && (t.kind !== 'boss' || A.fxBudget('aiBoss', 8)) && fxOk(s.kind === 'aoe');
+  const went = aiCast(W, b, s.id, { at: t, n, draw: seen, onHit: (e, k) => { if (k === 3 && !W.raid && Math.random() < 0.5) { scatterFrom(W, t, s.r); burstAt(W, t); } } });
+  if (!went) return false;
+  tally(b, s.kind);
+  CS.cast++;
+  if (onScreen(b) || onScreen(t)) CS.vis++;
+  if (seen) { cue(b, s.kind === 'aoe' ? 1 : 0.75); CS.shown++; } else CS.nofx++;
+  if (window.__aiProbe) window.__aiProbe({ id: s.id, kind: s.kind, by: b, seen }); // test
   if (Math.random() < (b.tier === 'server' ? 0.5 : 0.3)) shout(W, b, name);
   sound(W, b, 'skill_' + s.id, 'spell');
   pose(b, blowPose(b, true));
-}
-/** An AI skill's picture no bigger than AI_FX_AREA on the screen (the 승급 skills' great pictures,
- *  thirty-five at once round a boss, were what cost a phone its frames: measured, the effects alone). */
-const AI_FX_AREA = { raid: 120 * 120, war: 150 * 150 };
-/** 이펙트=판정: an AI skill's picture scale and reach. A spread one is drawn 2r tiles across (its drawn part, the
- *  frames' boxes), at most the AI cap (AI_FX_AREA) — and then it strikes as far as it is drawn; a single blow
- *  a body and a bit across. { scale (before aiO's aiFx), r }. */
-function fitArea(fx, s) {
-  const f = fx && A.M().fx[fx];
-  const raid = A.G().war && A.G().war.raid, cap = Math.sqrt(raid ? AI_FX_AREA.raid : AI_FX_AREA.war);
-  const aoe = s.kind === 'aoe', want = Math.min(cap, aoe ? s.r * 2 * TILE : 2.2 * TILE), r = aoe ? want / TILE / 2 : 0;
-  if (!f || !f.w) return { pic: fx, scale: aoe ? 0.72 : 0.62, r: aoe ? s.r : 0 };
-  // (a spread one: its drawn part made the square it strikes, stretched up or down to it — fxSquare)
-  if (aoe) return { pic: A.fxSquare(fx, want / TILE, 'ai'), scale: 1 / aiFx(), r };
-  const src = f.src ? A.M().fx[f.src] || f : f, tall = f.h > f.w * 1.4;
-  let ext = 0;
-  if (src.bb && src.bb.length >= 4) for (let i = 0; i + 3 < src.bb.length; i += 4) ext = Math.max(ext, src.bb[i + 2], tall ? 0 : src.bb[i + 3]);
-  ext = (ext || (tall ? f.w : Math.max(f.w, f.h))) * (f.k || 1);
-  return { pic: fx, scale: want / ext / aiFx(), r };
+  return true;
 }
 /** A blow under an AI picture that stays `life` s: [[delay, share], …] — at once when it is soon gone, else half at
  *  once and the rest in beats about every 0.4 s while it stays (a phone's worth: never more than four). */
@@ -4096,7 +4071,7 @@ function castBuff(W, b, to, id) {
       G.buffs.power = Math.max(G.buffs.power, G.t + dur);
     } else if (d.buff === 'guard') G.buffs.guard = Math.max(G.buffs.guard, G.t + Math.min(1.5, d.duration || 1.5));
     else G.buffs[d.buff] = Math.max(G.buffs[d.buff] || 0, G.t + dur);
-    if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, self: true, scale: 0.8 });
+    if (fx && healFxOk()) aiCast(W, b, id, { by: p, on: p, lv: Math.min(8, 1 + Math.floor(b.lv / 6)) });
     A.floatText(p.x, p.y - 84, name, '#bfe8ff', true);
     supCount(W, 'buff');
     (W.sup.names[name] = (W.sup.names[name] || 0) + 1);
@@ -4104,7 +4079,7 @@ function castBuff(W, b, to, id) {
   } else {
     if (d.buff === 'power') { to.powT = G.t + dur; to.powK = 1.15; }
     else to.shield = Math.max(to.shield || 0, G.t + dur);
-    if (fx && fxOk() && onScreen(to)) A.addFx(fx, 0, -26, aiO(0.65, { self: true, on: to }));
+    if (fx && fxOk() && onScreen(to)) aiCast(W, b, id, { by: to, on: to, lv: Math.min(8, 1 + Math.floor(b.lv / 6)) });
   }
   shout(W, b, name);
   pose(b, 'cast');
@@ -4114,7 +4089,7 @@ function castBuff(W, b, to, id) {
 /** A healer's mend has reached the hero: the 기원's picture over it, its name, a word now and then. */
 function heroMended(W, b, hid) {
   const G = A.G(), p = G.player, name = spellName(hid, b.lv), fx = spellFx(hid, b.lv);
-  if (fx && healFxOk()) A.addFx(fx, 0, -26, { follow: true, self: true, scale: 0.85 });
+  if (fx && healFxOk()) aiCast(W, b, SK[hid] ? hid : 'c_heal', { by: p, on: p, lv: Math.min(8, 1 + Math.floor(b.lv / 6)) });
   if (G.t - (W.mendSaidT || -99) > 2.5) { W.mendSaidT = G.t; A.floatText(p.x, p.y - 84, name, '#c8ffc0', true); }
   const names = supOf(W).names;
   names[name] = (names[name] || 0) + 1;
@@ -5515,7 +5490,7 @@ function raidCalls(W, dt) {
     if (alive(c) && d2(c, boss) < 8) {
       G.blast = null;
       boss.stun = Math.max(boss.stun || 0, 1.2);
-      castFx(W, c, SK.m_para ? 'm_para' : null, boss, 1);
+      castFx(W, c, SK.m_para ? 'm_para' : null, boss, [boss]);
       shout(W, c, '마비');
       credit(c, 'obj', 8);
       W.stat.cuts++;
@@ -6392,7 +6367,7 @@ function jaengCut(W, b) {
   if (!alive(c) || d2(c, b) >= 8) return;
   G.blast = null;
   b.stun = Math.max(b.stun || 0, 1.2);
-  castFx(W, c, SK.m_para ? 'm_para' : null, b, 1);
+  castFx(W, c, SK.m_para ? 'm_para' : null, b, [b]);
   shout(W, c, '마비');
   credit(c, 'obj', 8);
   W.stat.cuts++;
