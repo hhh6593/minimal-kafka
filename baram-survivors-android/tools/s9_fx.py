@@ -1509,6 +1509,19 @@ def parts_cells(frames, e):
             if dk_.any():
                 _, (iy_, ix_) = ndimage.distance_transform_edt(dk_, return_indices=True)
                 cell[dk_] = cell[iy_[dk_], ix_[dk_]]
+        if e.get("nopale"):
+            # (a pale rim left where the effect's edge was mixed with the original's light floor: over our dark ground a
+            # white or cream outline round a dark red effect. Each such dot — its middle channel over "nopale" (the effect's
+            # own dark red has two channels low; the floor's cream and white have them high) — takes the colour of the
+            # nearest dot of the effect's own; its opacity kept, so the shape stays the original's)
+            from scipy import ndimage
+            md_ = np.median(cell[..., :3].astype(int), axis=2)
+            on_ = cell[..., 3] > 0
+            pl_ = on_ & (md_ > e["nopale"])
+            if pl_.any() and (on_ & ~pl_).any():
+                _, (iy_, ix_) = ndimage.distance_transform_edt(pl_ | ~on_, return_indices=True)
+                cell = cell.copy()
+                cell[pl_, :3] = cell[iy_[pl_], ix_[pl_], :3]
         for x0, y0, x1, y1 in e.get("clearcell", []):
             cell[y0:y1, x0:x1, 3] = 0  # (a speck of a bystander, in the cell's own pixels)
         if e.get("unadd"):
