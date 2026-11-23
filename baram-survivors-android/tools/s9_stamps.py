@@ -989,8 +989,8 @@ def venomstar(src_dir):
     # (its pale trail and lines read faint over our dark ground: opacity raised, 1 − (1 − a)^2.2, colour kept)
     for i, p in enumerate(pics):
         a = np.asarray(p).astype(np.float32)
-        a[..., 3] = np.clip((1 - (1 - a[..., 3] / 255) ** 2.2) * 255, 0, 255)
-        a[..., :3] = 255 - (255 - a[..., :3]) * 0.55  # (its navy lines lightened toward white: seen over the brown ground)
+        a[..., 3] = np.clip((1 - (1 - a[..., 3] / 255) ** 4) * 255, 0, 255)
+        a[..., :3] = 255 - (255 - a[..., :3]) * 0.4  # (its navy lines lightened toward white: seen over the brown ground)
         pics[i] = Image.fromarray(a.astype(np.uint8))
     w, h = pics[0].size
     return pics, {"cell": [w, h], "n": len(pics), "ms": 60, "add": False, "anchor": [w // 2, h // 2], "src": "user/venom_star.gif"}

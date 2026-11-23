@@ -7823,7 +7823,11 @@ function castNow(skill, st) {
         const way = lfx && M.fx['k_v_' + skill.id + '_l'] && lfx.ax !== undefined;
         if (way) llife = fxAt(dx ? fxRect(lf, def.depth, LINE_ACROSS, 'lw') : fxRect(lf, LINE_ACROSS, def.depth, 'lw'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { flip: lflip });
         else {
-          addFx(fxFit(lf, ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
+          // (def.flyUp: a picture that faces up — 봉황신법's rising phoenix — turned to fly its way, def.flyTiles long; it was
+          // a small thing flipped left or right, thrown rather than flying: 사용자 2026-11-23)
+          if (def.flyUp) addFx(fxTiles(lf, def.flyTiles || ONE_TILES, 'fu'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
+            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], rot: Math.atan2(dy, dx) + Math.PI / 2, area: true, cap: def.flyTiles || ONE_TILES });
+          else addFx(fxFit(lf, ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
             { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip });
           // (gone a moment after its flight: it lay on at the row's end a second, striking nothing)
           const f = G.fxs[G.fxs.length - 1];

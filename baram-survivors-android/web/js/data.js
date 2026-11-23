@@ -1631,7 +1631,9 @@ const PICS1320 = {
   md_gongjeon: { fx: 'o_md_gonghole', fxEnd: 'o_md_gongend' }, // #26 금 간 보라 고리와 검은 구멍: 나는 동안 0~11, 끝에서 18~30 터짐 (뒤의 호는 그대로)
   m_seonsim: { fx: 'o_m_seonsim', fxK: 0.75 }, // #01 검붉은 저주의 핏줄 (회색 점박이 해골 대신; 터짐 fx2는 그대로)
   // 맹독표창: 사용자가 준 원작 표창 GIF가 몬스터 셋에게 날아가 박힌다 (s9_stamps.py venomstar)
-  r_venom: { fxShot: 'o_r_venomstar', shotTiles: 1.4 },
+  r_venom: { fxShot: 'o_r_venomstar', shotTiles: 2 },
+  // 봉황신법: 위를 보는 봉황이 날아가는 쪽으로 돌아 2.4칸 크기로 (game.js line def.flyUp; 사용자 2026-11-23)
+  p_bonghwang: { flyUp: true, flyTiles: 2.4 },
   // 필살검강: 근접기인데 다섯 칸을 날아가는 검기였다 (사용자 2026-11-23) → 앞쪽 역삼각형(아홉 칸)을 벤다, 뛰어들어
   r_pilgeom: { kind: 'cleave', radius: 0, max: 9, depth: undefined, fxAfter: null, noMain: true, desc: '검강을 실어 앞쪽 역삼각형(아홉 칸)의 몬스터를 단숨에 벤다' },
   l_javelin: { fx: 'o_l_javelin', fxShot: 'o_l_javelinshot', fxTurn: true, shotTiles: 3.4 }, // #11 청록 창끝 빛줄기: 날아가 꽂힘, 나는 쪽을 향해
