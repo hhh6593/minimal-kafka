@@ -3546,6 +3546,7 @@ window.__epopState = () => epState;
 // Every piece a class can have: the hunting grounds' line, the raids' sets and the specials,
 // with where each drops and whether it is found. Searchable, filtered by grade.
 
+import { ABYSS_UNIQUES, abyssPreview, HIDDEN_HINTS } from './items.js';
 let codexCls = null, codexGrade = 'all', codexOwned = false;
 
 function codexItems(cls) {
@@ -3579,7 +3580,35 @@ function codexItems(cls) {
     out.push({ grade: sp.craft ? 'craft' : 'special', kind: sp.kind, name: specialName(sp, cls.id),
       icon: pieceIcon(cls, sp.kind, t, sp.id) || picture(craftPicture(sp, cls.id, b.includes('sp:' + sp.id) ? starOf(cls, 'sp:' + sp.id) : 1)),
       pow: specialPower(sp, cls.id), owned: b.includes('sp:' + sp.id), from,
-      opt: [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : '', sp.ward ? `${STATUS[sp.ward].name} 막기` : ''].filter(Boolean).join(' · ') });
+      opt: [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : '', sp.ward ? `${STATUS[sp.ward].name} 막기` : ''].filter(Boolean).join(' · '),
+      // 악마 심판의낫 not yet had: the 지하국대적's own drop, as a hint (items.js HIDDEN_HINTS)
+      hint: !b.includes('sp:' + sp.id) && HIDDEN_HINTS[sp.id] || null });
+  }
+  return out.concat(codexHidden(cls, b));
+}
+
+/**
+ * The 끝없는 지옥's uniques and the 태초의 무기, kept as found (progress.abyssLoot), one row each:
+ * found (in this class's bag), the best one's own row; not yet, its shadow and a hint in an old
+ * NPC's words (items.js HIDDEN_HINTS) for where it falls.
+ */
+function codexHidden(cls, b) {
+  const loot = progress.abyssLoot || {}, out = [];
+  for (const un of ABYSS_UNIQUES) {
+    const have = b.filter(k => k.startsWith('sp:') && loot[k.slice(3)] && loot[k.slice(3)].u === un.u && SPECIAL[k.slice(3)])
+      .map(k => SPECIAL[k.slice(3)]).sort((x, y) => specialPower(y, cls.id) - specialPower(x, cls.id));
+    const sp = have[0] || abyssPreview(un.u), t = specialBase(sp, cls.id);
+    const opt = [sp.opt.text, sp.gyeok && GYEOK[sp.gyeok] ? GYEOK[sp.gyeok].name : ''].filter(Boolean).join(' · ');
+    if (have.length) {
+      out.push({ grade: 'special', kind: 'weapon', name: specialName(sp, cls.id), icon: pieceIcon(cls, 'weapon', t, sp.id), pow: specialPower(sp, cls.id),
+        owned: true, tag: un.taecho ? '태초' : '고유', from: un.u === 'cow' ? '끝없는 지옥 · 비밀의 소 레벨의 소 왕' : un.taecho ? '끝없는 지옥 · 세계석 요새의 군주, 소 왕' : '끝없는 지옥', opt });
+      continue;
+    }
+    // The shadow: the look it would have (the same for every unique of a class; 태초 its own).
+    const ab = sp.base && sp.base[cls.id], abIt = ab && costumeItems()[ab[0]];
+    const icon = taechoIcon(cls, sp) || (abIt && abIt.icon ? 'assets/' + abIt.icon : null);
+    out.push({ grade: 'special', kind: 'weapon', name: un.taecho ? '태초의 ???' : un.name, icon, pow: '??', owned: false, tag: '숨은 무기', shadow: true,
+      from: un.u === 'cow' || un.taecho ? '???' : '끝없는 지옥', hint: HIDDEN_HINTS[un.u] + (abyssFound() ? '' : ' ' + HIDDEN_HINTS.gate) });
   }
   return out;
 }
@@ -3620,10 +3649,12 @@ function buildCodex() {
     const row = document.createElement('div');
     row.className = 'codex-item ' + it.grade + (it.owned ? '' : ' missing');
     const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
-    const grade = { plain: '일반', raid: '레이드', craft: '조합', special: '스페셜' }[it.grade];
-    row.innerHTML = (it.icon ? `<img src="${it.icon}" alt="">` : '<span></span>')
+    const grade = it.tag || { plain: '일반', raid: '레이드', craft: '조합', special: '스페셜' }[it.grade];
+    // A hidden piece not yet found: its shadow, and the old words of where it falls.
+    row.innerHTML = (it.icon ? `<img src="${it.icon}" alt=""${it.shadow ? ' style="filter:brightness(0);opacity:.45"' : ''}>` : '<span></span>')
       + `<div><b>${it.grade === 'special' ? '★' : it.grade === 'craft' ? '◆' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
-      + `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span></div>`;
+      + (it.shadow ? `<span>${from}</span>` : `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span>`)
+      + (it.hint ? `<span class="codex-hint" style="color:#6a2a08;font-style:italic">${it.hint}</span>` : '') + '</div>';
     box.append(row);
   }
   if (!list.length) box.innerHTML = '<div class="note">찾는 장비가 없습니다.</div>';

@@ -799,19 +799,47 @@ const TAECHO_DROP = { abyss4: 0.25, cow: 0.12 };
 export function taechoChance(stage) { return TAECHO_DROP[stage] || 0; }
 const OPT_BY = Object.fromEntries(OPTIONS.map(o => [o.id, o]));
 
-function registerAbyss(id, d) {
+function abyssSpecial(id, d) {
   const un = ABYSS_UNIQUES.find(x => x.u === d.u) || ABYSS_UNIQUES[0];
   const opts = un.opts.filter(o => OPT_BY[o]);
   const T = un.taecho;
-  SPECIAL[id] = { id, src: 'abyss', srcName: '끝없는 지옥', raid: false, kind: d.kind, rank: d.rank, rarity: d.rarity,
+  return { id, src: 'abyss', srcName: '끝없는 지옥', raid: false, kind: d.kind, rank: d.rank, rarity: d.rarity,
     opts, opt: { id: opts[0], text: opts.map(o => OPT_BY[o].text).join(' · ') }, gyeok: un.gyeok,
     ward: null, abName: T ? Object.fromEntries(Object.entries(TAECHO_BASE).map(([c, [, n]]) => [c, '태초의 ' + n])) : un.name,
     taecho: !!T, classic: T ? TAECHO_CLASSIC : null,
     // The look on the hero (a plain weapon's) and the strike's effect.
     lookTier: ABYSS_LOOK_TIER.dark, base: T ? TAECHO_BASE : ABYSS_BASE, dress: T ? TAECHO_DRESS : ABYSS_DRESS, swing: SWING_OF,
     worn: T ? TAECHO_WORN : ABYSS_WORN };
-  return SPECIAL[id];
 }
+function registerAbyss(id, d) {
+  return (SPECIAL[id] = abyssSpecial(id, d));
+}
+/** What a unique not yet found would be (the 도감's row for it): built, not kept or registered. */
+export function abyssPreview(u, rank = 26) {
+  return abyssSpecial('abprev_' + u, { kind: 'weapon', rarity: 'unique', rank, u });
+}
+
+// ---- 도감's hints (game.js codexHidden) ----
+// The hidden top weapons the 도감 does not name the way to: until one is found, a line in the voice
+// of an old 바람 NPC, true to where and how rare (keep in step with game.js ABYSS_DROP / rollAbyss /
+// clearStage and TAECHO_DROP, AKMA_DROP above). The 끝없는 지옥 opens once 철상지옥 is conquered
+// three times; on its four floors (and the cows') a boss drops a unique one time in five, a leader
+// 6%, a champion 0.6%, which of the six at random, stronger the deeper the floor. The 소 왕 always
+// drops his horn, and a 태초 one hunt in eight; the 세계석 요새's lord a 태초 one in twenty (20% × 25%).
+// The 소 레벨 opens one 세계석 요새 conquest in four. 악마 심판의낫: one 지하국대적 win in 25.
+// gate: added while the 끝없는 지옥 is still shut.
+export const HIDDEN_HINTS = {
+  raven: '"붉은 깃털 하나가 지옥 바닥에 떨어져 있었지. 끝없는 지옥 층의 주인을 다섯 베면 한 번은 그 발톱이 구른다 하더이다."',
+  andariel: '"묘지 밑 어둠에 독니가 잠들어 있소. 지옥 네 층 어디든 주인이 다섯에 한 번 흘리고, 우두머리는 그보다 한참 드물다오."',
+  mephisto: '"증오는 깊은 곳일수록 짙은 법이라네. 끝없는 지옥의 주인 다섯에 하나, 아래층에서 얻은 것일수록 더 매섭지."',
+  diablo: '"공포의 군주라 하나 그 뿔은 어느 층 주인의 손에도 쥐여 있으니… 주인 다섯에 하나, 졸개 정예는 백을 베어도 어렵다네."',
+  baal: '"세계석의 부서진 조각이 지옥 네 층에 흩어졌소. 층의 주인이 다섯에 한 번 쥐고 있고, 세계석 요새의 것이 가장 밝다 하지."',
+  tyrael: '"타락한 천사의 맹세는 빛이 닿지 않는 곳에 묻혔다네. 끝없는 지옥의 주인 다섯에 하나, 우두머리는 열여섯에 하나 꼴이라 하오."',
+  cow: '"세계석 요새의 군주를 꺾고 나면, 네 번에 한 번쯤 어디선가 음매 소리가 들린다지. 그 들판의 소 왕은 쓰러질 때 반드시 뿔을 떨군다네."',
+  taecho: '"태초의 빛은 두 곳에 잠들었느니라. 세계석 요새의 군주가 스무 번에 한 번 흘리고, 음매 우는 들판의 소 왕이 여덟 번에 한 번 뿔과 함께 내어 주리라."',
+  cr_judge_weapon3: '"지하국의 대적, 아홉 머리를 다 베어도 그 낫을 내주는 건 스물다섯 번에 한 번뿐이라네. 기다리기 싫거든 회한옥\'심을 모아 군주의 낫을 벼리게."',
+  gate: '(그 문은 철상지옥을 세 번 정복한 자의 발밑에서 열린다 하네)',
+};
 
 /** The abyss pieces already found (an old save has none). A 마법 or 희귀 piece from when there were
  *  three grades becomes a 고유, the same one for the same piece (by its id), and is kept so. */
