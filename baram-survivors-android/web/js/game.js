@@ -6385,7 +6385,7 @@ function screenFx(id, sid, frac = 0.9, flip = false, hold = 0) {
   // in its middle (on a phone held sideways, the third of the screen each side was struck with nothing there).
   // (보이는 범위 = 맞는 범위: within the screen's struck tiles both ways — a tall one was fitted by its width alone and
   // stood twice the screen's height)
-  const v = viewTiles(), want = (2 * v.w + 1) * Math.min(1, frac / 0.85), high = 2 * v.h + 1;
+  const v = viewTiles(), want = (2 * v.w + 1) * Math.min(1, frac / 0.85), high = (2 * v.h + 1) * Math.min(1, frac / 0.85);
   const stages = [`k_x_${sid}_1`, `k_x_${sid}_2`].filter(s => M.fx[s]);
   let at = 0, end = 0;
   for (const s of [...stages, id]) {
@@ -8992,7 +8992,7 @@ const TIER_KINDS = {
     const p = G.player;
     if (!tkNear(p.tx, p.ty, st.radius).length) return 0.3;
     const cx = p.tx, cy = p.ty, seen = new Set();
-    addFx(fxTiles(fxid, st.radius * 2 + 1, 'wv'), 0, -26, { follow: true, area: true });
+    addFx(fxTiles(fxid, (st.radius * 2 + 1) * (def.fxK || 1), 'wv'), 0, -26, { follow: true, area: true }); // (def.fxK: 선기전도, 사용자: 너무 큼)
     if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
     for (let r = 1; r <= st.radius; r++) later(r * 0.09, () => {
       shock(cx * TILE + TILE / 2, cy * TILE + TILE - 6, r + 0.3, '200,240,255');

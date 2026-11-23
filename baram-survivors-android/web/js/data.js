@@ -1265,7 +1265,7 @@ const REWORK = {
   m_chaos: { pattern: 'mark', fxMark: 'k_m_chaos', desc: '혼돈의 혼을 화면의 몬스터에 씌우고, 잠시 뒤 한꺼번에 흔들어 멈추게 한다' },
   m_manpa: { pattern: 'sweep', desc: '만 갈래 독이 화면을 쓸고 지나가며 몬스터를 치고 느리게 하며 피해를 늘린다' },
   m_cross: { fxCast: 'k_u_m_seal', fxHit: 'k_x_m_ult_hit', fxAfter: 'k_m_quake' },
-  m_coldveil: { name: '혼마염', promo: 5, req: 21, pattern: 'rain', fxDrop: 'k_m_jiokchak', dropSize: 90, curse: 4, slow: 0, stun: 0,
+  m_coldveil: { name: '혼마염', promo: 5, req: 21, pattern: 'rain', fxDrop: 'k_m_jiokchak', dropSize: 60, curse: 4, slow: 0, stun: 0,
     desc: '혼을 태우는 보랏빛 마염이 화면의 몬스터마다 차례로 피어올라 태우고 받는 피해를 늘린다' },
   m_shift: { name: '마기순보', fxHit: 'k_u_m_bluefire', desc: '마기를 타고 바라보는 쪽 몬스터 너머로 순식간에 옮겨 가며 푸른 불꽃으로 친다' },
   m_instant: { fx: 'k_u_m_bluefire', fxAfter: 'k_m_magi' },
@@ -1641,6 +1641,9 @@ const PICS1320 = {
   rp_chain: { fx: 'o_rp_chain' }, // #20 청록 사슬이 묶인 몬스터마다 몸 크기로
 };
 for (const [id, o] of Object.entries(PICS1320)) Object.assign(SKILLS[id], o, { fxs: null, tint: null, modern: null, yeon: true });
+// 사용자 2026-11-23: 너무 크다 — 판정은 그대로, 그림만 (노도성황 화면의 0.9 → 0.5, 선기전도 11칸 → 5.5칸, 혼마염 불꽃 90 → 60px)
+Object.assign(SKILLS.m_nodo, { frac: 0.5 });
+Object.assign(SKILLS.p_seongi, { fxK: 0.5 });
 // 흑룡검풍: a passive in the original ([지속효과 마법]) — not a spell of the bar: 흑룡광참 brings it (wind9), and a saved
 // slot of it is 흑룡광참.
 Object.assign(SKILLS.w_hogi, { retired: true, was: 'warrior', cls: '-', pre: undefined, up: undefined, name: '흑룡검풍' });
