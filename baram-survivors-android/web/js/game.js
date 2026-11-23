@@ -1281,7 +1281,7 @@ function raidLock(r) {
 function raidInfo(r) {
   // 공대: twenty-four raiders gather; the player's other grown classes (Lv 8 and up) among them.
   const party = CLASSES.filter(c => c !== chosenClass && best[c.id] && best[c.id].lvl >= 8).map(c => `${c.name} Lv ${best[c.id].lvl}`);
-  const rec = best[chosenClass.id], start = raidStart(rec);
+  const rec = best[chosenClass.id], start = raidStart(rec, chosenClass.id);
   const roles = War.raidRoles(chosenClass);
   const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · ${RAID_LIMIT / 60}분 안에</div>
@@ -4249,7 +4249,7 @@ function treeSpell(id, opts = {}) {
     el.classList.add('lock');
   }
   if (grown) el.classList.add('have');
-  const lv = grown ? '완성됨' : mine ? (def.evolved ? '완성' : `${mine.lv}/${MAX_SKILL_LEVEL}단`) : `Lv ${def.req || 1}부터`;
+  const lv = grown ? '완성됨' : mine ? (def.evolved ? '완성' : `${mine.lv}/${MAX_SKILL_LEVEL}단`) : `Lv ${skillReq(def)}부터`;
   t.innerHTML = `<b>${def.name}</b><span>${opts.note || lv}</span>`;
   el.append(t);
   el.title = def.desc || '';
@@ -4904,9 +4904,15 @@ function raidStars(r) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
 
-/** The level a hero starts a raid (and a 쟁·대항전, floored there) at: the class's own level, its best. */
-function raidStart(rec) {
-  return Math.max(1, rec ? rec.lvl : 1);
+/** The level a hero starts a raid (and a 쟁·대항전, floored there) at: the class's own level, its best,
+ *  and no lower than its highest 승급's spells at 8단 (5차 Lv 16 … 9차 Lv 22, a 대항전's floor): a class
+ *  grown mostly as a companion (its record ≤ 80% of the hero's) or promoted on a short run would else
+ *  start below its 9차 spells (Lv 15) and fight with none of them. */
+function raidStart(rec, id = G && G.cls ? G.cls.id : chosenClass && chosenClass.id) {
+  const pr = id ? promoOf(id) : 0;
+  const top = pr >= 5 ? Object.values(SKILLS).filter(d => d.cls === id && d.promo === pr && d.kind !== 'ult').map(skillReq) : [];
+  const floor = top.length ? Math.max(...top) + MAX_SKILL_LEVEL - 1 : 1;
+  return Math.max(1, floor, rec ? rec.lvl : 1);
 }
 
 /** A raid: the hero starts grown (its build fitted to the start level), and the raid gathers. */
@@ -14668,7 +14674,7 @@ function drawCards() {
   for (const [id, d] of Object.entries(SKILLS)) {
     if (!d.pre || !mine(id) || d.evolved || skillReq(d) > lvl || have(id)) continue;
     if (d.promo && promoOf(G.cls.id) < d.promo) continue;
-    const from = G.skills.find(x => x.id === d.pre[0]);
+    const from = G.skills.find(x => x.id === d.pre[0]) || (d.promo === 9 ? lineHeld(d) : null);
     if (!from || from.lv < INHERIT_LV) continue;
     opts.push({ type: 'skill', id, lv: Math.max(1, Math.min(from.lv, levelCap(id))), from: from.id, w: 3.5 + 0.25 * (d.promo || 0) });
   }
@@ -14681,6 +14687,23 @@ function drawCards() {
       // The class's own way of fighting (the 도적's 투명) comes up more often.
       // A higher 승급's spell comes up more: the hero won it to use it.
       opts.push({ type: 'skill', id, lv: 1, w: SIGNATURE[G.cls.id] === id ? 4 : 2.5 + 0.25 * (d.promo || 0) });
+    }
+  }
+  // 9차: one of the 9차 spells the hero has no line to, a deal — a new spell while a slot is free, else
+  // in the place of its weakest spell (a 계승: its slot and its 단). A 9차 hero (Lv 15 in a run: skillReq)
+  // ended most hunts with none of them: they came only by their lines, rarely held, the slots full by Lv 20.
+  if (promoOf(G.cls.id) >= 9) {
+    const open9 = Object.entries(SKILLS).filter(([id, d]) => d.cls === G.cls.id && d.promo === 9 && !d.evolved && d.kind !== 'ult'
+      && skillReq(d) <= lvl && !have(id) && !opts.some(o => o.id === id));
+    if (open9.length) {
+      const [id] = open9[Math.floor(Math.random() * open9.length)];
+      if (G.skills.length < MAX_SKILLS) opts.push({ type: 'skill', id, lv: 1, w: 4.75 });
+      else {
+        const rank = x => (SKILLS[x.id].promo || 0) * 10 + x.lv;
+        const from = G.skills.filter(x => SKILLS[x.id].promo !== 9 && !SKILLS[x.id].evolved && SKILLS[x.id].kind !== 'ult'
+          && SKILLS[x.id].kind !== 'heal' && SIGNATURE[G.cls.id] !== x.id).sort((a, b) => rank(a) - rank(b))[0];
+        if (from) opts.push({ type: 'skill', id, lv: Math.max(1, Math.min(from.lv, levelCap(id))), from: from.id, w: 4 });
+      }
     }
   }
   const owned = Object.values(G.passives).filter(v => v > 0).length;
@@ -14698,6 +14721,19 @@ function drawCards() {
     picks.push(pool.splice(i < 0 ? 0 : i, 1)[0]);
   }
   return picks;
+}
+
+/** 9차 계승: the spell of the line the hero holds, nearest below the one before it. A 9차 spell came only
+ *  from its 8차·7차 step, and those from theirs, so with the slots full by about Lv 20 a 9차 hero ended
+ *  most hunts with none of its 9차 spells: any spell of the line now leads to it (its slot and its 단). */
+function lineHeld(d) {
+  let x = SKILLS[d.pre[0]];
+  for (let i = 0; x && x.pre && i < 12; i++) {
+    const held = G.skills.find(s => s.id === x.pre[0]);
+    if (held) return held;
+    x = SKILLS[x.pre[0]];
+  }
+  return null;
 }
 
 /** A level-up's show: in full (연's chime, burst, LEVEL UP lettering, the chat line), or quietly. */
