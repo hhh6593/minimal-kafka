@@ -1005,7 +1005,87 @@ def heukaura(src_dir):
                   "src": "yeon/k_w_blackdragon.webp"}
 
 
-BUILDERS = {"w_heukgwang": heukgwang, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
+# ---- 1320 조각을 고차 기술에 (사용자 결정 2026-11-23: "1320중에 안사용한 이펙트가 있다면 짜치는 이미지를 대체해서 써",
+# "고차 스킬로 다시 매핑해 9차 우선으로"). Each a 1320 sprite (white_sheet: unmixed off its white ground, cut to the box all its
+# frames draw), only cut, scaled down, turned or mirrored; no pixel drawn. How large each is drawn is the game's
+# (fxTiles/fxFit/fxSquare/fxIn hold it to what it strikes); "k" here only where the game draws the sheet as it is.
+def _fit_cells(pics, most):
+    """the frames scaled down (never up) so the cell's longer side is at most `most` (a phone's sheet: ≤ 4096 wide)"""
+    w, h = pics[0].size
+    z = min(1.0, most / max(w, h))
+    if z < 1:
+        pics = [p.resize((max(1, round(w * z)), max(1, round(h * z))), Image.LANCZOS) for p in pics]
+    return pics, pics[0].size
+
+
+def _entry(pics, ms, src, k=None, **o):
+    w, h = pics[0].size
+    e = {"cell": [int(w), int(h)], "n": len(pics), "ms": int(ms), "add": False, "anchor": [w // 2, h // 2], "src": src}
+    if k is not None:
+        e["k"] = round(float(k), 4)
+    e.update(o)
+    return pics, e
+
+
+def _sub(pics, idx):
+    """frames `idx` of a white_sheet, cut again to the box only they draw"""
+    sel = [pics[i] for i in idx]
+    on = np.zeros(np.asarray(sel[0]).shape[:2], bool)
+    for p in sel:
+        on |= np.asarray(p)[..., 3] > 20
+    ys, xs = np.nonzero(on)
+    box = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+    return [p.crop(box) for p in sel]
+
+
+def gongjeon1320(src_dir):
+    """공간전도 (마도사 9차): 1320 #26, the cracked violet ring round its black hole (the original's head is that hole in its
+    ring, 2662 IMG66 frame 7, one still frame). md_gonghole — its frames 0-11, turning, looped while the head runs its five
+    tiles (game.js gong9 draws it as it is: k makes it 104 game px, the tube it strikes, half 52 either side);
+    md_gongend — its frames 18-30, the ring bursting, at the end over the 3 tiles it stuns (fxSquare)."""
+    pics, w, h = white_sheet(src_dir, "dl1320/26.gif")
+    head, (hw, hh) = _fit_cells(_sub(pics, range(0, 12)), 200)
+    end, _ = _fit_cells(_sub(pics, range(18, 31)), 240)
+    return {"md_gonghole": _entry(head, 40, "dl1320/26.gif", k=104 / max(hw, hh)),
+            "md_gongend": _entry(end, 45, "dl1320/26.gif", k=0.6)}
+
+
+def seonsim1320(src_dir):
+    """선심단멸 (주술사 8차): 1320 #01, dark red veins of a curse spreading over the ground — in place of the grey dotted
+    skull. Drawn by detonate's fxSquare over the 5×5 it strikes."""
+    pics, w, h = white_sheet(src_dir, "dl1320/01.gif")
+    return _entry(pics, 110, "dl1320/01.gif")
+
+
+def javelin1320(src_dir):
+    """무형투창 (무사 8차): 1320 #11, a cyan spear-head of light. l_javelin — its six frames mirrored to point left (as the
+    game's 1320 shots are drawn; turned to the foe by the spell's fxTurn), on each one struck, a body across (fxFit);
+    l_javelinshot — its whole streak (frames 3-4) turned to point up, the shot flying to it (the spell's shoot: turned by
+    the way it flies, held to a body's length)."""
+    pics, w, h = white_sheet(src_dir, "dl1320/11.gif")
+    on = [p.transpose(Image.FLIP_LEFT_RIGHT) for p in pics]
+    shot = [p.rotate(90, expand=True) for p in _sub(pics, [3, 4])]
+    return {"l_javelin": _entry(on, 60, "dl1320/11.gif"), "l_javelinshot": _entry(shot, 60, "dl1320/11.gif")}
+
+
+def stack1320(src_dir):
+    """권기중첩 (격투가 8차): 1320 #21, a blue orb of 기 gathering and crackling out — in place of the blurred blue disc. On each
+    one struck, a body across (stack's fxFit)."""
+    pics, w, h = white_sheet(src_dir, "dl1320/21.gif")
+    pics, _ = _fit_cells(pics, 200)
+    return _entry(pics, 50, "dl1320/21.gif")
+
+
+def chain1320(src_dir):
+    """영혼족쇄 (차사 7차): 1320 #20, teal chains coiling round and tightening — on each of the three bound, a body across
+    (spell's fxFit), not round the hero."""
+    pics, w, h = white_sheet(src_dir, "dl1320/20.gif")
+    pics, _ = _fit_cells(pics, 200)
+    return _entry(pics, 70, "dl1320/20.gif")
+
+BUILDERS = {"w_heukgwang": heukgwang, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang,
+            "md_gong1320": gongjeon1320, "m_seonsim": seonsim1320, "l_javelin1320": javelin1320,
+            "mk_stack": stack1320, "rp_chain": chain1320}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
 
 

@@ -32,7 +32,10 @@
   후 `cd <OUT_WWW> && python3 -m http.server <PORT>`. 스크린샷:
   `PORT=<port> CLS=<n> DSF=1 WARM=o_a,o_b node tools/s9_shoot.js <outdir> <name> <skillId|ult> "t1,t2"`(5번째 인자에 경로 금지).
   직업 번호: warrior 0, rogue 1, mage 2, poet 3, archer 4, lancer 5, monk 6, magus 7, celestial 8, dokkaebi 9, reaper 10.
-- 1320 조각 사용처(중복 금지): #18 흑룡광참(w_heukgwang). (#20은 초혼진무에 잠깐 썼다가 연의 보라 사슬로 되돌려 미사용) 흑룡검풍 오라(w_heukaura)는 연의 흑룡광참 회오리를
+- 1320 조각 사용처(중복 금지): #18 흑룡광참(w_heukgwang). #26 공간전도(md_gonghole·md_gongend), #01 선심단멸(m_seonsim), #11 무형투창(l_javelin·l_javelinshot), #21 권기중첩(mk_stack),
+  #20 영혼족쇄(rp_chain) — 모두 tools/s9_stamps.py *1320 빌더, 사용자 결정 2026-11-23. #24·#05는 회선격풍·회색지대 후보였으나 사용자가 빼서 미사용.
+  (그림 비교로 이미 쓰이는 것: #02=new_r_storm, #04=new_p_talm, #06=new_raid_fire. #01·#11·#18과 같은 그림의 new_w_blood·new_r_heaven·new_w_talm 파일은 안 쓰임. #20은 초혼진무에
+  잠깐 썼다가 연의 보라 사슬로 되돌린 뒤 영혼족쇄로.) 흑룡검풍 오라(w_heukaura)는 연의 흑룡광참 회오리를
   흑적색으로: 입력 `$S/s9/yeon/k_w_blackdragon.webp`+`.json`(이전 APK의 assets/fx와 manifest 항목을 그대로 복사).
 - 원작 영웅 76px ↔ 우리 47px (k 0.62).
 - js 검사는 반드시 `node --input-type=module --check < web/js/<file>` (data.js는 모듈: 일반 --check로는 병합 잔재를 못 잡음).

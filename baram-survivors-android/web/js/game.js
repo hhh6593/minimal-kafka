@@ -7633,7 +7633,8 @@ function castNow(skill, st) {
         if (e.hp <= 0) return;
         later(shoot(e), () => {
           if (e.hp <= 0) return;
-          const life = fxOnArea(spic, e), at = def.hitAt || 0.3;
+          // (fxTurn: a picture that points the way it flew — 1320's, drawn pointing left — turned to the side the foe stands)
+          const life = fxOnArea(spic, e, def.fxTurn ? { flip: e.x > p.x } : undefined), at = def.hitAt || 0.3;
           // (hitAt: where in its picture the blow falls, for one cut short of its empty end)
           for (const [dt, k] of beatsUnder(life * (1 - at))) later(life * at + dt, () => {
             if (e.hp <= 0) return;
@@ -8508,6 +8509,8 @@ function gong9(st, def, smite) {
   later(def.dur, () => {
     if (G !== run) return;
     const ex = sx + ux * D, ey = sy + uy * D, R = def.endR || 1.5;
+    // (fxEnd: the ring bursting over the end it stuns — 2R tiles across, 이펙트=판정)
+    if (def.fxEnd && M.fx[def.fxEnd]) fxAtTile(fxSquare(def.fxEnd, 2 * R, 'ge'), ex, ey);
     G.quietHit = true;
     for (const e of G.enemies) if (tkFoe(e) && Math.hypot(e.tx - ex, e.ty - ey) <= R) {
       smite(e, st.dmg);

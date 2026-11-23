@@ -1623,6 +1623,18 @@ for (const [id, o] of Object.entries(S9)) {
   if (['echo', 'aura9'].includes(SKILLS[id].kind)) SKILLS[id].aoe = true;
   if (branch !== undefined && !BRANCHES[SKILLS[id].cls][branch].ids.includes(id)) BRANCHES[SKILLS[id].cls][branch].ids.push(id);
 }
+// 1320 조각 (xoxd.tistory.com/1320: 공식 바람의나라 이펙트 그림만, 흰 바탕에서 떼어 냄 — tools/s9_stamps.py *1320). 사용자 결정
+// 2026-11-23 ("1320중에 안사용한 이펙트가 있다면 짜치는 이미지를 대체해서 써", "고차 스킬로 다시 매핑해 9차 우선으로"): 아직 쓰이지
+// 않은 그림을 지금 그림이 짜치는(흐림·무채색·정지 그림·모양이 이름과 다름) 고차 기술에 하나씩만. 크기는 각 kind의 기존 규칙
+// (fxFit·fxSquare·fxIn·fxTiles: 보이는 범위 = 맞는 범위), AI(castAs)도 같은 그림. 'o_'로 시작해 boot의 k_ 덮어쓰기를 받지 않는다.
+const PICS1320 = {
+  md_gongjeon: { fx: 'o_md_gonghole', fxEnd: 'o_md_gongend' }, // #26 금 간 보라 고리와 검은 구멍: 나는 동안 0~11, 끝에서 18~30 터짐 (뒤의 호는 그대로)
+  m_seonsim: { fx: 'o_m_seonsim' }, // #01 검붉은 저주의 핏줄 (회색 점박이 해골 대신; 터짐 fx2는 그대로)
+  l_javelin: { fx: 'o_l_javelin', fxShot: 'o_l_javelinshot', fxTurn: true }, // #11 청록 창끝 빛줄기: 날아가 꽂힘, 나는 쪽을 향해
+  mk_stack: { fx: 'o_mk_stack' }, // #21 파란 기 구슬이 맺혀 튐 (흐린 파란 원판 대신)
+  rp_chain: { fx: 'o_rp_chain' }, // #20 청록 사슬이 묶인 몬스터마다 몸 크기로
+};
+for (const [id, o] of Object.entries(PICS1320)) Object.assign(SKILLS[id], o, { fxs: null, tint: null, modern: null, yeon: true });
 // 흑룡검풍: a passive in the original ([지속효과 마법]) — not a spell of the bar: 흑룡광참 brings it (wind9), and a saved
 // slot of it is 흑룡광참.
 Object.assign(SKILLS.w_hogi, { retired: true, was: 'warrior', cls: '-', pre: undefined, up: undefined, name: '흑룡검풍' });
