@@ -1867,7 +1867,8 @@ function fireGyeok(g, t) {
     // 청린수폭: its 청룡 drawn in parts (crBurst), the rest as one picture.
     if (g.draw === 'cr' && fxId === g.fx && M.fx.g_cr_brush) crBurst('storm', t, fxK, g);
     else {
-      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null });
+      // (보이는 범위 = 맞는 범위: an area 격 over the 3×3 it strikes, a single one on the one struck)
+      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null, ...(g.area ? { area: true, cap: 3 * 1.25 } : {}) });
       gyLight(fxId);
     }
     // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water; with its 청룡,
@@ -6145,6 +6146,7 @@ function flashRoom() {
 }
 
 function hurtEnemy(e, dmg, push = null) {
+  if (fxHitLog && e && dmg > 0) fxHitLog.push([e.tx, e.ty, SH ? 1 : 0]); // test (보이는 범위 = 맞는 범위)
   if (SH) return SH.hurt(e, dmg, push); // an AI's cast (castAs): its own blow
   e.provoked = true;
   if (e.hp <= 0) return 0;
@@ -6319,14 +6321,10 @@ const MELEE_LOOK = {
   reaper: { slash: 'h_ml_wind', ss: 0.3, hit: 'h_ml_slash', hs: 0.6, turn: true },
 };
 
-// How large (game pixels across, a tile is 48) a close-in technique's own 연 picture is drawn, by
-// the way it strikes: in 연's hunts a 진섬 or a 퇴격 covers two to four tiles, past the hero's height.
-const MELEE_SIZE = { slash: 104, blink: 128, spell: 112, strike: 144, line: 116, cleave: 142, nova: 188 };
-
 /**
  * A picture drawn larger: a second name for the same frames, `want` game pixels on its longer
- * side (never smaller than it is, at most `cap` times). What a spell strikes is still measured
- * on the picture it was given (fxReach in cast()), so only the look grows.
+ * side (never smaller than it is, at most `cap` times). (보이는 범위 = 맞는 범위: what uses it holds the
+ * picture to what it strikes afterwards — addFx's o.self/o.body/o.cap, capK.)
  */
 function bigFx(id, want, tag, cap = 3.2) {
   const f = id && M.fx[id];
@@ -6341,7 +6339,9 @@ function bigFx(id, want, tag, cap = 3.2) {
 
 /** The picture id drawn larger for a close-in technique (growing a little with the 단 still). */
 function meleeBig(id, kind, lv) {
-  return MELEE_SIZE[kind] ? bigFx(id, MELEE_SIZE[kind] * (1 + 0.04 * ((lv || 1) - 1)), kind) : id;
+  // 보이는 범위 = 맞는 범위 (사용자 규칙): no longer drawn larger than it strikes ("only the look grows" was the fault: a
+  // 백호참 or a 진섬 two to four tiles across over the tile or the few it struck). Each kind draws it fitted to its tiles.
+  return id;
 }
 
 /**
@@ -6361,20 +6361,10 @@ function dirFx(fxid, sid, dx, dy) {
   return [id, way === 'l' && dx > 0];
 }
 
-// 바람의나라 연 draws a caster's spells larger than ours were (its 혈마광폭열파 stands nine heroes tall,
-// 기공십자광선 twelve; ours were half to three quarters of that): a 주술사, 도사, 궁사, 마도사 or 천인
-// spell of its own class is drawn about one and a half times its old size, at least [0] and at
-// most [1] game pixels by the way it strikes (one on each of a few struck stays under a crowd's
-// width), a little larger a 단. What it strikes stays what the old picture reached.
-const CASTER_SIZE = { spell: [104, 200], spell4: [104, 190], strike: [140, 320], cleave: [170, 330], blink: [130, 260],
-  nova: [170, 560], heal: [124, 200], buff: [124, 200], line: [130, 440] };
 function casterBig(id, kind, lv) {
-  const f = id && M.fx[id], r = CASTER_SIZE[kind];
-  if (!f || !r) return id;
-  const now = Math.max(f.w, f.h) * (f.k || 1);
-  const want = Math.min(r[1], Math.max(r[0], now * 1.45)) * (1 + 0.03 * ((lv || 1) - 1));
-  // An old 72-pixel picture blown up past twice its size is a blur, not a spell.
-  return bigFx(id, want, 'c' + kind, f.cls === 'yeon' ? 3.2 : 2.2);
+  // 보이는 범위 = 맞는 범위 (사용자 규칙): as meleeBig — the picture as it is (it was half again larger, up to 560 px, a
+  // little more a 단, "what it strikes stays what the old picture reached"); each kind fits it to what it strikes.
+  return id;
 }
 
 /**
@@ -6387,11 +6377,13 @@ function screenFx(id, sid, frac = 0.9, flip = false, hold = 0) {
   // 이펙트=판정: a spell on the whole screen is drawn over the whole screen — its drawn part as wide as the
   // screen's tiles it strikes (onScreen: the view and a tile past each edge), not a square the screen's height
   // in its middle (on a phone held sideways, the third of the screen each side was struck with nothing there).
-  const want = 2 * viewTiles().w * Math.min(1, frac / 0.85);
+  // (보이는 범위 = 맞는 범위: within the screen's struck tiles both ways — a tall one was fitted by its width alone and
+  // stood twice the screen's height)
+  const v = viewTiles(), want = (2 * v.w + 1) * Math.min(1, frac / 0.85), high = 2 * v.h + 1;
   const stages = [`k_x_${sid}_1`, `k_x_${sid}_2`].filter(s => M.fx[s]);
   let at = 0, end = 0;
   for (const s of [...stages, id]) {
-    const b = fxTiles(s, want, 'scr');
+    const b = fxIn(s, want, high, 'scr');
     // Centred on the hero, not hung from its own pivot (that put a screen-high picture under it).
     const t0 = at;
     later(at, () => {
@@ -6644,7 +6636,7 @@ function meleeSlash(tx, ty, dx, dy, h = 0) {
   const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2 - 4;
   const along = Math.atan2(dy || 0, dx || 0.0001);
   const rot = look.turn ? along + Math.PI / 2 + (h % 2 ? 0.7 : -0.5) : (h % 2 ? 0.5 : -0.3);
-  addFx(look.slash, x + rand(-5, 5), y + rand(-5, 3), { scale: look.ss * (h % 3 === 2 ? 1.15 : 1), rot });
+  addFx(look.slash, x + rand(-5, 5), y + rand(-5, 3), { scale: look.ss * (h % 3 === 2 ? 1.15 : 1), rot, body: ONE_TILES });
 }
 
 /** The flash on one struck monster, and once in a while a slash arc over it too. */
@@ -7101,7 +7093,8 @@ function fxOn(id, b, o = {}) {
   if (!f) return 0.3;
   const tall = f.h > f.w * 1.4;
   const h = b.m ? b.m.h * b.scale : HERO_H;
-  return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...o });
+  // (보이는 범위 = 맞는 범위: a picture on one body no larger than that body — o.area: one already fitted to an area)
+  return addFx(id, b.x, tall ? b.y + 4 : b.y - h / 2, { anchor: tall ? 'bottom' : 'center', ...(o.area ? {} : { body: bodyTiles(b) }), ...o });
 }
 
 /** One spell going off: its wait starts again and it is cast, k times as strong. */
@@ -7389,7 +7382,18 @@ function plainLook(cls, t, alpha = 1, from = null) {
   if (fxid && M.fx[fxid]) fxOn(fxid, t, { scale: 0.55, alpha });
 }
 
+// 보이는 범위 = 맞는 범위 (사용자 규칙): while a skill's cast draws (FXC: cast() and its later steps), a picture over the caster
+// that is not the area it strikes (addFx follow, not placed by its middle as an area is — fxAt —, not the one picture of a
+// blow's area — o.must —, not o.area) strikes nothing: it is held to the caster's body (SELF_TILES), as a 기원 or a buff is.
+let FXC = 0;
+function inCastFx(fn) {
+  FXC++;
+  try { return fn(); } finally { FXC--; }
+}
 function cast(skill, st) {
+  return inCastFx(() => castNow(skill, st));
+}
+function castNow(skill, st) {
   const def = SKILLS[skill.id];
   // The spell's picture at this level (the site draws each grade of 신수마법 and 기원 differently).
   // 4차 승급 spells, the last of the tree, show today's client effect when the build has it.
@@ -7426,14 +7430,16 @@ function cast(skill, st) {
   let hitN = 0;
   const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: def.hitScale || 1.1 }); };
   let afterN = 0;
-  const afterAt = (x, y, delay = 0) => {
+  // (보이는 범위 = 맞는 범위: what stays where it landed no wider than what was struck there — `cap` tiles)
+  const afterAt = (x, y, delay = 0, cap = ONE_TILES) => {
     if (!def.fxAfter || !M.fx[def.fxAfter] || afterN++ >= 3) return;
-    later(delay, () => tkLoop(def.fxAfter, x, y, def.afterT || 0.8, { scale: def.afterScale || 1, alpha: settings.calmFx ? 0.5 : 0.8 }));
+    const sc = def.afterScale || 1;
+    later(delay, () => tkLoop(def.fxAfter, x, y, def.afterT || 0.8, { scale: sc * capK(def.fxAfter, sc, cap), alpha: settings.calmFx ? 0.5 : 0.8 }));
   };
   const shoot = e => {
     if (!M.fx[shotPic] || !e) return 0;
     const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
-    addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot: Math.atan2(dy, dx) + Math.PI / 2, scale: 1.3 });
+    addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot: Math.atan2(dy, dx) + Math.PI / 2, scale: 1.3, cap: ONE_TILES });
     return fl;
   };
   classFlourish(def, skill, st);
@@ -7652,7 +7658,7 @@ function cast(skill, st) {
         const tx = e.tx, ty = e.ty, fl = shoot(e);
         const [sf, sflip] = dirFx(fxid, skill.id, tx - p.tx, ty - p.ty);
         const so = { delay: i * 0.12 + fl, flip: sflip };
-        const life = sr && def.shape !== 'plus' ? fxAtSquare(sf, sr * 2 + 1, e.x, e.y - 24, so, 'st') : fxOnArea(fxFit(sf, sr ? sr * 2 + 1 : ONE_TILES, 'st'), e, so), at = def.hitAt || 0.3;
+        const life = sr && def.shape !== 'plus' ? fxAtSquare(sf, sr * 2 + 1, tx * TILE + TILE / 2, ty * TILE + TILE - 30, so, 'st') : fxOnArea(fxFit(sf, sr ? sr * 2 + 1 : ONE_TILES, 'st'), e, { ...so, tile: !!sr }), at = def.hitAt || 0.3;
         const inArea = () => (def.shape === 'plus' ? onTiles(plusTiles(tx, ty, sr)) : sr ? around(tx, ty, sr) : onTiles([[tx, ty]]));
         for (const [dt, k] of beatsUnder(life * (1 - at)).slice(1)) later(i * 0.12 + fl + life * at + dt, () => { for (const o of inArea()) smite(o, st.dmg * k); });
         const k0 = beatsUnder(life * (1 - at))[0][1];
@@ -7661,7 +7667,7 @@ function cast(skill, st) {
           const hit = inArea();
           if (MELEE_LOOK[G.cls.id] && !i) {
             // A slam: the ground rings out under it and the screen jolts.
-            shock(tx * TILE + TILE / 2, ty * TILE + TILE - 6, Math.max(1.2, (st.radius || 0) + 0.8));
+            shock(tx * TILE + TILE / 2, ty * TILE + TILE - 6, (st.radius || 0) + 0.5); // (the ring as wide as the square struck: 2r+1)
             meleeImpact(2);
           }
           for (const o of hit) {
@@ -7672,7 +7678,7 @@ function cast(skill, st) {
             hitOn(o);
             if (o !== e) fling(o, tx, ty);
           }
-          afterAt(tx * TILE + TILE / 2, ty * TILE + TILE - 10);
+          afterAt(tx * TILE + TILE / 2, ty * TILE + TILE - 10, 0, sr ? sr * 2 + 1 : ONE_TILES);
           // A field that stays (the 천인's 선풍 whirlpools): it strikes again where it fell, at half weight.
           for (let k = 1; k <= (def.ticks || 0); k++) {
             later(k * 0.45, () => { for (const o of around(tx, ty, st.radius)) smite(o, st.dmg * 0.5); });
@@ -7728,7 +7734,8 @@ function cast(skill, st) {
       // 이펙트=판정: the picture set in the triangle's middle (not hung from its pivot at the hero: 연's way pictures
       // reached behind and past it) and drawn over the triangle's box (its depth, its far row's width: fxRect);
       // what it strikes is the triangle, while the picture stays.
-      const along = depth + 0.6, across = Math.max(2, depth * 2 - 1);
+      // (보이는 범위 = 맞는 범위: as deep as the triangle and as wide as its far row — at least a body, ONE_TILES)
+      const along = Math.max(ONE_TILES, depth + 0.2), across = Math.max(ONE_TILES, depth * 2 - 1);
       const clife = fxAt(dx ? fxRect(cf, along, across, 'cv') : fxRect(cf, across, along, 'cv'), p.x + dx * mid * TILE, p.y - 24 + dy * mid * TILE, { flip: cflip });
       const cbeats = beatsUnder(clife - 0.12);
       const cx0 = p.tx, cy0 = p.ty;
@@ -7742,7 +7749,7 @@ function cast(skill, st) {
           hitOn(e);
           fling(e, p.tx, p.ty);
         }
-        afterAt(p.x + dx * mid * TILE, p.y - 10 + dy * mid * TILE);
+        afterAt(p.x + dx * mid * TILE, p.y - 10 + dy * mid * TILE, 0, Math.max(ONE_TILES, depth));
       });
       break;
     }
@@ -7774,14 +7781,14 @@ function cast(skill, st) {
       const rmid = (def.depth + 1) / 2;
       let llife = 0;
       if (beam) {
-        llife = fxAt(fxRect('k_x_' + skill.id + '_beam', 2, def.depth, 'bm'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { rot: Math.atan2(dy, dx) + Math.PI / 2 });
+        llife = fxAt(fxRect('k_x_' + skill.id + '_beam', LINE_ACROSS, def.depth, 'bm'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { rot: Math.atan2(dy, dx) + Math.PI / 2 });
       } else {
         const [lf, lflip] = dirFx(fxid, skill.id, dx, dy);
         const lfx = M.fx[lf];
         const way = lfx && M.fx['k_v_' + skill.id + '_l'] && lfx.ax !== undefined;
-        if (way) llife = fxAt(dx ? fxRect(lf, def.depth, 2, 'lw') : fxRect(lf, 2, def.depth, 'lw'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { flip: lflip });
+        if (way) llife = fxAt(dx ? fxRect(lf, def.depth, LINE_ACROSS, 'lw') : fxRect(lf, LINE_ACROSS, def.depth, 'lw'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { flip: lflip });
         else {
-          addFx(fxFit(lf, 2, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
+          addFx(fxFit(lf, ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
             { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip });
           // (gone a moment after its flight: it lay on at the row's end a second, striking nothing)
           const f = G.fxs[G.fxs.length - 1];
@@ -7870,7 +7877,7 @@ function cast(skill, st) {
           later(at, () => { if (hold(e)) { smite(e, st.dmg * far(e) * k0); hitOn(e); } });
         }
         for (let k = 1; k <= 3; k++) later(0.15 + k * 0.12, () => shock(p.x, p.y - 4, k * 2.5));
-        afterAt(p.x, p.y - 10, 0.3);
+        afterAt(p.x, p.y - 10, 0.3, 2 * viewTiles().h + 1);
       } else if (pat === 'sweep') {
         const dx = p.fdx || (p.fdy ? 0 : p.face || 1), dy = dx ? 0 : p.fdy, v = viewTiles();
         const along = e => (e.tx - p.tx) * dx + (e.ty - p.ty) * dy, from = -(dx ? v.w : v.h), span = 2 * (dx ? v.w : v.h);
@@ -7904,7 +7911,7 @@ function cast(skill, st) {
           shock(p.x, p.y - 4, 3.5);
           for (const e of all) if (hold(e)) { smite(e, st.dmg * far(e) * kp); hitOn(e); }
         });
-        afterAt(p.x, p.y - 10, 0.55);
+        afterAt(p.x, p.y - 10, 0.55, 2 * viewTiles().h + 1);
       } else if (pat === 'mark') {
         // (the marks first; the screen picture with the burst, when the blows fall — it played before them, over)
         later(0.85, big);
@@ -7927,12 +7934,12 @@ function cast(skill, st) {
       // 이펙트=판정: the burst drawn exactly over the square it strikes (2·reach+1 tiles round the hero; the old
       // ring of light copies out at the reach reached past it), striking while it stays.
       const life = fxAtSquare(fxid, reach * 2 + 1, 0, -24, { follow: true }, 'nv');
-      if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, Math.max(1.5, reach + 0.5));
+      if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, reach + 0.5);
       const beats = beatsUnder(life - 0.1);
       for (const [dt, k] of beats.slice(1)) later(0.1 + dt, () => { if (!G.dead) for (const e of around(p.tx, p.ty, reach)) smite(e, st.dmg * k); });
       later(0.1, () => {
         meleeImpact(3);
-        afterAt(p.x, p.y - 10);
+        afterAt(p.x, p.y - 10, 0, reach * 2 + 1);
         for (const e of around(p.tx, p.ty, reach)) {
           if (def.stun) { e.stun = def.stun; cutBlast(e); }
           hitOn(e);
@@ -8050,7 +8057,8 @@ function cast(skill, st) {
   // the call over the hero, under what the spell drew, now that it went off
   if (castOk && !skill.waiting) {
     const n = G.fxs.length;
-    addFx(def.fxCast ? bigFx(castPic, def.castSize || 150, 'cast') : castPic, 0, -30, { follow: true, scale: def.fxCast ? 1 : 1.3 });
+    // (the call strikes nothing: over the caster, about its body — 보이는 범위 = 맞는 범위; it was 150 px, three tiles)
+    addFx(castPic, 0, -30, { follow: true, self: true });
     if (G.fxs.length > n && castAt < n) G.fxs.splice(castAt, 0, G.fxs.pop());
   }
   if (SH) return; // (an AI's cast: what follows is the hero's own — its passives, words, sounds, pose)
@@ -8136,7 +8144,8 @@ function eungchuk9(st, def, smite) {
   const run = G, sx = p.tx, sy = p.ty, len = D * TILE, x0 = p.x, y0 = p.y - 24, dur = def.dur * D / def.depth, steps = Math.max(2, Math.round(dur / 0.075));
   const ex = x0 + dx * len, ey = y0 + dy * len, rot = Math.atan2(dy, dx), alpha = settings.calmFx ? 0.8 : 1;
   // the arrow: its head (the cell's pivot) running from the hero to the end
-  if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: dur, scale: 1, rot, anchor: 'bottom', alpha, must: true, loop: true, mv: [dx * len, dy * len, dur] });
+  // (보이는 범위 = 맞는 범위: no longer than the row it runs, D tiles — up or down the screen it was twice the row)
+  if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: dur, scale: capK(def.fx, 1, Math.max(ONE_TILES, D * 1.25), rot), rot, anchor: 'bottom', alpha, must: true, loop: true, mv: [dx * len, dy * len, dur] });
   const seen = new Set();
   for (let s = 1; s <= steps; s++) later(s * (dur / steps), () => {
     if (G !== run) return;
@@ -8153,7 +8162,7 @@ function eungchuk9(st, def, smite) {
   });
   later(dur, () => {
     if (G !== run) return;
-    if (M.fx[def.fxEnd]) G.fxs.push({ id: def.fxEnd, x: ex, y: ey, t: 0, life: fxLife(def.fxEnd), scale: 1, rot: 0, anchor: 'bottom', alpha, must: true });
+    if (M.fx[def.fxEnd]) G.fxs.push({ id: def.fxEnd, x: ex, y: ey, t: 0, life: fxLife(def.fxEnd), scale: capK(def.fxEnd, 1, (2 * R) / TILE), rot: 0, anchor: 'bottom', alpha, must: true });
     const inDisk = e => tkFoe(e) && Math.hypot(e.x - ex, e.y - 24 - ey) <= R;
     // drawn in to the middle as the disk turns, blown up as it shatters (its last frames)
     later(0.15, () => { if (G === run) for (const e of G.enemies) if (inDisk(e)) tkShove(e, e.tx - Math.sign(e.tx - (sx + dx * D)), e.ty - Math.sign(e.ty - (sy + dy * D))); });
@@ -8314,7 +8323,8 @@ function erode9(st, def, smite) {
   const seen = new Set(), step = def.step || 0.06;
   for (let k = 1; k <= D; k++) later((k - 1) * step, () => {
     if (G !== run) return;
-    G.fxs.push({ id: def.fx, x: x0 + ux * k * TILE, y: y0 + uy * k * TILE + 14, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: 1, must: true });
+    // (보이는 범위 = 맞는 범위: each stretch within the band it strikes there, a tile along and 2·side across)
+    G.fxs.push({ id: def.fx, x: x0 + ux * k * TILE, y: y0 + uy * k * TILE + 14, t: 0, life: fxLife(def.fx), scale: capK(def.fx, 1, Math.max(ONE_TILES, (2 * side) / TILE * 1.25)), rot: 0, anchor: 'bottom', alpha: 1, must: true });
     later(0.07, () => {
       if (G !== run || G.dead) return;
       G.quietHit = true;
@@ -8341,7 +8351,7 @@ function erode9(st, def, smite) {
 function dim9(skill, st, def) {
   const p = G.player, run = G;
   if (!tkNear(p.tx, p.ty, (def.range || 3) + 1).length) return 0.4;
-  if (M.fx[def.fxCast]) addFx(def.fxCast, 0, -18, { follow: true, anchor: 'bottom', must: true });
+  if (M.fx[def.fxCast]) addFx(def.fxCast, 0, -18, { follow: true, anchor: 'bottom', must: true, self: true });
   const life = def.duration || 15, n = Math.floor(life / def.every), d = tkHit(def, skill), [rx, ry] = def.reach || [46, 34];
   G.buffs.echo = G.t + life;
   for (let k = 1; k <= n; k++) later(0.4 + (k - 1) * def.every, () => {
@@ -8349,7 +8359,8 @@ function dim9(skill, st, def) {
     tkNear(p.tx, p.ty, def.range || 3).slice(0, def.shots || 2).forEach((t, i) => later(i * 0.07, () => {
       if (G !== run || t.hp <= 0) return;
       const x = t.x, y = t.y - 6;
-      G.fxs.push({ id: def.fx, x, y, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: 1, must: true, flip: Math.random() < 0.5 });
+      // (보이는 범위 = 맞는 범위: the disc on one foe and those inside it — its reach, a body at the least)
+      G.fxs.push({ id: def.fx, x, y, t: 0, life: fxLife(def.fx), scale: capK(def.fx, 1, Math.max(ONE_TILES, (2 * rx) / TILE)), rot: 0, anchor: 'bottom', alpha: 1, must: true, flip: Math.random() < 0.5 });
       later(0.1, () => {
         if (G !== run) return;
         G.quietHit = true;
@@ -8414,7 +8425,9 @@ function saechul9(st, def, smite) {
   const run = G, x0 = p.x, y0 = p.y - 20, struck = new Set();
   ahead.forEach((t, i) => later(i * 0.03, () => {
     if (G !== run) return;
-    const dx = t.x - x0, dy = t.y - 10 - y0, L = Math.hypot(dx, dy) || 1, sc = Math.max(0.55, Math.min(1.6, L / SAECHUL_L));
+    // (보이는 범위 = 맞는 범위: the beam as long as the way to the one it strikes — held at least 0.55 of its length, it
+    // reached a tile past a foe close by)
+    const dx = t.x - x0, dy = t.y - 10 - y0, L = Math.hypot(dx, dy) || 1, sc = Math.max(0.3, Math.min(1.6, L / SAECHUL_L));
     if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: fxLife(def.fx), scale: sc, rot: Math.atan2(dy, dx) - SAECHUL_A, anchor: 'bottom', alpha: 1, must: true });
     // (이펙트=판정: the pink splash at the beam's end — some 50 px across at the original's length, drawn to the foe's
     // distance (sc) — strikes the foe and whoever else stands inside it; each struck once a cast)
@@ -8536,39 +8549,64 @@ function fxTiles(id, tiles, tag = 't') {
   const f = id && M.fx[id];
   if (!f) return id;
   // (by what its frames draw — packed sheets know each frame's box — not the empty cell round it)
-  const u = fxUnion(id), ext = u ? Math.max(u.mw, u.mh) : Math.max(f.w, f.h);
+  // (보이는 범위 = 맞는 범위: all its frames together, as they are drawn — not its largest frame: a picture whose frames
+  // move across, a sweep, a rising bolt, reached past the tiles by what they cover between them)
+  const u = fxUnion(id), ext = u ? Math.max(u.x1 - u.x0, (u.y1 - u.y0) * (f.ky || 1)) : Math.max(f.w, f.h * (f.ky || 1));
   const now = ext * (f.k || 1), want = tiles * TILE;
   if (Math.abs(now - want) < 2) return id;
   const key = `${id}#${tag}${Math.round(want)}`;
   if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
   return key;
 }
-/** 이펙트=판정: how many tiles across a blow on one body is drawn (its tile and a little round it). */
-const ONE_TILES = 2.2;
-/** 이펙트=판정: as fxTiles, but a tall picture (a pillar, a bolt falling on a body: fxOn stands it on the feet)
- *  is measured by its width, its height kept in proportion: what it strikes is the ground it stands on. */
-function fxFit(id, tiles, tag = 'f') {
+/** 보이는 범위 = 맞는 범위: a picture drawn as large as fits in w × h tiles (what all its frames draw, its shape kept). */
+function fxIn(id, w, h, tag = 'in', grow = true) {
   const f = id && M.fx[id];
   if (!f) return id;
-  if (!(f.h > f.w * 1.4)) return fxTiles(id, tiles, tag);
-  const u = fxUnion(id), ext = u ? u.mw : f.w;
-  const now = ext * (f.k || 1), want = tiles * TILE;
-  if (Math.abs(now - want) < 2) return id;
-  const key = `${id}#${tag}w${Math.round(want)}`;
-  if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * want / now };
+  const u = fxUnion(id), uw = (u ? u.x1 - u.x0 : f.w) * (f.k || 1), uh = (u ? u.y1 - u.y0 : f.h) * (f.k || 1) * (f.ky || 1);
+  const m = Math.min(grow ? 1e9 : 1, (w * TILE) / uw, (h * TILE) / uh);
+  if (Math.abs(m - 1) < 0.02) return id;
+  const key = `${id}#${tag}${Math.round(w * 10)}x${Math.round(h * 10)}`;
+  if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * m };
   return key;
+}
+/** 이펙트=판정: how many tiles across a blow on one body is drawn — the body's own size (사용자 규칙, 보이는 범위 =
+ *  맞는 범위: a blow on one is drawn about the one it strikes, 1~1.5 tiles; it was 2.2, a burst twice the body). */
+const ONE_TILES = 1.4;
+/** 이펙트=판정: how many tiles across a row of one tile is drawn (a beam, an arrow's way: the row and a little). */
+const LINE_ACROSS = 1.3;
+/** 이펙트=판정: fxTiles (once: a tall picture — a pillar, a bolt — measured by its width alone, its height left two or
+ *  three times the tiles it strikes). */
+function fxFit(id, tiles, tag = 'f') {
+  // (보이는 범위 = 맞는 범위: a tall picture too is held to the tiles it strikes by its longer side — measured by its width,
+  // a bolt on one body stood three or four tiles over it, a 기원's pillar five)
+  return fxTiles(id, tiles, tag);
 }
 /** 이펙트=판정 for what strikes nothing — a 기원, a buff, a shield on a body (the hero's, a companion's, a raid or war
  *  fighter's): its drawn part never more than SELF_TILES across (a tall one by its width), shrunk only. (사용자 피드백:
  *  구름의 기원's ring stood about five heroes high round a hero it only mends; 완력 on a raid's 도깨비 four tiles wide.)
  *  The scale factor (≤ 1) for the picture at `scale`. */
-const SELF_TILES = 2.2;
-function selfCapK(id, scale = 1) {
+const SELF_TILES = 1.5;
+function selfCapK(id, scale = 1, rot = 0) {
+  return capK(id, scale, SELF_TILES, rot);
+}
+/** 보이는 범위 = 맞는 범위 (사용자 규칙): the scale factor (≤ 1) that keeps a picture at `scale` (turned `rot`) within `tiles`
+ *  tiles on its longer side — what all its frames draw together (the union of their boxes, as drawn: k, ky, the turn),
+ *  never cut, only shrunk. */
+function capK(id, scale, tiles, rot = 0) {
   const f = id && M.fx[id];
-  if (!f) return 1;
-  const u = fxUnion(id), tall = f.h > f.w * 1.4;
-  const ext = (u ? (tall ? u.mw : Math.max(u.mw, u.mh)) : tall ? f.w : Math.max(f.w, f.h)) * (f.k || 1) * scale;
-  return ext > SELF_TILES * TILE ? (SELF_TILES * TILE) / ext : 1;
+  if (!f || !(tiles > 0)) return 1;
+  const u = fxUnion(id), k = (f.k || 1) * (scale || 1);
+  let w = (u ? u.x1 - u.x0 : f.w) * k, h = (u ? u.y1 - u.y0 : f.h) * k * (f.ky || 1);
+  if (rot) { const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot)); [w, h] = [w * c + h * sn, w * sn + h * c]; }
+  const ext = Math.max(w, h);
+  return ext > tiles * TILE ? (tiles * TILE) / ext : 1;
+}
+/** 보이는 범위 = 맞는 범위: how many tiles a picture on one body may be — the body's own size (a tile; a big one, a boss,
+ *  its height), and a little round it. */
+function bodyTiles(b) {
+  // (a plain monster stands on one tile: a body across; a boss or a lieutenant drawn over several, its height)
+  if (!b || !b.m || !(b.kind === 'boss' || b.kind === 'mini' || b.cmdr)) return ONE_TILES;
+  return Math.max(ONE_TILES, Math.min(4, ((b.m.h || TILE) * (b.scale || 1) / TILE) * 1.1));
 }
 /** 이펙트=판정: where a picture's drawn part (the union of its frames' boxes) has its middle, from its cell's middle,
  *  in game pixels at its size: [x, y]. */
@@ -8629,9 +8667,12 @@ function fxAtSquare(id0, tiles, x, y, o = {}, tag = 'q') {
 function fxOnArea(id, b, o = {}) {
   const f = id && M.fx[id];
   if (!f) return 0;
+  // (o.tile: an area round the body's tile — on that tile's middle, not on the body, which a crowd draws up to a tile off
+  // it: a 3×3 burst stood a tile beside the 3×3 it struck)
+  const bx = o.tile ? b.tx * TILE + TILE / 2 : b.x, by = o.tile ? b.ty * TILE + TILE - 6 : b.y;
   // (a pillar: its drawn foot on the body's feet, not hung from its pivot)
-  if (f.h > f.w * 1.4) return fxAt(id, b.x, b.y + 4 - fxMid(id)[3] * (o.scale || 1) / 2, o);
-  return fxAt(id, b.x, b.y - 24, o);
+  if (f.h > f.w * 1.4) return fxAt(id, bx, by + 4 - fxMid(id)[3] * (o.scale || 1) / 2, o);
+  return fxAt(id, bx, by - 24, o);
 }
 /** tkLoop with the drawn part's middle on (x, y) (fxAt). */
 function tkLoopAt(id, x, y, life, o = {}) {
@@ -8646,7 +8687,9 @@ function fxSquare(id, tiles, tag = 'q') {
   const f = id && M.fx[id];
   if (!f) return id;
   const u = fxUnion(id), uw = u ? u.x1 - u.x0 : f.w, uh = u ? u.y1 - u.y0 : f.h, want = tiles * TILE;
-  const k = want / uw, ky = Math.max(0.6, Math.min(1.7, uw / uh));
+  const ky = Math.max(0.6, Math.min(1.7, uw / uh));
+  // (보이는 범위 = 맞는 범위: one too tall for the stretch is shrunk whole into the square — a pillar stood a tile over it)
+  const k = (want / uw) * Math.min(1, uw / (uh * ky));
   const key = `${id}#${tag}s${Math.round(want)}`;
   if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k, ky: (f.ky || 1) * ky };
   return key;
@@ -8693,6 +8736,8 @@ function tkLoop(id, x, y, life, o = {}) {
   if (!id || !M.fx[id]) return null;
   // (이펙트=판정 seenLoop: it loops over the frames that draw — a strip's blank tail left the field it stands for
   // unseen a moment each turn while it still struck)
+  // (보이는 범위 = 맞는 범위: one held over the caster that is not the area it strikes is held to the body, as addFx's)
+  if (FXC && o.follow && !o.area && !o.anchor) o = { ...o, scale: (o.scale || 1) * selfCapK(id, o.scale || 1) };
   const f = { id, x, y, t: 0, life, scale: o.scale || 1, rot: 0, follow: o.follow, anchor: o.anchor || 'center', loop: true,
     alpha: o.alpha || 0.85, tint: o.tint, seenLoop: true };
   G.fxs.push(f);
@@ -8828,7 +8873,7 @@ const TIER_KINDS = {
     if (!foes.length) return 0.3;
     if (def.hpCost) p.hp = Math.max(1, p.hp - p.maxHp * def.hpCost);
     for (const e of foes) {
-      const pic = tkLoop(def.fx, e.x, e.y - 30, def.delay + 0.1, { scale: 0.6, alpha: 0.9 });
+      const pic = tkLoop(def.fx, e.x, e.y - 30, def.delay + 0.1, { scale: 0.6 * capK(def.fx, 0.6, bodyTiles(e)), alpha: 0.9 });
       e.curse = Math.max(e.curse || 0, def.delay);
       const mark = { done: false };
       let lx = e.tx, ly = e.ty;
@@ -8881,11 +8926,11 @@ const TIER_KINDS = {
       const s = (e.tkStack = e.tkStack || {});
       const n = (s[skill.id] = (s[skill.id] || 0) + 1);
       // (이펙트=판정: its picture on the one struck a body across, the blow spread over it while it stays)
-      const life = fxOnArea(fxFit(fxid, 2, 'sk'), e);
+      const life = fxOnArea(fxFit(fxid, ONE_TILES, 'sk'), e);
       for (const [dt, k] of beatsUnder(life - 0.1)) later(dt, () => { if (e.hp > 0) smite(e, st.dmg * (1 + def.per * (n - 1)) * k); });
       if (n >= def.stacks) {
         s[skill.id] = 0;
-        if (def.fx2) fxOnArea(fxSquare(def.fx2, 3, 'skb'), e);
+        if (def.fx2) fxOnArea(fxSquare(def.fx2, 3, 'skb'), e, { tile: true });
         floatText(e.x, e.y - 40, '폭발', '#ffcf5a');
         for (const o of around(e.tx, e.ty, 1)) smite(o, st.dmg * 2.5);
       }
@@ -8896,7 +8941,7 @@ const TIER_KINDS = {
     const p = G.player;
     if (!tkNear(p.tx, p.ty, st.radius).length) return 0.3;
     const cx = p.tx, cy = p.ty, seen = new Set();
-    addFx(fxTiles(fxid, st.radius * 2 + 1, 'wv'), 0, -26, { follow: true });
+    addFx(fxTiles(fxid, st.radius * 2 + 1, 'wv'), 0, -26, { follow: true, area: true });
     if (def.shieldT) G.buffs.shield = Math.max(G.buffs.shield, G.t + def.shieldT);
     for (let r = 1; r <= st.radius; r++) later(r * 0.09, () => {
       shock(cx * TILE + TILE / 2, cy * TILE + TILE - 6, r + 0.3, '200,240,255');
@@ -8977,7 +9022,8 @@ const TIER_KINDS = {
     const p = G.player, dmg = st.dmg || tkHit(def, skill);
     if (!tkNear(p.tx, p.ty, st.range).length) return 0.3;
     const tx = p.tx, ty = p.ty, x = p.x + 6, y = p.y - 18, life = st.duration;
-    tkLoop(fxid, x, y, life, { scale: 0.9, alpha: 0.95 });
+    // (the 도깨비불 itself, a body beside the hero that strikes nothing where it stands: a body's size)
+    tkLoop(fxid, x, y, life, { scale: 0.9 * capK(fxid, 0.9, SELF_TILES), alpha: 0.95 });
     const n = Math.floor(life / def.every);
     for (let k = 1; k <= n; k++) later(k * def.every, () => {
       tkNear(tx, ty, st.range).slice(0, def.shots || 1).forEach(e => {
@@ -9122,7 +9168,8 @@ const TIER_KINDS = {
     for (let i = 0; i < def.ticks; i++) later(i * def.tick, () => {
       if (G !== run || G.dead) return;
       if (i % 3 === 0) {
-        fxAt(fxSquare(fxid, st.radius * 2 + 1, 'sp'), 0, -24, { follow: true, rot: i * 0.7 });
+        // (turned, held within the square it strikes: a square picture turned reached past it by its corners)
+        fxAt(fxSquare(fxid, st.radius * 2 + 1, 'sp'), 0, -24, { follow: true, rot: i * 0.7, cap: st.radius * 2 + 1 });
         // (이펙트=판정: not left turning past the last turn that strikes)
         const f = G.fxs[G.fxs.length - 1];
         if (f && f.follow) f.life = Math.min(f.life, (def.ticks - 1 - i) * def.tick + 0.3);
@@ -9179,7 +9226,7 @@ const TIER_KINDS = {
       const cr = def.linger ? def.radius || 1 : st.radius || 1;
       if (def.fx2 && !def.linger) fxAt(fxSquare(def.fx2, cr * 2 + 1, 'cs'), p.x, p.y - 24);
       else if (def.fx2) fxOn(def.fx2, e.hp > 0 ? e : p, { scale: 1 });
-      shock(p.x, p.y - 4, (st.radius || 1) + 1);
+      shock(p.x, p.y - 4, (st.radius || 1) + 0.5);
       meleeImpact(3);
       for (const o of around(p.tx, p.ty, def.linger ? def.radius || 1 : st.radius || 1)) { smite(o, st.dmg); tkAfflict(o, def); }
       // 순보선풍: a gale stays where it landed, sweeping round it
@@ -9255,7 +9302,7 @@ const TIER_KINDS = {
     for (const [dt, k] of beats.slice(1)) later(0.15 + dt, () => { for (const e of around(p.tx, p.ty, st.radius)) smite(e, (st.dmg + cost * def.k) * k); });
     later(0.15, () => {
       if (bp) fxAt(bp, 0, -24, { follow: true });
-      shock(p.x, p.y - 4, st.radius + 1, '255,180,120');
+      shock(p.x, p.y - 4, st.radius + 0.5, '255,180,120');
       meleeImpact(3);
       for (const e of around(p.tx, p.ty, st.radius)) smite(e, (st.dmg + cost * def.k) * beats[0][1]);
     });
@@ -9303,7 +9350,7 @@ const TIER_KINDS = {
       // 신성제마술 (밋밋한 효과 보강): its holy light drawn tall over the hero, and the stars of the cleansing
       // rising round the hero and on each companion while the guard lasts.
       if (def.fxAfter && M.fx[def.fxAfter]) {
-        addFx(bigFx(fxid, 180, 'cl'), 0, -10, { follow: true, anchor: 'bottom' });
+        addFx(bigFx(fxid, 180, 'cl'), 0, -10, { follow: true, anchor: 'bottom', self: true });
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2;
           later(0.1 + i * 0.06, () => addFx(def.fxAfter, Math.cos(a) * 40, -20 + Math.sin(a) * 24, { follow: true, scale: 1.5 }));
@@ -9394,8 +9441,8 @@ const TIER_KINDS = {
     tkLoop(fxid, 0, -26, st.duration, { follow: true, alpha: 0.65, scale: selfCapK(fxid) });
     later(st.duration, () => {
       if (G !== run || G.dead) return;
-      if (def.fx2) addFx(fxTiles(def.fx2, (st.radius || 2) * 2 + 1, 'sbu'), 0, -26, { follow: true });
-      shock(p.x, p.y - 4, (st.radius || 2) + 1, '200,220,255');
+      if (def.fx2) addFx(fxTiles(def.fx2, (st.radius || 2) * 2 + 1, 'sbu'), 0, -26, { follow: true, area: true });
+      shock(p.x, p.y - 4, (st.radius || 2) + 0.5, '200,220,255');
       const d = tkHit(def, skill);
       for (const e of around(p.tx, p.ty, st.radius || 2)) { hurtEnemy(e, d); tkAfflict(e, def); }
     });
@@ -9439,11 +9486,14 @@ const TIER_KINDS = {
     // (def.feet — 천선의영역: the seal's middle is where the hero's feet were, as in the original; R its drawn round)
     const p = G.player, run = G, fy = def.feet ? 0 : 14, cx = p.x, cy = p.y - fy, R = def.reach || (def.radius || 3) * TILE + TILE / 2, life = def.duration || 10;
     if (p.hp >= p.maxHp * 0.95 && !tkNear(p.tx, p.ty, 4).length) return 0.4;
-    const fx = { id: fxid, x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 1, must: true };
+    // (보이는 범위 = 맞는 범위: the domain drawn within the square it holds, 2R across — 아공간전개's crystals stood 5.7 × 6.4
+    // tiles over a field of 4.3, 천선의영역 grew with the 단 past it)
+    const zw = (2 * R) / TILE * 1.15, zfit = id => fxIn(id, zw, zw, 'z9');
+    const fx = { id: zfit(fxid), x: cx, y: cy, t: 0, life, scale: 1, loop: true, seenLoop: true, alpha: settings.calmFx ? 0.6 : 1, must: true };
     if (def.stay) Object.assign(fx, { y: cy + 4, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 }); // (its pivot its middle: on the hero's body)
     if (def.feet) fx.anchor = 'bottom'; // (its pivot, the seal's middle, exactly on the hero's feet)
     // (아공간전개: its pivot the hero's feet where it was laid, drawn whole — its own crystals and field, not see-through)
-    if (def.atFeet) Object.assign(fx, { id: def.fx, y: p.y, anchor: 'bottom', alpha: 1, floor: true });
+    if (def.atFeet) Object.assign(fx, { id: zfit(def.fx), y: p.y, anchor: 'bottom', alpha: 1, floor: true });
     G.fxs.push(fx);
     const end = G.t + life;
     G.ward9Hits = def.wardHits ? { n: 0, at: def.wardHits, until: end } : null;
@@ -9478,8 +9528,8 @@ const TIER_KINDS = {
     // original's own picture at the original's size relative to the hero, and what it strikes the ellipse it draws
     // (half: its half width and depth in game px), not grown with the 단
     const own = def.half && M.fx[def.fx];
-    if (own) tkLoop(def.fx, 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
-    else tkLoop(fxTiles(fxid, (r * 2 + 1) * (def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    if (own) tkLoop(def.fx, 0, -14, life, { follow: true, area: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
+    else tkLoop(fxTiles(fxid, (r * 2 + 1) * Math.min(1, def.auraSize || 1), 'a9'), 0, -14, life, { follow: true, area: true, alpha: settings.calmFx ? 0.45 : def.auraAlpha || 0.7 });
     // (the ring lies on the ground round the hero's feet, its middle def.halfAt px below them as in the original: a foe's
     // feet inside the ring drawn are struck — 이펙트=판정)
     const inAura = own ? () => G.enemies.filter(e => tkFoe(e) && ((e.x - p.x) / def.half[0]) ** 2 + ((e.y - (p.y + (def.halfAt || 0))) / def.half[1]) ** 2 <= 1)
@@ -9566,7 +9616,7 @@ const TIER_KINDS = {
     if (def.shot) {
       const sp = def.fxShot && M.fx[def.fxShot] ? def.fxShot : fxid, dx = t.x - p.x, dy = t.y - 20 - (p.y - 26);
       const fl = Math.min(0.24, 0.08 + Math.hypot(dx, dy) / 1500);
-      addFx(fxTiles(sp, 2, 'ss'), p.x, p.y - 26, { mv: [dx, dy, fl], rot: def.fxShot ? Math.atan2(dy, dx) + Math.PI / 2 : 0 });
+      addFx(fxTiles(sp, ONE_TILES, 'ss'), p.x, p.y - 26, { mv: [dx, dy, fl], rot: def.fxShot ? Math.atan2(dy, dx) + Math.PI / 2 : 0 });
       wait = fl;
     }
     // the blow's own picture on it (drawn a little larger than the foe: it is the class's great blow)
@@ -9575,9 +9625,9 @@ const TIER_KINDS = {
     const span = Math.max(1.5, (def.radius || 0) * 2 + 1);
     // (천신의심판, 원작 2662 IMG71: the whirl drawing them in and the 천신's pillar of light, one picture at the original's own
     // size, its pivot the middle of the ring — the spot struck; what it strikes the ring's round, radius tiles)
-    if (def.own) addFx(fxid, t.tx * TILE + TILE / 2, t.ty * TILE + TILE - 14, { anchor: 'bottom', must: true });
+    if (def.own) addFx(fxid, t.tx * TILE + TILE / 2, t.ty * TILE + TILE - 14, { anchor: 'bottom', must: true, cap: span * 1.25 });
     else if (def.front) later(wait, () => addFx(fxTiles(fxid, span, 'sm'), t.x, t.y - 24, { flip: t.x > p.x }));
-    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(fxTiles(fxid, span, 'sm'), t));
+    else if (!def.shot || def.fxShot) later(def.shot ? wait : 0, () => fxOn(fxTiles(fxid, span, 'sm'), t, { area: true }));
     const tx = t.tx, ty = t.ty;
     // 천신의심판: the foes round it drawn into the middle first
     if (def.pull) {
@@ -9703,7 +9753,8 @@ const TIER_KINDS = {
       // the kunai standing at the ring's edge, its tip to the hero (drawn pointing left: turned by its own angle)
       later(0.2, () => {
         if (G !== run) return;
-        G.fxs.push({ id: fxid, x, y, t: 0, life: dur, scale: 1, rot: a, anchor: 'bottom', loop: true, seenLoop: true, alpha });
+        // (보이는 범위 = 맞는 범위: a kunai standing on a tile, a body across)
+        G.fxs.push({ id: fxid, x, y, t: 0, life: dur, scale: capK(fxid, 1, ONE_TILES, a), rot: a, anchor: 'bottom', loop: true, seenLoop: true, alpha });
       });
     }
     // the flight: what lies on each streak (within a third of a tile of its line), once
@@ -9827,7 +9878,10 @@ const TIER_KINDS = {
     G.galeAt = G.t;
     const run = G, x = t.x, y = t.y, [hx, hy] = def.half, dmg = st.dmg * (1 + (def.stack || 0) * G.galeN);
     if (Math.abs(t.x - p.x) > 2) p.face = Math.sign(t.x - p.x);
-    G.fxs.push({ id: def.fx, x, y: y + 4, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.75 : 1, must: true });
+    // (보이는 범위 = 맞는 범위: the whirl drawn over the box it strikes — its middle on the struck one's feet, no taller than
+    // the box — not rising from them four tiles high over rows it never struck)
+    const gid = fxIn(def.fx, (2 * hx * 1.25) / TILE, ((2 * hy) / TILE + 0.3) * 1.25, 'gl');
+    fxAt(gid, x, y, { alpha: settings.calmFx ? 0.75 : 1, must: true });
     later(0.15, () => {
       if (G !== run) return;
       const hit = G.enemies.filter(e => tkFoe(e) && Math.abs(e.x - x) <= hx && Math.abs(e.y - y) <= hy);
@@ -9882,7 +9936,8 @@ const TIER_KINDS = {
     const pull = Math.max(0, TILE * 1.6 - along);
     const ex = t.x + dx * pull, ey = t.y - 20 + dy * pull;
     const sx = bx + dx * TILE, sy = by + dy * TILE, dist = Math.hypot(ex - sx, ey - sy), fly = 0.12 + dist / 900, hold = def.hold || 1.0;
-    const put = (id, x, y, life, o = {}) => G.fxs.push({ id, x, y, t: 0, life, scale: o.scale || 1, rot, flip, anchor: 'bottom', loop: o.loop, seenLoop: o.loop,
+    // (보이는 범위 = 맞는 범위: the sphere strikes the one under it — a body across, as each smaller one on those it leaps to)
+    const put = (id, x, y, life, o = {}) => G.fxs.push({ id, x, y, t: 0, life, scale: (o.scale || 1) * capK(id, o.scale || 1, bodyTiles(t), rot), rot, flip, anchor: 'bottom', loop: o.loop, seenLoop: o.loop,
       mv: o.mv, must: true, alpha: settings.calmFx ? 0.8 : 1 });
     put(form, sx, sy, 0.09, { scale: 0.55 });
     later(0.09, () => { if (G === run) put(ball, sx, sy, fly, { scale: 0.55, loop: true, mv: [ex - sx, ey - sy, fly] }); });
@@ -9925,7 +9980,7 @@ const TIER_KINDS = {
     const far = foes.map(e => Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty)).filter(n => n >= 2).sort((a, b) => a - b)[0];
     const k = far || Math.max(1, Math.min(...foes.map(e => Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty))));
     const sx = p.x, sy = p.y - 20, ex = sx + dx * k * TILE, ey = sy + dy * k * TILE, fly = 0.08 * k, run = G;
-    if (def.fxShot && M.fx[def.fxShot]) addFx(def.fxShot, sx, sy, { mv: [ex - sx, ey - sy, fly], anchor: 'mid', must: true });
+    if (def.fxShot && M.fx[def.fxShot]) addFx(def.fxShot, sx, sy, { mv: [ex - sx, ey - sy, fly], anchor: 'mid', must: true, cap: ONE_TILES });
     const passed = new Set();
     for (let i = 1; i < k; i++) later(0.08 * i, () => {
       if (G !== run) return;
@@ -9936,7 +9991,9 @@ const TIER_KINDS = {
     later(fly, () => {
       if (G !== run) return;
       const [hx, hy] = def.half, life = def.dur;
-      tkLoop(def.fx, ex, ey, life, { alpha: settings.calmFx ? 0.7 : 1, anchor: 'bottom' }); // (its pivot the field's middle)
+      // (its pivot the field's middle; 보이는 범위 = 맞는 범위: within the box it strikes, 2·half and a tile)
+      const sk = Math.min(1, (2 * hx * 1.25 + TILE) / (fxMid(def.fx)[2] || 1), (2 * hy * 1.25 + TILE) / (fxMid(def.fx)[3] || 1));
+      tkLoop(def.fx, ex, ey, life, { alpha: settings.calmFx ? 0.7 : 1, anchor: 'bottom', scale: sk });
       const n = Math.round(life / def.tick);
       for (let i = 0; i < n; i++) later(i * def.tick, () => {
         if (G !== run || G.dead) return;
@@ -10084,10 +10141,15 @@ const TIER_KINDS = {
       p.inv = Math.max(p.inv || 0, travel + 0.3);
     }
     const at = { get x() { return glideAt(p).x; }, get y() { return glideAt(p).y; } };
-    const f = { id: def.fx, x: 0, y: 0, on: at, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
+    // (보이는 범위 = 맞는 범위: the sweep and its trails no longer than the rows it burns, went + ahead, nor wider than
+    // them — drawn at the original's size it reached three tiles behind a charge the crowd held short)
+    const hid = fxIn(def.fx, Math.max(ONE_TILES, 1.25 * (went + ahead)), 1.25 * (2 * half + 1), 'hh' + went, false);
+    const f = { id: hid, x: 0, y: 0, on: at, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
     if (fx > 0) f.flip = true;
     if (fy) f.rot = fy < 0 ? Math.PI / 2 : -Math.PI / 2;
-    G.fxs.push(f);
+    // (held where it stood — the crowd let it go nowhere —: the sweep over the rows ahead it burns, not on the hero)
+    if (!went) fxAt(hid, p.x + fx * TILE * (ahead + 1) / 2, p.y - 24 + fy * TILE * (ahead + 1) / 2, { flip: f.flip, rot: f.rot, alpha: f.alpha });
+    else G.fxs.push(f);
     const rows = went + ahead, seen = new Set();
     for (let k = 1; k <= rows; k++) later(0.04 + (k <= went ? (k - 1) * per : travel + (k - went - 1) * 0.06), () => {
       if (G !== run) return;
@@ -10116,12 +10178,14 @@ const TIER_KINDS = {
       M.fx[def.fx + '#rise'] = { ...src, src: src.src || def.fx, f0: 0, n: cut, durs: src.durs.slice(0, cut) };
       M.fx[def.fx + '#held'] = { ...src, src: src.src || def.fx, f0: cut, n: src.n - cut, durs: src.durs.slice(cut) };
     }
+    // (보이는 범위 = 맞는 범위: the seal and its ring within the square they strike, (2R+1) tiles and a quarter)
+    const js = Math.min(capK(def.fx, 1, (2 * R + 1) * 1.25), M.fx[def.fxPole] ? capK(def.fxPole, 1, (2 * R + 1) * 1.25) : 1);
     if (src) {
       const rise = fxLife(def.fx + '#rise');
-      G.fxs.push({ id: def.fx + '#rise', x, y, t: 0, life: rise, scale: 1, rot: 0, anchor: 'bottom', alpha: calm, must: true });
-      G.fxs.push({ id: def.fx + '#held', x, y, t: -rise, life: life - rise, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
+      G.fxs.push({ id: def.fx + '#rise', x, y, t: 0, life: rise, scale: js, rot: 0, anchor: 'bottom', alpha: calm, must: true });
+      G.fxs.push({ id: def.fx + '#held', x, y, t: -rise, life: life - rise, scale: js, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
     }
-    if (M.fx[def.fxPole]) G.fxs.push({ id: def.fxPole, x, y, t: 0, life, scale: 1, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
+    if (M.fx[def.fxPole]) G.fxs.push({ id: def.fxPole, x, y, t: 0, life, scale: js, rot: 0, anchor: 'bottom', loop: true, seenLoop: true, alpha: calm, must: true, fadeOut: 0.4 });
     const inside = e => tkFoe(e) && Math.abs(e.tx - tx0) <= R && Math.abs(e.ty - ty0) <= R;
     const n = Math.round(life / (def.tick || 0.5));
     for (let k = 1; k <= n; k++) later(k * (def.tick || 0.5), () => {
@@ -10153,7 +10217,8 @@ const TIER_KINDS = {
         used.set(t, (used.get(t) || 0) + 1);
         const x = t.x, y = t.y - 24;
         // (the crescent, then the ring held a moment: the original's two frames at their own pace, 0.11 s each)
-        G.fxs.push({ id: def.fx, x, y, t: 0, life: life + 0.1, scale: 1, rot: 0, anchor: 'bottom', alpha, must: true, flip: t.x < p.x });
+        // (보이는 범위 = 맞는 범위: the ring no wider than its reach round the struck one, 2·reach)
+        G.fxs.push({ id: def.fx, x, y, t: 0, life: life + 0.1, scale: capK(def.fx, 1, Math.max(ONE_TILES, (2 * def.reach) / TILE * 1.25)), rot: 0, anchor: 'bottom', alpha, must: true, flip: t.x < p.x });
         later(life * 0.5, () => {
           if (G !== run) return;
           G.quietHit = true;
@@ -10279,8 +10344,10 @@ const TIER_KINDS = {
     const p = G.player, R = st.range || def.range || 5;
     if (!tkNear(p.tx, p.ty, R).length) return 0.3;
     const run = G, alpha = settings.calmFx ? 0.85 : 1, n = def.volleys || 8, span = n * def.every;
-    tkLoop(def.fxCast, 0, -26, span + 0.2, { follow: true, anchor: 'mid', alpha });
-    const len = (M.fx[def.fx] ? M.fx[def.fx].w * (M.fx[def.fx].k || 1) : 80) * 0.9;
+    // (보이는 범위 = 맞는 범위: the disc round the hero strikes nothing — the hero's size; each bolt a body long, as it
+    // strikes one)
+    tkLoop(def.fxCast, 0, -26, span + 0.2, { follow: true, anchor: 'mid', alpha, scale: selfCapK(def.fxCast) });
+    const bsc = capK(def.fx, 1, ONE_TILES), len = (M.fx[def.fx] ? M.fx[def.fx].w * (M.fx[def.fx].k || 1) * bsc : 80) * 0.9;
     for (let v = 0; v < n; v++) later(0.1 + v * def.every, () => {
       if (G !== run || G.dead) return;
       const pool = tkNear(p.tx, p.ty, R).slice(0, def.per || 3);
@@ -10288,7 +10355,7 @@ const TIER_KINDS = {
         // (the arrow's head starts at the hero, the spikes trailing it; it goes until its far end is on the foe)
         const ux = t.x - p.x, uy = t.y - p.y, d = Math.hypot(ux, uy) || 1;
         const go = Math.max(0, d - len);
-        G.fxs.push({ id: def.fx, x: p.x, y: p.y - 24, t: 0, life: 0.2, scale: 1, rot: Math.atan2(-uy, -ux), anchor: 'bottom', alpha, must: true,
+        G.fxs.push({ id: def.fx, x: p.x, y: p.y - 24, t: 0, life: 0.2, scale: bsc, rot: Math.atan2(-uy, -ux), anchor: 'bottom', alpha, must: true,
           mv: [(ux / d) * go, (uy / d) * go, 0.16], fadeOut: 0.06 });
         later(0.12 + j * 0.02, () => {
           if (G !== run || !tkFoe(t)) return;
@@ -10370,8 +10437,8 @@ const ECHO = {
     const tx = e.tx, ty = e.ty;
     // 이펙트=판정 (사용자 피드백: 레이드에서 날개 달린 푸른 소용돌이가 화면 삼분의 일): the sheet at its own size was 4.2 tiles
     // wide (its swirl and wings) over a blow of three (the struck one and a tile round it) — drawn as wide as it strikes
-    const f = M.fx[def.fx], u = f && fxUnion(def.fx), sc = f ? Math.min(1, (3 * TILE) / ((u ? u.mw : f.w) * (f.k || 1))) : 1;
-    addFx(def.fx, e.x, e.y + 2, { anchor: 'bottom', must: true, scale: sc });
+    // (and by its longer side, all its frames: the swords fall from over the 3×3, not three tiles over it)
+    addFx(def.fx, tx * TILE + TILE / 2, ty * TILE + TILE - 4, { anchor: 'bottom', must: true, scale: capK(def.fx, 1, 3 * 1.2) });
     later(0.08, () => {
       for (const o of around(tx, ty, 1)) hurtEnemy(o, o === e ? d : d * (def.splash || 0.5));
     });
@@ -10385,7 +10452,7 @@ const ECHO = {
         addFx(bigFx(def.fx2, def.shotSize || 70, 'es'), p.x, p.y - 60, { mv: [dx, dy, fl], flip: dx < 0, scale: 1 });
         later(fl, () => {
           if (e.hp <= 0) return;
-          if (def.fxHit) fxOn(fxTiles(def.fxHit, def.splash ? 3 : 1.5, 'ew'), e);
+          if (def.fxHit) fxOn(fxTiles(def.fxHit, def.splash ? 3 : ONE_TILES, 'ew'), e, { area: !!def.splash });
           hurtEnemy(e, d);
           // (the sword goes through: those beside it take a share)
           if (def.splash) for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, d * def.splash);
@@ -10435,7 +10502,7 @@ const ECHO = {
     const p = G.player, len = def.depth || 6, w = def.width === undefined ? 1 : def.width;
     // (each beam drawn as long as it reaches, every tick it strikes; its arms `w` tiles to each side)
     const pic = fxTiles(def.fx2, len * 2 + 1, 'cq');
-    addFx(pic, 0, -20, { follow: true, alpha: 0.85 });
+    addFx(pic, 0, -20, { follow: true, alpha: 0.85, area: true });
     const tiles = [];
     for (const [dx, dy] of DIRS) for (let i = 1; i <= len; i++) for (let o = -w; o <= w; o++) tiles.push([p.tx + dx * i + (dy ? o : 0), p.ty + dy * i + (dx ? o : 0)]);
     let got = 0;
@@ -11449,6 +11516,8 @@ function later(delay, fn) {
   if (delay <= 0) return void fn();
   // (a step of an AI's cast (castAs) runs in its shadow again, on the real hunt's clock)
   if (SH) { const ctx = SH, f0 = fn; fn = () => inShadow(ctx, f0); }
+  // (a step of a skill's cast draws as the cast does: FXC, 보이는 범위 = 맞는 범위)
+  if (FXC) { const f1 = fn; fn = () => inCastFx(f1); }
   timers.push({ at: G.t + delay, fn, run: SH ? SH.real : G });
 }
 
@@ -13485,7 +13554,9 @@ function grownFx(id, lv) {
   if (!M.fx[key]) {
     // 연's spells are drawn large over the field: a quarter larger to begin, 6% more a 단.
     const f = M.fx[id];
-    M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * (1 + 0.04 * (lv - 1)) };
+    // (보이는 범위 = 맞는 범위, 사용자 규칙: no longer drawn larger a 단 — 4% a step, 8단 a third larger than what it
+    // strikes; a spell's area grows only with what it strikes, st.radius, and its picture is fitted to that)
+    M.fx[key] = { ...f, src: f.src || id };
   }
   return key;
 }
@@ -15291,7 +15362,26 @@ function addFx(id, x, y, o = {}) {
   if (SH && !SH.draw) return life; // (an AI's cast struck unseen: castAs)
   // a picture that strikes nothing, on a body (o.self: a 기원, a buff, a shield on the hero, a companion, a raid or war
   // fighter): no larger than the body and a little round it (selfCapK)
-  if (o.self) { const c = selfCapK(id, o.scale || 1); if (c < 1) o = { ...o, scale: (o.scale || 1) * c }; }
+  // 보이는 범위 = 맞는 범위 (사용자 규칙): a picture on one body (o.body: tiles, fxOn) no larger than that body; o.cap: any
+  // picture's longest side at most that many tiles (what its blow strikes). Shrunk about its drawn middle (fxMid), so a
+  // picture placed by its middle (fxAt) stays where it was put; one hung from its pivot (연's: the struck one's feet), about it.
+  const self = o.self || (FXC && o.follow && !o.must && !o.area && !o.anchor);
+  // (and one flying, o.mv — a shot, a thrown blade, a row's arrow —: a body across, what it strikes as it passes)
+  const shot = FXC && o.mv && !o.must && !o.area;
+  const capT = Math.min(self ? SELF_TILES : 1e9, shot ? ONE_TILES : 1e9, o.body || 1e9, o.cap || 1e9);
+  if (capT < 1e9) {
+    const sc = o.scale || 1, c = capK(id, sc, capT, o.rot || 0);
+    if (c < 1) {
+      const f0 = M.fx[id];
+      if (!(f0.ax !== undefined && o.anchor !== 'mid') && o.anchor !== 'bottom') {
+        let [mx, my] = fxMid(id);
+        if (o.flip) mx = -mx;
+        if (o.rot) { const cs = Math.cos(o.rot), sn = Math.sin(o.rot); [mx, my] = [mx * cs - my * sn, mx * sn + my * cs]; }
+        x += mx * sc * (1 - c); y += my * sc * (1 - c);
+      }
+      o = { ...o, scale: sc * c };
+    }
+  }
   // A screen-filling effect (연's 포효검황, 혈겁만파 ...) is shown once at a time, and no more
   // than two of them together: stacked they hid the field and slowed a phone to a crawl.
   // (the drawn part of its frames — packed sheets know each frame's box — not the empty cell round it: a
@@ -15308,7 +15398,7 @@ function addFx(id, x, y, o = {}) {
   // 연's 신수 각인 pictures open on four frames of a pure white shape (280 ms): started past them,
   // faded in instead (a white pop the size of the beast, seen at every 현무·청룡·주작 격).
   const skip = FX_LEAD[id] || 0;
-  G.fxs.push({ id, x, y, t: skip - (o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
+  G.fxs.push({ uid: ++fxUid, id, x, y, t: skip - (o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
     follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint, skip, fadeIn: skip ? 0.2 : 0,
     alpha: o.alpha, on: o.on }); // (o.alpha: an AI fighter's picture, see-through: war.js aiAlpha)
   return life;
@@ -15360,6 +15450,27 @@ function fxBlit(c, pic, f, i, dx, dy, k, sid, kv = k) {
   } else c.drawImage(pic, sx, sy, f.w, f.h, dx, dy, f.w * k, f.h * kv);
 }
 
+// test (보이는 범위 = 맞는 범위): what each picture drew (world pixels, frame by frame) and what was struck, while on
+let fxDrawLog = null, fxHitLog = null, fxCur = null, fxUid = 0;
+function fxLogDraw(f, i, dx, dy, k, kv, x, y, turn, rot, flip) {
+  const sh = f.src ? M.fx[f.src] : f, bb = sh.bb, b4 = i * 4;
+  let r = bb && b4 + 3 < bb.length ? [dx + bb[b4] * k, dy + bb[b4 + 1] * kv, bb[b4 + 2] * k, bb[b4 + 3] * kv] : [dx, dy, f.w * k, f.h * kv];
+  if (!(r[2] > 0)) return;
+  let xs = [r[0], r[0] + r[2]], ys = [r[1], r[1] + r[3]];
+  if (turn) {
+    const c = Math.cos(rot || 0), sn = Math.sin(rot || 0), px = [], py = [];
+    for (const a of xs) for (const b of ys) { const u = flip ? -a : a; px.push(x + u * c - b * sn); py.push(y + u * sn + b * c); }
+    xs = px; ys = py;
+  }
+  const f0 = fxCur;
+  if (!f0.uid) f0.uid = ++fxUid;
+  const e = fxDrawLog[f0.uid] || (fxDrawLog[f0.uid] = { id: String(f0.id), cast: f0.cast || '', mv: !!f0.mv, follow: !!f0.follow, x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9, fw: 0, fh: 0 });
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  e.x0 = Math.min(e.x0, x0); e.y0 = Math.min(e.y0, y0); e.x1 = Math.max(e.x1, x1); e.y1 = Math.max(e.y1, y1);
+  e.fw = Math.max(e.fw, x1 - x0); e.fh = Math.max(e.fh, y1 - y0);
+}
+window.__clearFoes = () => { for (const e of G.enemies) leave(e); G.enemies.length = 0; timers.length = 0; G.fxs.length = 0; }; // test: the field emptied (and what was still to come)
+window.__fxMeasure = on => { const r = { draw: fxDrawLog, hit: fxHitLog }; fxDrawLog = on ? {} : null; fxHitLog = on ? [] : null; return r; };
 function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   const f = M.fx[id];
   const im = fxPic(id);
@@ -15392,6 +15503,7 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   // Only the part of the cell that shows (tools/fx_trim.py): most of a cell is empty, and every
   // pixel drawn is blended.
   fxBlit(ctx, pic, f, i, dx, dy, k, id, kv);
+  if (fxDrawLog && fxCur) fxLogDraw(f, i, dx, dy, k, kv, x, y, turn, rot, flip);
   if (turn) {
     if (flip) ctx.scale(-1, 1);
     if (rot) ctx.rotate(-rot);
@@ -16867,7 +16979,7 @@ function render(now) {
 
   if (p.aura && !G.dead) drawAuraRing(p);
   // (f.floor: a picture laid on the ground — 아공간전개's domain — drawn under the bodies, not over them)
-  for (const f of G.fxs) if (f.floor && f.t >= 0) drawFx(f.id, f.x, f.y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
+  for (const f of G.fxs) if (f.floor && f.t >= 0) (fxCur = f), drawFx(f.id, f.x, f.y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
 
   // Bodies, back to front.
   const seenProps = (G.war && !G.war.raid) || G.arena ? [] : G.broken ? propsInView(camX, camY).filter(b => !G.broken.has(b.x + ',' + b.y)) : propsInView(camX, camY); // 사냥 기믹: broken jars
@@ -17014,9 +17126,11 @@ function render(now) {
     if (f.alpha || f.fadeIn) ctx.globalAlpha = (f.alpha || 1) * (f.fadeIn ? Math.min(1, (f.t - f.skip) / f.fadeIn) : 1);
     // (fadeOut: a held picture of one frame — 절섬's crescent — fading over its last fadeOut seconds)
     if (f.fadeOut && f.life) ctx.globalAlpha *= Math.max(0, Math.min(1, (f.life - f.t) / f.fadeOut));
+    fxCur = f;
     drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
     ctx.globalAlpha = 1;
   }
+  fxCur = null;
   drawGyeokLines(); // 격 chains' leaps
   // 공대: the spells of twenty-five hid the boss. Its shape again, faint, over them.
   if (G.war && G.war.raid) {
