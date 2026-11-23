@@ -7459,7 +7459,11 @@ function castNow(skill, st) {
   const shoot = e => {
     if (!M.fx[shotPic] || !e) return 0;
     const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
-    addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot: Math.atan2(dy, dx) + Math.PI / 2, scale: 1.3, cap: ONE_TILES });
+    const rot = Math.atan2(dy, dx) + Math.PI / 2;
+    // (def.shotTiles: a thrown thing longer than a body — 무형투창's spear, 사용자 2026-11-23: 표창 같다 — drawn that
+    // many tiles long, its own length, not the 1.4 of a shot)
+    if (def.shotTiles) addFx(fxTiles(shotPic, def.shotTiles, 'sh'), q.x, q.y - 26, { mv: [dx, dy, fl], rot, area: true, cap: def.shotTiles });
+    else addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot, scale: 1.3, cap: ONE_TILES });
     return fl;
   };
   classFlourish(def, skill, st);
