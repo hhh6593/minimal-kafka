@@ -15526,7 +15526,11 @@ function addFx(id, x, y, o = {}) {
   const self = o.self || (FXC && o.follow && !o.must && !o.area && !o.anchor);
   // (and one flying, o.mv — a shot, a thrown blade, a row's arrow —: a body across, what it strikes as it passes)
   const shot = FXC && o.mv && !o.must && !o.area;
-  const capT = Math.min(self ? SELF_TILES : 1e9, shot ? ONE_TILES : 1e9, o.body || 1e9, o.cap || 1e9);
+  // (사용자 2026-11-23: 차사·격투가의 기술 크기가 기준 — 다른 직업은 몸·투사체·시전자 그림이 그만큼(1.3배) 작아 보였다.
+  // 범위기의 그림(fxAt의 o.must, o.area)은 판정에 맞춘 그대로. 던지는 것은 조금 더 크고 진하게)
+  const big = FXC && G.cls && G.cls.id !== 'reaper' && G.cls.id !== 'monk' && !o.must && !o.area ? (o.mv ? 1.45 : 1.3) : 1;
+  if (big > 1) o = { ...o, scale: (o.scale || 1) * big, alpha: o.mv && o.alpha ? Math.min(1, o.alpha * 1.3) : o.alpha };
+  const capT = Math.min(self ? SELF_TILES * big : 1e9, shot ? ONE_TILES * big : 1e9, o.body ? o.body * big : 1e9, o.cap ? o.cap * big : 1e9);
   if (capT < 1e9) {
     const sc = o.scale || 1, c = capK(id, sc, capT, o.rot || 0);
     if (c < 1) {
