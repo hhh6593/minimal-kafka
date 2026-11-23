@@ -6704,7 +6704,8 @@ function rollSpecial(e) {
 // ---- abyss drop rates (retune here) ----
 // (Was boss 35%, mini 10%, champ 1%: about 0.64 uniques a hunt, every unique within a few dozen
 // hunts. Now about 0.38: boss 20%, two leaders 6% each, nine or so champions 0.6% each.)
-const ABYSS_DROP = { boss: 0.2, mini: 0.06, champ: 0.006 };
+// (사용자 2026-11-23: 심연 템치고 드랍률이 너무 높다 — 약 4분의 1로)
+const ABYSS_DROP = { boss: 0.05, mini: 0.015, champ: 0.0015 };
 function rollAbyss(e) {
   const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
   // 태초의 무기: the 소 왕 besides his horn, now and then; the 세계석 요새's lord in place of his drop.

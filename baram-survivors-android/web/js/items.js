@@ -683,7 +683,9 @@ export function starCost(star) {
 // windows. Its power is its depth's (abyssPower), under the 용무기 제십's: ABYSS_HUNT is its edge. (An old save's 마법 and
 // 희귀 pieces, from when there were three grades, load as 고유: loadAbyssLoot.)
 export const RARITY = {
-  unique: { name: '고유', color: '#d8a64a', ui: '#a0601a', pow: 2 },
+  // (pow 2 → 4.3: 심연 고유가 14.5로 최종 무기(16.4~17.2)보다 낮았다 — 사용자 2026-11-23: 최종 무기는 모두 최고 등급,
+  // 성격만 다르게. 태초는 그 위 +2 대신 같은 등급(TAECHO_EDGE.pow 0), 사냥 쪽 특색(mob·fresh)은 그대로)
+  unique: { name: '고유', color: '#d8a64a', ui: '#a0601a', pow: 4.3 },
 };
 // Their looks: one of 연's own high named weapons per class (its 코디 weapon layer, ABYSS_BASE: the
 // 진일염화검 and its 염화 kin, the 진'청일기창 ...), "dressed" in the abyss's colours by the game:
@@ -795,7 +797,7 @@ export const TOP_GYEOK_FX = { taecho: 1.6, abyss: 1.4 };
 // (11.5 + 2 = 13.5; with its 공격력 option a boss ×3.01, rank 16.8, under the 용무기 제십's 17.2); a
 // crowd ×3.46 (×4.85 its first blow), the most outside the abyss, where an abyss unique's own hunt
 // (×3.78) is better still.
-export const TAECHO_EDGE = { pow: 2, all: 0, mob: 0.15, fresh: 0.4 };
+export const TAECHO_EDGE = { pow: 0, all: 0, mob: 0.15, fresh: 0.4 };
 export const TAECHO_DRESS = { pal: 'gold', tint: 0.45, classicTint: 0.12, glow: 0.85, glowColor: '#ffcf5a', core: '#fff6dc', flames: 4, fsc: 0.75, fxTint: { default: 'grayscale(1) sepia(0.55) saturate(1.8) brightness(2.1)',
     // the dark ones (smoke, the dark burst) turned over first: their black becomes light
     k_ab_smoke: 'grayscale(1) invert(1) sepia(0.5) saturate(1.6) brightness(1.05)',
