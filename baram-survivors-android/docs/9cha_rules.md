@@ -32,7 +32,7 @@
   후 `cd <OUT_WWW> && python3 -m http.server <PORT>`. 스크린샷:
   `PORT=<port> CLS=<n> DSF=1 WARM=o_a,o_b node tools/s9_shoot.js <outdir> <name> <skillId|ult> "t1,t2"`(5번째 인자에 경로 금지).
   직업 번호: warrior 0, rogue 1, mage 2, poet 3, archer 4, lancer 5, monk 6, magus 7, celestial 8, dokkaebi 9, reaper 10.
-- 1320 조각 사용처(중복 금지): #18 흑룡광참(w_heukgwang), #20 초혼진무 사슬(w_chohonbind). 흑룡검풍 오라(w_heukaura)는 연의 흑룡광참 회오리를
+- 1320 조각 사용처(중복 금지): #18 흑룡광참(w_heukgwang). (#20은 초혼진무에 잠깐 썼다가 연의 보라 사슬로 되돌려 미사용) 흑룡검풍 오라(w_heukaura)는 연의 흑룡광참 회오리를
   흑적색으로: 입력 `$S/s9/yeon/k_w_blackdragon.webp`+`.json`(이전 APK의 assets/fx와 manifest 항목을 그대로 복사).
 - 원작 영웅 76px ↔ 우리 47px (k 0.62).
 - js 검사는 반드시 `node --input-type=module --check < web/js/<file>` (data.js는 모듈: 일반 --check로는 병합 잔재를 못 잡음).
@@ -48,4 +48,4 @@
 - 장승 부서지는 끝 장면은 체력바에 덮여 빼고 0.4초에 사라지게.
 - 흑룡광참: 1320 #18을 역순(작은 회오리 → 큰 회오리)으로, 다섯 칸을 나가다 몬스터에 닿으면 그 자리에서 1.2초 돌며 둘레를 끌어들여 벤다.
 - 흑룡검풍: 옆에서 도는 바람이 아니라 몸에 두른 흑적색 오라(2.6칸), 둘레 한 칸을 벤다.
-- 초혼진무: 영웅 둘레의 큰 사슬 고리 대신 묶인 몬스터마다 몸 크기의 사슬, 1.2초 묶음(보스 0.5초).
+- 초혼진무: 연의 보라 사슬(k_w_chohonjin) 하나를 4칸 안 가장 몰린 곳에 3칸으로, 둘레 두 칸의 몬스터를 그 안으로 끌어모아 1.2초 묶음(보스 0.5초). 영웅 둘레에는 뜨지 않는다.

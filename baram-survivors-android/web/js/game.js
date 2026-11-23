@@ -7932,6 +7932,7 @@ function castNow(skill, st) {
       break;
     }
     case 'nova': {
+      if (def.snare) { if (!snare(def, st, smite, fxid)) return retry(0.3); break; }
       if (def.hpCost) p.hp = Math.max(1, p.hp * (1 - def.hpCost));
       const nf = M.fx[fxid];
       // It strikes as far as its picture is seen to spread, if that is past its own reach.
@@ -7939,8 +7940,7 @@ function castNow(skill, st) {
       const reach = Math.max(1, Math.floor(Math.max(st.radius || 0, nf && nf.cls === 'yeon' ? seenReach(fxReach, novaScale) : 0) + 1e-6));
       // 이펙트=판정: the burst drawn exactly over the square it strikes (2·reach+1 tiles round the hero; the old
       // ring of light copies out at the reach reached past it), striking while it stays.
-      // (def.bind: a binding — 초혼진무's chains — drawn on each one it holds, as large as that body, not round the hero)
-      const life = def.bind ? fxLife(def.bind) : fxAtSquare(fxid, reach * 2 + 1, 0, -24, { follow: true }, 'nv');
+      const life = fxAtSquare(fxid, reach * 2 + 1, 0, -24, { follow: true }, 'nv');
       if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, reach + 0.5);
       const beats = beatsUnder(life - 0.1);
       for (const [dt, k] of beats.slice(1)) later(0.1 + dt, () => { if (!G.dead) for (const e of around(p.tx, p.ty, reach)) smite(e, st.dmg * k); });
@@ -7948,9 +7948,8 @@ function castNow(skill, st) {
         meleeImpact(3);
         afterAt(p.x, p.y - 10, 0, reach * 2 + 1);
         for (const e of around(p.tx, p.ty, reach)) {
-          if (def.stun) { e.stun = e.kind === 'boss' && def.bind ? Math.min(def.stun, 0.5) : def.stun; cutBlast(e); }
-          if (def.bind) fxOn(def.bind, e, { alpha: settings.calmFx ? 0.8 : 1 });
-          else hitOn(e);
+          if (def.stun) { e.stun = def.stun; cutBlast(e); }
+          hitOn(e);
           smite(e, st.dmg * beats[0][1]);
           fling(e, p.tx, p.ty);
         }
@@ -10580,6 +10579,33 @@ const ECHO = {
 /** A shot's picture drawn pointing left (1320's sprites), turned the way it flies. */
 function shotTurn(dx, dy) {
   return dx > 0 ? { flip: true } : dx < 0 ? {} : { rot: dy < 0 ? Math.PI / 2 : -Math.PI / 2 };
+}
+/** 초혼진무 (def.snare; 사용자 2026-11-23: 사슬은 하나, 그 안으로 몬스터를 모아 묶는다 — 영웅에게 뜨지 않게): 연's purple chain
+ *  ring (the skill's own picture, k_w_chohonjin, as it was) laid once, 3 tiles across, on the foe within def.range with the most round it; those two
+ *  tiles out drawn a step in, then all within the ring (its 3×3, at most nine) bound def.stun seconds (a boss 0.5) and
+ *  struck, and struck again as the chains tighten. False when no foe is in reach (the cast waits). */
+function snare(def, st, smite, fxid) {
+  const p = G.player, foes = nearestEnemies(40, def.range || 4).filter(e => e.hp > 0);
+  if (!foes.length) return false;
+  let best = foes[0], most = -1;
+  for (const e of foes) { const n = around(e.tx, e.ty, 1).length; if (n > most) { most = n; best = e; } }
+  const cx = best.tx, cy = best.ty;
+  // (3 tiles across by its cell: its frames' boxes (fxTiles) read a fraction of the ring it draws)
+  const sf = M.fx[fxid];
+  if (sf) fxAt(fxid, cx * TILE + TILE / 2, cy * TILE + TILE - 30, { scale: (3 * TILE) / (Math.max(sf.w, sf.h) * (sf.k || 1)) });
+  for (const e of around(cx, cy, 2)) {
+    const ex = e.tx - cx, ey = e.ty - cy;
+    if (Math.max(Math.abs(ex), Math.abs(ey)) > 1) tkShove(e, cx + Math.sign(ex) * Math.min(1, Math.abs(ex)), cy + Math.sign(ey) * Math.min(1, Math.abs(ey)));
+  }
+  const bind = (k, hold) => {
+    for (const e of around(cx, cy, 1)) {
+      if (hold && def.stun) { e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? Math.min(def.stun, 0.5) : def.stun); cutBlast(e); }
+      smite(e, st.dmg * k);
+    }
+  };
+  later(0.15, () => { if (!G.dead) bind(0.6, true); });
+  later(0.7, () => { if (!G.dead) bind(0.6, false); });
+  return true;
 }
 /** 흑룡광참 (def.swirl; 사용자 결정 2026-11-23): the whirl runs ahead as the plain vortex does, but the first time a foe
  *  stands on its way (the 3 tiles across it) it stops there and turns on the spot for swirl.dur seconds — drawn as the

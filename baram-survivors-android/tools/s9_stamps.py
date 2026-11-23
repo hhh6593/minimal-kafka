@@ -980,15 +980,6 @@ def white_sheet(src_dir, path):
     return [Image.fromarray(c[y0:y1, x0:x1]) for c in cells], x1 - x0, y1 - y0
 
 
-def chohonbind(src_dir):
-    """초혼진무 (전사 6차; 사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다): 1320 #20, teal chains coiling round a
-    body and fading — laid on each foe it binds, as large as that body (game.js nova def.bind). Its frames 1-18: the first, a
-    wider burst of the coil, made every foe of a crowd one teal mass the moment it struck."""
-    pics, w, h = white_sheet(src_dir, "dl1320/20.gif")
-    pics = pics[1:]
-    return pics, {"cell": [w, h], "n": len(pics), "ms": 70, "add": False, "anchor": [w // 2, h // 2], "src": "dl1320/20.gif"}
-
-
 def heukaura(src_dir):
     """흑룡검풍 (전사 9차 패시브; 사용자 결정 2026-11-23): 연's own grey whirl of 흑룡광참 (Skill_Effect_Warrior_5th_03, as the
     earlier APK holds it: SRC_DIR/yeon/k_w_blackdragon.webp + .json, its manifest entry) made 흑적색 — its brightness laid on
@@ -1014,7 +1005,7 @@ def heukaura(src_dir):
                   "src": "yeon/k_w_blackdragon.webp"}
 
 
-BUILDERS = {"w_heukgwang": heukgwang, "w_chohonbind": chohonbind, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
+BUILDERS = {"w_heukgwang": heukgwang, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
 
 

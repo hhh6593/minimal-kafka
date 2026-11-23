@@ -1227,9 +1227,9 @@ const REWORK = {
   w_roar3: { evolved: true, desc: '동귀어진 8단 + 3차 승급. 많은 체력을 바쳐 정면 한 칸의 몬스터에게 치명적인 피해를 주고 잠시 기절시킨다' },
   w_fly: { kind: 'line', depth: 4, max: undefined, desc: '검을 날려 몬스터가 가장 많은 쪽 일렬 네 칸을 꿰뚫는다' },
   w_rush: { fxHit: 'k_u_w_wave', fxAfter: 'k_w_tiger', desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 꿰뚫고, 지난 자리에 검기가 남는다' },
-  // (사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다 — 1320 #20의 청록 사슬을 묶인 몬스터 하나하나에 몸 크기로,
-  // tools/s9_stamps.py chohonbind)
-  w_chohonjin: { fxCast: 'none', bind: 'o_w_chohonbind', stun: 1.2, desc: '혼을 부르는 사슬로 둘레 두 칸의 몬스터를 휘감아 1.2초 동안 묶고 조인다' },
+  // (사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다 → 연의 보라 사슬 하나를 가장 몰린 곳에 3칸으로 놓고,
+  // 그 안으로 둘레 두 칸의 몬스터를 모아 묶는다: game.js snare)
+  w_chohonjin: { fxCast: 'none', snare: true, range: 4, stun: 1.2, desc: '혼을 부르는 사슬을 몬스터가 가장 몰린 곳에 던져 둘레의 몬스터를 그 안으로 끌어모아 1.2초 동안 묶고 조인다' },
   w_tarok: { fxHit: 'k_u_w_wave' },
   w_gwangya: { fxCast: 'k_w_gale', fxHit: 'k_w_jinseom', fxAfter: 'k_w_tiger' },
   // (그림: 1320 #18 검붉은 소용돌이, 작은 회오리에서 큰 회오리로 — tools/s9_stamps.py heukgwang. 사용자 결정 2026-11-23:
