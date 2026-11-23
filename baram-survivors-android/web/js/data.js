@@ -1629,7 +1629,7 @@ for (const [id, o] of Object.entries(S9)) {
 // (fxFit·fxSquare·fxIn·fxTiles: 보이는 범위 = 맞는 범위), AI(castAs)도 같은 그림. 'o_'로 시작해 boot의 k_ 덮어쓰기를 받지 않는다.
 const PICS1320 = {
   md_gongjeon: { fx: 'o_md_gonghole', fxEnd: 'o_md_gongend' }, // #26 금 간 보라 고리와 검은 구멍: 나는 동안 0~11, 끝에서 18~30 터짐 (뒤의 호는 그대로)
-  m_seonsim: { fx: 'o_m_seonsim' }, // #01 검붉은 저주의 핏줄 (회색 점박이 해골 대신; 터짐 fx2는 그대로)
+  m_seonsim: { fx: 'o_m_seonsim', fxK: 0.75 }, // #01 검붉은 저주의 핏줄 (회색 점박이 해골 대신; 터짐 fx2는 그대로)
   l_javelin: { fx: 'o_l_javelin', fxShot: 'o_l_javelinshot', fxTurn: true, shotTiles: 2.6 }, // #11 청록 창끝 빛줄기: 날아가 꽂힘, 나는 쪽을 향해
   mk_stack: { fx: 'o_mk_stack' }, // #21 파란 기 구슬이 맺혀 튐 (흐린 파란 원판 대신)
   rp_chain: { fx: 'o_rp_chain' }, // #20 청록 사슬이 묶인 몬스터마다 몸 크기로

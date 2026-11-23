@@ -8939,11 +8939,14 @@ const TIER_KINDS = {
     const tx = e.tx, ty = e.ty;
     if (def.fx2) fxOn(def.fx2, e, { scale: 0.9 });
     // (이펙트=판정: the burst drawn over the square it strikes, striking while it stays)
-    const life = fxLife(fxSquare(fxid, st.radius * 2 + 1, 'dt'));
+    // (def.fxK: a picture whose thin tips reach past its body — 선심단멸's veins, 1320 #01 — drawn that much smaller, so
+    // what is seen of it stays within the square; 사용자 2026-11-23: 크기 좀 줄여)
+    const side = (st.radius * 2 + 1) * (def.fxK || 1);
+    const life = fxLife(fxSquare(fxid, side, 'dt'));
     const beats = beatsUnder(life - 0.1);
     for (const [dt, k] of beats.slice(1)) later(0.25 + dt, () => { for (const o of around(tx, ty, st.radius)) smite(o, st.dmg * k); });
     later(0.25, () => {
-      fxAtTile(fxSquare(fxid, st.radius * 2 + 1, 'dt'), tx, ty);
+      fxAtTile(fxSquare(fxid, side, 'dt'), tx, ty);
       G.shake = Math.max(G.shake, 0.15);
       for (const o of around(tx, ty, st.radius)) {
         const n = Math.min(3, tkStatusN(o));
