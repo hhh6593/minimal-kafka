@@ -7045,6 +7045,20 @@ function nearestEnemies(n, range, from = G.player) {
     .slice(0, n)
     .map(([e]) => e);
 }
+/** 보스 우선 (사용자 피드백: 보스가 나와도 어그로가 계속 빠져서 잡몹을 친다): the ground's boss when it is a foe within
+ *  `range` tiles of the hero, else null. Since 사냥 개편 A the field stays full while the boss stands (50~90 of the crowd,
+ *  and 4~6 more called round it every 8 s: hunt.js PACE.boss), so the nearest foe, a random one of the nearest or the
+ *  row with most foes was nearly always the crowd's. A blow that picks one foe (the 기본 공격, spell, strike, blink) or a
+ *  way (line, cleave, the rows) goes to the boss first when it is in that blow's reach; out of its reach they take what
+ *  is near, as before (the hero never waits on a boss it cannot reach). A spread spell hits round it as it always did. */
+function bossIn(range, from = G.player) {
+  for (const e of G.enemies) if (e.kind === 'boss' && tkFoe(e) && tdist(e, from) <= range) return e;
+  return null;
+}
+/** What a row or a triangle of foes is worth in choosing the way a blow goes: the one with the boss in it first (보스 우선). */
+function aimWorth(hit) {
+  return hit.length + (hit.some(e => e.kind === 'boss') ? 1000 : 0);
+}
 
 /** Monsters within a square of tiles around a tile (radius 1 = the eight around it). */
 /** Monsters on a list of tiles. */
@@ -7561,7 +7575,7 @@ function castNow(skill, st) {
       const ahead = G.enemies.filter(e => {
         const f = (e.tx - p.tx) * fx0 + (e.ty - p.ty) * fy0, side = Math.abs((e.tx - p.tx) * fy0 + (e.ty - p.ty) * fx0);
         return e.hp > 0 && f >= 1 && f <= st.range && side <= 1;
-      }).sort((a, b) => tdist(a, p) - tdist(b, p));
+      }).sort((a, b) => (b.kind === 'boss') - (a.kind === 'boss') || tdist(a, p) - tdist(b, p)); // (보스 우선: the boss ahead first)
       // Nothing ahead: strike one beside the hero where it stands, without moving.
       const e = ahead[0] || DIRS.map(([dx, dy]) => occ.get(key(p.tx + dx, p.ty + dy))).find(b => b && b.m && !b.ally && !(b.war && b.team === SIDE) && b.hp > 0);
       if (!e) return retry(0.25);
@@ -7606,6 +7620,9 @@ function castNow(skill, st) {
     case 'spell': {
       let targets = nearestEnemies(st.count * 3, st.range);
       if (def.weakest) targets.sort((a, b) => a.hp - b.hp);
+      // 보스 우선: the boss in reach is the first struck (it may stand past the nearest few of its crowd)
+      const sbo = !def.weakest && bossIn(st.range);
+      if (sbo) targets = [sbo, ...targets.filter(e => e !== sbo)];
       targets = targets.slice(0, st.count);
       if (!targets.length) return retry(0.25);
       // 이펙트=판정: one foe struck, its picture about a body across (not four tiles round it), the blow
@@ -7654,8 +7671,10 @@ function castNow(skill, st) {
       // On a monster near the hero, and the tiles around it as the spell grows.
       // 탈명 and its kind take the strongest in reach (a boss before its followers); the rest fall
       // where they will.
-      const targets = nearestEnemies(st.count * 3, st.range)
-        .sort(def.strongest ? (a, b) => b.maxHp - a.maxHp : () => Math.random() - 0.5).slice(0, st.count);
+      // 보스 우선: the boss in reach is the first struck (the rest at random, as before).
+      const kbo = bossIn(st.range);
+      const targets = [...(kbo ? [kbo] : []), ...nearestEnemies(st.count * 3, st.range).filter(e => e !== kbo)
+        .sort(def.strongest ? (a, b) => b.maxHp - a.maxHp : () => Math.random() - 0.5)].slice(0, st.count);
       if (!targets.length) return retry(0.3);
       // 이펙트=판정: the picture exactly as wide as what it strikes (2r+1 tiles; one foe: a body across), and
       // a picture that stays strikes while it stays (beatsUnder: the same blow, spread)
@@ -7722,14 +7741,15 @@ function castNow(skill, st) {
         });
         break;
       }
-      // Ahead of the hero in an inverted triangle, turning first to where most monsters stand.
+      // Ahead of the hero in an inverted triangle, turning first to where most monsters stand (the boss's way first: aimWorth).
       // The triangle deepens a row at 4단 and 8단 (1 → 4 → 9 tiles); grown spells count as 8단.
       const depth = def.depth || 1 + Math.floor((def.evolved ? 8 : skill.lv) / 4);
       let best = null, most = 0;
       for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
         if (!dx && !dy) continue;
         const hit = onTiles(triTiles(p.tx, p.ty, dx, dy, depth));
-        if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+        const w = aimWorth(hit);
+        if (w > most) { most = w; best = [dx, dy, hit]; }
       }
       if (!best) return retry(0.2);
       const [dx, dy, hit] = best;
@@ -7760,7 +7780,7 @@ function castNow(skill, st) {
       break;
     }
     case 'line': {
-      // 무형검, 파천검무: a row of tiles ahead, turning to the row with most monsters.
+      // 무형검, 파천검무: a row of tiles ahead, turning to the row with most monsters (the boss's row first: aimWorth).
       // A row that carries the hero (파천검무) goes only the way it faces; one that does not
       // (무형검) may strike the row with most monsters. The hero is not turned either way.
       let best = null, most = 0;
@@ -7770,7 +7790,8 @@ function castNow(skill, st) {
         const tiles = [];
         for (let k = 1; k <= def.depth; k++) tiles.push([p.tx + dx * k, p.ty + dy * k]);
         const hit = onTiles(tiles);
-        if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+        const w = aimWorth(hit);
+        if (w > most) { most = w; best = [dx, dy, hit]; }
       }
       if (!best) return retry(0.25);
       const [dx, dy, hit] = best;
@@ -8794,7 +8815,7 @@ function tkAfflict(e, def, scale = 1) {
   if (def.stun && scale >= 1) { e.stun = Math.max(e.stun || 0, e.kind === 'boss' ? Math.min(def.stun, 0.5) : def.stun); cutBlast(e); }
   if (def.dot) applyStatus(e, def.dot, 3, 1);
 }
-/** The row (of `depth` tiles) out from the hero with the most foes: [dx, dy, foes]. */
+/** The row (of `depth` tiles) out from the hero with the most foes (the boss's first: aimWorth): [dx, dy, foes]. */
 function tkBestRow(depth, ways = DIRS) {
   const p = G.player;
   let best = null, most = 0;
@@ -8803,7 +8824,8 @@ function tkBestRow(depth, ways = DIRS) {
     const tiles = [];
     for (let k = 1; k <= depth; k++) tiles.push([p.tx + dx * k, p.ty + dy * k]);
     const hit = onTiles(tiles);
-    if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+    const w = aimWorth(hit);
+    if (w > most) { most = w; best = [dx, dy, hit]; }
   }
   return best;
 }
@@ -9192,7 +9214,8 @@ const TIER_KINDS = {
     for (const [dx, dy] of [[p.fdx, p.fdy], ...DIRS]) {
       if (!dx && !dy) continue;
       const hit = onTiles(triTiles(p.tx, p.ty, dx, dy, def.depth));
-      if (hit.length > most) { most = hit.length; best = [dx, dy, hit]; }
+      const w = aimWorth(hit);
+      if (w > most) { most = w; best = [dx, dy, hit]; }
     }
     if (!best) return 0.25;
     const [dx, dy, hit] = best, mid = (def.depth + 1) / 2;
@@ -10701,10 +10724,11 @@ function plainDmg() {
   return PLAIN_K * ((d0 && d0.dmg) || 12) * Math.pow(1.15, Math.min(lv, 8) - 1) * (1 + 0.1 * G.passives.power);
 }
 
-/** The nearest foe (alive, not a war's own side) within `reach` tiles of the hero, or null. */
+/** The nearest foe (alive, not a war's own side) within `reach` tiles of the hero, or null — the boss first when it is
+ *  within reach (보스 우선: bossIn). */
 function plainTarget(reach) {
   const p = G.player;
-  let best = null, bd = 1e9;
+  let best = bossIn(reach), bd = best ? -1 : 1e9;
   for (const e of G.enemies) {
     if (e.hp <= 0 || e.ally || (e.war && e.team === SIDE)) continue;
     const d = tdist(e, p);
