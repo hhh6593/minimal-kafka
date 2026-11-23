@@ -7939,7 +7939,8 @@ function castNow(skill, st) {
       const reach = Math.max(1, Math.floor(Math.max(st.radius || 0, nf && nf.cls === 'yeon' ? seenReach(fxReach, novaScale) : 0) + 1e-6));
       // 이펙트=판정: the burst drawn exactly over the square it strikes (2·reach+1 tiles round the hero; the old
       // ring of light copies out at the reach reached past it), striking while it stays.
-      const life = fxAtSquare(fxid, reach * 2 + 1, 0, -24, { follow: true }, 'nv');
+      // (def.bind: a binding — 초혼진무's chains — drawn on each one it holds, as large as that body, not round the hero)
+      const life = def.bind ? fxLife(def.bind) : fxAtSquare(fxid, reach * 2 + 1, 0, -24, { follow: true }, 'nv');
       if (MELEE_LOOK[G.cls.id]) shock(p.x, p.y - 4, reach + 0.5);
       const beats = beatsUnder(life - 0.1);
       for (const [dt, k] of beats.slice(1)) later(0.1 + dt, () => { if (!G.dead) for (const e of around(p.tx, p.ty, reach)) smite(e, st.dmg * k); });
@@ -7947,8 +7948,9 @@ function castNow(skill, st) {
         meleeImpact(3);
         afterAt(p.x, p.y - 10, 0, reach * 2 + 1);
         for (const e of around(p.tx, p.ty, reach)) {
-          if (def.stun) { e.stun = def.stun; cutBlast(e); }
-          hitOn(e);
+          if (def.stun) { e.stun = e.kind === 'boss' && def.bind ? Math.min(def.stun, 0.5) : def.stun; cutBlast(e); }
+          if (def.bind) fxOn(def.bind, e, { alpha: settings.calmFx ? 0.8 : 1 });
+          else hitOn(e);
           smite(e, st.dmg * beats[0][1]);
           fling(e, p.tx, p.ty);
         }
@@ -9142,7 +9144,9 @@ const TIER_KINDS = {
     else { const e = near[0], ex = e.tx - p.tx, ey = e.ty - p.ty; if (Math.abs(ex) >= Math.abs(ey)) { dx = Math.sign(ex); dy = 0; } else { dx = 0; dy = Math.sign(ey); } }
     const len = def.depth * TILE, x0 = p.x, y0 = p.y - 10, steps = Math.round(def.dur / 0.15), next = new Map(), sx = p.tx, sy = p.ty;
     // (이펙트=판정: the whirl three tiles across, as wide as the path it draws in and strikes)
+    const n0 = G.fxs.length;
     fxAt(fxTiles(fxid, 3, 'vx'), x0, p.y - 24, { mv: [dx * len, dy * len, def.dur] });
+    if (def.swirl) { vortexSwirl(def, st, smite, dx, dy, G.fxs.length > n0 ? G.fxs[G.fxs.length - 1] : null); return; }
     for (let s = 1; s <= steps; s++) later(s * 0.15, () => {
       const k = Math.round((s / steps) * def.depth), cx = sx + dx * k, cy = sy + dy * k;
       for (const e of around(cx, cy, 1)) {
@@ -10577,27 +10581,61 @@ const ECHO = {
 function shotTurn(dx, dy) {
   return dx > 0 ? { flip: true } : dx < 0 ? {} : { rot: dy < 0 ? Math.PI / 2 : -Math.PI / 2 };
 }
-/** 흑룡검풍 (원작 9차 패시브, 2662 IMG04·IMG05): 흑룡광참 brings, three times in ten, a dark red wind that roams round
- *  the hero for eight seconds (o_w_heukryong at the original's own size), cutting what it passes over every tick.
+/** 흑룡광참 (def.swirl; 사용자 결정 2026-11-23): the whirl runs ahead as the plain vortex does, but the first time a foe
+ *  stands on its way (the 3 tiles across it) it stops there and turns on the spot for swirl.dur seconds — drawn as the
+ *  whole whirl looping (swirl.fx) over the 3×3 it strikes, the foes a tile further out drawn in onto it, each struck
+ *  every swirl.every. If nothing stands on the way it runs its five tiles and ends. (이펙트=판정: the turning whirl is
+ *  laid where the running one was seen to stop, and strikes round that tile.) */
+function vortexSwirl(def, st, smite, dx, dy, runner) {
+  const p = G.player, run = G, sx = p.tx, sy = p.ty, px = p.x, py = p.y - 24, steps = Math.round(def.dur / 0.15);
+  const sw = def.swirl, next = new Map();
+  let stopped = false;
+  const strike = (cx, cy) => {
+    for (const e of around(cx, cy, 2)) {
+      if (Math.max(Math.abs(e.tx - cx), Math.abs(e.ty - cy)) > 1) { tkShove(e, e.tx - Math.sign(e.tx - cx), e.ty - Math.sign(e.ty - cy)); continue; }
+      if ((next.get(e) || 0) > G.t) continue;
+      next.set(e, G.t + sw.every);
+      smite(e, st.dmg * def.k);
+      tkAfflict(e, def, 0);
+    }
+  };
+  for (let s = 1; s <= steps; s++) later(s * 0.15, () => {
+    if (G !== run || G.dead || stopped) return;
+    const k = Math.round((s / steps) * def.depth), cx = sx + dx * k, cy = sy + dy * k;
+    const on = around(cx, cy, 1);
+    for (const e of on) if (dx) tkShove(e, e.tx, cy); else tkShove(e, cx, e.ty);
+    if (!on.length) return;
+    // caught: where the running whirl is seen now (its eased path), to the tile
+    stopped = true;
+    let ox = dx * k * TILE, oy = dy * k * TILE;
+    if (runner && runner.mv) {
+      const q = Math.min(1, runner.t / runner.mv[2]), e = 1 - (1 - q) * (1 - q);
+      ox = runner.mv[0] * e; oy = runner.mv[1] * e;
+      runner.life = runner.t;
+    }
+    const tx = sx + Math.round(ox / TILE), ty = sy + Math.round(oy / TILE);
+    tkLoopAt(fxTiles(sw.fx, 3, 'vx'), px + (tx - sx) * TILE, py + (ty - sy) * TILE, sw.dur, { alpha: settings.calmFx ? 0.75 : 1 });
+    strike(tx, ty);
+    const n = Math.round(sw.dur / 0.15);
+    for (let j = 1; j < n; j++) later(j * 0.15, () => { if (G === run && !G.dead) strike(tx, ty); });
+  });
+}
+/** 흑룡검풍 (원작 9차 패시브, 2662 IMG04·IMG05): 흑룡광참 brings, three times in ten, a 흑적색 wind worn round the hero
+ *  for eight seconds (사용자 결정 2026-11-23: 옆에서 도는 것이 아니라 캐릭터의 오라처럼 — o_w_heukaura, 연's whirl of 흑룡광참
+ *  made dark red, tools/s9_stamps.py heukaura), cutting what stands within `reach` tiles of the hero every tick.
+ *  이펙트=판정: drawn 2.6 tiles across over the 3×3 it strikes; see-through enough that the hero's face shows.
  *  One at a time. (data.js w_blackdragon.wind9; test: window.__windAlways) */
 function heukWind(w, skill) {
   if (!w || !M.fx[w.fx] || (G.windUntil || 0) > G.t) return;
   if (!window.__windAlways && Math.random() >= w.chance) return;
-  const p = G.player, run = G, t0 = G.t, a0 = Math.random() * Math.PI * 2, d = tkHit(w, skill);
+  const p = G.player, run = G, d = tkHit(w, skill);
   G.windUntil = G.t + w.duration;
-  // (it rises beside the hero and goes round it, a tile and a half out, once in three and a half seconds)
-  const at = t => { const a = a0 + (t / 3.5) * Math.PI * 2; return [Math.cos(a) * 1.5 * TILE, Math.sin(a) * 1.1 * TILE]; };
-  const [x0, y0] = at(0);
-  const f = tkLoop(w.fx, x0, y0 - 4, w.duration, { follow: true, anchor: 'bottom', alpha: settings.calmFx ? 0.6 : 1 });
+  const f = tkLoopAt(fxTiles(w.fx, 2.6, 'au'), 0, -24, w.duration, { follow: true, alpha: settings.calmFx ? 0.55 : 0.78 });
   if (!f) return;
-  const step = 0.05, n = Math.round(w.duration / step), every = Math.round(w.tick / step);
-  for (let k = 1; k <= n; k++) later(k * step, () => {
+  const n = Math.round(w.duration / w.tick);
+  for (let k = 1; k <= n; k++) later(k * w.tick, () => {
     if (G !== run || G.dead) return;
-    const [x, y] = at(G.t - t0);
-    f.x = x; f.y = y - 4;
-    if (k % every) return;
-    const wx = (p.x + x) / TILE - 0.5, wy = (p.y + y) / TILE - 0.9;
-    for (const e of G.enemies) if (tkFoe(e) && Math.abs(e.tx - wx) <= w.reach + 0.4 && Math.abs(e.ty - wy) <= w.reach - 0.3) hurtEnemy(e, d);
+    for (const e of around(p.tx, p.ty, w.reach)) if (tkFoe(e)) hurtEnemy(e, d);
   });
   note(`${w.name}이 일어납니다.`);
 }

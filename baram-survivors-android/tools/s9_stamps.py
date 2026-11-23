@@ -932,7 +932,89 @@ def yeonok(src_dir):
                    "src": "gif2662/IMG98.gif", "k": 0.62}
 
 
-BUILDERS = {"m_seori": seori, "a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
+def heukgwang(src_dir):
+    """흑룡광참 (전사 8차; 사용자 결정 2026-11-23): 1320 #18, the dark red whirl (2662's 흑룡참파 ring — see s9_fx.json
+    w_heukryong.why), in place of 연's grey one. Unmixed off its white ground (254: O = a·F + (1−a)·254, a from the darkest
+    channel), cut to the box all its frames draw. Two sheets:
+      w_heukgwang — its eight frames played backwards (사용자: 작은 회오리에서 큰 회오리로), while it runs ahead;
+      w_heukgwangloop — the whole whirl (its frames 0-3, as played backwards), turning on the spot where it caught a foe.
+    Pivot: the box's middle (drawn by fxTiles to the 3 tiles it strikes)."""
+    im = Image.open(os.path.join(src_dir, "dl1320/18.gif"))
+    cells = []
+    for i in range(im.n_frames):
+        im.seek(i)
+        a = np.asarray(im.convert("RGB")).astype(np.float32)
+        al = np.clip((254 - a.min(2)) / 254 * 1.2, 0, 1)
+        al[al < 0.05] = 0
+        F = np.where(al[..., None] > 0, (a - 254 * (1 - al[..., None])) / np.maximum(al[..., None], 1e-3), 0)
+        cells.append(np.dstack([np.clip(F, 0, 255), al * 255]).astype(np.uint8))
+    on = np.zeros(cells[0].shape[:2], bool)
+    for c in cells:
+        on |= c[..., 3] > 20
+    ys, xs = np.nonzero(on)
+    y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+    pics = [Image.fromarray(c[y0:y1, x0:x1]) for c in cells]
+    w, h = x1 - x0, y1 - y0
+    base = {"cell": [w, h], "add": False, "anchor": [w // 2, h // 2], "src": "dl1320/18.gif"}
+    run = pics[::-1]
+    loop = [pics[i] for i in (3, 2, 1, 0)]
+    return {"w_heukgwang": (run, dict(base, n=len(run), ms=150)), "w_heukgwangloop": (loop, dict(base, n=len(loop), ms=90))}
+
+
+def white_sheet(src_dir, path):
+    """a 1320 sprite (official effect frames on a white ground, 254) unmixed off it and cut to the box all its frames draw"""
+    im = Image.open(os.path.join(src_dir, path))
+    cells = []
+    for i in range(im.n_frames):
+        im.seek(i)
+        a = np.asarray(im.convert("RGB")).astype(np.float32)
+        al = np.clip((254 - a.min(2)) / 254 * 1.2, 0, 1)
+        al[al < 0.05] = 0
+        F = np.where(al[..., None] > 0, (a - 254 * (1 - al[..., None])) / np.maximum(al[..., None], 1e-3), 0)
+        cells.append(np.dstack([np.clip(F, 0, 255), al * 255]).astype(np.uint8))
+    on = np.zeros(cells[0].shape[:2], bool)
+    for c in cells:
+        on |= c[..., 3] > 20
+    ys, xs = np.nonzero(on)
+    y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+    return [Image.fromarray(c[y0:y1, x0:x1]) for c in cells], x1 - x0, y1 - y0
+
+
+def chohonbind(src_dir):
+    """초혼진무 (전사 6차; 사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다): 1320 #20, teal chains coiling round a
+    body and fading — laid on each foe it binds, as large as that body (game.js nova def.bind). Its frames 1-18: the first, a
+    wider burst of the coil, made every foe of a crowd one teal mass the moment it struck."""
+    pics, w, h = white_sheet(src_dir, "dl1320/20.gif")
+    pics = pics[1:]
+    return pics, {"cell": [w, h], "n": len(pics), "ms": 70, "add": False, "anchor": [w // 2, h // 2], "src": "dl1320/20.gif"}
+
+
+def heukaura(src_dir):
+    """흑룡검풍 (전사 9차 패시브; 사용자 결정 2026-11-23): 연's own grey whirl of 흑룡광참 (Skill_Effect_Warrior_5th_03, as the
+    earlier APK holds it: SRC_DIR/yeon/k_w_blackdragon.webp + .json, its manifest entry) made 흑적색 — its brightness laid on
+    black → dark blood red → red, its opacity as it was — and worn round the hero as an aura (사용자: 옆에서 도는 것이 아니라
+    캐릭터의 오라처럼). Its middle frames 5-17, where the whirl is whole, loop. Pivot: the cell's middle."""
+    m = json.load(open(os.path.join(src_dir, "yeon/k_w_blackdragon.json"), encoding="utf-8"))
+    sh = Image.open(os.path.join(src_dir, "yeon/k_w_blackdragon.webp")).convert("RGBA")
+    c1, c2, c3 = np.array([8, 0, 2.]), np.array([62, 2, 6.]), np.array([140, 14, 18.])
+    pics = []
+    for i in range(5, 18):
+        x, y, w, h = m["at"][i * 4:i * 4 + 4]
+        bx, by = m["bb"][i * 4:i * 4 + 2]
+        t = Image.new("RGBA", (m["w"], m["h"]))
+        t.alpha_composite(sh.crop((x, y, x + w, y + h)), (int(bx), int(by)))
+        a = np.asarray(t).astype(np.float32)
+        L = a[..., :3].mean(2) / 255
+        t2 = np.clip((L - 0.25) / 0.35, 0, 1)[..., None]
+        t3 = np.clip((L - 0.6) / 0.4, 0, 1)[..., None]
+        col = c1 + (c2 - c1) * t2
+        col = col + (c3 - col) * t3
+        pics.append(Image.fromarray(np.dstack([col, a[..., 3]]).astype(np.uint8)))
+    return pics, {"cell": [m["w"], m["h"]], "n": len(pics), "ms": 70, "add": False, "anchor": [m["w"] // 2, m["h"] // 2],
+                  "src": "yeon/k_w_blackdragon.webp"}
+
+
+BUILDERS = {"w_heukgwang": heukgwang, "w_chohonbind": chohonbind, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
 
 

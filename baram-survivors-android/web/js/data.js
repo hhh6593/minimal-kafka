@@ -1227,11 +1227,16 @@ const REWORK = {
   w_roar3: { evolved: true, desc: '동귀어진 8단 + 3차 승급. 많은 체력을 바쳐 정면 한 칸의 몬스터에게 치명적인 피해를 주고 잠시 기절시킨다' },
   w_fly: { kind: 'line', depth: 4, max: undefined, desc: '검을 날려 몬스터가 가장 많은 쪽 일렬 네 칸을 꿰뚫는다' },
   w_rush: { fxHit: 'k_u_w_wave', fxAfter: 'k_w_tiger', desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 꿰뚫고, 지난 자리에 검기가 남는다' },
-  w_chohonjin: { fxCast: 'k_w_chohon', fxHit: 'k_w_roar3', desc: '혼을 부르는 사슬로 둘레의 몬스터를 휘감아 조인다' },
+  // (사용자 2026-11-23: 몬스터를 묶는 기술인데 영웅 둘레에 크게 떴다 — 1320 #20의 청록 사슬을 묶인 몬스터 하나하나에 몸 크기로,
+  // tools/s9_stamps.py chohonbind)
+  w_chohonjin: { fxCast: 'none', bind: 'o_w_chohonbind', stun: 1.2, desc: '혼을 부르는 사슬로 둘레 두 칸의 몬스터를 휘감아 1.2초 동안 묶고 조인다' },
   w_tarok: { fxHit: 'k_u_w_wave' },
   w_gwangya: { fxCast: 'k_w_gale', fxHit: 'k_w_jinseom', fxAfter: 'k_w_tiger' },
+  // (그림: 1320 #18 검붉은 소용돌이, 작은 회오리에서 큰 회오리로 — tools/s9_stamps.py heukgwang. 사용자 결정 2026-11-23:
+  // 다섯 칸을 무조건 꿰뚫지 않고, 몬스터에 닿으면 그 자리에서 1.2초 동안 돌며 둘레를 끌어들여 벤다)
   w_blackdragon: { kind: 'vortex', depth: 5, dur: 1.2, k: 0.4, radius: 0, ck: 'line', fxHit: 'k_w_fly', dmg: 32, cd: 5.5,
-    desc: '검은 용의 칼바람이 앞으로 다섯 칸을 휘몰아치며 곁의 몬스터를 끌어들여 거듭 벤다' },
+    fx: 'o_w_heukgwang', yeon: true, swirl: { fx: 'o_w_heukgwangloop', dur: 1.2, every: 0.3 },
+    desc: '검은 용의 회오리가 앞으로 다섯 칸까지 휘몰아쳐 나가다 몬스터에 닿으면 그 자리에 머물러 돌며, 둘레의 몬스터를 끌어들여 거듭 벤다' },
   w_sentence: { kind: 'mark', fx: 'h_hit_tiger', fx2: 'k_u_w_wave', dmg: 40, cd: 5, range: 6, count: 3, radius: 1, delay: 1.2, strongest: true, ck: 'strike', stun: 1,
     desc: '가장 강한 몬스터 셋에 사형을 선고해 묶어 두고, 1.2초 뒤 백호의 검기로 둘레까지 벤다' },
   w_hogi: { fx: 'y_baram', fxHit: 'k_w_tiger' },
@@ -1629,8 +1634,8 @@ SKILLS.w_mcheon = { name: '명천검파', kind: 'passive', retired: true, was: '
 SKILL_ALIAS.w_mcheon = 'w_swords';
 for (const id of BRANCHES.warrior[0].ids) if (SKILLS[id] && SKILLS[id].dmg && !SKILLS[id].retired) SKILLS[id].mcheon9 = { every: 3, k: 0.6, cd: 5, at: 0.3 };
 SKILLS.w_swords.desc += '. 9차 패시브 명천검파: 검기 계열 기술을 세 번 쓸 때마다 그 기술이 한 번 더 나간다';
-Object.assign(SKILLS.w_blackdragon, { wind9: { name: '흑룡검풍', fx: 'o_w_heukryong', chance: 0.3, duration: 8, tick: 0.5, hit: 12, reach: 1.3 },
-  desc: SKILLS.w_blackdragon.desc + '. 9차 승급부터는 패시브 흑룡검풍: 벨 때 30% 확률로 검붉은 검풍이 일어 8초 동안 주위를 돌며 닿는 몬스터를 거듭 벤다' });
+Object.assign(SKILLS.w_blackdragon, { wind9: { name: '흑룡검풍', fx: 'o_w_heukaura', chance: 0.3, duration: 8, tick: 0.5, hit: 12, reach: 1 },
+  desc: SKILLS.w_blackdragon.desc + '. 9차 승급부터는 패시브 흑룡검풍: 벨 때 30% 확률로 흑적색 검풍이 몸을 감싸, 8초 동안 둘레 한 칸의 몬스터를 거듭 벤다' });
 // 죽음의희열: a passive in the original ([지속효과 마법]: a kill brings, three times in ten, one of the 수리검 skills
 // ready at once) — 2662 IMG15 shows no picture of its own (묵마수리검'쇄 thrown again), so none here. A saved slot of it
 // is 묵마수리검'쇄. (In our game kills come thick: at most once in three seconds.)
