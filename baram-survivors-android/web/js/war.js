@@ -428,7 +428,7 @@ export function openBoard() {
   box.innerHTML = `<h2>사신수 문파대항전 · 쟁</h2>
     <div class="wb-cards">${cards}</div>
     <div class="wb-info"><b>${w.name} · ${w.title}</b> — ${w.desc}<br>
-    ${w.jaeng ? w.more : '양 문파 25명씩 · 혼자 들어가도 전장이 꽉 찹니다 · 양 진영의 전력은 자동으로 맞춰집니다(전장 보정).'}</div>
+    ${w.jaeng ? w.more : '양 문파 25명씩 · 혼자 입장해도 인원이 채워집니다 · 양 진영 전력은 자동 보정됩니다.'}</div>
     ${side}
     <div class="wb-row">${roleBtns}</div>
     <div class="wb-info"><b>${ROLES[pickRole].name}</b> — ${ROLES[pickRole].desc}<br>역할 보너스: ${ROLES[pickRole].bonus}</div>
@@ -464,7 +464,7 @@ function loadoutHtml(cls, role) {
     }
   }
   return `<div class="wb-load"><b>장비 격</b> — 역할에 맞는 격 ${fitN}개 (격 하나당 역할 효과 +8%, 최대 +24%)<br>
-    <small>추천 격: ${rec}</small>${lines}${bag.length ? '<b>가방에서 바꿔 입기</b>' + bag.slice(0, 6).join('') : ''}</div>`;
+    <small>추천 격: ${rec}</small>${lines}${bag.length ? '<b>가방에서 교체</b>' + bag.slice(0, 6).join('') : ''}</div>`;
 }
 
 function wornGyeoks(cls, g) {
@@ -2537,7 +2537,7 @@ function objectives(W, dt) {
     const s = snap(W, ...pick(spots));
     if (!W.crates.some(c => c.x === s[0] && c.y === s[1])) {
       W.crates.push({ x: s[0], y: s[1], by: null, t: G.t });
-      if (Math.random() < 0.5) A.say('보급 상자가 놓였습니다. 진영(목표)으로 나르면 문파에 도움이 됩니다.', 'sys');
+      if (Math.random() < 0.5) A.say('보급 상자가 나타났습니다. 목표 지점으로 운반하면 문파에 도움이 됩니다.', 'sys');
     }
   }
   for (const c of W.crates) {
@@ -5096,7 +5096,7 @@ function raidSetup() {
   if (altNames.length) A.say(`내 다른 직업도 함께합니다: ${altNames.join(', ')}`, 'party');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
   // Spells keep to their reach: a caster fighting the adds at the edge never touches the boss.
-  if (['mage', 'poet', 'magus', 'celestial'].includes(G.cls.id)) A.say('주문은 닿는 곳까지만 갑니다. 보스 가까이(4~5칸)에서 싸우세요.', 'sys');
+  if (['mage', 'poet', 'magus', 'celestial'].includes(G.cls.id)) A.say('마법은 사거리 안에만 닿습니다. 보스 가까이(4~5칸)에서 싸우세요.', 'sys');
   const btn = document.getElementById('war-sb-btn');
   if (btn) btn.hidden = false;
   document.body.classList.add('war');
@@ -6095,7 +6095,7 @@ function jaengSetup() {
   jaengLists(W);
   for (const t of [0, 1, 2]) jaengPlan(W, t, true);
   A.say(`[쟁] ${W.teams[0].name} · ${W.teams[1].name} · ${W.teams[2].name} — ${G.stage.name}. ${clockWords(JAENG.bossAt)} 뒤 봉인이 풀립니다. 역할: ${ROLES[role].name}`, 'sys');
-  if (W.practice) A.say('이번 주 보상 횟수를 다 썼습니다: 연습전(보상 없음)', 'warn');
+  if (W.practice) A.say('이번 주 보상 횟수를 모두 사용했습니다 · 연습전(보상 없음)', 'warn');
   if (fit) A.say(`역할에 맞는 격 ${fit}개: ${ROLES[role].name} 효과 +${Math.round((W.roleK - 1) * 100)}%`, 'sys');
   if (pocket) A.say(`${pocket.name}(${pocket.cls.name})이(가) 당신을 전담 치유합니다`, 'sys');
   A.banner(`쟁 · ${G.stage.name.replace('쟁 · ', '')}`);
@@ -6871,7 +6871,7 @@ function jaengCard(cls, pr) {
     jaeng: true, id: 'jaeng', name: '쟁', title: `월드 보스 · ${boss}`, locked, practice: !left, wk,
     desc: `${JAENG_MAPS[wk.map].name}에 봉인된 ${boss}을(를) 세 문파(${bigOn('jaeng') ? 16 : 12}명씩)가 다툰다. ${clockWords(JAENG.bossAt)} 봉인전(봉인석 셋) 뒤 보스가 깨어나고, 보스에 넣은 피해 몫(합 ${JAENG.pts.boss}점)·막타(+${JAENG.pts.last})·봉인석·PK(처치 ${JAENG.pts.kill}, 도움 ${JAENG.pts.assist})·광역기 끊기(+${JAENG.pts.cut})로 순위를 가린다. ${clockWords(JAENG.time)}이면 보스가 달아난다.`,
     more: `이번 주 보상 ${left}/${JAENG_PAID}회 남음 (월요일 초기화) · 보상: 레이드주화 · ${open ? A.MATS[wk.sinsu].name : `겁화의 파편 (${A.raidName(gate)}을 깨면 ${A.MATS[wk.sinsu].name})`} · 전 · 1위 보스 상자(${boss} 세트 한 부위 50%, 코디 30%) · 막타 상자`
-      + (locked ? '<br><b style="color:#ff9a8a">왕궁을 정복하고 문파대항전에서 한 번 이기면 열린다</b>' : ''),
+      + (locked ? '<br><b style="color:#ff9a8a">왕궁 정복 + 문파대항전 1승 시 해금</b>' : ''),
   };
 }
 function jaengCardHtml(cls, pr) {

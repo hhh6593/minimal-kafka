@@ -872,7 +872,7 @@
   <button id="backup-btn" class="btn">기록 백업</button>
   <div id="title-sound"><button class="btn snd" data-sound="bgm"></button><button class="btn snd" data-sound="sfx"></button></div>
   <div class="note" id="version"></div>
-  <div class="note">손가락으로 끌어 이동 · 마법은 저절로 나간다 · 마력이 차면 필살기</div>
+  <div class="note">드래그로 이동 · 마법은 자동 시전 · 마력이 차면 필살기</div>
 </div>
 
 <div id="select" class="screen" hidden>
@@ -901,7 +901,7 @@
     <button id="town-goal" class="btn" hidden></button>
   </div>
   <button id="town-back" class="btn">직업 선택</button>
-  <div class="town-tip">끌어서 걷기 · 사람 곁에서 말 걸기 · 왼쪽 버튼으로 바로 가기</div>
+  <div class="town-tip">드래그로 이동 · NPC 곁에서 대화 · 왼쪽 버튼으로 바로 이동</div>
   <button id="talk" class="btn" hidden></button>
   <div id="town-quick">
     <button class="btn" id="town-last" data-go="last" hidden></button>
@@ -931,7 +931,7 @@
   <div id="coordi-box">
     <div class="caption"><span id="coordi-title"></span> <small id="coordi-gold"></small><button id="coordi-close" class="btn">닫기</button></div>
     <div id="coordi-tabs"></div>
-    <div id="coordi-filter"><input id="coordi-q" type="search" placeholder="이름 찾기" autocomplete="off"><select id="coordi-grade"></select><select id="coordi-own"><option value="all">전체</option><option value="own">보유</option><option value="not">미보유</option><option value="new">새로 얻음</option></select><button id="coordi-sets" class="btn">세트</button><small id="coordi-count"></small></div>
+    <div id="coordi-filter"><input id="coordi-q" type="search" placeholder="이름 찾기" autocomplete="off"><select id="coordi-grade"></select><select id="coordi-own"><option value="all">전체</option><option value="own">보유</option><option value="not">미보유</option><option value="new">신규 획득</option></select><button id="coordi-sets" class="btn">세트</button><small id="coordi-count"></small></div>
     <div id="coordi-body"><div id="coordi-list"></div><div id="coordi-detail"></div></div>
   </div>
 </div>
@@ -971,7 +971,7 @@
   <div id="pause-box">
     <div class="caption">메뉴</div>
     <div class="row"><button id="resume" class="btn">계속하기</button><button id="quit" class="btn">마을로 가기</button></div>
-    <div class="row"><button id="open-equip" class="btn">장비</button><button id="open-sounds" class="btn">소리 맞추기</button><button id="open-tree" class="btn">기술 트리</button><button id="open-codex" class="btn">도감</button></div>
+    <div class="row"><button id="open-equip" class="btn">장비</button><button id="open-sounds" class="btn">소리 설정</button><button id="open-tree" class="btn">기술 트리</button><button id="open-codex" class="btn">도감</button></div>
     <div class="row">
       <button id="opt-bgm" class="btn"></button>
       <button id="opt-sfx" class="btn"></button>
@@ -984,8 +984,8 @@
       <button id="opt-auto" class="btn"></button>
       <button id="opt-info" class="btn"></button>
       <button id="opt-calm" class="btn"></button>
-      <button id="opt-cam" class="btn" title="걸을 때 화면이 가는 방향으로 한 칸 앞을 보여 줍니다 (멀미가 나면 끄세요)"></button>
-      <button id="opt-bar" class="btn" title="사냥 화면 오른쪽 아래 기술 창과 단추의 크기"></button>
+      <button id="opt-cam" class="btn" title="이동 방향으로 화면을 한 칸 앞당겨 보여 줍니다 (어지러우면 끄세요)"></button>
+      <button id="opt-bar" class="btn" title="사냥 화면 오른쪽 아래 기술 창과 버튼 크기"></button>
       <button id="opt-aifx" class="btn" title="대항전·레이드·쟁의 다른 문파원·적 이펙트 투명도 (내 캐릭터 이펙트는 그대로)"></button>
       <button id="opt-overlap" class="btn" title="대항전·레이드·쟁에서 겹쳐 선 캐릭터(내 캐릭터 위에 선 캐릭터, 한 칸을 함께 쓰는 아군)의 투명도 (내 캐릭터는 그대로)"></button>
       <button id="opt-big" class="btn" title="대항전·레이드·쟁의 인원 (다음 전투부터)"></button>
@@ -1037,19 +1037,19 @@
 </div></div>
 <div id="sounds" hidden>
   <div id="sounds-box">
-    <div class="caption">소리 맞추기 <small>소리를 종류별로 나누면 마법마다 알맞은 종류에서 골라 씁니다.</small></div>
+    <div class="caption">소리 설정 <small>소리를 종류별로 분류하면 마법마다 알맞은 소리를 골라 씁니다.</small></div>
     <div id="sort" hidden>
       <div class="sort-head"><b id="sort-num"></b><span id="sort-left"></span><button id="sort-again" class="btn">다시 듣기</button></div>
       <div id="sort-kinds"></div>
-      <div class="row"><button id="sort-done" class="btn">그만 나누기</button></div>
+      <div class="row"><button id="sort-done" class="btn">분류 끝내기</button></div>
     </div>
     <div id="sound-rows"></div>
-    <div class="row"><button id="start-sort" class="btn">빠르게 나누기</button><button id="close-sounds" class="btn">닫기</button></div>
+    <div class="row"><button id="start-sort" class="btn">빠른 분류</button><button id="close-sounds" class="btn">닫기</button></div>
   </div>
 </div>
 <div id="backup" hidden>
   <div id="backup-box">
-    <div class="caption">기록 백업 <small>앱을 지웠다 다시 깔아도 이 글을 붙여 넣으면 돌아옵니다.</small></div>
+    <div class="caption">기록 백업 <small>앱을 삭제했다가 다시 설치해도 이 코드를 붙여 넣으면 복구됩니다.</small></div>
     <textarea id="backup-text" spellcheck="false"></textarea>
     <div class="note" id="backup-note"></div>
     <div class="row">
@@ -1083,7 +1083,7 @@
 
 <div id="equip" hidden>
   <div id="equip-box">
-    <div class="caption">장비 <small>주운 장비를 누르면 자세히 보고 입을 수 있습니다.</small></div>
+    <div class="caption">장비 <small>장비를 눌러 상세 정보를 보고 장착하세요.</small></div>
     <div id="equip-rows"></div>
     <div id="equip-tip" hidden></div>
     <div id="equip-toast" hidden></div>

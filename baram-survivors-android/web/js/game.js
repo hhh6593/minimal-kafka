@@ -1046,7 +1046,7 @@ function lookFrame(H, sheets) {
 /** What opens a closed ground: the boss of the ground before it (or of the ground it hangs on). */
 function lockReason(i) {
   const s = STAGES[i], need = s.open ? STAGES.find(x => x.id === s.open) : STAGES[i - 1];
-  return need ? `${need.name}의 보스를 쓰러뜨리면 열립니다` : '앞 사냥터를 정복하면 열립니다';
+  return need ? `${need.name}의 보스를 쓰러뜨리면 해금됩니다` : '이전 사냥터를 정복하면 해금됩니다';
 }
 
 /** The hardest ground open to the hero: by its level (the order it is hunted in). */
@@ -1124,7 +1124,7 @@ function buildStages() {
       b.className = 'raid' + (raidOpen(r) ? '' : ' locked') + (r === pickedStage ? ' on' : '');
       const done = (progress.raids || {})[r.id];
       b.innerHTML = `<img src="${monFace((namedMonster(r.boss) || r.boss).id)}" alt=""><div><b>${r.name} <small>${raidStars(r)}</small></b><span>${r.intro}</span>`
-        + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '아직 잡지 못함') : raidLock(r)}</span></div>`;
+        + `<span>${raidOpen(r) ? (done ? `${done}번 처치` : '미처치') : raidLock(r)}</span></div>`;
       b.onclick = () => { pickedStage = r; buildStages(); };
       map.append(b);
     }
@@ -1187,7 +1187,7 @@ function stageInfo() {
     <div class="mons">${show.map(m => `<img src="${monFace(m.id)}" alt="">`).join('')}</div>
     <div class="boss">보스: <b>${boss.name}</b></div>
     <div class="state${progress.cleared[s.id] ? ' done' : ''}">${progress.cleared[s.id] ? '정복한 사냥터'
-      : open ? '도전할 수 있는 사냥터' : `잠김: ${lockReason(i)}`}</div>`;
+      : open ? '도전 가능한 사냥터' : `잠김: ${lockReason(i)}`}</div>`;
   // 사냥 기믹: a ground conquered before, three ways in; its 숙련 ★.
   if (!progress.cleared[s.id] || settings.legacyPace) pickedMode = 'conquer';
   else {
@@ -1252,7 +1252,7 @@ function openCards() {
   const wk = gwoeWeek(), [, wname] = GWOE_BEASTS[wk % GWOE_BEASTS.length];
   const left = 3 - (progress.gwoe && progress.gwoe.week === wk ? progress.gwoe.n : 0);
   $('#trade-gold').textContent = `이번 주 괴수 ${wname} · 남은 보상 ${left}/3번 · 한 번에 카드 2장`;
-  $('#trade-title').textContent = `괴력난신 ★ 효과 · ★${cs.stars}` + (cs.next ? ` · 다음 ★${cs.next[0]}` : ' · 모두 열림');
+  $('#trade-title').textContent = `괴력난신 ★ 효과 · ★${cs.stars}` + (cs.next ? ` · 다음 ★${cs.next[0]}` : ' · 모두 해금');
   box.innerHTML = '';
   const row = (name, desc) => {
     const r = document.createElement('div');
@@ -1273,8 +1273,8 @@ function raidOpen(r) {
 }
 /** What a raid still waits on, for its card. */
 function raidLock(r) {
-  if (!progress.cleared[r.open]) return `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 열린다`;
-  return `${RAIDS.find(x => x.id === r.after).name}에서 이기면 열린다`;
+  if (!progress.cleared[r.open]) return `${STAGES.find(x => x.id === r.open).name}을(를) 정복하면 해금`;
+  return `${RAIDS.find(x => x.id === r.after).name} 승리 시 해금`;
 }
 
 /** The raid's card: its boss, and the party that will gather, from each class's best. */
@@ -1293,9 +1293,9 @@ function raidInfo(r) {
     <div class="party" style="color:${combatPower(chosenClass) >= raidPower(r) ? '#1e6a10' : '#9a1800'}">권장 전투력 ${raidPower(r).toLocaleString()} · 내 전투력 ${combatPower(chosenClass).toLocaleString()}</div>
     <div class="party">${raidSet(r.id, chosenClass.id).map(([k, n]) => {
       const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
-      return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(있음)' : ''}`;
+      return `${{ weapon: '무기', armor: '갑옷', shield: '방패' }[k]} ${n}${owned ? '(보유)' : ''}`;
     }).join(' · ')}</div>
-    <div class="state">${raidOpen(r) ? '공격대 25명이 함께 친다' : raidLock(r)}</div>`;
+    <div class="state">${raidOpen(r) ? '25인 공격대 레이드' : raidLock(r)}</div>`;
   $('#stage-info').querySelectorAll('[data-rrole]').forEach(b => {
     b.onclick = () => { settings.raidRole = b.dataset.rrole; saveJson('bs_settings', settings); raidInfo(r); };
   });
@@ -2838,7 +2838,7 @@ function companionPick(g) {
   const put = companionWearBest(cls);
   saveJson('bs_progress', progress);
   if (put.length) {
-    say(`내 ${cls.name}: ${josa(name, '을', '를')} 주워 더 강한 장비로 갈아입었습니다.`, 'party');
+    say(`내 ${cls.name}: ${josa(name, '을', '를')} 주워 바로 장착했습니다.`, 'party');
     const m = (G.party || []).find(x => x.own && x.cls === cls);
     if (m) m.bubble = { text: '장비 교체!', t: G.t };
   } else say(`내 ${cls.name}: ${josa(name, '을', '를')} 주웠습니다.`, 'party');
@@ -2883,7 +2883,7 @@ function bootsRow(box) {
     const b = id && BOOT[id], btn = document.createElement('button');
     btn.className = 'equip' + (st.worn === id ? ' on' : '');
     const icon = b && picture(b.name);
-    btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${b ? b.name : '벗기'}</span>` + (b ? `<small>이동 +${b.pct}%</small>` : '');
+    btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${b ? b.name : '해제'}</span>` + (b ? `<small>이동 +${b.pct}%</small>` : '');
     const d = moveInfo(cls, id).pct - now.pct, em = document.createElement('em');
     em.className = 'cmp ' + (st.worn === id ? 'worn' : d > 0 ? 'up' : d < 0 ? 'down' : 'same');
     em.textContent = st.worn === id ? (b ? '착용 중' : '비어 있음') : d > 0 ? `▲이동 ${d}%` : d < 0 ? `▼이동 ${-d}%` : '같음';
@@ -2897,7 +2897,7 @@ function bootsRow(box) {
   note.className = 'boots-note';
   note.style.cssText = 'grid-column:1 / -1;font:10px G9, monospace;color:#6a3e16;line-height:1.5;margin:0 0 4px';
   note.innerHTML = KYEONGGONG.map((k, i) => `<div style="opacity:${now.lvl > i ? 1 : 0.55}">${now.lvl > i ? '●' : '○'} +${k.at}% ${k.name}: ${k.text}</div>`).join('')
-    + `<div style="opacity:0.7">신발은 모든 직업이 함께 씁니다${st.have.length < BOOTS.length ? " · 사냥터 보스, 대장장이 조합, 레이드 상점에서 얻습니다" : ""}.</div>`;
+    + `<div style="opacity:0.7">신발은 모든 직업 공용입니다${st.have.length < BOOTS.length ? " · 획득: 사냥터 보스, 대장장이 조합, 레이드 상점" : ""}</div>`;
   box.append(note);
 }
 
@@ -3080,7 +3080,7 @@ function buildEquip() {
   if (better) {
     const bb = document.createElement('button');
     bb.className = 'btn wear-best';
-    bb.textContent = '가장 강한 장비로 갈아입기';
+    bb.textContent = '최강 장비 일괄 장착';
     bb.id = 'equip-best';
     bb.onclick = () => (window.__equipInstant ? (wearBest(cls), buildEquip()) : openBestPop());
     box.append(bb);
@@ -3114,7 +3114,7 @@ function buildEquip() {
       btn.dataset.k = kind; btn.dataset.t = t; btn.dataset.sp = '';
       const icon = pieceIcon(cls, kind, t);
       const star = t < 0 ? 1 : starOf(cls, `${kind}:${t}`), dragon = kind === 'weapon' && t === dragonTier(cls);
-      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '벗기' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
+      btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span>${t < 0 ? '해제' : pieceName(cls, kind, t)}${star > 1 && !dragon ? ` ★${star}` : ''}</span>`;
       if (dragon) {
         const dg = dragonGyeok(cls.id, starOf(cls, `weapon:${t}`));
         const sm = document.createElement('small');
@@ -3260,14 +3260,14 @@ function pieceFrom(cls, kind, t, spId) {
   const name = pieceLabel(cls, kind, t, spId);
   const it = codexItems(cls).find(x => x.kind === kind && (x.name === name || (x.name.includes(' ~ ') && !spId && t === dragonTier(cls))));
   if (!it) return '';
-  return Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
+  return Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '드롭 없음') : it.from;
 }
 /** Which classes can wear it. */
 function pieceClasses(cls, kind, spId) {
   const sp = spId && SPECIAL[spId];
   if (sp && sp.craft && sp.craft.only) return `${sp.craft.only.map(c => (CLASSES.find(x => x.id === c) || { name: c }).name).join('·')} 전용`;
   if (sp && sp.cls) return `${(CLASSES.find(x => x.id === sp.cls) || { name: sp.cls }).name} 전용`;
-  return `${cls.name} 장비${kind === 'shield' ? ' (방패를 드는 직업)' : ''} · 직업마다 따로 줍니다`;
+  return `${cls.name} 장비${kind === 'shield' ? ' (방패를 드는 직업)' : ''} · 직업별로 따로 획득`;
 }
 
 let epState = null; // what the popup shows, for tests: {type, kind, t, sp}
@@ -3326,19 +3326,19 @@ function openPiecePop(kind, t, spId = null) {
     const ms = sp && sp.craft && sp.craft.set && MUSIN_SET[sp.craft.set];
     if (ms) {
       const on = !!musinSetOf(after);
-      L.push(`<div class="pr"><b>세트 · ${ms.name}</b> ${on ? '(이 장비로 완성)' : '(같은 신수의 갑옷 + 기운을 함께)'}: ${ms.text}</div>`);
+      L.push(`<div class="pr"><b>세트 · ${ms.name}</b> ${on ? '(이 장비로 완성)' : '(같은 신수의 갑옷 + 기운 착용 시)'}: ${ms.text}</div>`);
     }
     const from = pieceFrom(cls, kind, t, spId);
-    if (from) L.push(`<div class="from">얻는 곳: ${from}</div>`);
-  } else L.push(`<div class="none">${EQ_LABEL[kind]}을(를) 벗고 아무것도 끼지 않습니다.</div>`);
+    if (from) L.push(`<div class="from">획득처: ${from}</div>`);
+  } else L.push(`<div class="none">${EQ_LABEL[kind]}을(를) 해제합니다.</div>`);
   L.push(`<div class="from">착용 직업: ${pieceClasses(cls, kind, spId)}</div>`);
   // -- the comparison with what is worn now
   const curSp = g0[kind + 'Sp'] && SPECIAL[g0[kind + 'Sp']], curT = g0[kind];
   const cur = pieceLabel(cls, kind, curT, curSp ? curSp.id : null), curRank = pieceRank(cls, g0, kind);
   const R = [];
-  if (worn) R.push('<div class="ep-now">지금 착용 중인 장비입니다.</div>');
+  if (worn) R.push('<div class="ep-now">현재 착용 중인 장비입니다.</div>');
   else {
-    R.push(`<div class="ep-cur">지금 ${EQ_LABEL[kind]}: <b>${cur}</b>${curRank >= 0 ? ` (${Math.round(curRank * 10) / 10}등급)` : ''}</div>`);
+    R.push(`<div class="ep-cur">현재 ${EQ_LABEL[kind]}: <b>${cur}</b>${curRank >= 0 ? ` (${Math.round(curRank * 10) / 10}등급)` : ''}</div>`);
     R.push('<table class="ep-cmp">'
       + `<tr><th>전투력</th><td>${epDelta(A.power, B.power)}</td></tr>`
       + `<tr><th>공격력</th><td>${epDelta(A.atk, B.atk, '%')}</td></tr>`
@@ -3350,13 +3350,13 @@ function openPiecePop(kind, t, spId = null) {
     const fa = weaponFamilyOf(cls, g0.weapon, g0.weaponSp), fb = weaponFamilyOf(cls, after.weapon, after.weaponSp);
     const dl = [...(fa !== fb ? [`<div class="${fb && WEAPON_FAMILY[fb] ? 'up' : 'down'}">계열: ${fa && WEAPON_FAMILY[fa] ? WEAPON_FAMILY[fa].name : '없음'} → ${fb && WEAPON_FAMILY[fb] ? WEAPON_FAMILY[fb].name : '없음'}</div>`] : []), ...diff(A.opts, B.opts).map(x => `<div class="up">+ 옵션 ${x}</div>`), ...diff(B.opts, A.opts).map(x => `<div class="down">− 옵션 ${x}</div>`),
       ...diff(A.lines, B.lines).map(x => `<div class="up">+ ${x}</div>`), ...diff(B.lines, A.lines).map(x => `<div class="down">− ${x}</div>`)];
-    R.push(dl.length ? `<div class="ep-diff">${dl.join('')}</div>` : '<div class="none">옵션·격은 달라지지 않습니다.</div>');
+    R.push(dl.length ? `<div class="ep-diff">${dl.join('')}</div>` : '<div class="none">옵션·격은 그대로입니다.</div>');
   }
   const head = `<div class="ep-head">${icon ? `<img src="${icon}" alt="">` : '<span class="ep-noimg"></span>'}<div><b class="ep-name${sp && sp.rarity ? ' uniq' : ''}">${name}</b>`
     + `${isNewPiece(cls, key) && !none ? ' <i class="newtag">NEW</i>' : ''}${worn ? ' <i class="wornflag">착용 중</i>' : ''}</div></div>`;
   const btns = [];
   const canOff = none || (worn && ['shield', 'helmet', 'cape'].includes(kind));
-  if (!worn) btns.push([none ? '벗기' : '장착', 'primary', () => equipFromPop(kind, t, spId), 'ep-wear']);
+  if (!worn) btns.push([none ? '해제' : '장착', 'primary', () => equipFromPop(kind, t, spId), 'ep-wear']);
   else if (canOff && !none) btns.push(['해제', 'primary', () => equipFromPop(kind, -1, null), 'ep-wear']);
   else btns.push(['착용 중', 'primary', null, 'ep-wear']);
   if (!none) btns.push([isFav(cls, key) ? '찜 해제' : '찜', '', () => { toggleFav(cls, key); openPiecePop(kind, t, spId); buildEquip(); }, 'ep-fav']);
@@ -3371,7 +3371,7 @@ function openPiecePop(kind, t, spId = null) {
   btns.push(['취소', '', closePiecePop, 'ep-cancel']);
   if (btns[0][2] === null) btns[0][2] = closePiecePop;
   if (!none) markSeen(cls, key);
-  epopShow(none ? `${EQ_LABEL[kind]} 벗기` : '장착 확인', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`, btns, { type: 'piece', kind, t, sp: spId });
+  epopShow(none ? `${EQ_LABEL[kind]} 해제` : '장착 확인', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`, btns, { type: 'piece', kind, t, sp: spId });
   buildEquip();
 }
 function equipFromPop(kind, t, spId) {
@@ -3382,7 +3382,7 @@ function equipFromPop(kind, t, spId) {
   closePiecePop();
   equipTip = [kind, t, spId];
   buildEquip();
-  eqToast(t < 0 && !spId ? `${EQ_LABEL[kind]}을(를) 벗었습니다` : `${name} 착용`, () => { wear(...prev); buildEquip(); });
+  eqToast(t < 0 && !spId ? `${EQ_LABEL[kind]}을(를) 해제했습니다` : `${name} 착용`, () => { wear(...prev); buildEquip(); });
 }
 /** A line under the window's rows, with 되돌리기 where there is something to undo. */
 let eqToastTimer = 0;
@@ -3425,7 +3425,7 @@ function openBestPop() {
   if (!out.length) { eqToast('이미 가장 강한 장비입니다'); return; }
   const A = gearStats(cls, savedGear(cls)), B = gearStats(cls, after);
   const rows = out.map(s => `<tr><th>${EQ_LABEL[s.kind]}</th><td>${s.from} <span class="arrow">→</span> <b>${s.to}</b></td></tr>`).join('');
-  epopShow('가장 강한 장비로 갈아입기', `<div class="ep-cur">아래처럼 바뀝니다.</div><table class="ep-cmp ep-swaps">${rows}</table>`
+  epopShow('최강 장비 일괄 장착', `<div class="ep-cur">다음과 같이 바뀝니다.</div><table class="ep-cmp ep-swaps">${rows}</table>`
     + `<table class="ep-cmp"><tr><th>전투력</th><td>${epDelta(A.power, B.power)}</td></tr><tr><th>공격력</th><td>${epDelta(A.atk, B.atk, '%')}</td></tr>`
     + `<tr><th>체력</th><td>${epDelta(A.hp, B.hp)}</td></tr><tr><th>방어</th><td>${epDelta(A.def, B.def)}</td></tr></table>`,
   [['적용', 'primary', () => {
@@ -3433,7 +3433,7 @@ function openBestPop() {
     for (const s of out) { wear(s.kind, s.q[0], s.q[1]); if (s.q[0] >= 0 || s.q[1]) markSeen(cls, pieceKey(s.kind, s.q[0], s.q[1])); }
     closePiecePop();
     buildEquip();
-    eqToast(`${out.length}곳을 갈아입었습니다`, () => { for (const p of prev) wear(...p); buildEquip(); });
+    eqToast(`${out.length}부위를 교체했습니다`, () => { for (const p of prev) wear(...p); buildEquip(); });
   }, 'ep-apply'], ['취소', '', closePiecePop, 'ep-cancel']], { type: 'best' });
 }
 
@@ -3444,14 +3444,14 @@ function openBootsPop(id) {
   const lv = nxt.lvl ? KYEONGGONG[nxt.lvl - 1] : null;
   const L = [`<div class="ep-tier"><b>신발</b> · 이동속도 ${b ? `+${b.pct}%` : '기본'}</div>`,
     lv ? `<div class="gy"><b>경공</b> · ${lv.name}: ${lv.text}</div>` : '<div class="none">경공 없음</div>',
-    `<div class="from">모든 직업이 함께 씁니다 · 사냥터 보스, 대장장이 조합, 레이드 상점에서 얻습니다</div>`];
-  const R = worn ? ['<div class="ep-now">지금 신고 있는 신발입니다.</div>']
-    : [`<div class="ep-cur">지금 신발: <b>${cur ? cur.name : '없음'}</b></div>`, `<table class="ep-cmp"><tr><th>이동속도</th><td>${epDelta(now.pct, nxt.pct, '%')}</td></tr></table>`,
-      `<div class="${nxt.lvl > now.lvl ? 'up' : nxt.lvl < now.lvl ? 'down' : 'none'}">${nxt.lvl !== now.lvl ? `경공: ${now.lvl ? KYEONGGONG[now.lvl - 1].name : '없음'} → ${nxt.lvl ? KYEONGGONG[nxt.lvl - 1].name : '없음'}` : '경공은 달라지지 않습니다.'}</div>`];
+    `<div class="from">모든 직업 공용 · 획득: 사냥터 보스, 대장장이 조합, 레이드 상점</div>`];
+  const R = worn ? ['<div class="ep-now">현재 착용 중인 신발입니다.</div>']
+    : [`<div class="ep-cur">현재 신발: <b>${cur ? cur.name : '없음'}</b></div>`, `<table class="ep-cmp"><tr><th>이동속도</th><td>${epDelta(now.pct, nxt.pct, '%')}</td></tr></table>`,
+      `<div class="${nxt.lvl > now.lvl ? 'up' : nxt.lvl < now.lvl ? 'down' : 'none'}">${nxt.lvl !== now.lvl ? `경공: ${now.lvl ? KYEONGGONG[now.lvl - 1].name : '없음'} → ${nxt.lvl ? KYEONGGONG[nxt.lvl - 1].name : '없음'}` : '경공은 그대로입니다.'}</div>`];
   const head = `<div class="ep-head">${icon ? `<img src="${icon}" alt="">` : '<span class="ep-noimg"></span>'}<div><b class="ep-name">${b ? b.name : '신발 벗기'}</b>${worn ? ' <i class="wornflag">착용 중</i>' : ''}</div></div>`;
-  const go = () => { const prev = st.worn; wearBoots(id); closePiecePop(); buildEquip(); eqToast(b ? `${b.name} 착용` : '신발을 벗었습니다', () => { wearBoots(prev); }); };
-  epopShow(b ? '신발 장착 확인' : '신발 벗기', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`,
-    [[worn ? '착용 중' : b ? '장착' : '벗기', 'primary', worn ? closePiecePop : go, 'ep-wear'], ['취소', '', closePiecePop, 'ep-cancel']], { type: 'boots', id });
+  const go = () => { const prev = st.worn; wearBoots(id); closePiecePop(); buildEquip(); eqToast(b ? `${b.name} 착용` : '신발을 해제했습니다', () => { wearBoots(prev); }); };
+  epopShow(b ? '신발 장착 확인' : '신발 해제', `${head}<div class="ep-cols"><div class="ep-l">${L.join('')}</div><div class="ep-r">${R.join('')}</div></div>`,
+    [[worn ? '착용 중' : b ? '장착' : '해제', 'primary', worn ? closePiecePop : go, 'ep-wear'], ['취소', '', closePiecePop, 'ep-cancel']], { type: 'boots', id });
 }
 
 /** A card was tapped: the popup (or, for tests with window.__equipInstant, the old instant change). */
@@ -3507,10 +3507,10 @@ function eqBar(cls) {
   const news = newPieces(cls);
   if (news.length) add(`신규 장비 확인 (${news.length})`, true, () => openPiecePop(...news[0]), 'eq-new', '새로 얻은 장비를 차례로 봅니다');
   add(P.sort === 'power' ? '정렬: 전투력순' : '정렬: 기본', false, () => { P.sort = P.sort === 'power' ? 'rank' : 'power'; saveJson('bs_settings', settings); buildEquip(); }, 'eq-sort');
-  for (const [f, label] of [['all', '전체'], ['up', '▲ 강한 것'], ['new', 'NEW'], ['fav', '♥ 찜']]) {
+  for (const [f, label] of [['all', '전체'], ['up', '▲ 상위 장비'], ['new', 'NEW'], ['fav', '♥ 찜']]) {
     add(label, P.filter === f, () => { P.filter = f; saveJson('bs_settings', settings); buildEquip(); }, 'eq-f-' + f);
   }
-  add(`자동 착용 ${P.auto ? '켬' : '끔'}`, P.auto, () => { P.auto = !P.auto; saveJson('bs_settings', settings); buildEquip(); eqToast(P.auto ? '사냥 중 더 강한 장비를 주우면 바로 입습니다' : '자동 착용을 껐습니다'); }, 'eq-auto', '사냥에서 전투력이 오르는 장비를 주우면 바로 입습니다');
+  add(`자동 착용 ${P.auto ? '켬' : '끔'}`, P.auto, () => { P.auto = !P.auto; saveJson('bs_settings', settings); buildEquip(); eqToast(P.auto ? '사냥 중 더 강한 장비를 얻으면 바로 장착합니다' : '자동 착용을 껐습니다'); }, 'eq-auto', '사냥 중 전투력이 오르는 장비를 얻으면 바로 장착합니다');
   return bar;
 }
 
@@ -3671,7 +3671,7 @@ function buildCodex() {
     grades.append(btn);
   }
   const own = document.createElement('button');
-  own.textContent = '가진 것만';
+  own.textContent = '보유 장비만';
   own.className = codexOwned ? 'on' : '';
   own.onclick = () => { codexOwned = !codexOwned; buildCodex(); };
   grades.append(own);
@@ -3679,18 +3679,18 @@ function buildCodex() {
   const all = codexItems(cls);
   const list = all.filter(it => (codexGrade === 'all' || it.grade === codexGrade) && (!codexOwned || it.owned)
     && (!q || [it.name, KIND_NAME[it.kind], it.opt || '', ...[].concat(it.from)].some(x => x.includes(q))));
-  $('#codex-count').textContent = `${cls.name} · 모은 것 ${all.filter(x => x.owned).length}/${all.length}`;
+  $('#codex-count').textContent = `${cls.name} · 수집 ${all.filter(x => x.owned).length}/${all.length}`;
   const box = $('#codex-rows');
   box.innerHTML = '';
   for (const it of list) {
     const row = document.createElement('div');
     row.className = 'codex-item ' + it.grade + (it.owned ? '' : ' missing');
-    const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '나오지 않음') : it.from;
+    const from = Array.isArray(it.from) ? (it.from.length ? (it.from.length > 2 ? `${it.from[0]} ~ ${it.from[it.from.length - 1]}` : it.from.join(', ')) : '드롭 없음') : it.from;
     const grade = it.tag || { plain: '일반', raid: '레이드', craft: '조합', special: '스페셜' }[it.grade];
     // A hidden piece not yet found: its shadow, and the old words of where it falls.
     row.innerHTML = (it.icon ? `<img src="${it.icon}" alt=""${it.shadow ? ' style="filter:brightness(0);opacity:.45"' : ''}>` : '<span></span>')
       + `<div><b>${it.grade === 'special' ? '★' : it.grade === 'craft' ? '◆' : ''}${it.name}</b><i>${grade}</i><i>${KIND_NAME[it.kind]} ${it.pow}등급</i>`
-      + (it.shadow ? `<span>${from}</span>` : `<span>${it.owned ? '✓ 가짐 · ' : ''}${it.grade === 'special' ? '아주 드묾 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span>`)
+      + (it.shadow ? `<span>${from}</span>` : `<span>${it.owned ? '✓ 보유 · ' : ''}${it.grade === 'special' ? '매우 희귀 · ' : ''}${from}${it.opt ? ` · ${it.opt}` : ''}</span>`)
       + (it.hint ? `<span class="codex-hint" style="color:#6a2a08;font-style:italic">${it.hint}</span>` : '') + '</div>';
     box.append(row);
   }
@@ -3719,7 +3719,7 @@ function openCraft(sink = null) {
   if (!sink) box.innerHTML = '';
   $('#trade-title').textContent = '대장장이 · 강화·조합';
   const mats = progress.mats || {};
-  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)} · `
+  $('#trade-gold').textContent = `소지금 ${won(progress.gold || 0)} · `
     + Object.entries(MATS).map(([id, m]) => `${m.name} ${mats[id] || 0}`).join(' · ');
   let icon = null, fxs = null;
   const row = (name, desc, label, can, act) => {
@@ -3777,7 +3777,7 @@ function openCraft(sink = null) {
   meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) * DRAGON_STEP}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(rc.gold)}`,
-    has ? '가짐' : '조합', ok, () => {
+    has ? '보유' : '조합', ok, () => {
       progress.gold -= rc.gold;
       for (const [id, n] of Object.entries(rc.mats)) mats[id] -= n;
       progress.mats = mats;
@@ -3797,7 +3797,7 @@ function openCraft(sink = null) {
       progress.coins -= price;
       mats[id] = (mats[id] || 0) + n;
       progress.mats = mats;
-      say(`${MATS[id].name} ${n}개로 바꿨습니다.`, 'sys');
+      say(`${MATS[id].name} ${n}개를 교환했습니다.`, 'sys');
     });
   }
   // 신발 (boots.js): the smith's pairs, the raid shop's, and 극'열반 made from 열반. Shared by every class.
@@ -3811,7 +3811,7 @@ function openCraft(sink = null) {
     meta = bt.coins ? { opt: `이동속도 +${bt.pct}%`, got } : { mats: bt.mats, gold: bt.gold, base: bt.from ? BOOT[bt.from].name : null, opt: `이동속도 +${bt.pct}%`, got };
     row(`${bt.name} (이동속도 +${bt.pct}%)`, bt.coins ? `레이드주화 ${bt.coins}개` : `${bt.from ? BOOT[bt.from].name + ' + ' : ''}`
       + Object.entries(bt.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(bt.gold)}`,
-    got ? '가짐' : bt.coins ? '교환' : '조합', ok, () => {
+    got ? '보유' : bt.coins ? '교환' : '조합', ok, () => {
       if (bt.coins) progress.coins -= bt.coins;
       else {
         progress.gold -= bt.gold;
@@ -3848,9 +3848,9 @@ function openCraft(sink = null) {
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
     // A recipe of the story's gate (items.js needs): shut until that ground or raid is won.
     const gateOk = got || needsMet(c.needs, progress);
-    const gateText = gateOk ? '' : `🔒 ${needsName(c.needs)}${c.needs.startsWith('raid_') ? '에서 이기면' : '을(를) 정복하면'} 열린다 · `;
+    const gateText = gateOk ? '' : `🔒 ${needsName(c.needs)}${c.needs.startsWith('raid_') ? ' 승리 시' : ' 정복 시'} 해금 · `;
     row(`${specialName(sp, cls.id)} (${KIND_NAME[c.kind]} ${c.pow}등급${c.stars === 1 ? ' · 별 없음' : ''})`, `${gateText}${baseText}${matText(c.mats)} + ${won(c.gold)} · ${sp.opt.text}${sp.gyeok && GYEOK[sp.gyeok] ? ' · ' + GYEOK[sp.gyeok].name : ''}${famText}`,
-      got ? '가짐' : gateOk ? '조합' : '잠김', !got && gateOk && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
+      got ? '보유' : gateOk ? '조합' : '잠김', !got && gateOk && baseOk && have(c.mats) && (progress.gold || 0) >= c.gold, () => {
         progress.gold -= c.gold;
         for (const [id, n] of Object.entries(c.mats)) mats[id] -= n;
         progress.mats = mats;
@@ -3874,7 +3874,7 @@ function openCraft(sink = null) {
       icon = dragonIcon(cls, DRAGON_MAX) || picture(dragonName(cls.id, DRAGON_MAX));
       meta = { mats: need, gold: 20000, gyeok: GYEOK[sn.gyeok], got: now };
       row(`${sn.name}의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(need)} + 20000전 · ${gyeokText(sn.gyeok)}${sid === 'jujak' ? ` · 주작의 기운: 주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.dragonK * 100)}%` : ''}`,
-        now ? '새김' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
+        now ? '각인 완료' : '각인', !now && have(need) && (progress.gold || 0) >= 20000, () => {
           progress.gold -= 20000;
           for (const [id, n] of Object.entries(need)) mats[id] -= n;
           progress.mats = mats;
@@ -3889,7 +3889,7 @@ function openCraft(sink = null) {
     icon = dragonIcon(cls, DRAGON_MAX) || picture(dragonName(cls.id, DRAGON_MAX));
     meta = { mats: HEAVEN_COST.mats, gold: HEAVEN_COST.gold, got: hv };
     row(`천상의 ${dragonName(cls.id, DRAGON_MAX)}`, `${matText(HEAVEN_COST.mats)} + ${won(HEAVEN_COST.gold)} · 금백 광채와 격 섬광 (등급은 그대로 17.2)`,
-      hv ? '입힘' : '각성', !hv && have(HEAVEN_COST.mats) && (progress.gold || 0) >= HEAVEN_COST.gold, () => {
+      hv ? '각성 완료' : '각성', !hv && have(HEAVEN_COST.mats) && (progress.gold || 0) >= HEAVEN_COST.gold, () => {
         progress.gold -= HEAVEN_COST.gold;
         for (const [id, n] of Object.entries(HEAVEN_COST.mats)) mats[id] -= n;
         progress.mats = mats;
@@ -3902,7 +3902,7 @@ function openCraft(sink = null) {
   // 확률 강화 (today's way, optional): half the materials, but it can fail — 손상 (spent for
   // nothing) or 부식 (a star back) — at 90% … 10% from 제일 to 제구.
   if (!sink) row(`확률 강화 ${settings.chanceUp ? '켜짐' : '꺼짐'}`, settings.chanceUp ? '재료 절반 · 성공 90%→10% · 실패 시 손상(재료만 잃음) 또는 부식(별 -1)'
-    : '켜면 조합 장비·용무기 별을 절반 재료로, 대신 확률로 올린다', settings.chanceUp ? '끄기' : '켜기', true, () => {
+    : '켜면 조합 장비·용무기 강화에 재료가 절반만 들고, 대신 성공 확률이 붙습니다', settings.chanceUp ? '끄기' : '켜기', true, () => {
     settings.chanceUp = !settings.chanceUp;
     saveJson('bs_settings', settings);
   });
@@ -3927,7 +3927,7 @@ function openCraft(sink = null) {
       meta = star < top ? { mats: sc.mats, gold: sc.gold, gyeok: dragon ? dragonGyeok(cls.id, star + 1) : null } : null;
       fxs = { n: star, dragon };
       row(dragon ? name : `${name} ★${star}`, star >= top ? (dragon ? '최고 단계 (제십)' : '최고 별') : `${next}: ${matText(sc.mats)} + ${won(sc.gold)}`
-        + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 오름'),
+        + (settings.chanceUp ? ` · 성공 ${Math.round(chance * 100)}%` : ' · 반 등급 상승'),
         star >= top ? '최고' : (dragon ? '승급' : '강화'), star < top && have(sc.mats) && (progress.gold || 0) >= sc.gold, () => {
           progress.gold -= sc.gold;
           for (const [id, n] of Object.entries(sc.mats)) mats[id] -= n;
@@ -3966,7 +3966,7 @@ function openCraft(sink = null) {
         say(`${name} ★${star + 1} 강화!`, 'sys');
       });
   }
-  if (!any) row('강화할 장비가 없습니다', '같은 장비를 한 번 더 주우면 사본이 되어 강화 재료가 됩니다', '-', false, () => {});
+  if (!any) row('강화할 장비가 없습니다', '같은 장비를 한 번 더 얻으면 사본이 되어 강화 재료로 쓰입니다', '-', false, () => {});
   if (!sink) $('#trade').hidden = false;
 }
 
@@ -4008,7 +4008,7 @@ function openForge() {
   forgePick = pick && forgeKey(pick);
   const keep = !forgeFresh && lbScroll.tab === forgeTab;
   forgeFresh = false;
-  const done = e => e.label === '가짐' || e.label === '새김' || e.label === '최고';
+  const done = e => e.label === '보유' || e.label === '각인 완료' || e.label === '최고';
   const lb = $('#forge-list'), d = $('#forge-detail');
   const sL = lb.scrollTop, sD = d.scrollTop;
   lb.innerHTML = '';
@@ -4016,7 +4016,7 @@ function openForge() {
     const it = document.createElement('button');
     it.className = 'forge-item' + (e === pick ? ' on' : '') + (e.can ? ' ready' : '') + (done(e) ? ' done' : '');
     it.innerHTML = (e.icon ? `<img src="${e.icon}" alt="">` : '<span class="noimg"></span>')
-      + `<b>${e.name.replace(/ \(.*\)$/, '')}</b><small>${e.can ? '할 수 있음' : e.label === '가짐' || e.label === '새김' ? '보유' : e.label === '최고' ? '최고 단계' : '재료 부족'}</small>`;
+      + `<b>${e.name.replace(/ \(.*\)$/, '')}</b><small>${e.can ? '가능' : e.label === '보유' || e.label === '각인 완료' ? '보유' : e.label === '최고' ? '최고 단계' : '재료 부족'}</small>`;
     it.onclick = () => { if (forgeBusy) return; forgePick = forgeKey(e); openForge(); };
     lb.append(it);
   }
@@ -4152,7 +4152,7 @@ function forgeRun(ent, raw) {
   fx.id = 'forge-fx';
   fx.className = 'ffx ffx-live wait' + (calm ? ' calm' : '');
   fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card"><div class="ffx-ico">${ent.icon ? `<img src="${ent.icon}" alt="">` : ''}</div>`
-    + `<b class="ffx-name">${label}</b><div class="ffx-star">${ent.star && ent.star.n ? '★' + ent.star.n : '…'}</div><div class="ffx-msg">${kind === 'craft' ? '만드는 중…' : kind === 'promo' ? '승급 중…' : '강화 중…'}</div></div>`;
+    + `<b class="ffx-name">${label}</b><div class="ffx-star">${ent.star && ent.star.n ? '★' + ent.star.n : '…'}</div><div class="ffx-msg">${kind === 'craft' ? '조합 중…' : kind === 'promo' ? '승급 중…' : '강화 중…'}</div></div>`;
   $('#forge-box').append(fx);
   // The effect layers sit on the window (not inside the card: a card in motion would cut the
   // 'screen' blend short), centred on the card's picture.
@@ -4319,7 +4319,7 @@ function buildTree(cls, hot = new Set()) {
         const q = SKILLS[d.pre[0]];
         note = (note ? note + ' · ' : '') + `${q.name}(${q.promo ? q.promo + '차' : '일반'}) ${INHERIT_LV}단에서 계승 (자리·단 이어받음)`;
       }
-      if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 나옴';
+      if (!note && mastered(cls.id).includes(id)) note = '숙련 · 첫 카드에 등장';
       const el = treeSpell(id, note ? { note } : {});
       if (hot.has(id)) el.style.outline = '2px solid #7a1800';
       grid.append(el);
@@ -12563,7 +12563,7 @@ function syncTrainPanel() {
   $('#train-plain').textContent = tr.plain ? '기본 공격: 켬' : '기본 공격: 끔';
   $('#train-cast').hidden = tr.auto;
   if (!d) {
-    $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>송백인형에게 쓰면 이펙트와 피해 숫자가 나옵니다. 아직 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
+    $('#train-info').innerHTML = '<b>기술을 고르세요</b><p>송백인형에게 쓰면 이펙트와 피해 숫자가 표시됩니다. 승급 전이라 잠긴 기술도 여기서는 시험할 수 있습니다.</p>';
     return;
   }
   const s = G.skills[0], st = stats(s), tier = promoOf(G.cls.id);
@@ -12874,7 +12874,7 @@ function openQuests() {
   const keep = box.scrollTop;
   box.innerHTML = '';
   $('#trade-title').textContent = '관원 · 의뢰';
-  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)} · 레이드주화 ${progress.coins || 0}`;
+  $('#trade-gold').textContent = `소지금 ${won(progress.gold || 0)} · 레이드주화 ${progress.coins || 0}`;
   const done = progress.quests = progress.quests || {};
   const row = (name, desc, label, can, act, cls = '') => {
     const r = document.createElement('div');
@@ -12890,27 +12890,27 @@ function openQuests() {
   };
   const head = text => { const h = document.createElement('h4'); h.textContent = text; h.style.margin = '6px 0 2px'; box.append(h); };
   const bar = (have, need) => `<i class="qbar"><i style="width:${Math.round(100 * Math.min(1, have / need))}%"></i></i>${have}/${need}`;
-  head('오늘의 의뢰 (매일 바뀜)');
+  head('오늘의 의뢰 (매일 갱신)');
   const daily = dailyQuests();
   for (const q of daily) {
     const have = Math.max(0, Math.min(q.need, dailyHave(q))), got = progress.daily.claimed.includes(q.id);
-    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '완료' : '받기', !got && have >= q.need, () => {
       progress.daily.claimed.push(q.id);
       payReward(q, '오늘의 의뢰');
     }, !got && have >= q.need ? 'ready' : '');
   }
   const weekly = weeklyQuests(), W = progress.weekly;
   const wDone = weekly.filter(q => W.claimed.includes(q.id)).length;
-  head(`이번 주 의뢰 ${wDone}/${weekly.length} (월요일에 바뀜)`);
+  head(`이번 주 의뢰 ${wDone}/${weekly.length} (월요일 갱신)`);
   for (const q of weekly) {
     const have = Math.max(0, Math.min(q.need, dailyHave(q))), got = W.claimed.includes(q.id);
-    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    row(q.text, `${bar(have, q.need)} · ${rewardText(q)}`, got ? '완료' : '받기', !got && have >= q.need, () => {
       W.claimed.push(q.id);
       payReward(q, '이번 주 의뢰');
     }, !got && have >= q.need ? 'ready' : '');
   }
   const chest = WEEKLY_CHEST(metaLevel()), all = wDone >= weekly.length;
-  row('주간 상자', `이번 주 의뢰를 모두 받으면 · ${rewardText(chest)}`, W.chest ? '받음' : '열기', all && !W.chest, () => {
+  row('주간 상자', `이번 주 의뢰를 모두 완료하면 · ${rewardText(chest)}`, W.chest ? '완료' : '열기', all && !W.chest, () => {
     W.chest = true;
     payReward(chest, '주간 상자');
     banner('주간 상자를 열었습니다!');
@@ -12920,16 +12920,16 @@ function openQuests() {
   const order = QUESTS.map(q => ({ q, have: Math.min(q.need, q.have(s)), got: !!done[q.id] }))
     .sort((a, b) => (a.got - b.got) || ((b.have >= b.q.need) - (a.have >= a.q.need)) || (b.have / b.q.need - a.have / a.q.need));
   for (const { q, have, got } of order) {
-    row(`${q.text}`, `${bar(have, q.need)} · ${rewardText(q)} · 칭호 「${q.title}」`, got ? '받음' : '받기', !got && have >= q.need, () => {
+    row(`${q.text}`, `${bar(have, q.need)} · ${rewardText(q)} · 칭호 「${q.title}」`, got ? '완료' : '받기', !got && have >= q.need, () => {
       done[q.id] = true;
       payReward(q, `의뢰 「${q.title}」`);
     }, !got && have >= q.need ? 'ready' : '');
   }
   head('칭호 고르기');
   const titles = QUESTS.filter(q => done[q.id]).map(q => q.title);
-  if (!titles.length) row('아직 받은 칭호가 없습니다', '의뢰를 마치고 받기를 누르면 칭호가 생깁니다', '-', false, () => {});
+  if (!titles.length) row('보유한 칭호가 없습니다', '의뢰를 완료하고 보상을 받으면 칭호를 얻습니다', '-', false, () => {});
   for (const t of titles)
-    row(`「${t}」`, progress.title === t ? '지금 쓰는 칭호' : '상태창 TITLE에 보입니다', progress.title === t ? '쓰는 중' : '쓰기', progress.title !== t, () => {
+    row(`「${t}」`, progress.title === t ? '사용 중인 칭호' : '상태창 TITLE에 표시됩니다', progress.title === t ? '사용 중' : '사용', progress.title !== t, () => {
       progress.title = t;
     });
   $('#trade').hidden = false;
@@ -12973,7 +12973,7 @@ function nextGoal(cls, noClaim = false) {
   }
   const W = progress.weekly, wk = weeklyQuests();
   const left = wk.filter(q => !W.claimed.includes(q.id)).length;
-  if (left) return { text: `이번 주 의뢰 ${wk.length - left}/${wk.length} — 모두 받으면 주간 상자`, go: 'clerk' };
+  if (left) return { text: `이번 주 의뢰 ${wk.length - left}/${wk.length} — 모두 완료하면 주간 상자`, go: 'clerk' };
   return { text: '용무기·사신수 강화로 더 강해지기 — 대장장이에게', go: 'smith' };
 }
 /** The 조합 recipe this class lacks that is nearest to done, as { name, need }. */
@@ -13071,14 +13071,14 @@ function openTrade(who) {
   const cls = chosenClass, box = $('#trade-rows');
   box.innerHTML = '';
   $('#trade-title').textContent = who === 'inn' ? '주모 · 단련' : '상인 · 장비';
-  $('#trade-gold').textContent = `가진 돈 ${won(progress.gold || 0)}`;
+  $('#trade-gold').textContent = `소지금 ${won(progress.gold || 0)}`;
   const row = (name, desc, cost, done, buy) => {
     const r = document.createElement('div');
     r.className = 'trade-row';
     r.innerHTML = `<div><b>${name}</b><span>${desc}</span></div>`;
     const b = document.createElement('button');
     b.className = 'btn';
-    b.textContent = done ? (typeof done === 'string' ? done : '다 배움') : `${won(cost)}`;
+    b.textContent = done ? (typeof done === 'string' ? done : '습득 완료') : `${won(cost)}`;
     b.disabled = done || (progress.gold || 0) < cost;
     b.onclick = () => {
       progress.gold -= cost;
@@ -15030,7 +15030,7 @@ function resultsHTML(style, huntGold) {
   const chip = (html, cls = '') => `<span class="rchip${cls ? ' ' + cls : ''}">${html}</span>`;
   const out = [];
   out.push(`<div class="r-head">${style ? `<b class="r-grade g${style.g}">${style.g}</b>` : ''}<div class="r-who"><b>${G.cls.name} · Lv ${G.player.lvl} · ${G.stage.name}</b><br>`
-    + `버틴 시간 ${clock(G.t)}${G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : ''} · 쓰러뜨린 몬스터 ${G.kills.toLocaleString()}마리</div></div>`);
+    + `생존 시간 ${clock(G.t)}${G.endless ? ` (계속 사냥 ${clock(G.t - G.clearT)})` : ''} · 처치 ${G.kills.toLocaleString()}마리</div></div>`);
   if (style) {
     const parts = Array.isArray(style.parts) ? style.parts.map(([l, v]) => `${l} ${v}`)
       : [`최고 기세 ${style.best}단`, `처형 ${style.execs}`, `일망타진 ${style.sweeps}`, `반응 ${style.reactions}`];
@@ -15056,7 +15056,7 @@ function resultsHTML(style, huntGold) {
   const comp = companionSummary() + companionDeeds();
   if (comp) out.push(`<div class="r-comp">${comp.replace(/^<br>/, '').replace(/<br>/g, ' · ')}</div>`);
   if (d && d.quests.length) {
-    out.push(`<div class="r-quest">${d.quests.slice(0, 3).map(q => `<span class="${q.done ? 'done' : ''}">${q.week ? '주간' : '오늘'} · ${q.text} ${q.now}/${q.need}${q.done ? ' ✔ 받기 가능' : ''}</span>`).join('')}</div>`);
+    out.push(`<div class="r-quest">${d.quests.slice(0, 3).map(q => `<span class="${q.done ? 'done' : ''}">${q.week ? '주간' : '오늘'} · ${q.text} ${q.now}/${q.need}${q.done ? ' ✔ 보상 받기' : ''}</span>`).join('')}</div>`);
   }
   try {
     const nc = claimable();
@@ -15113,7 +15113,7 @@ function promoCeremony(list) {
   fx.innerHTML = `<div class="ffx-flash"></div><div class="ffx-card pc-card"><div class="ffx-ico"><img class="pc-hero" src="${heroPicture(cls)}" alt=""></div>`
     + `<b class="pc-n">${top.n}차 승급${title}</b><div class="ffx-name">${cls.name} · 승급 효과 피해 +${Math.round(PROMO_BONUS.dmg * 100 * top.n)}% · 체력 +${PROMO_BONUS.hp * top.n}</div>`
     + (icons ? `<div class="pc-sks">${icons}</div>` : '')
-    + `<div class="ffx-msg">필살기: ${ult.name}</div><small class="pc-tap">눌러서 닫기</small></div>`;
+    + `<div class="ffx-msg">필살기: ${ult.name}</div><small class="pc-tap">터치하여 닫기</small></div>`;
   document.body.append(fx);
   const ico = fx.querySelector('.ffx-ico').getBoundingClientRect(), fr = fx.getBoundingClientRect();
   for (const c of ['', ' add']) {
@@ -17861,7 +17861,7 @@ $('#backup-btn').onclick = () => {
   const data = {};
   for (const k of SAVE_KEYS) data[k] = localStorage.getItem(k);
   $('#backup-text').value = 'BARAM1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  $('#backup-note').textContent = '이 글 전체를 복사해 메모장 같은 곳에 두세요. 불러올 때는 붙여 넣고 불러오기.';
+  $('#backup-note').textContent = '이 코드 전체를 복사해 메모장 등에 보관하세요. 복구할 때는 붙여 넣고 불러오기를 누르세요.';
   $('#backup').hidden = false;
 };
 $('#backup-copy').onclick = () => {
@@ -17880,7 +17880,7 @@ $('#backup-load').onclick = () => {
     $('#backup-note').textContent = '불러왔습니다. 다시 시작합니다…';
     setTimeout(() => location.reload(), 800);
   } catch (e) {
-    $('#backup-note').textContent = '기록 백업 글이 아닙니다. 처음부터 끝까지 그대로 붙여 넣으세요.';
+    $('#backup-note').textContent = '올바른 백업 코드가 아닙니다. 처음부터 끝까지 그대로 붙여 넣으세요.';
   }
 };
 $('#backup-close').onclick = () => { $('#backup').hidden = true; };
@@ -17920,7 +17920,7 @@ function syncLastHunt() {
   const b = $('#town-last'), st = lastHuntStage();
   if (!b) return;
   b.hidden = !st;
-  if (st) { b.textContent = `다시: ${st.name.replace(' 레이드', '')}`; b.title = `${st.name}에 바로 들어갑니다`; }
+  if (st) { b.textContent = `다시: ${st.name.replace(' 레이드', '')}`; b.title = `${st.name}에 바로 입장합니다`; }
 }
 $('#pause-btn').onclick = () => togglePause();
 $('#resume').onclick = () => togglePause(false);
@@ -18004,8 +18004,8 @@ $('#opt-party-pick').onclick = () => openPartyPick();
  *  The classes as cards like 직업 선택's, each in its own look; a tap puts it in or takes it out. */
 function openPartyPick() {
   const box = $('#pp-cards'), picks = (settings.partyPick || []).slice();
-  $('#pp-note').textContent = `고른 동료 ${picks.length}/3 · 빈 자리는 무작위 · 사냥 중 레벨 3·9·15에 고른 순서대로 합류`
-    + (chosenClass ? ` · 지금 직업(${chosenClass.name})은 빠집니다` : '');
+  $('#pp-note').textContent = `선택한 동료 ${picks.length}/3 · 빈자리는 무작위 · 사냥 중 Lv 3·9·15에 선택 순서대로 합류`
+    + (chosenClass ? ` · 현재 직업(${chosenClass.name})은 제외` : '');
   box.innerHTML = '';
   for (const c of CLASSES) {
     const at = picks.indexOf(c.id), pr = promoOf(c.id), rec = best[c.id];
@@ -18179,7 +18179,7 @@ const MUSIC = [['title', '처음 화면'], ['select', '직업·사냥터 선택'
 // Sound kinds the player sorts the numbered sounds into, and which game sounds draw on each.
 const SOUND_KINDS = [
   ['heal', '회복'], ['fire', '불'], ['ice', '얼음·물'], ['thunder', '번개'], ['slash', '베기·타격'],
-  ['boom', '폭발·큰 마법'], ['light', '빛·신비'], ['monster', '몬스터'], ['ui', '알림'], ['none', '모름·안 씀'],
+  ['boom', '폭발·큰 마법'], ['light', '빛·신비'], ['monster', '몬스터'], ['ui', '알림'], ['none', '미분류·미사용'],
 ];
 const KIND_USES = {
   heal: ['skill_c_heal', 'heal', 'skill_p_ult'],
@@ -18353,7 +18353,7 @@ function startSort() {
 function nextSort() {
   const left = sortQueue.length;
   if (!left) {
-    $('#sort-num').textContent = '다 나눴습니다';
+    $('#sort-num').textContent = '분류를 마쳤습니다';
     $('#sort-left').textContent = '';
     return;
   }

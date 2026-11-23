@@ -170,7 +170,7 @@ export function unlockMusinHair(from) {
   for (const h of MUSIN_HAIR) {
     if (items[h.id] && h.raids.every(r => won[r]) && giveCostume(h.id)) got.push(h.name);
   }
-  if (got.length && from) A.say(`${from}: 코디 헤어 [${got.join('], [')}]을(를) 얻었습니다! (마을의 코디 · 헤어에서 입습니다)`, 'sys');
+  if (got.length && from) A.say(`${from}: 코디 헤어 [${got.join('], [')}]을(를) 얻었습니다! (마을 코디 → 헤어에서 착용)`, 'sys');
   return got;
 }
 
@@ -312,7 +312,7 @@ export function dropCostume(tiers, from) {
   const id = randomCostume(grades) || randomCostume([0, 1, 2]);
   if (!id || !giveCostume(id)) return null;
   const it = costumeItems()[id];
-  A.say(`${from}: ${it.kind === 'pet' ? '환수' : '코디'} [${it.name}]을(를) 얻었습니다! (마을의 코디에서 입습니다)`, 'sys');
+  A.say(`${from}: ${it.kind === 'pet' ? '환수' : '코디'} [${it.name}]을(를) 얻었습니다! (마을 코디에서 착용)`, 'sys');
   return it.name;
 }
 
@@ -629,7 +629,7 @@ const $ = s => document.querySelector(s);
 export function openCoordi(at) {
   const cls = A.cls();
   if (!cls || !A.M().yhero2 || !A.M().yhero2[cls.id] || !A.M().ycostume || !A.M().ycostume.index) {
-    A.say('이 직업은 아직 코디를 입을 수 없습니다.', 'warn');
+    A.say('이 직업은 아직 코디를 착용할 수 없습니다.', 'warn');
     return;
   }
   state();
@@ -644,7 +644,7 @@ export function openCoordi(at) {
   };
   if (D) go();
   else {
-    $('#coordi-list').innerHTML = '<div class="coordi-note">코디 목록을 읽는 중…</div>';
+    $('#coordi-list').innerHTML = '<div class="coordi-note">코디 목록을 불러오는 중…</div>';
     loadCostumes().then(() => { if (!$('#coordi').hidden) go(); });
   }
 }
@@ -758,7 +758,7 @@ function renderList(cls) {
       rows.push({ head: `${name} (${v.length})` });
       for (let i = 0; i < v.length; i += cols) rows.push({ cells: v.slice(i, i + cols).map(id => ({ id })) });
     }
-    if (solo.length) rows.push({ head: '세트 아닌 것' });
+    if (solo.length) rows.push({ head: '단품' });
     cells.push(...solo.map(id => ({ id })));
   } else {
     // The 벗기 cell leads the first row.
@@ -808,12 +808,12 @@ function paintRows() {
         const d = document.createElement('div');
         if (c.none) {
           d.className = 'forge-item' + (!trial[tab] ? ' on' : '');
-          d.innerHTML = '<div class="noimg"></div><b>' + ({ pet: '데리고 다니지 않기', hair: '직업 기본 머리', head: '직업 기본 얼굴' }[tab] || '장비 그대로')
+          d.innerHTML = '<div class="noimg"></div><b>' + ({ pet: '환수 해제', hair: '직업 기본 머리', head: '직업 기본 얼굴' }[tab] || '장비 그대로')
             + '</b><small>' + (FREE.has(tab) ? '처음 모습' : '코디 없음') + '</small>';
           d.onclick = () => { delete trial[tab]; pick = null; repaint(cls); };
         } else if (c.hide) {
           d.className = 'forge-item ready' + (trial[tab] === HIDE ? ' on' : '');
-          d.innerHTML = `<div class="noimg hide">숨김</div><b>${HIDE_NAME[tab]}</b><small>${HIDE_WHAT[tab]} 감추기 · 무료</small>`;
+          d.innerHTML = `<div class="noimg hide">숨김</div><b>${HIDE_NAME[tab]}</b><small>${HIDE_WHAT[tab]} 숨기기 · 무료</small>`;
           d.onclick = () => { trial[tab] = HIDE; pick = null; repaint(cls); };
         } else {
           const it = items[c.id], free = isFree(it), o = free || own[c.id], g = GRADES[it.grade];
@@ -843,10 +843,10 @@ function repaint(cls) {
 
 function howToGet(it, inShop) {
   const g = GRADES[it.grade];
-  if (it.musin) return `${it.musin.gate}를 이기면 얻습니다(남·여 모두, 모든 직업 공용)`;
-  if (it.grade <= 1) return `${A.won(g.gold)}에 삽니다`;
+  if (it.musin) return `${it.musin.gate} 승리 시 획득(남·여, 모든 직업 공용)`;
+  if (it.grade <= 1) return `${A.won(g.gold)}에 구매`;
   if (it.grade <= 3) return inShop ? `상점 진열 중: 레이드주화 ${g.coins}개` : '상점 진열(6시간마다 바뀜)·뽑기·레이드·대항전·보스에서 얻습니다';
-  return '뽑기와 레이드·대항전 승리, 보스의 보물에서만 나옵니다';
+  return '뽑기, 레이드·대항전 승리, 보스의 보물에서만 획득';
 }
 
 function buyButton(id, after) {
@@ -856,7 +856,7 @@ function buyButton(id, after) {
   const buy = document.createElement('button');
   buy.className = 'btn';
   buy.disabled = g.gold ? (p.gold || 0) < g.gold : (p.coins || 0) < g.coins;
-  buy.textContent = g.gold ? `사기 ${A.won(g.gold)}` : `사기 주화 ${g.coins}`;
+  buy.textContent = g.gold ? `구매 ${A.won(g.gold)}` : `구매 주화 ${g.coins}`;
   buy.onclick = () => {
     if (g.gold) p.gold -= g.gold;
     else p.coins -= g.coins;
@@ -884,25 +884,25 @@ function buildDetail(detail, cls) {
   const info = document.createElement('div');
   info.className = 'coordi-info';
   if (id === HIDE && HIDE_NAME[tab]) {
-    info.innerHTML = `<b>${HIDE_NAME[tab]}</b> <span>무료</span><br><small>쓰고 있는 ${HIDE_WHAT[tab]}를 감춥니다. 능력치는 장비 그대로`
+    info.innerHTML = `<b>${HIDE_NAME[tab]}</b> <span>무료</span><br><small>착용 중인 ${HIDE_WHAT[tab]}를 숨깁니다. 능력치는 장비 그대로`
       + `${tab === 'helmet' ? ', 머리(고른 헤어)가 보입니다' : ''}.</small>`;
   } else if (it) {
     const g = GRADES[it.grade], own = ownsCostume(id);
     const note = it.kind === 'weapon' || it.kind === 'shield' ? ' · 모습만: 장비 창에는 실제 무기·별·용무기 단계 그대로'
       : it.kind === 'pet' ? ' · 사냥·마을·레이드·대항전에서 뒤를 따라다님'
-        : isFree(it) ? ' · 언제든 무료로 바꿈(머리째 덮는 모자를 쓰면 머리카락은 가려짐)' : ' · 능력치는 장비 그대로';
+        : isFree(it) ? ' · 언제든 무료로 변경(머리 전체를 덮는 모자를 쓰면 머리카락이 가려집니다)' : ' · 능력치는 장비 그대로';
     info.innerHTML = isFree(it) ? `<b>${it.name}</b> <span>${it.kind === 'hair' ? '헤어' : '얼굴'}</span><br><small>연의 ${it.kind === 'hair' ? '미용실' : '성형외과'}${note}</small>`
       : `<b>${it.name}</b> <span style="color:${g.color}">${g.name}</span>${it.set ? ` <small>· ${it.set}</small>` : ''}<br>`
-      + `<small>${own ? '보유' : howToGet(it, shop().ids.includes(id))}${it.whole ? ' · 머리째 덮는 장식' : ''}${note}</small>`;
+      + `<small>${own ? '보유' : howToGet(it, shop().ids.includes(id))}${it.whole ? ' · 머리 전체를 덮는 장식' : ''}${note}</small>`;
     const b = buyButton(id, () => buildCoordi());
     if (b) info.append(document.createElement('br'), b);
-  } else info.innerHTML = '<small>고른 코디를 미리 입어 봅니다. 가진 것만 저장됩니다.</small>';
+  } else info.innerHTML = '<small>선택한 코디를 미리 입어 봅니다. 보유한 코디만 저장됩니다.</small>';
   detail.append(info);
   const row = document.createElement('div');
   row.className = 'coordi-actions';
   const save = document.createElement('button');
   save.className = 'btn fd-go';
-  save.textContent = '이대로 입기';
+  save.textContent = '이대로 적용';
   save.onclick = () => {
     for (const [kind] of KINDS) {
       const v = trial[kind];
@@ -915,13 +915,13 @@ function buildDetail(detail, cls) {
   };
   const strip = document.createElement('button');
   strip.className = 'btn';
-  strip.textContent = '모두 벗기';
+  strip.textContent = '모두 해제';
   strip.onclick = () => { trial = {}; pick = null; buildCoordi(); };
   // 되돌리기: the preview back to what the hero wears now (a trial not yet saved is dropped).
   const undo = document.createElement('button');
   undo.className = 'btn';
   undo.textContent = '되돌리기';
-  undo.title = '미리 입어 본 것을 취소하고 지금 입은 모습으로';
+  undo.title = '미리 보기를 취소하고 현재 모습으로 되돌립니다';
   undo.onclick = () => {
     trial = ownedTrial(cls);
     pick = null;
@@ -932,7 +932,7 @@ function buildDetail(detail, cls) {
   const orig = document.createElement('button');
   orig.className = 'btn';
   orig.textContent = '원래 모습으로';
-  orig.title = '코디를 모두 벗고 직업 본래의 모습으로 바로 저장합니다. 가진 코디는 그대로 남습니다.';
+  orig.title = '코디를 모두 해제하고 직업 기본 모습으로 저장합니다. 보유한 코디는 그대로 남습니다.';
   orig.onclick = () => {
     for (const [kind] of KINDS) setCostume(cls.id, kind, null);
     setCostume(cls.id, 'dye', null);
@@ -954,7 +954,7 @@ function dyeRow(cls, detail) {
   row.className = 'coordi-dye';
   const lab = document.createElement('small');
   lab.textContent = '염색';
-  lab.title = '염색약을 사면 그 색으로 언제든 염색합니다(모든 직업 공용). 원래 색으로 되돌릴 수도 있습니다.';
+  lab.title = '염색약을 구매하면 언제든 그 색으로 염색할 수 있습니다(모든 직업 공용). 원래 색으로도 되돌릴 수 있습니다.';
   row.append(lab);
   const off = document.createElement('button');
   off.className = 'btn' + (!trial.dye ? ' on' : '');
@@ -978,13 +978,13 @@ function dyeRow(cls, detail) {
     note.textContent = `${d.name} 염색약 ${dyeCost(d)} `;
     const buy = document.createElement('button');
     buy.className = 'btn';
-    buy.textContent = '사기';
+    buy.textContent = '구매';
     buy.disabled = d.gold ? (p.gold || 0) < d.gold : (p.coins || 0) < d.coins;
     buy.onclick = () => {
       if (d.gold) p.gold -= d.gold;
       else p.coins -= d.coins;
       giveDye(d.id);
-      A.say(`염색약 [${d.name}]을(를) 샀습니다. 이제 언제든 그 색으로 염색합니다.`, 'sys');
+      A.say(`염색약 [${d.name}]을(를) 구매했습니다. 이제 언제든 그 색으로 염색할 수 있습니다.`, 'sys');
       buildCoordi();
     };
     note.append(buy);
@@ -1068,7 +1068,7 @@ function presetRow(cls) {
         const p = savePreset(cls.id, i, trial, name && name.value.trim().slice(0, 12));
         A.say(`지금 모습을 ${p.name}에 저장했습니다.`, 'sys');
       } else if (!pr) {
-        A.say(`프리셋 ${i + 1}은 비어 있습니다. 저장을 누르고 칸을 고르면 지금 모습이 들어갑니다.`, 'warn');
+        A.say(`프리셋 ${i + 1}은 비어 있습니다. 저장을 누르고 칸을 고르면 현재 모습이 저장됩니다.`, 'warn');
         return;
       } else {
         trial = applyPreset(cls.id, i);
@@ -1126,17 +1126,17 @@ function buildShop(detail, cls) {
   detail.innerHTML = '<canvas id="coordi-preview" width="400" height="136"></canvas>';
   const info = document.createElement('div');
   info.className = 'coordi-info';
-  info.innerHTML = `<b>코디 상점</b><br><small>희귀·영웅 코디와 환수는 여기 진열될 때만 레이드주화로 삽니다. ${Math.ceil(left / 60000)}분 뒤 바뀝니다. 일반·고급은 각 칸에서 언제든 전으로 삽니다.</small>`;
+  info.innerHTML = `<b>코디 상점</b><br><small>희귀·영웅 코디와 환수는 진열됐을 때만 레이드주화로 구매할 수 있습니다. ${Math.ceil(left / 60000)}분 뒤 진열이 바뀝니다. 일반·고급은 각 칸에서 언제든 전으로 구매합니다.</small>`;
   if (sel) {
     const it = items[sel];
     info.innerHTML += `<br><b>${it.name}</b> <span style="color:${GRADES[it.grade].color}">${GRADES[it.grade].name}</span>`
-      + (it.kind !== 'pet' && !canWear(cls, it) ? '<br><small>이 직업은 입을 수 없습니다(다른 직업용).</small>' : '');
+      + (it.kind !== 'pet' && !canWear(cls, it) ? '<br><small>다른 직업 전용이라 착용할 수 없습니다.</small>' : '');
     const b = buyButton(sel, () => buildCoordi());
     if (b) info.append(document.createElement('br'), b);
   }
   const re = document.createElement('button');
   re.className = 'btn';
-  re.textContent = `진열 바꾸기 ${A.won(REROLL)}`;
+  re.textContent = `진열 갱신 ${A.won(REROLL)}`;
   re.disabled = (p.gold || 0) < REROLL;
   re.onclick = () => { p.gold -= REROLL; state().shop = null; pick = null; buildCoordi(); };
   info.append(document.createElement('br'), re);
@@ -1147,12 +1147,12 @@ function buildShop(detail, cls) {
 function buildPull(detail) {
   const items = costumeItems(), p = A.progress();
   staticList(lastPulls.map(id => itemCell(id)));
-  if (!lastPulls.length) $('#coordi-list').innerHTML = '<div class="coordi-note" style="position:static">뽑은 코디가 여기 보입니다.</div>';
+  if (!lastPulls.length) $('#coordi-list').innerHTML = '<div class="coordi-note" style="position:static">뽑은 코디가 여기에 표시됩니다.</div>';
   detail.innerHTML = '';
   const info = document.createElement('div');
   info.className = 'coordi-info';
   const rate = PULL.rate.map((r, g) => `${GRADES[g].name} ${r}%`).join(' · ');
-  info.innerHTML = `<b>코디 뽑기</b><br><small>아직 없는 코디·환수 하나를 뽑습니다(겹치지 않음). ${rate}. 10회는 마지막 한 번이 희귀 이상을 보장합니다. 능력치는 없고, 모은 수만 코디 수집 효과에 더해집니다.</small>`;
+  info.innerHTML = `<b>코디 뽑기</b><br><small>미보유 코디·환수 하나를 뽑습니다(중복 없음). ${rate}. 10회는 마지막 한 번이 희귀 이상을 보장합니다. 능력치는 없고, 수집 수만큼 코디 수집 효과가 오릅니다.</small>`;
   const row = document.createElement('div');
   row.className = 'coordi-actions';
   row.style.marginTop = '6px';
@@ -1169,7 +1169,7 @@ function buildPull(detail) {
       if (!got.length) A.say('더 뽑을 코디가 없습니다.', 'sys');
       else {
         const best = got.reduce((a, b) => (items[b].grade > items[a].grade ? b : a));
-        A.say(`코디 뽑기: ${got.length}개 (가장 좋은 것 [${items[best].name}] ${GRADES[items[best].grade].name})`, 'sys');
+        A.say(`코디 뽑기: ${got.length}개 (최고 등급 [${items[best].name}] ${GRADES[items[best].grade].name})`, 'sys');
       }
       buildCoordi();
     };
@@ -1185,11 +1185,11 @@ function buildCollect(detail) {
     const el = document.createElement('div');
     el.className = 'forge-item' + (b.n >= at ? ' ready' : ' done');
     const txt = Object.entries(add).map(([k, v]) => (k === 'hp' ? `체력 +${v}` : k === 'armor' ? `방어 +${v}` : `피해 +${Math.round(v * 100)}%`)).join(', ');
-    el.innerHTML = `<b>${at}개 모으기</b><small>${txt}</small>`;
+    el.innerHTML = `<b>${at}개 수집</b><small>${txt}</small>`;
     return el;
   }));
-  detail.innerHTML = `<div class="coordi-info"><b>코디 수집 ${b.n}개</b> <small>(코디와 환수 모두)</small><br><small>모든 직업이 함께: 체력 +${b.hp}, 방어 +${b.armor}, 피해 +${Math.round(b.dmg * 100)}%`
-    + `${b.next ? ` · 다음 ${b.next[0]}개` : ' · 모두 열림'}</small><br><small>일반·고급 코디는 전으로 언제든, 희귀·영웅은 상점 진열 때 레이드주화로 사고, 뽑기(전)와 레이드·대항전 승리, 사냥터 보스의 보물에서도 얻습니다. 전설은 뽑기와 보상에서만 나옵니다.</small></div>`;
+  detail.innerHTML = `<div class="coordi-info"><b>코디 수집 ${b.n}개</b> <small>(코디와 환수 모두)</small><br><small>모든 직업 공용: 체력 +${b.hp}, 방어 +${b.armor}, 피해 +${Math.round(b.dmg * 100)}%`
+    + `${b.next ? ` · 다음 ${b.next[0]}개` : ' · 모두 해금'}</small><br><small>일반·고급 코디는 언제든 전으로, 희귀·영웅은 상점 진열 때 레이드주화로 구매합니다. 뽑기(전), 레이드·대항전 승리, 사냥터 보스의 보물에서도 획득합니다. 전설은 뽑기와 보상에서만 나옵니다.</small></div>`;
 }
 
 // The dress room's sheets (a trial look's layers, a pet's), each decoded into a bitmap of its own
