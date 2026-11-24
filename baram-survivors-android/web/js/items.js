@@ -415,7 +415,7 @@ export const JUDGE_CRAFTS = [
     base: { warrior: [7100443], rogue: [7100443] }, pow: 12.5, opt: 'life', from: 'cr_judge_weapon',
     mats: { essence: 15, kalpa: 15, pearl: 1, scroll: 2 }, gold: 22000, legend: true, judge: true },
   { id: 'cr_judge_weapon3', kind: 'weapon', name: '악마 심판의낫', look: '심판의낫', needs: 'raid_hell',
-    base: { warrior: [7100443], rogue: [7100443] }, worn: { warrior: 's_akma', rogue: 's_akma', mage: 's_akma' }, dress: AKMA_DRESS, swing: true,
+    base: { warrior: [7100443], rogue: [7100443] }, dress: AKMA_DRESS, swing: true, // (사용자 2026-11-24: 군주 청룡 낫에 심연색 — AKMA_DRESS)
     pic: 'name', picName: '악마사냥꾼의낫', noCoordi: true, stars: 1, pow: 16.3, opt: 'life', from: 'cr_judge_weapon2',
     mats: { hoehan: 10, essence: 20, kalpa: 25, scroll: 3 }, gold: 40000, legend: true, judge: true },
 ];

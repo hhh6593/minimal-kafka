@@ -596,7 +596,7 @@ async function boot() {
       for (const [c, H] of Object.entries(M.yhero2)) {
         if (!H.layers || !H.layers.weapon) continue;
         if (!H.layers.weapon.s_akma) H.layers.weapon.s_akma = ak;
-        if (id !== 'cr_judge_weapon3' && !BORROW.includes(c)) continue;
+        if (!BORROW.includes(c)) continue; // (악마 심판의낫도 이제 군주 청룡 낫에 심연색: items.js dress)
         if (!(sp.worn[c] && H.layers.weapon[sp.worn[c]])) sp.worn[c] = 's_akma';
       }
     }
