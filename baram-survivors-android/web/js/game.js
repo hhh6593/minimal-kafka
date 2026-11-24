@@ -583,12 +583,18 @@ async function boot() {
   // 악마 심판의낫 (공용 무기, 사용자 2026-11-23): the classes with no scythe of their own wear the warrior's drawn
   // scythe layer, laid by its foot on theirs (the swing is the same for all).
   if (M.yhero2 && M.yhero2.warrior && M.yhero2.warrior.layers.weapon.s_akma && SPECIAL.cr_judge_weapon3) {
-    const ak = M.yhero2.warrior.layers.weapon.s_akma, sp = SPECIAL.cr_judge_weapon3;
-    sp.worn = sp.worn || {};
-    for (const [c, H] of Object.entries(M.yhero2)) {
-      if (!H.layers || !H.layers.weapon) continue;
-      if (!H.layers.weapon.s_akma) H.layers.weapon.s_akma = ak;
-      sp.worn[c] = sp.worn[c] || 's_akma';
+    const ak = M.yhero2.warrior.layers.weapon.s_akma;
+    // (청룡·군주 청룡 심판의낫의 낫 그림(c7100334 …)은 이 빌드에 없어 아무도 낫이 안 보였다: 세 단계 모두 이 낫 그림,
+    // 불꽃(dress)은 악마 심판의낫만)
+    for (const id of ['cr_judge_weapon', 'cr_judge_weapon2', 'cr_judge_weapon3']) {
+      const sp = SPECIAL[id];
+      if (!sp) continue;
+      sp.worn = sp.worn || {};
+      for (const [c, H] of Object.entries(M.yhero2)) {
+        if (!H.layers || !H.layers.weapon) continue;
+        if (!H.layers.weapon.s_akma) H.layers.weapon.s_akma = ak;
+        if (!(sp.worn[c] && H.layers.weapon[sp.worn[c]])) sp.worn[c] = 's_akma';
+      }
     }
   }
   // Every getting-up (성황령, the class's own 부활, a companion raised) shows 연's revive.
