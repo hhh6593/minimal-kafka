@@ -209,7 +209,8 @@ export const MATS = {
 };
 // The 사신수 성물's own raids (above); elsewhere a taste only (SINSU_TASTE a boss). 현무's 해왕 gives
 // its full share only once 바루나 has fallen. A 사신수 recipe's gate (needs) is its 성물's raid.
-export const SINSU_GATE = { sinsu_cheong: ['raid_varuna'], sinsu_jujak: ['raid_agni'], sinsu_baekho: ['raid_airavata'], sinsu_hyeonmu: ['raid_varuna', 'raid_sea'] };
+// (주작혈안: 아그니만이 아니라 화령(천 년의 불)에서도 온전히 — 사용자 2026-11-24, 화령을 돌아도 안 나왔다)
+export const SINSU_GATE = { sinsu_cheong: ['raid_varuna'], sinsu_jujak: ['raid_agni', 'raid_fire'], sinsu_baekho: ['raid_airavata'], sinsu_hyeonmu: ['raid_varuna', 'raid_sea'] };
 export const SINSU_TASTE = 0.05;
 /** How many of a 성물 a kill drops at a stage, with the raids already won (progress.raids). */
 export function sinsuCount(id, stage, kind, raids) {
@@ -366,7 +367,7 @@ export const CRAFTS = [
   // 청룡신검 the 백사월도(치장용) (코디 309106, the same hooked blade), blued.
   { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', base: { warrior: [309106, '백사월도'] }, dress: SINSU_DRESS.cheong, worn: { warrior: 's_cheong' }, pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage'], name: '주작선장', look: '흑단화염장', base: { mage: [309203, '주작선장'] }, /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
+  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage', 'poet', 'magus', 'celestial'], name: '주작선장', look: '흑단화염장', base: { mage: [309203, '주작선장'], poet: [309203, '주작선장'], magus: [309203, '주작선장'], celestial: [309203, '주작선장'] }, /* (사용자 2026-11-24: 도사·주술사·마도사·천인 모두 착용) */ /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',

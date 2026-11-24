@@ -69,4 +69,4 @@
 - [해결 2026-11-24] 심판의낫 외형 (아래 기록은 원인): 청룡·군주 청룡 심판의낫(연 아이템 7100334·7100335·7100336·7100443)의 낫 레이어(c<id>)가 이 빌드(이전 APK 기반)에 없어, 임시로 악마 심판의낫 낫 그림(s_akma)을 세 단계 모두에 빌려 씀(game.js 부팅 코드). 연 원본(/yres/dec/*.unity3d)에서 이 아이템들의 직업별 무기 레이어를 뽑아 yhero2에 넣고, 빌린 그림은 원래 레이어가 있으면 쓰지 않게(이미 그렇게 조건 걸림). 악마 심판의낫 그림(sinsu/akma_*)도 원작과 맞는지 재확인. 사용자 참고 그림: 창처럼 세워 드는 모습.
 - 심판의낫 치장용 낫(연 7100334·7100335·7100336·7100443)은 tools/yeon_costume.py로 뽑음: Commons에서 tables/Items_Avatar.bin·Strings → item_names.json,
   YHERO2_DIR = 테스트 www의 manifest yhero2(index.json) + assets/yhero2 링크, `COSTUME_ALL_CLASSES=1 COSTUME_CAST_BARE=1 COSTUME_IDS=… … weapon`
-  → <GEAR>/ycostume_add, repack_from_apk.py가 www ycostume에 합침. 8직업은 원본 낫, 무사·궁사·격투가는 악마 심판의낫 낫을 빌림.
+  → <GEAR>/ycostume_add, repack_from_apk.py가 www ycostume에 합침. 주작선장(309203)도 같은 방법으로 마도사·천인에 추가. 8직업은 원본 낫, 무사·궁사·격투가는 악마 심판의낫 낫을 빌림.
