@@ -1901,7 +1901,7 @@ function fireGyeok(g, t) {
     if (g.draw === 'cr' && fxId === g.fx && M.fx.g_cr_brush) crBurst('storm', t, fxK, g);
     else {
       // (보이는 범위 = 맞는 범위: an area 격 over the 3×3 it strikes, a single one on the one struck)
-      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null, ...(g.area ? { area: true, cap: 3 * 1.25 } : {}) });
+      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null, ...(g.area ? { area: true, cap: g.capT || 3 * 1.25 } : g.capT ? { area: true, cap: g.capT } : {}) });
       gyLight(fxId);
     }
     // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water; with its 청룡,

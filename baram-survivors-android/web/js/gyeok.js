@@ -13,6 +13,8 @@
 
 // The 끝없는 지옥's black and blood, as a filter over a 격's picture (악마 심판 격, the 심연판 격).
 export const ABYSS_TINT = 'grayscale(1) sepia(1) saturate(8) hue-rotate(-42deg) brightness(0.48) contrast(1.7)';
+// 심연·악마 심판의 격 그림: 흑적색이되 용의 모양이 보이게(0.48은 검은 그림자로만 보였다 — 사용자 2026-11-24)
+export const ABYSS_GY_TINT = 'grayscale(1) sepia(1) saturate(9) hue-rotate(-42deg) brightness(0.78) contrast(1.5)';
 
 export const STATUS = {
   // id: name, icon (hud/st_<icon>.png), colour of its numbers, what it does (game.js)
@@ -54,14 +56,15 @@ export const GYEOK = {
   gwimunsang: { name: '귀문진상격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_grab_ghost', st: ['despair', 6], mech: { pull: { r: 3, max: 8 } } },
   cheonja: { name: '천자의분노 격', on: 'hit', chance: 0.2, cd: 20, dmg: 3.5, area: 1, fx: 'g_anger_son', self: ['pierce', 5, 0.2], mech: { rally: { k: 0.12, sec: 5 } } },
   // 기원 격: the blow that heals (연 8030 진청룡마령참 격: 체력·마력 50% 회복).
-  maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', heal: 0.5, mech: { strikes: { n: 2, gap: 0.35 }, cleanse: true } },
+  // (사용자 2026-11-24: 심판의낫 격은 원래의 3배 — 청룡참 0.8→2.4, 진청룡마령참 1→3, 악마 심판 1.3→3.9; 심연 ×1.7→×2.2)
+  maryeongcham: { name: '진청룡마령참 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4, area: 1, fx: 'g_roaring_dragon', fxK: 3, capT: 7, heal: 0.5, mech: { strikes: { n: 2, gap: 0.35 }, cleanse: true } },
   // 심판의낫's line, one way grown at each step: a blow and a heal (연 Buff 5534-5538, 심판의 낫의 힘:
   // "피해를 입히고 체력과 마력을 회복"). 청룡참 the first (the dragon smaller), 진청룡마령참 the 군주's
   // (above), 악마 심판 격 the last: the dragon's roar in the 끝없는 지옥's black and blood (tint), wider,
   // and 절망 on the struck (they strike softer): the line's balance, a little of blow, heal and guard.
-  cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', fxK: 0.8, mech: { strikes: { n: 2, gap: 0.35 } } },
-  akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', fxK: 1.3,
-    fx2: 'k_ab_darkburst', fx2K: 0.7, tint: ABYSS_TINT, mech: { first: 0.6, zone: { r: 2, sec: 4, k: 0.05, drain: 0.3, color: 'blood' } } },
+  cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', fxK: 2.4, capT: 6, mech: { strikes: { n: 2, gap: 0.35 } } },
+  akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', fxK: 3.9,
+    fx2: 'k_ab_darkburst', fx2K: 1.3, tint: ABYSS_GY_TINT, capT: 8, mech: { first: 0.6, zone: { r: 2, sec: 4, k: 0.05, drain: 0.3, color: 'blood' } } },
   // 태초's own (태초광명 격): 천자의분노's wide blow in gold-white light, a stun, and the wearer's pierce.
   taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_taecho_light', fxK: 1.4,
     fx2: 'g_taecho_light', fx2K: 0.6, tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.2)', mech: { first: 0.8, rays: { n: 3, r: 1, k: 0.3, lone: 0.07, gap: 0.12 }, rally: { k: 0.1, sec: 5 } } },
@@ -123,7 +126,7 @@ export const ABYSS_KIN = ['saseong', 'maengdok', 'binggyeol', 'yeomryeong', 'jio
 for (const id of ABYSS_KIN) {
   const g = GYEOK[id];
   // Drawn as the top weapons they are: their own picture larger, and the abyss's dark burst on the struck.
-  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_TINT, fxK: (g.fxK || 1) * 1.7,
+  GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_GY_TINT, capT: 5, fxK: (g.fxK || 1) * 2.2,
     ...(g.fx2 ? {} : { fx2: 'k_ab_darkburst', fx2K: 0.9 }),
     ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : g.mech && g.mech.chain ? {} : { area: 1 }),
     // and its way one step further: a chain two more leaps, a ground a second longer
