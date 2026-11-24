@@ -1644,6 +1644,10 @@ const PICS1320 = {
 for (const [id, o] of Object.entries(PICS1320)) Object.assign(SKILLS[id], o, { fxs: null, tint: null, modern: null, yeon: true });
 // 사용자 2026-11-23: 너무 크다 — 판정은 그대로, 그림만 (노도성황 화면의 0.9 → 0.5, 선기전도 11칸 → 5.5칸, 혼마염 불꽃 90 → 60px)
 Object.assign(SKILLS.m_nodo, { frac: 0.5 });
+// 원거리 직업(천인 제외 마법 계열·궁사)은 돌진하지 않는다 (사용자 2026-11-24): 추격은 선 자리에서 일렬 여섯 칸에 화살을,
+// 마기순보는 몸을 옮기지 않고 바라보는 쪽 몬스터를 푸른 불꽃으로 친다.
+Object.assign(SKILLS.a_chase, { dash: false, desc: '바람을 타고 선 자리에서 일렬 여섯 칸의 몬스터에게 화살을 퍼붓는다' });
+Object.assign(SKILLS.m_shift, { kind: 'spell', range: 5, count: 1, desc: '마기를 실은 푸른 불꽃을 바라보는 쪽 몬스터에게 순식간에 꽂는다' });
 // 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
 Object.assign(SKILLS.r_formless, { kind: 'cleave', depth: 2, max: 4 });
 Object.assign(SKILLS.m_coldveil, { fxHit: null, frac: 0.45 });
