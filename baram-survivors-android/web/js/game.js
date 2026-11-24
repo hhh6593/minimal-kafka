@@ -1726,11 +1726,11 @@ function applyGear() {
   p.abyssHunt = !!(wsp && wsp.rarity && !wsp.taecho);
   p.taecho = !!(wsp && wsp.taecho);
   // 최종 무기의 성격 (사용자 2026-11-23: 모두 같은 최고 등급, 장점만 다르게) — items.js FINAL_ROLE:
-  // 용무기 제구·제십 보스형, 사신수 지존 PVP형(대항전·쟁의 적), 심연 고유 하이브리드(보스 조금 더); 태초 사냥형·
-  // 심판의낫 고른 피해는 각자의 몫(TAECHO_EDGE, JUDGE_EDGE)
+  // 용무기 제구·제십 보스형, 사신수 지존 PVP형(대항전·쟁의 적), 심연 PVP+보스, 태초 사냥(TAECHO_EDGE)+보스,
+  // 심판의낫 하이브리드+생명력(JUDGE_EDGE)
   const dstep = !g.weaponSp && g.weapon === dragonTier(G.cls) ? starOf(G.cls, `weapon:${g.weapon}`) : 0;
   p.role = dstep >= 9 ? FINAL_ROLE.dragon : wsp && wsp.craft && wsp.craft.sinsu && wsp.kind === 'weapon' ? FINAL_ROLE.sinsu
-    : p.abyssHunt ? FINAL_ROLE.abyss : null;
+    : p.abyssHunt ? FINAL_ROLE.abyss : p.taecho ? FINAL_ROLE.taecho : null;
   p.aura = 0;
   if (g.weaponSp === 'cr_sinsu_jujak') p.aura = JUJAK_AURA.k + JUJAK_AURA.perStar * (starOf(G.cls, 'sp:cr_sinsu_jujak') - 1);
   else if (!g.weaponSp && g.weapon === dragonTier(G.cls) && starOf(G.cls, `weapon:${g.weapon}`) >= 10 && (progress.dragonSinsu || {})[c] === 'jujak') p.aura = JUJAK_AURA.dragonK;

@@ -907,7 +907,7 @@ export function abyssPower(rank) {
 // Their hunt: mob — more to plain monsters and champions (not bosses, leaders or a war's
 // fighters); abyss — more again to all in the 끝없는 지옥; burst — a kill may burst in dark fire
 // round the fallen (격 power dmg on the tiles within area; cd seconds).
-export const ABYSS_HUNT = { mob: 0.12, abyss: 0.15, burst: { chance: 0.2, cd: 0.5, dmg: 2.5, area: 1, fx: 'k_ab_darkburst' } };
+export const ABYSS_HUNT = { mob: 0, abyss: 0.15, burst: { chance: 0.2, cd: 0.5, dmg: 2.5, area: 1, fx: 'k_ab_darkburst' } };
 // 주작의 기운: allies (companions, raiders, the guild in a war) within r tiles of the wearer
 // strike k harder, perStar more for each star above ★1; the 용무기 제십 that took the 주작, dragonK.
 export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
@@ -915,8 +915,9 @@ export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
 // with each step of the line (청룡 4%, 군주 6%, 악마 8%).
 export const JUDGE_EDGE = { cr_judge_weapon: 0.04, cr_judge_weapon2: 0.06, cr_judge_weapon3: 0.08 };
 // 최종 무기의 성격 (사용자 2026-11-23): 등급은 같고 장점만 다르다. boss: 보스·우두머리에게, war: 대항전·쟁의 적에게.
-// 태초 = 사냥형(TAECHO_EDGE: 잡몹·첫 타), 심판의낫 = 고르게 + 생명력(JUDGE_EDGE, opt life), 심연 = 하이브리드(ABYSS_HUNT 잡몹·지옥 + 보스).
-export const FINAL_ROLE = { dragon: { boss: 0.15, war: 0 }, sinsu: { boss: 0, war: 0.15 }, abyss: { boss: 0.07, war: 0 } };
+// 태초 = 사냥(TAECHO_EDGE 잡몹·첫 타) + 보스, 심판의낫 = 고르게 + 생명력(JUDGE_EDGE, opt life), 심연 = PVP + 보스(지옥에서 조금 더).
+// 사용자 결정: 용무기 보스형, 사신수 PVP형, 태초 사냥+보스, 심연 PVP+보스, 심판의낫 하이브리드+생명력(악마 심판의낫만 최고 등급).
+export const FINAL_ROLE = { dragon: { boss: 0.15, war: 0 }, sinsu: { boss: 0, war: 0.15 }, abyss: { boss: 0.1, war: 0.1 }, taecho: { boss: 0.1, war: 0 } };
 // A weapon's 격 grows with the weapon: from rank `at` its picture is drawn fxK times larger and a
 // 격 that strikes round (area) reaches `area` tiles further (진청룡마령참 on a 13+ weapon, the
 // 사신수's, the 용무기 제구·제십's). Single-target 격 stay single (the 용X격): only the picture grows.
