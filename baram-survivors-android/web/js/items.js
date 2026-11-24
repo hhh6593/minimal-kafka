@@ -70,7 +70,11 @@ export const SPECIAL = Object.fromEntries(SPECIALS.map(s => [s.id, s]));
 export function specialBase(sp, cls) {
   if (sp.craft) {
     const look = typeof sp.craft.look === 'string' ? sp.craft.look : sp.craft.look[cls];
-    return lookTier(cls, sp.kind, look);
+    const t = lookTier(cls, sp.kind, look);
+    // (심판의낫류는 원작에서 직업 제한 없는 공용 무기 — 사용자 2026-11-23. 낫 그림이 없는 직업은 그 직업의 가장 높은
+    // 무기 모양으로 든다; 휘두르는 동작은 모두 같다)
+    if (t < 0 && sp.craft.judge && GEAR[cls] && GEAR[cls][sp.kind]) return GEAR[cls][sp.kind].length - 1;
+    return t;
   }
   if (sp.raid) {
     return raidTier(sp.src, cls, sp.kind); // -1: a raid's shield, for a class with none
@@ -404,15 +408,15 @@ settleRaidPieces();
 // weapons are (AKMA_DRESS: black, blood and embers, the abyss's strike effects). No stars: one step.
 export const AKMA_DRESS = { tint: 0.85, glow: 0.7, glowColor: '#b0100a', core: '#ff6a2a', flames: 5, fsc: 1 };
 export const JUDGE_CRAFTS = [
-  { id: 'cr_judge_weapon', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '청룡 심판의낫', look: '심판의낫', needs: 'palace',
+  { id: 'cr_judge_weapon', kind: 'weapon', name: '청룡 심판의낫', look: '심판의낫', needs: 'palace',
     base: { warrior: [7100334], rogue: [7100334] }, lookSteps: { 1: 7100334, 3: 7100335, 5: 7100336 },
     pow: 12, opt: 'life', mats: { scale: 12, essence: 6, scroll: 1 }, gold: 9000, legend: true, judge: true },
-  { id: 'cr_judge_weapon2', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '군주 청룡 심판의낫', look: '심판의낫', needs: 'aram',
+  { id: 'cr_judge_weapon2', kind: 'weapon', name: '군주 청룡 심판의낫', look: '심판의낫', needs: 'aram',
     base: { warrior: [7100443], rogue: [7100443] }, pow: 12.5, opt: 'life', from: 'cr_judge_weapon',
     mats: { essence: 15, kalpa: 15, pearl: 1, scroll: 2 }, gold: 22000, legend: true, judge: true },
-  { id: 'cr_judge_weapon3', kind: 'weapon', only: ['warrior', 'rogue', 'mage'], name: '악마 심판의낫', look: '심판의낫', needs: 'raid_hell',
+  { id: 'cr_judge_weapon3', kind: 'weapon', name: '악마 심판의낫', look: '심판의낫', needs: 'raid_hell',
     base: { warrior: [7100443], rogue: [7100443] }, worn: { warrior: 's_akma', rogue: 's_akma', mage: 's_akma' }, dress: AKMA_DRESS, swing: true,
-    pic: 'name', picName: '악마사냥꾼의낫', noCoordi: true, stars: 1, pow: 14.5, opt: 'life', from: 'cr_judge_weapon2',
+    pic: 'name', picName: '악마사냥꾼의낫', noCoordi: true, stars: 1, pow: 16.3, opt: 'life', from: 'cr_judge_weapon2',
     mats: { hoehan: 10, essence: 20, kalpa: 25, scroll: 3 }, gold: 40000, legend: true, judge: true },
 ];
 // 악마 심판의낫 straight from the 지하국대적 (game.js clearStage), now and then, for a class that wields it.
@@ -423,7 +427,7 @@ for (const c of JUDGE_CRAFTS) {
     gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress, worn: c.worn, lookSteps: c.lookSteps };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
-  for (const k of c.only) specialBase(sp, k);
+  for (const k of c.only || Object.keys(GEAR)) specialBase(sp, k);
 }
 // The raids written after the crafted looks (지하국대적, 선계): their pieces' places in the lines now,
 // at the ends, so no place a save holds moves (avatar.js LATE_RAIDS).
@@ -903,13 +907,16 @@ export function abyssPower(rank) {
 // Their hunt: mob — more to plain monsters and champions (not bosses, leaders or a war's
 // fighters); abyss — more again to all in the 끝없는 지옥; burst — a kill may burst in dark fire
 // round the fallen (격 power dmg on the tiles within area; cd seconds).
-export const ABYSS_HUNT = { mob: 0.2, abyss: 0.15, burst: { chance: 0.2, cd: 0.5, dmg: 2.5, area: 1, fx: 'k_ab_darkburst' } };
+export const ABYSS_HUNT = { mob: 0.12, abyss: 0.15, burst: { chance: 0.2, cd: 0.5, dmg: 2.5, area: 1, fx: 'k_ab_darkburst' } };
 // 주작의 기운: allies (companions, raiders, the guild in a war) within r tiles of the wearer
 // strike k harder, perStar more for each star above ★1; the 용무기 제십 that took the 주작, dragonK.
 export const JUJAK_AURA = { r: 4, k: 0.12, perStar: 0.0075, dragonK: 0.06 };
 // 심판의낫's way: the same edge on every foe (crowd, boss, leader, a war's fighter), no niche; more
 // with each step of the line (청룡 4%, 군주 6%, 악마 8%).
 export const JUDGE_EDGE = { cr_judge_weapon: 0.04, cr_judge_weapon2: 0.06, cr_judge_weapon3: 0.08 };
+// 최종 무기의 성격 (사용자 2026-11-23): 등급은 같고 장점만 다르다. boss: 보스·우두머리에게, war: 대항전·쟁의 적에게.
+// 태초 = 사냥형(TAECHO_EDGE: 잡몹·첫 타), 심판의낫 = 고르게 + 생명력(JUDGE_EDGE, opt life), 심연 = 하이브리드(ABYSS_HUNT 잡몹·지옥 + 보스).
+export const FINAL_ROLE = { dragon: { boss: 0.15, war: 0 }, sinsu: { boss: 0, war: 0.15 }, abyss: { boss: 0.07, war: 0 } };
 // A weapon's 격 grows with the weapon: from rank `at` its picture is drawn fxK times larger and a
 // 격 that strikes round (area) reaches `area` tiles further (진청룡마령참 on a 13+ weapon, the
 // 사신수's, the 용무기 제구·제십's). Single-target 격 stay single (the 용X격): only the picture grows.

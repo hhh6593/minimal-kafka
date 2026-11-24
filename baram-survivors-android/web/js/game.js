@@ -15,7 +15,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds, specialRank, MUSIN_SET, musinSetOf, JUDGE_EDGE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
+  GEAR_OPT, PROCS, optIds, specialRank, MUSIN_SET, musinSetOf, JUDGE_EDGE, FINAL_ROLE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
   sinsuCount, SINSU_GATE, needsMet, needsName, AKMA_DROP, FAMILY_TINT, SINSU_TINT, HEAVEN_DRESS, HEAVEN_COST,
 } from './items.js';
 import {
@@ -579,6 +579,17 @@ async function boot() {
   // 연's own effects where the build has them: the spell's picture as it is, no tint.
   for (const [id, fx] of Object.entries(YEON_FX)) {
     if (M.fx[fx]) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
+  }
+  // 악마 심판의낫 (공용 무기, 사용자 2026-11-23): the classes with no scythe of their own wear the warrior's drawn
+  // scythe layer, laid by its foot on theirs (the swing is the same for all).
+  if (M.yhero2 && M.yhero2.warrior && M.yhero2.warrior.layers.weapon.s_akma && SPECIAL.cr_judge_weapon3) {
+    const ak = M.yhero2.warrior.layers.weapon.s_akma, sp = SPECIAL.cr_judge_weapon3;
+    sp.worn = sp.worn || {};
+    for (const [c, H] of Object.entries(M.yhero2)) {
+      if (!H.layers || !H.layers.weapon) continue;
+      if (!H.layers.weapon.s_akma) H.layers.weapon.s_akma = ak;
+      sp.worn[c] = sp.worn[c] || 's_akma';
+    }
   }
   // Every getting-up (성황령, the class's own 부활, a companion raised) shows 연's revive.
   if (M.fx.k_revive) FX.revive = 'k_revive';
@@ -1714,6 +1725,12 @@ function applyGear() {
   const wsp = g.weaponSp && SPECIAL[g.weaponSp];
   p.abyssHunt = !!(wsp && wsp.rarity && !wsp.taecho);
   p.taecho = !!(wsp && wsp.taecho);
+  // 최종 무기의 성격 (사용자 2026-11-23: 모두 같은 최고 등급, 장점만 다르게) — items.js FINAL_ROLE:
+  // 용무기 제구·제십 보스형, 사신수 지존 PVP형(대항전·쟁의 적), 심연 고유 하이브리드(보스 조금 더); 태초 사냥형·
+  // 심판의낫 고른 피해는 각자의 몫(TAECHO_EDGE, JUDGE_EDGE)
+  const dstep = !g.weaponSp && g.weapon === dragonTier(G.cls) ? starOf(G.cls, `weapon:${g.weapon}`) : 0;
+  p.role = dstep >= 9 ? FINAL_ROLE.dragon : wsp && wsp.craft && wsp.craft.sinsu && wsp.kind === 'weapon' ? FINAL_ROLE.sinsu
+    : p.abyssHunt ? FINAL_ROLE.abyss : null;
   p.aura = 0;
   if (g.weaponSp === 'cr_sinsu_jujak') p.aura = JUJAK_AURA.k + JUJAK_AURA.perStar * (starOf(G.cls, 'sp:cr_sinsu_jujak') - 1);
   else if (!g.weaponSp && g.weapon === dragonTier(G.cls) && starOf(G.cls, `weapon:${g.weapon}`) >= 10 && (progress.dragonSinsu || {})[c] === 'jujak') p.aura = JUJAK_AURA.dragonK;
@@ -6182,6 +6199,7 @@ function hurtEnemy(e, dmg, push = null) {
     // 태초's first blow (items.js TAECHO_EDGE.fresh): a foe at its full health, never a war's fighter.
     * (p.taecho && own && !G.procHitting && !e.war && e.hp >= e.maxHp ? 1 + TAECHO_EDGE.fresh : 1)
     * (p.judge && own ? 1 + p.judge : 1) // 심판의낫 (items.js JUDGE_EDGE): every foe alike
+    * (p.role && own ? 1 + (e.kind === 'boss' || e.kind === 'mini' ? p.role.boss : e.war ? p.role.war : 0) : 1) // 최종 무기의 성격
     * (G.hunt ? Hunt.takeK(e) * (own ? Hunt.react(e) : 1) : 1); // 사냥 기믹: 그로기, 폭주, 속성 반응
   if (!(dmg > 0)) return 0; // never NaN: a monster with NaN life could not die
   // 치명타: one blow in ten lands at 1.8 times, its number large and golden.
@@ -6943,7 +6961,7 @@ function clearStage() {
     G.drops.push({ x: p.x, y: p.y + 30, kind: 'chest' });
     // 지하국대적: now and then 악마 심판의낫 itself (items.js AKMA_DROP), for a class that wields it.
     const ak = SPECIAL.cr_judge_weapon3;
-    if (G.stage.id === 'raid_hell' && ak && ak.craft.only.includes(G.cls.id) && Math.random() < AKMA_DROP) {
+    if (G.stage.id === 'raid_hell' && ak && (!ak.craft.only || ak.craft.only.includes(G.cls.id)) && Math.random() < AKMA_DROP) {
       G.drops.push({ x: p.x, y: p.y - 30, kind: 'gear', gear: { kind: 'weapon', tier: specialBase(ak, G.cls.id), sp: ak.id } });
       later(2.4, () => banner(`★ ${specialName(ak, G.cls.id)}`));
     }
