@@ -211,6 +211,20 @@ export function loadCostumes() {
         }
       }
     }
+    // 심판의낫 치장용 낫 (공용 무기, 사용자 2026-11-24): the classes on a rig of their own — 격투가·궁사·무사 — hold the
+    // warrior's drawn scythe, laid by its foot on theirs, as the warrior holds it.
+    const WJ = H2.warrior && H2.warrior.layers.weapon;
+    for (const id of ['c7100334', 'c7100335', 'c7100336', 'c7100443']) {
+      if (!WJ || !WJ[id]) continue;
+      for (const cls of ['monk', 'archer', 'lancer']) {
+        const H = H2[cls];
+        if (!H || !H.layers.weapon || H.layers.weapon[id]) continue;
+        H.layers.weapon[id] = WJ[id];
+        if (H2.warrior.layers.wback && H2.warrior.layers.wback[id]) (H.layers.wback = H.layers.wback || {})[id] = H2.warrior.layers.wback[id];
+        const it = items[id.slice(1)];
+        if (it && !it.classes.includes(cls)) it.classes.push(cls);
+      }
+    }
     // (연's pets run 일반 to 신화, a grade more than the looks: their 일반 and 고급 are 일반 here, their 신화 전설.)
     for (const [id, [name, grade, file, cols, cw, ch, fx, fy, anims, icon]] of Object.entries(j.pets || {})) {
       const an = {};

@@ -588,7 +588,7 @@ async function boot() {
     // 불꽃(dress)은 악마 심판의낫만)
     // (사용자 2026-11-24: 청룡·군주 청룡은 연의 치장용 낫 그림(c7100334 …, ycostume)이 맞다 — 그 그림을 그릴 수 없는 몸 틀의
     // 무사·궁사·격투가만 이 낫을 빌린다; 악마 심판의낫은 모든 직업이 이 낫)
-    const BORROW = ['monk', 'archer', 'lancer'];
+    const BORROW = []; // (격투가·궁사·무사도 이제 전사의 원본 낫을 빌린다: costume.js loadCostumes)
     for (const id of ['cr_judge_weapon', 'cr_judge_weapon2', 'cr_judge_weapon3']) {
       const sp = SPECIAL[id];
       if (!sp) continue;
