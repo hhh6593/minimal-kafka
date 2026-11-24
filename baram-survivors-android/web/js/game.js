@@ -3856,7 +3856,7 @@ function openCraft(sink = null) {
     const sp = SPECIAL[c.id], key = 'sp:' + c.id, got = b.includes(key);
     if (c.legend && c === CRAFTS.find(x => x.legend)) head('조합 · 전설 장비 (현대 바람의나라)');
     if (c.sinsu && c === CRAFTS.find(x => x.sinsu && (!x.only || x.only.includes(cls.id)))) head('조합 · 사신수 지존 장비 (성물 4종 → 신수의 격)');
-    if (c.judge && c === CRAFTS.find(x => x.judge)) head('조합 · 심판의낫 (용궁의 보물 · 균형 딜)');
+    if (c.judge && c === CRAFTS.find(x => x.judge)) head('조합 · 심판의낫 (청룡 → 군주 → 악마 · 공용 · 하이브리드·생명력)');
     if (c.group && c === CRAFTS.find(x => x.group === c.group && (!x.only || x.only.includes(cls.id)))) head(c.group);
     // An evolution is made out of its base piece at ★5, which goes into the making.
     const baseKey = c.from && 'sp:' + c.from, base = c.from && SPECIAL[c.from];
@@ -3999,7 +3999,7 @@ $('#equip-craft').onclick = () => openForge();
 let forgeTab = null, forgePick = null, forgeFresh = true, forgeBusy = false, forgeOut = null, forgeLast = null;
 const lbScroll = { tab: null };
 const forgeKey = e => e.name.replace(/ ★\d+$/, '').replace(/ \(.*\)$/, '');
-const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['무신 방어구', /사신수 무신/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
+const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['심판의낫', /심판의낫/], ['무신 방어구', /사신수 무신/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
   ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
   const t = FORGE_TABS.find(([, re]) => re.test(sec));
