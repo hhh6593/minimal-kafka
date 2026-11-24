@@ -7867,8 +7867,8 @@ function castNow(skill, st) {
           // a small thing flipped left or right, thrown rather than flying: 사용자 2026-11-23)
           if (def.flyUp) addFx(fxTiles(lf, def.flyTiles || ONE_TILES, 'fu'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
             { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], rot: Math.atan2(dy, dx) + Math.PI / 2, area: true, cap: def.flyTiles || ONE_TILES });
-          else addFx(fxFit(lf, ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
-            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip });
+          else addFx(fxFit(lf, def.flyTiles || ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
+            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip, ...(def.flyTiles ? { area: true, cap: def.flyTiles } : {}) });
           // (gone a moment after its flight: it lay on at the row's end a second, striking nothing)
           const f = G.fxs[G.fxs.length - 1];
           if (f && f.mv) f.life = Math.min(f.life, dur + 0.35);
@@ -17561,29 +17561,23 @@ function matImage(id) {
 
 /** 주작의 기운: its reach as a faint breathing ring of fire on the ground round the hero. */
 function drawAuraRing(p) {
-  // (사용자 2026-11-24: 점선 원이 짜친다 — 주작의 불꽃(연 g_sinsu_jujak_fire) 열두 송이가 범위 둘레를 따라 천천히 돌며
-  // 타오르고, 바닥은 붉은 기운이 옅게 번진다)
-  const r = JUJAK_AURA.r * TILE, k = 0.5 + 0.5 * Math.sin(G.t * 2.4);
+  // (사용자 2026-11-24: 은은한 붉은빛 기운이 주변을 감싸는 느낌 — 점선 원·불꽃 송이 대신, 범위만큼 번지는 붉은 빛이
+  // 천천히 숨쉬듯 밝아졌다 흐려진다. 가장자리는 부드럽게 사라져 범위의 끝이 은은히 보인다)
+  const r = JUJAK_AURA.r * TILE, k = 0.5 + 0.5 * Math.sin(G.t * 1.6);
   ctx.save();
-  const gr = ctx.createRadialGradient(p.x, p.y - 4, r * 0.2, p.x, p.y - 4, r);
-  gr.addColorStop(0, 'rgba(255, 90, 20, 0)');
-  gr.addColorStop(0.75, `rgba(255, 90, 20, ${0.05 + 0.03 * k})`);
-  gr.addColorStop(1, 'rgba(255, 60, 10, 0)');
+  ctx.translate(p.x, p.y - 8);
+  ctx.scale(1, 0.62);
+  const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  gr.addColorStop(0, `rgba(255, 70, 30, ${0.16 + 0.06 * k})`);
+  gr.addColorStop(0.55, `rgba(255, 60, 20, ${0.1 + 0.05 * k})`);
+  gr.addColorStop(0.88, `rgba(230, 40, 20, ${0.07 + 0.04 * k})`);
+  gr.addColorStop(1, 'rgba(200, 30, 10, 0)');
+  ctx.globalCompositeOperation = 'lighter';
   ctx.fillStyle = gr;
   ctx.beginPath();
-  ctx.ellipse(p.x, p.y - 4, r, r * 0.62, 0, 0, Math.PI * 2);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-  const id = 'g_sinsu_jujak_fire', f = M.fx[id];
-  if (!f) return;
-  const n = 12, sc = 0.8;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + G.t * 0.35;
-    const x = p.x + Math.cos(a) * r, y = p.y - 4 + Math.sin(a) * r * 0.62;
-    ctx.globalAlpha = 0.55 + 0.3 * Math.sin(G.t * 3 + i);
-    drawFx(id, x, y, G.t + i * 0.13, sc, 0, 'bottom', true);
-  }
-  ctx.globalAlpha = 1;
 }
 
 /** 주작의 기운 on the allies it reaches: the 주작혈안 (연's icon) over their heads, breathing. */
