@@ -1400,6 +1400,12 @@ function leave(b) {
 /** May this monster press onto a taken tile beside the hero? */
 function canShare(b, nx, ny) {
   if (G && G.war) return !!(b.war && War.share(b, nx, ny));
+  // 보스는 잡몹 사이를 헤치고 영웅에게 붙는다 (사용자: 보스가 나와도 잡몹에게 쏠린다 — 영웅을 둘러싼 무리에 막혀 2~3칸 밖에
+  // 서 있어, 근접 공격이 닿는 건 늘 잡몹이었다): a plain monster's tile it may share, near the hero.
+  if (G && !G.stage.raid && b.kind === 'boss' && b.m && !b.flee) {
+    const p = G.player, d = Math.abs(nx - p.tx) + Math.abs(ny - p.ty), h = occ.get(key(nx, ny));
+    return d >= 1 && d <= 8 && !!(h && h.m && !h.ally && !h.war && h.kind !== 'boss') && !(p.stepping && p.sfx === nx && p.sfy === ny);
+  }
   if (!G || G.war || G.stage.raid || !b.m || b.ally || b.war || b.march || b.flee || b.kind === 'boss' || b.kind === 'mini') return false;
   const p = G.player, d = Math.abs(nx - p.tx) + Math.abs(ny - p.ty);
   if (d < 1 || d > 2 || (p.stepping && p.sfx === nx && p.sfy === ny)) return false;
@@ -7084,7 +7090,9 @@ function nearestEnemies(n, range, from = G.player) {
  *  way (line, cleave, the rows) goes to the boss first when it is in that blow's reach; out of its reach they take what
  *  is near, as before (the hero never waits on a boss it cannot reach). A spread spell hits round it as it always did. */
 function bossIn(range, from = G.player) {
-  for (const e of G.enemies) if (e.kind === 'boss' && tkFoe(e) && tdist(e, from) <= range) return e;
+  // (a boss is drawn two to four tiles high round its one tile: within 1.5 tiles more it is seen beside the hero —
+  // 사용자: 보스가 바로 옆인데 잡몹을 친다)
+  for (const e of G.enemies) if (e.kind === 'boss' && tkFoe(e) && tdist(e, from) <= range + 1.5) return e;
   return null;
 }
 /** What a row or a triangle of foes is worth in choosing the way a blow goes: the one with the boss in it first (보스 우선). */
