@@ -586,6 +586,9 @@ async function boot() {
     const ak = M.yhero2.warrior.layers.weapon.s_akma;
     // (청룡·군주 청룡 심판의낫의 낫 그림(c7100334 …)은 이 빌드에 없어 아무도 낫이 안 보였다: 세 단계 모두 이 낫 그림,
     // 불꽃(dress)은 악마 심판의낫만)
+    // (사용자 2026-11-24: 청룡·군주 청룡은 연의 치장용 낫 그림(c7100334 …, ycostume)이 맞다 — 그 그림을 그릴 수 없는 몸 틀의
+    // 무사·궁사·격투가만 이 낫을 빌린다; 악마 심판의낫은 모든 직업이 이 낫)
+    const BORROW = ['monk', 'archer', 'lancer'];
     for (const id of ['cr_judge_weapon', 'cr_judge_weapon2', 'cr_judge_weapon3']) {
       const sp = SPECIAL[id];
       if (!sp) continue;
@@ -593,6 +596,7 @@ async function boot() {
       for (const [c, H] of Object.entries(M.yhero2)) {
         if (!H.layers || !H.layers.weapon) continue;
         if (!H.layers.weapon.s_akma) H.layers.weapon.s_akma = ak;
+        if (id !== 'cr_judge_weapon3' && !BORROW.includes(c)) continue;
         if (!(sp.worn[c] && H.layers.weapon[sp.worn[c]])) sp.worn[c] = 's_akma';
       }
     }

@@ -75,6 +75,27 @@ def main():
         if old_g and (old_g["cols"], old_g["rows"]) == (v["cols"], v["rows"]):
             old_g["walk"], old_g["start"] = v["walk"], v["start"]
             print(f"walk grid of {gid} replaced")
+    # Looks made since that APK (GEAR_DIR/ycostume_add/: tools/yeon_costume.py's output for a few items, e.g. the
+    # 청룡·군주 청룡 심판의낫 치장용 on every class — COSTUME_ALL_CLASSES=1 COSTUME_CAST_BARE=1 COSTUME_IDS=…), merged into
+    # the www's ycostume/index.json as prepare_assets.py does (sheets under yhero2/c/).
+    add = os.path.join(gear, "ycostume_add")
+    cip = os.path.join(assets, "ycostume", "index.json")
+    if os.path.isfile(os.path.join(add, "index.json")) and os.path.isfile(cip):
+        ci, ad = json.load(open(cip, encoding="utf-8")), json.load(open(os.path.join(add, "index.json"), encoding="utf-8"))
+        fidx = {f[0]: n for n, f in enumerate(ci["files"])}
+        for cls_id, kinds in ad["layers"].items():
+            for kind, variants in kinds.items():
+                for v, meta in variants.items():
+                    fn = "c/" + os.path.basename(meta["file"])
+                    if fn not in fidx:
+                        shutil.copyfile(os.path.join(add, meta["file"]), os.path.join(assets, "yhero2", fn))
+                        fidx[fn] = len(ci["files"])
+                        ci["files"].append([fn, meta["cols"]] + meta["cell"] + meta["foot"] + ([meta["side"]] if meta.get("side") else []))
+                    ci["layers"].setdefault(cls_id, {}).setdefault(kind, {})[v] = fidx[fn]
+        for iid, it in ad["items"].items():
+            ci["items"][iid] = [it["kind"], it["name"], it.get("grade", 1), it.get("set") or "", it.get("whole", 0), 0]
+        json.dump(ci, open(cip, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        print(f"merged {len(ad['items'])} looks from ycostume_add")
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
 

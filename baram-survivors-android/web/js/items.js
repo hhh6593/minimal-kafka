@@ -427,6 +427,9 @@ for (const c of JUDGE_CRAFTS) {
     gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress, worn: c.worn, lookSteps: c.lookSteps };
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
+  // (공용: the 연 치장용 낫 for every class — the base look's ids are the same for all; tools/yeon_costume.py drew them on
+  // each class's own frames, GEAR_DIR/ycostume_add)
+  if (c.judge && c.base && c.base.warrior) for (const k of Object.keys(GEAR)) c.base[k] = c.base[k] || c.base.warrior;
   for (const k of c.only || Object.keys(GEAR)) specialBase(sp, k);
 }
 // The raids written after the crafted looks (지하국대적, 선계): their pieces' places in the lines now,

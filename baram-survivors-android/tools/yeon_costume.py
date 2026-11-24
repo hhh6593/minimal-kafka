@@ -698,6 +698,9 @@ def main():
         allowed = None
         if kind == 'weapon':
             allowed = set(weapon_classes(iid))
+            # (COSTUME_ALL_CLASSES=1: a 공용 무기's look on every class — 심판의낫, whose swing is the same for all)
+            if os.environ.get('COSTUME_ALL_CLASSES'):
+                allowed = set(index)
         elif kind == 'shield':
             allowed = {c for c in index if index[c]['layers'].get('shield')}
         whole = kind == 'helmet' and 'WHOLE_HAT' in (it.get('Tag') or [])
@@ -750,7 +753,10 @@ def main():
                         need = need | own[cls].get('wback', set())
                     if only:
                         print(iid, cls, 'bare frames', sorted(f for f in need if not d.get(f))[:8])
-                    if any(not d.get(f) for f in need):
+                    # (COSTUME_CAST_BARE=1: a look that misses only the cast poses — 천인·도깨비 holding 심판의낫 — is kept;
+                    # the hand is raised there, the weapon a moment unseen)
+                    bare = [f for f in need if not d.get(f)]
+                    if bare and not (os.environ.get('COSTUME_CAST_BARE') and all(f[0].startswith('cast') for f in bare)):
                         continue
                     if not metas:
                         for k in lk:
