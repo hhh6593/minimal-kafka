@@ -16023,6 +16023,11 @@ function yGearVariants(cls, gear) {
     const fx = LOOK_FIX[cls.id] && LOOK_FIX[cls.id][kind];
     const fid = fx && !(v && v[0] === 'c') && ((v && fx[v]) || (t >= 0 && fx[GEAR[cls.id][kind][t]]));
     if (fid && H.layers[kind] && H.layers[kind]['c' + fid]) v = 'c' + fid;
+    // (심판의낫 공용, 사용자 2026-11-24: 낫 그림이 없는 직업 — 격투가 등 — 에서 끼면 아무것도 안 보였다: 그 직업에서
+    // 그림이 있는 가장 높은 무기 모양으로)
+    if (kind === 'weapon' && !(v && H.layers.weapon && H.layers.weapon[v]) && sp && SPECIAL[sp] && SPECIAL[sp].craft && SPECIAL[sp].craft.judge) {
+      for (let k = GEAR[cls.id].weapon.length - 1; k >= 0; k--) { const w = map['t' + k]; if (w && H.layers.weapon[w]) { v = w; break; } }
+    }
     if (v && H.layers[kind] && H.layers[kind][v]) out[kind] = v;
   }
   // What of the weapon goes behind the body (the 무사's spear shaft, the 격투가's far fist).
