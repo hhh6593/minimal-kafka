@@ -7996,7 +7996,7 @@ function castNow(skill, st) {
         later(0.85, big);
         const km = screenBeats(0.85 + fxLife(dirFx(fxReach, skill.id, p.fdx, p.fdy)[0]), 0.9);
         const mk = def.fxMark && M.fx[def.fxMark] ? def.fxMark : null;
-        all.slice(0, 14).forEach((e, i) => { if (mk) later(0.1 + i * 0.03, () => { if (e.hp > 0) fxOn(mk, e, { scale: 0.7 }); }); });
+        all.slice(0, 14).forEach((e, i) => { if (mk) later(0.1 + i * 0.03, () => { if (e.hp > 0) fxOn(mk, e, { scale: 0.7, cap: 1.2 }); }); });
         for (const e of all) e.curse = Math.max(e.curse || 0, 1.2);
         all.slice().sort((a, b) => tdist(a, p) - tdist(b, p)).forEach((e, i) => {
           later(0.9 + Math.min(0.5, i * 0.02), () => { if (hold(e)) { smite(e, st.dmg * far(e) * km); hitOn(e); } });

@@ -1276,7 +1276,7 @@ const REWORK = {
   m_seonsim: { fx: 'k_m_curse', fx2: 'k_m_manpa' },
   // 도사 — 기원과 진법: 살리고(기원), 하늘의 벌로 치고(천벌), 진을 펼친다(진법).
   p_aegis: { aura: 6, auraR: 1, fxHit: 'k_u_p_sparkle', fxCast: 'k_u_p_seal', desc: '진을 펼쳐 잠시 받는 피해를 절반으로 줄이고, 진에 닿은 몬스터를 거듭 친다' },
-  p_daeseon: { pattern: 'mark', fxMark: 'k_p_daeseon', desc: '화면의 몬스터에 혼을 씌우고 잠시 뒤 한꺼번에 흔들어 치고 느리게 한다' },
+  p_daeseon: { pattern: 'mark', fxMark: 'k_p_daeseon', frac: 0.3, /* (사용자 2026-11-24: 너무 큼 — 화면 그림 0.9 → 0.3) */ desc: '화면의 몬스터에 혼을 씌우고 잠시 뒤 한꺼번에 흔들어 치고 느리게 한다' },
   p_wave: { fxHit: 'k_u_p_swirl' },
   p_judge: { fxHit: 'h_hit_light', fxAfter: 'k_u_p_sparkle' },
   p_honma: { fx: 'k_u_p_swirl', fx2: 'k_p_jiroe' },
@@ -1634,7 +1634,7 @@ const PICS1320 = {
   // 맹독표창: 사용자가 준 원작 표창 GIF가 몬스터 셋에게 날아가 박힌다 (s9_stamps.py venomstar)
   r_venom: { fxShot: 'o_r_venomstar', shotTiles: 2 },
   // 봉황신법: 위를 보는 봉황이 날아가는 쪽으로 돌아 2.4칸 크기로 (game.js line def.flyUp; 사용자 2026-11-23)
-  p_bonghwang: { flyUp: true, flyTiles: 2.4 },
+  p_bonghwang: { flyUp: true, flyTiles: 6 }, // (사용자 2026-11-24: 너무 작다, 5배 — 처음 1.4칸 대비 약 4.3배, 화면 높이 안)
   // 필살검강: 근접기인데 다섯 칸을 날아가는 검기였다 (사용자 2026-11-23) → 앞쪽 역삼각형(아홉 칸)을 벤다, 뛰어들어
   r_pilgeom: { kind: 'cleave', radius: 0, max: 9, depth: undefined, fxAfter: null, noMain: true, desc: '검강을 실어 앞쪽 역삼각형(아홉 칸)의 몬스터를 단숨에 벤다' },
   l_javelin: { fx: 'o_l_javelin', fxShot: 'o_l_javelinshot', fxTurn: true, shotTiles: 3.4 }, // #11 청록 창끝 빛줄기: 날아가 꽂힘, 나는 쪽을 향해
