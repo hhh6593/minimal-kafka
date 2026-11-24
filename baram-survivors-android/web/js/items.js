@@ -673,7 +673,8 @@ export function iconPictures() {
 /** The 용무기 recipe: the class's best hunting-ground weapon at ★3, scales, a pearl and gold. */
 export function craftRecipe(cls) {
   const list = plainList(cls, 'weapon');
-  return { base: list[list.length - 1], star: 3, mats: { scale: 15, pearl: 1 }, gold: 3000 };
+  // (사용자 2026-11-24: 기본 무기 ★3은 사본 다섯 개가 들어 만들기 어려웠다 — 기본 무기 하나(★1)면 된다)
+  return { base: list[list.length - 1], star: 1, mats: { scale: 15, pearl: 1 }, gold: 3000 };
 }
 
 /** Copies needed to raise a piece from a star to the next (★1→★2 two, … ★4→★5 five). */
