@@ -17561,16 +17561,29 @@ function matImage(id) {
 
 /** 주작의 기운: its reach as a faint breathing ring of fire on the ground round the hero. */
 function drawAuraRing(p) {
+  // (사용자 2026-11-24: 점선 원이 짜친다 — 주작의 불꽃(연 g_sinsu_jujak_fire) 열두 송이가 범위 둘레를 따라 천천히 돌며
+  // 타오르고, 바닥은 붉은 기운이 옅게 번진다)
   const r = JUJAK_AURA.r * TILE, k = 0.5 + 0.5 * Math.sin(G.t * 2.4);
   ctx.save();
-  ctx.strokeStyle = `rgba(255, 120, 40, ${0.24 + 0.14 * k})`;
-  ctx.lineWidth = 3;
-  ctx.setLineDash([6, 5]);
-  ctx.lineDashOffset = -G.t * 12;
+  const gr = ctx.createRadialGradient(p.x, p.y - 4, r * 0.2, p.x, p.y - 4, r);
+  gr.addColorStop(0, 'rgba(255, 90, 20, 0)');
+  gr.addColorStop(0.75, `rgba(255, 90, 20, ${0.05 + 0.03 * k})`);
+  gr.addColorStop(1, 'rgba(255, 60, 10, 0)');
+  ctx.fillStyle = gr;
   ctx.beginPath();
   ctx.ellipse(p.x, p.y - 4, r, r * 0.62, 0, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.fill();
   ctx.restore();
+  const id = 'g_sinsu_jujak_fire', f = M.fx[id];
+  if (!f) return;
+  const n = 12, sc = 0.8;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + G.t * 0.35;
+    const x = p.x + Math.cos(a) * r, y = p.y - 4 + Math.sin(a) * r * 0.62;
+    ctx.globalAlpha = 0.55 + 0.3 * Math.sin(G.t * 3 + i);
+    drawFx(id, x, y, G.t + i * 0.13, sc, 0, 'bottom', true);
+  }
+  ctx.globalAlpha = 1;
 }
 
 /** 주작의 기운 on the allies it reaches: the 주작혈안 (연's icon) over their heads, breathing. */

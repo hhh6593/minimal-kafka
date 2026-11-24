@@ -72,7 +72,7 @@ export const GYEOK = {
   // 연 plays it (g_zuzak_kyeog: the whole prefab, the fire whirling up into a white flash and the
   // phoenix in its blaze; the old g_zuzak_captain was its one texture) on the struck, and 연's 주작
   // 신수 (g_zodiac_phoenix: the red bird spreading its wings) over the wearer it strengthens.
-  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'g_zuzak_kyeog', fxAlt: 'g_zuzak_captain', altK: 2.4, fxK: 4, capT: 7.5, /* (최종 무기 등급의 크기: 심판의낫·심연 격과 같게, 사용자 2026-11-24) */ fxSelf: 'g_zodiac_phoenix', selfK: 0.7, selfDy: -34, st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true, mech: { first: 0.65, zone: { r: 2, sec: 3, k: 0.06, st: ['burn', 2, 1], color: 'fire' } } },
+  jujakbisang: { name: '주작비상 격', on: 'hit', chance: 0.2, cd: 20, dmg: 4.5, area: 2, fx: 'y_jujak', fxAlt: 'g_zuzak_kyeog', altK: 2.4, fxK: 1.3, capT: 7.5, /* (사용자 2026-11-24: 연의 주작 신수 기술 그림 y_jujak) */ /* (최종 무기 등급의 크기: 심판의낫·심연 격과 같게, 사용자 2026-11-24) */ fxSelf: 'g_zodiac_phoenix', selfK: 0.7, selfDy: -34, st: ['burn', 4, 1.5], self: ['power', 6, 0.3], party: true, mech: { first: 0.65, zone: { r: 2, sec: 3, k: 0.06, st: ['burn', 2, 1], color: 'fire' } } },
   // The PC original's three common 격 (공식 지식인: 저주격 / 데미지격 / 노도성황격) and its
   // status 격 (연 skills 30701 저주, 30801 중독, 30901 마비, 31001 절망, 33101 혼마염, 3000271 흡혈).
   jeoju: { name: '저주격', on: 'hit', chance: 0.15, cd: 12, dmg: 1.5, fx: 'g_curse_zod', st: ['curse', 6] },
