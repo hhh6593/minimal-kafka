@@ -70,3 +70,15 @@
 - 심판의낫 치장용 낫(연 7100334·7100335·7100336·7100443)은 tools/yeon_costume.py로 뽑음: Commons에서 tables/Items_Avatar.bin·Strings → item_names.json,
   YHERO2_DIR = 테스트 www의 manifest yhero2(index.json) + assets/yhero2 링크, `COSTUME_ALL_CLASSES=1 COSTUME_CAST_BARE=1 COSTUME_IDS=… … weapon`
   → <GEAR>/ycostume_add, repack_from_apk.py가 www ycostume에 합침. 주작선장(309203)도 같은 방법으로 마도사·천인에 추가. 8직업은 원본 낫, 무사·궁사·격투가는 악마 심판의낫 낫을 빌림.
+
+## 사용자 문제 보고 (2026-11-24, 나중에 할 것)
+- 대규모 전투(쟁·레이드·대항전): 기술 그림이 여전히 커지는 문제 — AI 시전(castAs)·문파원 그림 크기 다시 측정.
+- 레이드에서 스펙이 낮은 내가 엔드스펙 무기를 낀 문파원보다 세게 측정됨(다른 대규모 전투도 확인). 영웅 vs AI 피해 비율·전투력 반영 점검.
+- 대항전·쟁: 어느 정도 스펙만 맞추면 거의 죽지 않아 너무 쉬움. 자동공격이라 가만히 둬도 운으로 승패 → 컨트롤 요소 필요
+  (지휘 명령·거점·위치 선택·스킬 타이밍 등 영웅 행동이 승패에 의미 있게).
+- 문파별 스펙 분포 최대값을 더 높일 것(war.js AI_TIERS·SIDE_MAKES). 스펙 간 전투력 차이가 체감되게.
+- 레이드 난이도(쉬움/어려움) 차이가 체감 안 됨.
+- 직업 선택창: 가끔 특정 직업 모습이 안 보이거나 코디가 빠진 채로 보임(코디 늦게 불러오는 타이밍 의심 — costume.js loadCostumes 후 다시 그리기).
+- 조합창: 재료·장비 일부 이미지 없음(아이콘 누락 목록 뽑아 채우기).
+- 청룡마령참류 격 애니메이션이 너무 빨리 지나감 — 연 원본은 청룡 포효까지 약 3초. 격 그림 재생 시간/프레임 늘리기.
+- 코디 전설템 누락이 꽤 보임(yeon_costume.py 후보 조건·bare frames로 빠진 전설 코디 확인).
