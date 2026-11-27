@@ -1,3 +1,4 @@
 {
- "l_formless": {"yid": "20721400", "name": "무형지창", "prefab": "Skill_Effect_Lancer_5th_02", "icon": "Skill_Icon_Lancer_5th_02", "add_own": true, "why": "이전 APK의 k_l_formless는 렌더러가 Ifrit_Raid/Explosion 셰이더를 알기 전에 잘라 R·G·B 채널이 무지개 고리로 나옴(아이콘은 푸른 창). 지금 렌더러로 다시: 푸른 창과 빛, 어두운 고리"}
+ "l_formless": {"yid": "20721400", "name": "무형지창", "prefab": "Skill_Effect_Lancer_5th_02", "icon": "Skill_Icon_Lancer_5th_02", "add_own": true, "why": "이전 APK의 k_l_formless는 렌더러가 Ifrit_Raid/Explosion 셰이더를 알기 전에 잘라 R·G·B 채널이 무지개 고리로 나옴(아이콘은 푸른 창). 지금 렌더러로 다시: 푸른 창과 빛, 어두운 고리"},
+ "a_chasearrow": {"name": "추격 (줄 위 화살)", "prefab": "Skill_Effect_Acher_ReinForceArrowTornado_Hit", "why": "추격(a_chase)의 돌진 줄 칸마다: 바람 고리가 일고 금빛 화살이 내리꽂혀 터짐(연 궁사 강화 화살 회오리 적중, 쓰이지 않던 프리팹 — 빌드의 모든 그림과 비교해 같은 것 없음, 가장 가까운 k_l_unity 0.79). 옛 그림 k_a_chase(파란 가시 폭발)를 대신함"}
 }

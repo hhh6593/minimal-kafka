@@ -635,36 +635,36 @@ export const SKILLS = {
     desc: '마령을 불러 몬스터가 가장 많은 쪽 일렬 여섯 칸을 휩쓴다' },
   md_amulet: { promo: 1, cls: 'magus', req: 6, name: '광폭보호부', kind: 'buff', buff: 'shield', fx: '33', cd: 15, duration: 5,
     desc: '광폭의 보호부를 둘러 잠시 받는 피해를 절반으로 줄인다' },
-  md_frenzyexp: { promo: 1, cls: 'magus', req: 6, name: '광폭기폭사', kind: 'nova', fx: '25', dmg: 20, cd: 3, radius: 1,
+  md_frenzyexp: { promo: 1, cls: 'magus', req: 6, name: '광폭기폭사', kind: 'nova', spark: null, fx: '25', dmg: 20, cd: 3, radius: 1,
     desc: '광폭기를 터뜨려 둘러싼 몬스터를 밀쳐 낸다' },
   // 2차 마현선
   md_cross: { promo: 2, cls: 'magus', req: 10, name: '기공십자광선', kind: 'strike', fx: '24', dmg: 22, cd: 3, range: 7, radius: 2, count: 1,
     hitAt: 0.3, shape: 'plus', up: 'md_exfrenzy', desc: '십자로 뻗는 기공광선이 대상과 그 상하좌우를 꿰뚫는다' },
-  md_decay: { promo: 2, cls: 'magus', req: 10, name: '광폭부패', kind: 'spell', fx: '115', dmg: 16, cd: 2.6, range: 7, count: 3, curse: 3,
+  md_decay: { promo: 2, cls: 'magus', req: 10, name: '광폭부패', kind: 'spell', spark: null, fx: '115', dmg: 16, cd: 2.6, range: 7, count: 3, curse: 3,
     desc: '몬스터 셋을 썩게 하여 피해를 주고 약화시킨다' },
   md_recovery: { promo: 2, cls: 'magus', req: 10, name: '광폭즉축기', kind: 'heal', fx: '125', heal: 22, cd: 13, shieldT: 2,
     desc: '광폭기를 거두어 체력을 회복하고 잠시 보호막을 두른다' },
   // 3차 마광사
   md_wave: { promo: 3, cls: 'magus', req: 14, name: '마력파장', kind: 'nova', fx: '25', dmg: 22, cd: 3.2, radius: 2,
     desc: '마력의 물결이 둘레 두 칸의 몬스터를 친다' },
-  md_silence: { promo: 3, cls: 'magus', req: 14, name: '광폭침묵염파', kind: 'strike', fx: '148', dmg: 24, cd: 3.4, range: 7, radius: 2, count: 1,
+  md_silence: { promo: 3, cls: 'magus', req: 14, name: '광폭침묵염파', kind: 'strike', spark: null, fx: '148', dmg: 24, cd: 3.4, range: 7, radius: 2, count: 1,
     hitAt: 0.4, stun: 1, desc: '침묵의 불길이 대상과 그 주위를 태우고 잠시 멈춘다' },
-  md_bust: { promo: 3, cls: 'magus', req: 14, name: '광폭기대방출', kind: 'strike', fx: '147', dmg: 30, cd: 2.8, range: 7, radius: 0, count: 2,
+  md_bust: { promo: 3, cls: 'magus', req: 14, name: '광폭기대방출', kind: 'strike', spark: null, fx: '147', dmg: 30, cd: 2.8, range: 7, radius: 0, count: 2,
     hitAt: 0.25, desc: '광폭기를 한꺼번에 내리꽂아 몬스터 둘에게 큰 피해를 준다' },
   // 4차 마진선
-  md_ray: { promo: 4, cls: 'magus', req: 18, name: '광폭기조사', kind: 'line', fx: '22', dmg: 26, cd: 2.6, depth: 7,
+  md_ray: { promo: 4, cls: 'magus', req: 18, name: '광폭기조사', kind: 'line', spark: null, fx: '22', dmg: 26, cd: 2.6, depth: 7,
     desc: '광폭기의 빛줄기가 몬스터가 가장 많은 쪽 일렬 일곱 칸을 꿰뚫는다' },
-  md_absorb: { promo: 4, cls: 'magus', req: 18, name: '광폭체마', kind: 'spell', fx: '49', dmg: 20, cd: 2.8, range: 6, count: 1,
+  md_absorb: { promo: 4, cls: 'magus', req: 18, name: '광폭체마', kind: 'spell', spark: null, fx: '49', dmg: 20, cd: 2.8, range: 6, count: 1,
     drain: 0.3, weakest: true, desc: '몬스터의 체력과 마력을 빨아들여 체력을 회복한다' },
-  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', fx: '141', dmg: 18, cd: 6, darken: 0.8,
+  md_exfrenzy: { promo: 4, cls: 'magus', req: 18, evolved: true, name: '광폭멸천강', kind: 'screen', spark: null, fx: '141', dmg: 18, cd: 6, darken: 0.8,
     desc: '기공십자광선 8단 + 4차 승급. 하늘을 멸하는 광폭기가 화면의 모든 몬스터에게 떨어진다' },
   // 5차 마선사
-  md_bloodbat: { promo: 5, cls: 'magus', req: 21, name: '혈마광폭열파', kind: 'line', fx: '144', dmg: 32, cd: 3, depth: 7,
+  md_bloodbat: { promo: 5, cls: 'magus', req: 21, name: '혈마광폭열파', kind: 'line', spark: null, fx: '144', dmg: 32, cd: 3, depth: 7,
     curse: 3, desc: '마도사의 궁극오의. 피의 박쥐떼가 일렬 일곱 칸을 휩쓸며 약화시킨다' },
-  md_crossfrenzy: { promo: 5, cls: 'magus', req: 21, name: '광폭십자광선', kind: 'strike', fx: '24', dmg: 28, cd: 3.2, range: 7, radius: 2, count: 1,
+  md_crossfrenzy: { promo: 5, cls: 'magus', req: 21, name: '광폭십자광선', kind: 'strike', spark: null, fx: '24', dmg: 28, cd: 3.2, range: 7, radius: 2, count: 1,
     hitAt: 0.3, shape: 'plus', desc: '광폭기를 실은 십자광선이 대상과 그 상하좌우를 불사른다' },
   // 6차 마천선
-  md_stormfrenzy: { promo: 6, cls: 'magus', req: 24, name: '광폭신장', kind: 'strike', fx: '89', dmg: 30, cd: 2.8, range: 7, radius: 1, count: 3,
+  md_stormfrenzy: { promo: 6, cls: 'magus', req: 24, name: '광폭신장', kind: 'strike', spark: null, fx: '89', dmg: 30, cd: 2.8, range: 7, radius: 1, count: 3,
     hitAt: 0.3, desc: '광폭의 신장이 몬스터 셋과 그 주위를 내리친다' },
   // 7차~9차: 연's other 마도사 techniques
   md_storm: { promo: 7, cls: 'magus', req: 27, name: '기공신장', kind: 'strike', fx: '89', dmg: 32, cd: 2.2, range: 7, radius: 1, count: 3,
@@ -679,7 +679,7 @@ export const SKILLS = {
     desc: '광폭해져 잠시 공격력이 크게 오른다' },
   md_manafill: { promo: 9, cls: 'magus', req: 33, name: '마력증폭', kind: 'buff', buff: 'haste', fx: '7', cd: 16, duration: 5,
     desc: '마력을 증폭해 잠시 모든 기술이 빨리 돈다' },
-  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', fx: '141', dmg: 60, cd: 9, darken: 0.8,
+  md_wavefrenzy: { promo: 9, cls: 'magus', req: 33, name: '광폭파장', kind: 'screen', spark: null, fx: '141', dmg: 60, cd: 9, darken: 0.8,
     desc: '궁극기. 광폭의 파장이 화면의 모든 몬스터를 덮친다' },
   md_ult: { cls: 'magus', name: '광폭구회격', kind: 'ult', fx: '144', hpCost: 0.1, darken: 0.8,
     desc: '체력 10%와 마력을 모두 써서, 화면의 몬스터에게 광폭의 구슬을 퍼붓는다' },
@@ -1517,7 +1517,10 @@ const S9 = {
   md_crossq: { promo: 9, cls: 'magus', req: 33, name: "기공십자광선'쾌", kind: 'cross9', echo: undefined, fx: 'o_md_cross9', fxCast: undefined, fx2: undefined, fxHit: undefined,
     hit: 16, cd: 8, duration: 6, tick: 0.5, reach: 5, power: 0.2, buff: undefined, every: undefined, range: undefined, depth: undefined, ck: 'nova', pre: 'md_cross', branch: 0,
     desc: '6초 동안 몸 주변에 마력의 거울을 만들어 십자 네 방향으로 다섯 칸씩 열광선을 빠르게 거듭 쏜다. 광선이 몬스터에 닿으면 광폭기를 흡수해 그동안 피해가 20% 는다' },
-  md_frenzyshot: { promo: 9, cls: 'magus', req: 33, name: '광폭기사출', kind: 'saechul9', fx: 'o_md_saechul', fxHit: undefined, dmg: 60, cd: 3.2, range: 5, count: 8,
+  // (광폭기사출: the original's beam and burst cut in two — fxBeam stretched to each foe, fxBurst upright on it at the original's
+  // size, splashR its half width; spark null: no yellow lightning of the 마도사's default spark on a pink 광폭 blow)
+  md_frenzyshot: { promo: 9, cls: 'magus', req: 33, name: '광폭기사출', kind: 'saechul9', fx: 'o_md_saechul', fxBeam: 'o_md_saechulbeam', fxBurst: 'o_md_saechulburst',
+    splashR: 20, spark: null, fxHit: undefined, dmg: 60, cd: 3.2, range: 5, count: 8,
     ck: 'spell', pre: 'md_bust', branch: 1,
     desc: '바라보는 쪽 앞의 몬스터 최대 여덟에게 광폭기를 쏘아 보낸다. 광폭기가 닿은 자리에서 분홍빛 기운이 터진다' },
   md_gongjeon: { promo: 9, cls: 'magus', req: 33, name: '공간전도', kind: 'gong9', fx: 'o_md_gongjeon', fxArc: 'o_md_gongarc', dmg: 50, cd: 18, depth: 5, dur: 0.45, k: 0.5,
@@ -1652,7 +1655,10 @@ Object.assign(SKILLS.m_chaos, { frac: 0.5 });
 Object.assign(SKILLS.m_frost, { frac: 0.35, dropMax: 40 }); // (그 흰 눈구름은 작은 그림을 키운 것이라 뭉개진다: 얼음을 몬스터마다)
 // 원거리 직업(천인 제외 마법 계열)은 돌진하지 않는다 (사용자 2026-11-24): 마기순보는 몸을 옮기지 않고 바라보는 쪽 몬스터를 푸른 불꽃으로 친다.
 // (추격은 다시 돌진, 사용자 2026-11-24 — 대신 날아가는 화살 그림을 2.4칸으로 키움)
-Object.assign(SKILLS.a_chase, { flyTiles: 2.4 });
+// 2026-11-28: 날아가던 파란 가시 폭발(k_a_chase)이 궁사답지 않아, 돌진하며 지나는 줄의 칸마다 바람 고리가 일고 금빛 화살이 내리꽂히는
+// 연 궁사 그림(Skill_Effect_Acher_ReinForceArrowTornado_Hit → k_a_chasearrow, 쓰이지 않던 프리팹)으로. 한 칸에 몸 하나 크기(1.4×1.3칸),
+// 화살이 꽂히는 0.76초(10번째 그림)에 그 칸의 몬스터가 맞음 — game.js line rowFx. 돌진은 그대로.
+Object.assign(SKILLS.a_chase, { rowFx: 'k_a_chasearrow', rowHit: 0.76 });
 Object.assign(SKILLS.m_shift, { kind: 'spell', range: 5, count: 1, desc: '마기를 실은 푸른 불꽃을 바라보는 쪽 몬스터에게 순식간에 꽂는다' });
 // 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
 Object.assign(SKILLS.r_formless, { kind: 'cleave', depth: 2, max: 4 });

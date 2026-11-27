@@ -1099,10 +1099,51 @@ def chain1320(src_dir):
     pics, _ = _fit_cells(pics, 200)
     return _entry(pics, 70, "dl1320/20.gif")
 
+def saechulsplit(src_dir, out_dir):
+    """광폭기사출 (마도사 9차, 2662 IMG62): s9_fx.py's md_saechul is the original's lower-left beam with its pink burst at
+    the end, one picture. Turned to each foe as one, the burst turned with it (a pink comet lying along the beam on a
+    foe below or to the right — the original's bursts lie flat on the ground, mirrored on the right) and the whole drawn
+    to the foe's distance (a near foe's burst a speck, a far one's a blot; the beam thin or thick). Cut in two, nothing
+    redrawn: md_saechulbeam — the beam alone (a band along its axis, up to the burst's middle), turned to the foe and
+    stretched along its length only (game.js saechul9 · drawFx stretch); md_saechulburst — the burst alone (round its
+    middle, the beam's band toward the hero left out), drawn upright at its own size on the foe, mirrored on the right."""
+    ent = json.load(open(os.path.join(out_dir, "index.json"), encoding="utf-8"))["md_saechul"]
+    (cw, ch), n = ent["cell"], ent["n"]
+    sheet = np.asarray(Image.open(os.path.join(out_dir, "md_saechul.png")).convert("RGBA")).astype(np.float32)
+    ax, ay = ent["anchor"]
+    d = np.array([-142.0, 190.0]); d /= np.linalg.norm(d)
+    yy, xx = np.mgrid[0:ch, 0:cw].astype(np.float32)
+    t = (xx - ax) * d[0] + (yy - ay) * d[1]
+    s = np.abs((xx - ax) * -d[1] + (yy - ay) * d[0])
+    tc = 231.0  # the burst's middle along the beam (its frames' mean, 2662 IMG62)
+    cx, cy = ax + d[0] * tc, ay + d[1] * tc
+    band = np.clip((13.0 - s) / 4.0, 0, 1)
+    beam_k = band * np.clip((tc - 8 - t) / 6.0, 0, 1)
+    rr = np.hypot(xx - cx, yy - cy)
+    burst_k = np.clip((44.0 - rr) / 6.0, 0, 1) * (1 - band * np.clip((tc - t) / 4.0, 0, 1) * np.clip((rr - 10) / 4.0, 0, 1))
+    R = 44
+    box = (int(round(cx)) - R, int(round(cy)) - R, int(round(cx)) + R, int(round(cy)) + R)
+    beams, bursts = [], []
+    for i in range(n):
+        c = sheet[:, i * cw:(i + 1) * cw]
+        b = c.copy(); b[..., 3] *= beam_k
+        u = c.copy(); u[..., 3] *= burst_k
+        beams.append(Image.fromarray(np.clip(b, 0, 255).astype(np.uint8)))
+        big = Image.new("RGBA", (cw + 2 * R, ch + 2 * R))
+        big.paste(Image.fromarray(np.clip(u, 0, 255).astype(np.uint8)), (R, R))
+        bursts.append(big.crop((box[0] + R, box[1] + R, box[2] + R, box[3] + R)))
+    src = ent.get("src", "gif2662/IMG62.gif")
+    beam = {"cell": [cw, ch], "n": n, "ms": ent["ms"], "add": False, "anchor": [ax, ay], "src": src, "k": ent.get("k", 0.62),
+            "len": round(tc, 1)}
+    burst = {"cell": [2 * R, 2 * R], "n": n, "ms": ent["ms"], "add": False, "anchor": [R, R], "src": src, "k": ent.get("k", 0.62)}
+    return {"md_saechulbeam": (beams, beam), "md_saechulburst": (bursts, burst)}
+
+
 BUILDERS = {"w_heukgwang": heukgwang, "r_venomstar": venomstar, "w_heukaura": heukaura, "m_seori": seori,"a_hwasalbi": hwasalbi, "a_igibolt": igibolt, "mk_yeonok": yeonok, "dk_jang": dk_jang,
             "md_gong1320": gongjeon1320, "m_seonsim": seonsim1320, "l_javelin1320": javelin1320,
             "mk_stack": stack1320, "rp_chain": chain1320}  # (dk_jang: two sheets, dk_jangseal and dk_jangpole)
 POST = {"a_ult9": ult9rain, "cl_ult9": clult9orb, "cl_haeil": haeil9, "a_cheongung": cheongung9, "md_ult9": mdult9edge}  # (re-drawing an s9_fx.py sheet: run after it)
+CUT = {"md_saechulsplit": saechulsplit}  # (new sheets cut from an s9_fx.py sheet, which stays: run after it; md_saechul → md_saechulbeam·burst)
 
 
 def main():
@@ -1110,7 +1151,7 @@ def main():
     # (with no ids: every builder, then every post-pass whose s9_fx.py sheet is in the index and not yet re-drawn — a
     # post-pass marks the entry "post"; s9_fx.py writes it afresh, without the mark, when it rebuilds that sheet. So a
     # second run never lays the rain, the orb or a fade over twice)
-    only = sys.argv[3].split(",") if len(sys.argv) > 3 else list(BUILDERS) + list(POST)
+    only = sys.argv[3].split(",") if len(sys.argv) > 3 else list(BUILDERS) + list(POST) + list(CUT)
     os.makedirs(out_dir, exist_ok=True)
     ipath = os.path.join(out_dir, "index.json")
     index = json.load(open(ipath, encoding="utf-8")) if os.path.isfile(ipath) else {}
@@ -1120,7 +1161,10 @@ def main():
                 print(sid, "(post-pass: %s)" % ("already done" if sid in index else "no sheet"))
                 continue
             json.dump(index, open(ipath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-        got = POST[sid](src_dir, out_dir) if sid in POST else BUILDERS[sid](src_dir)
+        if sid in CUT and not os.path.isfile(os.path.join(out_dir, sid.replace("split", "") + ".png")):
+            print(sid, "(cut: no sheet)")
+            continue
+        got = POST[sid](src_dir, out_dir) if sid in POST else CUT[sid](src_dir, out_dir) if sid in CUT else BUILDERS[sid](src_dir)
         for sid2, (cells, entry) in (got.items() if isinstance(got, dict) else [(sid, got)]):
             if sid in POST:
                 entry["post"] = 1

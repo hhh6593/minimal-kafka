@@ -6627,6 +6627,9 @@ function screenFx(id, sid, frac = 0.9, flip = false, hold = 0) {
 
 /** Which of 연's small hit sparks (fx h_hit_*) a caster's spell leaves on each one it strikes. */
 function sparkOf(id, def) {
+  // (def.spark: its own — null for none: the 마도사's 광폭 blows are pink, their own 연 hit on each; the default yellow lightning was not theirs)
+  // ('none': no picture — and not the class's fallback claw mark either, which a null spark would bring in hurtEnemy)
+  if (def.spark !== undefined) return def.spark || 'none';
   if (def.elem === 'thunder' || /thunder|light|judge|flash|noejeon|storm|ray|cross|brilliant|jiroe|burst|gwang/.test(id)) return 'h_hit_light';
   if (def.elem === 'fire' || /fire|flame|inferno|boom|sammae|desert|kalpa|jiok|bomb|hell|crowfire|m_ult/.test(id)) return 'h_hit_fire';
   return { archer: 'h_hit_attack', celestial: 'h_hit_tiger', magus: 'h_hit_light', mage: 'h_hit_6', poet: 'h_hit_6' }[def.cls] || null;
@@ -8162,7 +8165,17 @@ function castNow(skill, st) {
       // across going down the row. A beam or a way picture that stays strikes the row while it stays.
       const rmid = (def.depth + 1) / 2;
       let llife = 0;
-      if (beam) {
+      // (def.rowFx: on each tile of the row, as the hero goes through it, a picture of its own — 추격's wind ring and the arrow
+      // driven down into it (k_a_chasearrow), a body across and stood on the tile's feet; each in the row is struck when the
+      // arrow lands on its tile, rowHit seconds into the picture: 보이는 것 = 맞는 것)
+      const rowFx = def.rowFx && M.fx[def.rowFx] ? fxFit(def.rowFx, ONE_TILES * 1.3, 'rw') : null;
+      const rowAt = d => 0.04 + dur * Math.min(1, d / def.depth);
+      if (rowFx) {
+        for (let k2 = 1; k2 <= def.depth; k2++) {
+          const tx = lx + dx * k2, ty = ly + dy * k2;
+          later(rowAt(k2), () => addFx(rowFx, tx * TILE + TILE / 2, ty * TILE + TILE - 20, { must: true, area: true }));
+        }
+      } else if (beam) {
         llife = fxAt(fxRect('k_x_' + skill.id + '_beam', LINE_ACROSS, def.depth, 'bm'), p.x + dx * rmid * TILE, p.y - 24 + dy * rmid * TILE, { rot: Math.atan2(dy, dx) + Math.PI / 2 });
       } else {
         const [lf, lflip] = dirFx(fxid, skill.id, dx, dy);
@@ -8190,7 +8203,7 @@ function castNow(skill, st) {
       later(0.04, () => meleeImpact(2));
       for (const e of hit) {
         const d = Math.max(Math.abs(e.tx - lx), Math.abs(e.ty - ly));
-        later(0.04 + (beam ? 0.06 : lpj && lpj.sp ? dur * Math.max(0, d - 0.5) / (def.depth - 0.5) : dur * Math.min(1, d / def.depth)), () => {
+        later(rowFx ? rowAt(d) + (def.rowHit || 0) : 0.04 + (beam ? 0.06 : lpj && lpj.sp ? dur * Math.max(0, d - 0.5) / (def.depth - 0.5) : dur * Math.min(1, d / def.depth)), () => {
           hitOn(e);
           smite(e, st.dmg * lk, [dx, dy]);
           // A thrust drives them on along it; one that went through throws them aside.
@@ -8808,26 +8821,34 @@ function cross9(skill, st, def) {
   note(`${skillName(skill.id, skill.lv)}: 마력의 거울이 십자로 열광선을 쏩니다.`);
 }
 
-const SAECHUL_A = Math.atan2(190, -142), SAECHUL_L = 237 * 0.62;
+const SAECHUL_A = Math.atan2(190, -142), SAECHUL_L = 231 * 0.62;
 /** 광폭기사출 (원작 2662 IMG62): 광폭기 shot at the foes ahead (the way the hero faces, within `range` tiles), `count` at most,
- *  the nearest first: each a beam from the hero to the foe and its pink burst there (o_md_saechul: the original's lower left beam,
- *  its pivot the hero, turned to the foe and drawn to its distance). 이펙트=판정: the splash at the beam's end — the foe and
- *  whoever stands inside it. */
+ *  the nearest first: each a beam from the hero to the foe and its pink burst there. The original's lower left beam cut in
+ *  two (tools/s9_stamps.py md_saechulsplit): the beam (o_md_saechulbeam, its pivot the hero) turned to the foe and stretched
+ *  along its length only to the foe's distance (drawFx stretch: as thick near or far, as in the original); the burst
+ *  (o_md_saechulburst) upright at the original's size on the foe, mirrored on the right as the original's right-hand bursts.
+ *  (It was one picture turned and scaled whole: the burst lay along the beam — a pink comet on a foe below — and was a
+ *  speck on a near foe, a blot on a far one.) 이펙트=판정: the burst — the foe and whoever stands inside it (`splashR`
+ *  game px round its middle, the burst's own half width). */
 function saechul9(st, def, smite) {
   const p = G.player, [ux, uy] = faceWay(), r = st.range || def.range || 5;
   const ahead = tkNear(p.tx, p.ty, r).filter(e => ux ? Math.sign(e.tx - p.tx) === ux && Math.abs(e.ty - p.ty) <= Math.abs(e.tx - p.tx) + 1
     : Math.sign(e.ty - p.ty) === uy && Math.abs(e.tx - p.tx) <= Math.abs(e.ty - p.ty) + 1).slice(0, st.count || def.count || 8);
   if (!ahead.length) return 0.3;
-  const run = G, x0 = p.x, y0 = p.y - 20, struck = new Set();
+  const run = G, x0 = p.x, y0 = p.y - 20, struck = new Set(), beam = M.fx[def.fxBeam] ? def.fxBeam : null;
   ahead.forEach((t, i) => later(i * 0.03, () => {
     if (G !== run) return;
-    // (보이는 범위 = 맞는 범위: the beam as long as the way to the one it strikes — held at least 0.55 of its length, it
-    // reached a tile past a foe close by)
-    const dx = t.x - x0, dy = t.y - 10 - y0, L = Math.hypot(dx, dy) || 1, sc = Math.max(0.3, Math.min(1.6, L / SAECHUL_L));
-    if (M.fx[def.fx]) G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: fxLife(def.fx), scale: sc, rot: Math.atan2(dy, dx) - SAECHUL_A, anchor: 'bottom', alpha: 1, must: true });
-    // (이펙트=판정: the pink splash at the beam's end — some 50 px across at the original's length, drawn to the foe's
-    // distance (sc) — strikes the foe and whoever else stands inside it; each struck once a cast)
-    const bx = t.x, by = t.y - 10, R = (def.splashR || 26) * sc;
+    const bx = t.x, by = t.y - 10, dx = bx - x0, dy = by - y0, L = Math.hypot(dx, dy) || 1, ang = Math.atan2(dy, dx);
+    if (beam) {
+      G.fxs.push({ id: beam, x: x0, y: y0, t: 0, life: fxLife(beam), scale: 1, rot: ang - SAECHUL_A, stretch: [ang, Math.max(0.15, L / SAECHUL_L)], anchor: 'bottom', alpha: 1, must: true });
+      if (M.fx[def.fxBurst]) G.fxs.push({ id: def.fxBurst, x: bx, y: by, t: 0, life: fxLife(def.fxBurst), scale: 1, flip: dx > 4, anchor: 'mid', alpha: 1, must: true });
+    } else if (M.fx[def.fx]) {
+      // (a build without the cut sheets: the one picture, turned and drawn to the foe's distance)
+      const sc = Math.max(0.3, Math.min(1.6, L / SAECHUL_L));
+      G.fxs.push({ id: def.fx, x: x0, y: y0, t: 0, life: fxLife(def.fx), scale: sc, rot: ang - SAECHUL_A, anchor: 'bottom', alpha: 1, must: true });
+    }
+    // (이펙트=판정: the burst on the foe strikes it and whoever else stands inside it; each struck once a cast)
+    const R = def.splashR || 20;
     later(0.12, () => {
       if (G !== run) return;
       G.quietHit = true;
@@ -10642,10 +10663,11 @@ const TIER_KINDS = {
     const f = { id: hid, x: 0, y: 0, on: at, t: 0, life: fxLife(def.fx), scale: 1, rot: 0, anchor: 'bottom', alpha: settings.calmFx ? 0.85 : 1, must: true };
     if (fx > 0) f.flip = true;
     if (fy) f.rot = fy < 0 ? Math.PI / 2 : -Math.PI / 2;
-    // (held where it stood — the crowd let it go nowhere —: the sweep over the rows ahead it burns, not on the hero)
-    if (!went) fxAt(hid, p.x + fx * TILE * (ahead + 1) / 2, p.y - 24 + fy * TILE * (ahead + 1) / 2, { flip: f.flip, rot: f.rot, alpha: f.alpha });
-    else G.fxs.push(f);
+    // (보이는 범위 = 맞는 범위, 2026-11-28: laid over the rows it burns — the path and the rows ahead, from the tile past where
+    // the charge began —, not carried with the hero: carried, a picture as long as the rows reached as far behind the start
+    // when it set out, 1.7 times the rows struck. Held where it stood — the crowd let it go nowhere —: the rows ahead.)
     const rows = went + ahead, seen = new Set();
+    fxAt(hid, x0 + fx * TILE * (rows + 1) / 2, y0 - 24 + fy * TILE * (rows + 1) / 2, { flip: f.flip, rot: f.rot, alpha: f.alpha });
     for (let k = 1; k <= rows; k++) later(0.04 + (k <= went ? (k - 1) * per : travel + (k - went - 1) * 0.06), () => {
       if (G !== run) return;
       G.quietHit = true;
@@ -16093,6 +16115,9 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
   // sheet the build shrank, ds, always: its pixels are no longer the cell's).
   if (scale * (f.k || 1) > 1.5 || (f.src ? M.fx[f.src] : f).ds) ctx.imageSmoothingEnabled = true;
   const turn = rot || flip;
+  // (fxCur.stretch [angle, k]: drawn k times as long along that way only — 광폭기사출's beam reaching each foe, as thick near or far)
+  const stretch = fxCur && fxCur.stretch;
+  if (stretch) { ctx.save(); ctx.translate(x, y); ctx.rotate(stretch[0]); ctx.scale(stretch[1], 1); ctx.rotate(-stretch[0]); ctx.translate(-x, -y); }
   let ox = x, oy = y;
   if (turn) {
     ctx.translate(x, y);
@@ -16115,6 +16140,7 @@ function drawFx(id, x, y, t, scale, rot, anchor, loop, flip, tint) {
     if (rot) ctx.rotate(-rot);
     ctx.translate(-x, -y);
   }
+  if (stretch) ctx.restore();
   if (f.add) ctx.globalCompositeOperation = op0;
   ctx.imageSmoothingEnabled = sm0;
 }
