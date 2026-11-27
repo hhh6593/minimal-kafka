@@ -4863,7 +4863,7 @@ function update(dt) {
     p.poseT = Math.max(0, p.poseT - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * (1 + 0.3 * opt('mana')) * dt);
     // Health comes back slowly by itself, as it did in the old game.
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * (1 + opt('regen')) * dt);
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * (1 + opt('regen')) * healK() * dt);
     gearTick(dt);
   }
   G.shake = Math.max(0, G.shake - dt);
@@ -6047,6 +6047,8 @@ function pactReward() {
 // MobAttackTime 1000-3000) and its AI (mob_ai_basic): a monster with no target turns to a random
 // side most of the time and steps only when it already faced that way, else walks on; a passive
 // one (MobBehavior 0) leaves people alone until struck.
+// A raid boss's bite on a raider, as a share of the raider's life (its bite on the hero: e.dmg).
+const RAID_BITE = 0.16;
 const TEMPERS = {
   timid: { step: 1.45, atk: 2.4, sight: 3 },    // 겁 많은: wanders, fights back when struck or crowded
   normal: { step: 1, atk: 1.6, sight: 99 },
@@ -6167,8 +6169,14 @@ function moveEnemies(dt) {
         }
       }
     }
+    // 공대: the boss stands three heroes tall and twenty-five crowd round it. It reaches as far as
+    // they reach it (war.js reachOf: about two tiles), or it stood wedged in the crowd, its target a
+    // tile out of reach, never striking nor stepping — no swing, no stride: a still picture.
+    const reach = e.kind === 'boss' && G.war && G.war.raid ? 1.3 + 0.6 * (e.baseScale || 1) : 0;
+    const inReach = t => reach ? Math.hypot(e.tx - t.tx, e.ty - t.ty) <= reach : Math.abs(e.tx - t.tx) + Math.abs(e.ty - t.ty) <= 1;
+    if (reach && e.atk <= 0 && tgt && !inReach(tgt) && raidSwat(e, inReach)) continue;
     if (tgt && tgt !== p) {
-      if (Math.abs(e.tx - tgt.tx) + Math.abs(e.ty - tgt.ty) <= 1) {
+      if (inReach(tgt)) {
         faceTo(e, tgt.tx, tgt.ty);
         if (e.atk <= 0) {
           e.atk = TEMPERS[e.temper || 'normal'].atk;
@@ -6176,7 +6184,7 @@ function moveEnemies(dt) {
           e.atkAt = G.t;
           // A 공대 raider's life is in the raid's measure: a servant's bite as the share it takes of
           // a hero of the raid's level (war.js), whatever the class the player came as.
-          hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * 0.16 * raidK() : tgt.war ? tgt.maxHp * e.dmg * 0.8 / War.raidHeroHp() : e.dmg * 0.8, e);
+          hurtMember(tgt, e.kind === 'boss' && G.stage.raid ? tgt.maxHp * RAID_BITE * raidK() : tgt.war ? tgt.maxHp * e.dmg * 0.8 / War.raidHeroHp() : e.dmg * 0.8, e);
         }
         continue;
       }
@@ -6186,7 +6194,7 @@ function moveEnemies(dt) {
       for (const [dx, dy] of towards(e, tgt.tx, tgt.ty)) if (step(e, dx, dy, st)) break;
       continue;
     }
-    const next = Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1; // beside, or under the hero
+    const next = reach ? inReach(p) : Math.abs(e.tx - p.tx) + Math.abs(e.ty - p.ty) <= 1; // beside, or under the hero
     if (next && !hidden) {
       // Beside the hero: strike, as monsters do, from the next tile.
       faceTo(e, p.tx, p.ty);
@@ -6197,7 +6205,7 @@ function moveEnemies(dt) {
         // Only the tile's holder bites; the others pressed in on its tile lunge for show. The heap
         // round the hero is a sight and a target, not three times the bites (at 0.6 a ring of
         // heaps bit 2.2 times as hard and swarmed the casters, 천인 dying on 왕초보).
-        if (occ.get(key(e.tx, e.ty)) === e) hurtPlayer(e.dmg, e);
+        if (reach || occ.get(key(e.tx, e.ty)) === e) hurtPlayer(e.dmg, e);
       }
       continue;
     }
@@ -6233,6 +6241,29 @@ function moveEnemies(dt) {
     leave(e);
     if (e.flee) say('보물을 지닌 몬스터가 달아났습니다.');
   }
+}
+
+/**
+ * 공대: the boss's target out of its reach (the crowd between them): it swats whoever is in reach
+ * instead, the nearest — at a raider as its bite on the one it faces, at the hero as its bite.
+ */
+function raidSwat(e, inReach) {
+  const p = G.player;
+  let best = null, bd = 1e9;
+  for (const m of G.party) {
+    if (m.down || m.dead || !m.war || !inReach(m)) continue;
+    const d = Math.hypot(e.tx - m.tx, e.ty - m.ty);
+    if (d < bd) { bd = d; best = m; }
+  }
+  if (!G.dead && !(G.buffs.stealth > G.t) && inReach(p) && Math.hypot(e.tx - p.tx, e.ty - p.ty) < bd) best = p;
+  if (!best) return false;
+  e.atk = TEMPERS[e.temper || 'normal'].atk;
+  e.lunge = 0.15;
+  e.atkAt = G.t;
+  faceTo(e, best.tx, best.ty);
+  if (best === p) hurtPlayer(e.dmg, e);
+  else hurtMember(best, best.maxHp * RAID_BITE * raidK(), e);
+  return true;
 }
 
 /** 차폐: monsters next to the hero cannot touch them while it holds. */
@@ -6296,7 +6327,9 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   p.hp -= taken;
   // 공대: the hero's share of the blows, counted (not the red floor's: that could be stepped off).
   if (G.war && (G.war.raid || G.stage.jaeng) && !(pierce && !from)) War.heroTaken(taken);
-  p.inv = 0.25;
+  // (The blink after a blow: in 대항전·「쟁」 a guild's crowd strikes together and a quarter second let four blows a
+  // second through whatever stood round — a hero of 7.7만 in the middle of a guild was never felled, balance runs.)
+  p.inv = G.war && !G.war.raid ? WAR_INV : 0.25;
   audio.play('hurt');
   floatText(p.x, p.y - 64, '-' + shownNum(taken), '#ff6060');
   if (p.hp <= 0) die();
@@ -6378,7 +6411,7 @@ function hurtEnemy(e, dmg, push = null) {
   // 흡혈 (an armour's line): a share of the hero's own blows back, at most vampCap a second (update).
   if (own && opt('vamp') && !G.procHitting) p.vampAcc = (p.vampAcc || 0) + dmg * GEAR_OPT.vamp * opt('vamp');
   // 흡혈 buff (스킬 2차 개편, data.js drain): straight back, at most 2% of the hero's life a blow.
-  if (own && G.buffs.drain > G.t && !G.procHitting && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + Math.min(p.maxHp * 0.02, dmg * (G.buffs.drainK || 0)));
+  if (own && G.buffs.drain > G.t && !G.procHitting && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + Math.min(p.maxHp * 0.02, dmg * (G.buffs.drainK || 0)) * healK());
   // The white flash of the struck, as 연 shows it on the few it strikes: a whole screen struck at
   // once (포효검황, a 필살기) flashed every body white for a blink, a field of white shapes.
   // 수련장: the dummy is struck many times a second; kept white it showed nothing but a white shape.
@@ -7498,7 +7531,9 @@ function castAs(by, id, lv, o = {}) {
   for (const k of Object.keys(real.passives || {})) pass[k] = 0;
   // (its reach as the hero's at that 단 on this field: the hero's 공력 (passive area) widens a spread spell's square, and the
   // same spell of an ally beside it is drawn and strikes as wide — the hero's blow and pace stay the hero's own)
-  pass.area = (real.passives && real.passives.area) || 0;
+  // (대규모 전투 — 대항전·「쟁」·레이드 —: not the hero's 공력. Thirty-five fighters' spells all as wide as the hero's grown
+  // ones covered the screen; theirs are as the hero's spell is at that 단 without its passives.)
+  pass.area = real.war ? 0 : (real.passives && real.passives.area) || 0;
   const st = skillStats(id, lv, { power: 0, haste: 0, ...pass });
   const on = o.on || by, onHero = on === real.player || on.hero;
   const p = {
@@ -7512,8 +7547,15 @@ function castAs(by, id, lv, o = {}) {
   const buffs = {};
   for (const k of Object.keys(real.buffs)) buffs[k] = 0;
   const sh = Object.create(real);
+  // 대규모 전투: what an AI's cast can strike lies about the one it means (AI_FX_TILES across, as its picture is held to):
+  // a 화면기 of thirty-five fighters struck and covered the whole screen each.
+  let foes = o.foes || real.enemies;
+  if (real.war) {
+    const c = o.at && o.at !== by ? o.at : by, r = AI_FX_TILES / 2 + 0.5;
+    foes = foes.filter(e => e && Math.abs(e.tx - c.tx) <= r && Math.abs(e.ty - c.ty) <= r);
+  }
   Object.assign(sh, {
-    player: p, cls: o.cls || by.cls || real.cls, buffs, passives: { power: 0, haste: 0, area: 0, ...pass }, enemies: o.foes || real.enemies, party: [], skills: [], allies: [],
+    player: p, cls: o.cls || by.cls || real.cls, buffs, passives: { power: 0, haste: 0, area: 0, ...pass }, enemies: foes, party: [], skills: [], allies: [],
     dead: false, shake: 0, bubble: null, binfo: [], ghosts: [], ambush: null, coat9: null, chainRun: null, blast: null, quietHit: false,
   });
   const base = st.dmg || def.hit || 1, draw = o.draw !== false, alpha = o.alpha === undefined ? 1 : o.alpha;
@@ -7529,6 +7571,7 @@ function castAs(by, id, lv, o = {}) {
       if (f.follow && !onHero) { f.follow = false; f.on = on; }
       if (f.life === Infinity) f.life = 1.5; // (a ward kept round the hero while it holds: once, a moment)
       if (alpha < 1) f.alpha = (f.alpha === undefined ? 1 : f.alpha) * alpha;
+      if (real.war) aiFxCap(f);
     },
   };
   const skill = { id, lv, timer: 0 };
@@ -7536,6 +7579,17 @@ function castAs(by, id, lv, o = {}) {
   return !skill.waiting && !ctx.failed;
 }
 window.__castAs = (b, id, lv, o) => castAs(b, id, lv, o); // test: an AI cast of a skill
+// 대규모 전투 (대항전·「쟁」·레이드): an AI's picture at most AI_FX_TILES across. Measured in a 청룡전 (__fxExt, 70 s): the 화면기
+// of the crowd (포효검황 k_w_howl, 결박 k_cl_bind, 짓누르기 k_dk_flatten, 빙결 k_u_m_ice: 17~21 tiles, the whole screen), 노도성황
+// 10 tiles, 9-tile squares of 8단 casts — 23 over six tiles in one war. Its blow is held to the same square (castAs foes).
+const AI_FX_TILES = 7;
+function aiFxCap(f) {
+  const d = M.fx[f.id];
+  if (!d) return;
+  const u = fxUnion(f.id), k = (d.k || 1) * (f.scale || 1), ky = d.ky || 1;
+  const m = Math.max((u ? u.x1 - u.x0 : d.w) * k, (u ? u.y1 - u.y0 : d.h) * k * ky) / TILE;
+  if (m > AI_FX_TILES) f.scale = (f.scale || 1) * AI_FX_TILES / m;
+}
 window.__joinParty = ids => { for (const id of ids) joinParty(CLASSES.find(c => c.id === id)); return G.party.map(m => [m.name, m.cls.id, m.own, m.cl, memberSkillLv(m)]); }; // test: companions now
 // test (같은 기술은 같은 그림): each picture up now, its drawn extent in tiles (the union of its frames' boxes, at its scale)
 // [id, w, h, an AI's cast ('id@lv') or '' for the hero's, alpha]
@@ -14852,10 +14906,14 @@ function updatePickups(dt) {
   G.drops = G.drops.filter(d => !d.taken);
 }
 
+// 대항전·「쟁」 (PvP): what mends the hero — its own 기원, 흡혈, the healers', its health coming back — less for a hero well
+// over its guild (war.js heroHealK); a war's guilds are the hero's match only once it can fall. (Not a raid.)
+const healK = () => (G.war && !G.war.raid ? War.heroHealK() : 1);
+const WAR_INV = 0.1;
 function heal(n, sound, quiet = false) {
   if (SH) return; // (an AI's cast mends by its own rule)
   const p = G.player;
-  n = Math.min(n, p.maxHp - p.hp);
+  n = Math.min(n * healK(), p.maxHp - p.hp);
   if (n <= 0) return;
   p.hp += n;
   healText(p, n);
@@ -17480,7 +17538,12 @@ function render(now) {
   // 공대: the spells of twenty-five hid the boss. Its shape again, faint, over them.
   if (G.war && G.war.raid) {
     const bo = G.enemies.find(e => e.kind === 'boss' && e.hp > 0);
-    if (bo && G.fxs.length) drawMonster(bo, bo.x, bo.y, bo.scale, 0.42);
+    // (A 괴수 boss in its own four-way sheet: drawMonster drew 바루나·아그니·아이라바타 as the old
+    // monster's still picture — the brown shape lying over the fight, never moving.)
+    if (bo && G.fxs.length) {
+      if (bo.beast && M.beast[bo.beast]) drawBeast(bo, 0.42, 0, 0, 0.62 * bo.scale);
+      else drawMonster(bo, bo.x, bo.y, bo.scale, 0.42);
+    }
   }
   if (trail) {
     for (const sh of G.shots) if (sh.mine && G.t >= (sh.trailAt || 0) && puffs.length < 8) { sh.trailAt = G.t + trail.cd; puffs.push([sh.x, sh.y]); }
