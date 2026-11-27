@@ -36,11 +36,20 @@ from PIL import Image, ImageDraw  # noqa: E402
 T, G, CH = 32, 48, 1024
 # war id -> bundle, map, crop in 연 tiles (x0, y0, x1, y1)
 WARS = {
-    'cheong': ('Maps_1311.unity3d', 'kow_jilin_pk_castle', (40, 30, 140, 96)),
-    'baekho': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (26, 28, 138, 76)),
-    'jujak': ('Maps_5100.unity3d', 'kow_zodiac_redbird_siege_00_00_castle', (58, 24, 104, 142)),
-    'hyeonmu': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (42, 76, 120, 142)),
-    # 월드 보스 쟁탈전 「쟁」: 연's world-boss arenas (the painted part round the play square).
+    # (대규모 전투 맵 확장, 2026-11-28: each field cut wider from the same 연 map, its origin moved by whole steps of
+    # three 연 tiles — two of the game's 48-pixel tiles — so the walk grid is the same cells and war.js's spots only shift.)
+    'cheong': ('Maps_1311.unity3d', 'kow_jilin_pk_castle', (25, 15, 140, 126)),
+    'baekho': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (26, 28, 138, 106)),
+    'jujak': ('Maps_5100.unity3d', 'kow_zodiac_redbird_siege_00_00_castle', (40, 24, 121, 142)),
+    'hyeonmu': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_00_00_castle', (21, 76, 141, 151)),
+    # 월드 보스 쟁탈전 「쟁」: 연's world-boss arenas were 28x20 tiles of ground, too small for three guilds' squads to go
+    # round one another; now 연's own PK fields of the same lands, the boss's altar and the seal stones stood on them as props.
+    'bosspk_jp': ('Maps_405500.unity3d', 'kow_japan_35_01_pyo_pk_palace', (9, 42, 141, 108)),
+    'bosspk_sea': ('Maps_509001.unity3d', 'kow_dragonpalace_pk_00_00_castle', (36, 66, 126, 138)),
+    'bosspk_sky': ('Maps_515701.unity3d', 'kow_map_assembly_skybelow', (12, 58, 148, 148)),
+}
+# The world-boss arenas used before (FLOOR_OPEN's rule is theirs).
+OLD_ARENAS = {
     'bosspk_jp': ('Maps_416001.unity3d', 'kow_japan2_worldboss_01', (9, 9, 52, 40)),
     'bosspk_sea': ('Maps_416501.unity3d', 'kow_younggung2_worldboss_01', (8, 8, 53, 41)),
     'bosspk_sky': ('Maps_415501.unity3d', 'kow_map_worldboss_undersky_wave1', (8, 8, 49, 44)),
@@ -48,7 +57,11 @@ WARS = {
 # 연 lets one walk only on a square in the middle of its world-boss arenas (the screen it fights
 # on); round it lies the same ground, painted. On these the ground the square is laid with (its
 # tiles found eight times or more in it) counts as open wherever nothing stands on it.
-FLOOR_OPEN = {'bosspk_jp', 'bosspk_sea', 'bosspk_sky'}
+FLOOR_OPEN = {'kow_japan2_worldboss_01', 'kow_younggung2_worldboss_01', 'kow_map_worldboss_undersky_wave1'}
+# 「쟁」's PK fields: 연's own movables only (blocked32's unseen-blocker rule opened 왜국's lake — its water is the
+# ground layer the shore's movable tiles also use — and 하늘 아래's dark pits round the bridges: 300~430 tiles walked on
+# that the eye reads as water or chasm).
+SEEN_ONLY = {'kow_japan_35_01_pyo_pk_palace', 'kow_dragonpalace_pk_00_00_castle', 'kow_map_assembly_skybelow'}
 
 
 PROPS = {'gate': ('1070', 'wall'), 'door': ('1054', 'wall'), 'wall': ('1034', 'wall'), 'brazier': ('1052', 'torch'),
@@ -351,7 +364,7 @@ def main():
         data, _ = yeon_maps.load_map(b, name)
         if walk_only:
             v = index[war]
-            v['walk'] = walk_grid((floor_open if war in FLOOR_OPEN else blocked32)(data, (x0, y0, x1, y1)), v['cols'], v['rows'])
+            v['walk'] = walk_grid((floor_open(data, (x0, y0, x1, y1)) if name in FLOOR_OPEN else blocked32(data, (x0, y0, x1, y1), unseen=name not in SEEN_ONLY)), v['cols'], v['rows'])
             print(war, 'walk', sum(r.count('#') for r in v['walk']), 'closed of', v['cols'] * v['rows'])
             continue
         if (b, name) not in full_cache:
@@ -367,7 +380,7 @@ def main():
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
                     os.path.join(d, f'{war}_{cx}_{cy}.png'), optimize=True)
         cols, rows = w // G, h // G
-        walk = walk_grid((floor_open if war in FLOOR_OPEN else blocked32)(data, (x0, y0, x1, y1)), cols, rows)
+        walk = walk_grid((floor_open(data, (x0, y0, x1, y1)) if name in FLOOR_OPEN else blocked32(data, (x0, y0, x1, y1), unseen=name not in SEEN_ONLY)), cols, rows)
         index[war] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'map': name, 'crop': [x0, y0, x1, y1]}
         print(war, name, (w, h), (cols, rows))
         if preview:
