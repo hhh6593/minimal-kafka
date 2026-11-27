@@ -417,6 +417,36 @@ def add_s9(gear_src, out, manifest):
     return s9icons
 
 
+def add_yskill(kdir, out, manifest):
+    """연's spell strips (a yskill dir: <skill id>.png + index.json from tools/yeon_skills.py) as fx "k_<id>"
+    (OUT/fx/<id>.png, OUT/icon/<id>.png). The screen-wide ones are stored at most 360 pixels ("scale" in
+    the index says by how much) and drawn back at their size. Returns the fx ids written."""
+    with open(os.path.join(kdir, "index.json"), encoding="utf-8") as f:
+        kindex = json.load(f)
+    done = []
+    for sid, k in kindex.items():
+        ksrc = os.path.join(kdir, sid + ".png")
+        if not os.path.isfile(ksrc):
+            continue
+        (cw, ch), n = k["cell"], k["n"]
+        sheet = Image.open(ksrc).convert("RGBA")
+        pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+        z = min(1.0, 360 / max(cw, ch))
+        if z < 1:
+            pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
+        fid = "k_" + sid
+        strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+        icon(pics, k.get("add", False)).save(os.path.join(out, "icon", fid + ".png"))
+        manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
+                               "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
+                               "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+        # A spell whose picture was redrawn larger keeps the old picture's reach (seenReach in game.js).
+        if k.get("reach"):
+            manifest["fx"][fid]["reach"] = k["reach"]
+        done.append(fid)
+    return done
+
+
 def add_ygyeok(gdir, gindex, out, manifest):
     """연's 격 strips (GEAR_DIR/ygyeok/ or ygyeok_hd/, its index.json read) as fx "g_<name>" (OUT/fx/<id>.png)."""
     for name, k in gindex.items():
@@ -527,31 +557,12 @@ def main():
 
     # 연's own spell effects (GEAR_DIR/yskill/<skill id>.png strips + index.json, from
     # tools/yeon_skills.py): fx "k_<skill id>", drawn with their own pivot on the target's feet.
-    # The screen-wide ones are stored at most 360 pixels ("scale" in the index says by how much)
-    # and drawn back at their size.
-    kdir = os.path.join(gear_src, "yskill") if gear_src else None
-    if kdir and os.path.isfile(os.path.join(kdir, "index.json")):
-        with open(os.path.join(kdir, "index.json"), encoding="utf-8") as f:
-            kindex = json.load(f)
-        for sid, k in kindex.items():
-            ksrc = os.path.join(kdir, sid + ".png")
-            if not os.path.isfile(ksrc):
-                continue
-            (cw, ch), n = k["cell"], k["n"]
-            sheet = Image.open(ksrc).convert("RGBA")
-            pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
-            z = min(1.0, 360 / max(cw, ch))
-            if z < 1:
-                pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
-            fid = "k_" + sid
-            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
-            icon(pics, k.get("add", False)).save(os.path.join(out, "icon", fid + ".png"))
-            manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
-                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / (z * k.get("scale", 1)), 3),
-                                   "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
-            # A spell whose picture was redrawn larger keeps the old picture's reach (seenReach in game.js).
-            if k.get("reach"):
-                manifest["fx"][fid]["reach"] = k["reach"]
+    # ...and over them, a few made again since (GEAR_DIR/yskill_add/, tools/yeon_skill_add.json: 무형지창's sheet
+    # had been cut before the renderer knew its shader — a rainbow ring, not the icon's blue spear).
+    for sub in ("yskill", "yskill_add"):
+        kdir = os.path.join(gear_src, sub) if gear_src else None
+        if kdir and os.path.isfile(os.path.join(kdir, "index.json")):
+            add_yskill(kdir, out, manifest)
 
     s9icons = add_s9(gear_src, out, manifest)
 

@@ -5,7 +5,7 @@ import {
 } from './data.js';
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT, GYEOK_SIZE, GYEOK_SIZE_MAX } from './gyeok.js';
-import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
+import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM, YEON_VARIANTS } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
@@ -541,6 +541,8 @@ async function boot() {
   // The pixel fonts, before anything is written on the canvas with them.
   await Promise.all(['12px G11', 'bold 12px G11', '10px G9', '8px G7'].map(f => document.fonts.load(f).catch(() => {})));
   audio = new Audio(M.audio);
+  audio.variants = YEON_VARIANTS; // (several takes of one sound: one picked each time)
+  window.__audio = () => audio; // test: the mix (audio.log)
   applySounds();
   audio.setBgm(settings.bgm);
   audio.setSfx(settings.sfx);
@@ -4876,6 +4878,7 @@ function update(dt) {
     if (G.ambush && !(G.buffs.stealth > G.t)) G.ambush = null;
     const stalk = G.ambush;
     const opener = stalk && G.t >= stalk.at + AMBUSH.stalk && G.t < stalk.at + AMBUSH.stalk + AMBUSH.grace ? ambushOpener() : null;
+    const sit = castSituation();
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
       s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste')) * (G.hunt ? Hunt.cdK() : 1); // 사냥 기믹: 기세 2단
@@ -4911,7 +4914,9 @@ function update(dt) {
           s.timer = 0;
           continue;
         }
+        if (castHold(s, sit)) continue;
         fireSkill(s, 1);
+        sit.fired++;
       }
     }
     if (chain.length && !G.chainRun && !G.ambush && chain.every(s => s.timer <= 0) && nearestEnemies(1, 7).length) startChain(chain);
@@ -5032,7 +5037,8 @@ function applyBuild(start) {
   add('c_heal');
   G.skills = ids.map(id => {
     const d = SKILLS[id];
-    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.5 };
+    // (자동 시전 패턴화: not all at the same moment at the start — each first comes a little apart)
+    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.35 + Math.random() * 0.8 };
   });
   // Its 보조 능력 at their best too: the six it may hold (MAX_PASSIVES), its own picks first and then
   // those a fight wants, each as high as the level allows up to MAX_PASSIVE_LEVEL (it went past 5).
@@ -7249,6 +7255,45 @@ function nearestEnemies(n, range, from = G.player) {
  *  row with most foes was nearly always the crowd's. A blow that picks one foe (the 기본 공격, spell, strike, blink) or a
  *  way (line, cleave, the rows) goes to the boss first when it is in that blow's reach; out of its reach they take what
  *  is near, as before (the hero never waits on a boss it cannot reach). A spread spell hits round it as it always did. */
+// ---- 자동 시전 패턴화 (사용자 2026-11-28: 쿨이 같은 기술들이 매번 같은 순서·박자로 나감 — window.__castLog로 측정).
+// Each wait ±CAST_JITTER; a skill ready the moment another went off comes a beat after it (CAST_BEAT) unless it is what the
+// moment wants (a spread spell into a crowd, a single great blow on a boss); a spread spell with few about and no boss
+// waits a moment for more (CAST_THIN). A held skill keeps its time: its timer runs on below zero and the next wait is that
+// much shorter (fireSkill: timer += cd), so the spells a second stay as they were.
+const CAST_JITTER = 0.08, CAST_BEAT = [0.05, 0.16], CAST_THIN = [0.2, 0.45];
+const SPREAD_KINDS = new Set(['nova', 'screen', 'cleave', 'vortex', 'rain', 'zone', 'zone9', 'wave', 'barrage', 'line', 'spell4', 'chain', 'spin']);
+/** What the fight round the hero is now: foes within 2 and 4 tiles, a boss within 7, how many went off this moment. */
+function castSituation() {
+  const p = G.player;
+  let n2 = 0, n4 = 0;
+  for (const e of G.enemies) {
+    if (e.hp <= 0 || !tkFoe(e)) continue;
+    const d = tdist(e, p);
+    if (d <= 2) n2++;
+    if (d <= 4) n4++;
+  }
+  return { n2, n4, boss: !!bossIn(7), fired: 0 };
+}
+/** Whether a ready skill waits a moment more (it is held at most once a turn: then it goes). */
+function castHold(s, sit) {
+  const d = SKILLS[s.id];
+  // (not the quick ones that are the fight's beat itself — 이중공격, 마력화살: held every turn they lost their turns —, nor
+  // one that has waited already)
+  if (!d || d.kind === 'ult' || G.training || G.chainRun || !d.dmg || (s.cdMax || d.cd) < 1.2) return false;
+  if (s.holdTo) {
+    if (G.t < s.holdTo) return true;
+    s.holdTo = 0;
+    s.heldOnce = true;
+    return false;
+  }
+  if (s.heldOnce || s.timer < -0.1) return false;
+  const spread = SPREAD_KINDS.has(d.kind) || (d.kind === 'strike' && (d.radius || 0) >= 1) || (d.count || 1) >= 3;
+  const fits = spread ? sit.n4 >= 4 || sit.n2 >= 3 : sit.boss;
+  const hold = (a, b) => { s.holdTo = G.t + a + Math.random() * (b - a); return true; };
+  if (spread && !sit.boss && sit.n4 <= 2) return hold(...CAST_THIN);
+  if (!fits && (sit.fired || G.t - (G.lastCastT ?? -9) < 0.08)) return hold(...CAST_BEAT);
+  return false;
+}
 function bossIn(range, from = G.player) {
   // (a boss is drawn two to four tiles high round its one tile: within 1.5 tiles more it is seen beside the hero —
   // 사용자: 보스가 바로 옆인데 잡몹을 친다)
@@ -7324,7 +7369,10 @@ function fireSkill(s, k) {
   // 용무기 제구·제십: the class's core spell comes sooner (the original's 광폭, 파천검무, 헬파이어·삼매, 백호의희원).
   if (G.player.dragonCut && (DRAGON_CORE[G.cls.id] || []).includes(s.id)) st.cd *= 1 - G.player.dragonCut;
   s.cdMax = st.cd;
-  s.timer += st.cd;
+  // (자동 시전 패턴화: its wait a little longer or shorter each time, ±CAST_JITTER, the same on the whole)
+  s.timer += st.cd * (1 + (Math.random() * 2 - 1) * CAST_JITTER);
+  s.heldOnce = false;
+  G.lastCastT = G.t;
   if (s.timer < 0) s.timer = st.cd;
   if (st.dmg) st.dmg *= k;
   // A 도사 alone has no one to keep alive: its strikes are what it has (+35% without a party).
@@ -7677,15 +7725,33 @@ function castNow(skill, st) {
     const sc = def.afterScale || 1;
     later(delay, () => tkLoop(def.fxAfter, x, y, def.afterT || 0.8, { scale: sc * capK(def.fxAfter, sc, cap), alpha: settings.calmFx ? 0.5 : 0.8 }));
   };
-  const shoot = e => {
+  // 투사체 성격 (def.proj, data.js PROJ): its own speed and way (flyAt), the tiles it passes left burning (trail); from the
+  // hero, or (bounce) from the one it struck before. (pierce: on past the one aimed at to `to`, its far end.)
+  const pj = def.proj;
+  const shoot = (e, from, to) => {
     if (!M.fx[shotPic] || !e) return 0;
-    const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), fl = Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
-    const rot = Math.atan2(dy, dx) + Math.PI / 2;
+    // (pj.sky: it comes down on the one struck out of the sky, sky tiles over it — 유성창 내리꽂기 — not across from the hero)
+    const end = to || { x: e.x, y: e.y - 20 };
+    const q = from || (pj && pj.sky ? { x: end.x - TILE * pj.sky * 0.3 * Math.sign(e.x - G.player.x || 1), y: end.y - TILE * pj.sky } : { x: G.player.x, y: G.player.y - 26 });
+    const dx = end.x - q.x, dy = end.y - q.y;
+    const fl = projFly(pj, Math.hypot(dx, dy)) || Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
+    const rot = Math.atan2(dy, dx) + Math.PI / 2, path = projPath(pj, to ? null : e);
     // (def.shotTiles: a thrown thing longer than a body — 무형투창's spear, 사용자 2026-11-23: 표창 같다 — drawn that
     // many tiles long, its own length, not the 1.4 of a shot)
-    if (def.shotTiles) addFx(fxTiles(shotPic, def.shotTiles, 'sh'), q.x, q.y - 26, { mv: [dx, dy, fl], rot, area: true, cap: def.shotTiles });
-    else addFx(shotPic, q.x, q.y - 26, { mv: [dx, dy, fl], rot, scale: 1.3, cap: ONE_TILES });
-    return fl;
+    if (def.shotTiles) addFx(fxTiles(shotPic, def.shotTiles, 'sh'), q.x, q.y, { mv: [dx, dy, fl], rot, area: true, cap: def.shotTiles, path });
+    else addFx(shotPic, q.x, q.y, { mv: [dx, dy, fl], rot, scale: 1.3, cap: ONE_TILES, path });
+    if (pj && pj.trail) projTrail(def, pj.trail, projTiles(q, end, fl), st.dmg, smite);
+    if (!to) return fl;
+    // what stands on its way to the far end struck as it passes (pierce: that share of the blow), the one aimed at as before
+    const seen = new Set([e]), L = Math.hypot(dx, dy) || 1;
+    for (const o of G.enemies) {
+      if (seen.has(o) || o.hp <= 0 || !tkFoe(o)) continue;
+      const ox = o.x - q.x, oy = o.y - 20 - q.y, along = (ox * dx + oy * dy) / L;
+      if (along < 0 || along > L || Math.abs(ox * dy - oy * dx) / L > TILE * 0.6) continue;
+      seen.add(o);
+      later(fl * along / L, () => { if (o.hp > 0) { hitOn(o); smite(o, st.dmg * pj.pierce); } });
+    }
+    return fl * Math.min(1, Math.hypot(e.x - q.x, e.y - 20 - q.y) / L);
   };
   classFlourish(def, skill, st);
   const p = G.player;
@@ -7854,9 +7920,7 @@ function castNow(skill, st) {
       // 이펙트=판정: one foe struck, its picture about a body across (not four tiles round it), the blow
       // spread over the picture's life when it stays (half at once, the rest in beats)
       const spic = fxFit(fxid, ONE_TILES, 'sp');
-      targets.forEach((e, i) => later(i * 0.08, () => {
-        if (e.hp <= 0) return;
-        later(shoot(e), () => {
+      const land = e => {
           if (e.hp <= 0) return;
           // (fxTurn: a picture that points the way it flew — 1320's, drawn pointing left — turned to the side the foe stands)
           const life = fxOnArea(spic, e, def.fxTurn ? { flip: e.x > p.x } : undefined), at = def.hitAt || 0.3;
@@ -7871,7 +7935,32 @@ function castNow(skill, st) {
             if (def.curse) e.curse = def.curse;
             if (def.drain && dealt) heal(dealt * def.drain, false, true);
           });
+      };
+      if (pj && pj.bounce && M.fx[shotPic]) {
+        // 투사체 성격 bounce (연폭화살·기공구슬'뇌): one shot leaping from the one struck to the nearest not yet struck,
+        // as many as it had targets (the same blows, one after another along its way)
+        const struck = new Set(), run = G;
+        const hop = (e, from, left) => later(shoot(e, from), () => {
+          if (G !== run) return;
+          struck.add(e);
+          const pt = { x: e.x, y: e.y - 20 };
+          land(e);
+          if (left <= 1) return;
+          const nx = G.enemies.filter(o => o.hp > 0 && tkFoe(o) && !struck.has(o) && tdist(o, e) <= (pj.hop || st.range))
+            .sort((a, b) => tdist(a, e) - tdist(b, e))[0];
+          if (nx) hop(nx, pt, left - 1);
         });
+        hop(targets[0], null, targets.length);
+        break;
+      }
+      targets.forEach((e, i) => later(i * 0.08, () => {
+        if (e.hp <= 0) return;
+        // (pierce: on past it to the spell's reach, its way's foes struck as it passes)
+        const far = pj && pj.pierce ? (() => {
+          const q = G.player, dx = e.x - q.x, dy = e.y - 20 - (q.y - 26), L = Math.hypot(dx, dy) || 1, R = st.range * TILE;
+          return { x: q.x + dx / L * R, y: q.y - 26 + dy / L * R };
+        })() : null;
+        later(shoot(e, null, far), () => land(e));
       }));
       break;
     }
@@ -8029,7 +8118,10 @@ function castNow(skill, st) {
       // copy of the spell on every one in it): the spell's picture goes from the hero to the
       // row's end, and each in the row is struck as it reaches it (the class's flash or the
       // spell's spark on it). A beam (광폭기조사) stands along the row at once instead.
-      const lx = p.tx, ly = p.ty, len = def.depth * TILE, dur = 0.14 + 0.025 * def.depth;
+      // (투사체 성격 def.proj: its own speed — a fast arrow, a slow phoenix — at an even pace, so each in the row is struck
+      // as the picture reaches it; its way bent (wave, spin) and the tiles it passed burning a while (trail))
+      const lpj = !def.dash && def.proj, lx = p.tx, ly = p.ty, len = def.depth * TILE;
+      const dur = lpj && lpj.sp ? (def.depth - 0.5) / lpj.sp : 0.14 + 0.025 * def.depth, lpath = projPath(lpj, null);
       const beam = M.fx['k_x_' + skill.id + '_beam'];
       // 이펙트=판정: what is drawn lies on the row it strikes — a beam laid along the row's own tiles (it hung
       // from its pivot, half of it behind the hero), 연's way picture set over the row's middle — each as long as
@@ -8048,9 +8140,9 @@ function castNow(skill, st) {
           // (def.flyUp: a picture that faces up — 봉황신법's rising phoenix — turned to fly its way, def.flyTiles long; it was
           // a small thing flipped left or right, thrown rather than flying: 사용자 2026-11-23)
           if (def.flyUp) addFx(fxTiles(lf, def.flyTiles || ONE_TILES, 'fu'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
-            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], rot: Math.atan2(dy, dx) + Math.PI / 2, area: true, cap: def.flyTiles || ONE_TILES });
+            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], rot: Math.atan2(dy, dx) + Math.PI / 2, area: true, cap: def.flyTiles || ONE_TILES, path: lpath });
           else addFx(fxFit(lf, def.flyTiles || ONE_TILES, 'lf'), p.x + dx * TILE * 0.5, p.y - 24 + dy * TILE * 0.5,
-            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip, ...(def.flyTiles ? { area: true, cap: def.flyTiles } : {}) });
+            { mv: [dx * (len - TILE * 0.5), dy * (len - TILE * 0.5), dur], flip: lf === fxid ? dx < 0 : lflip, ...(def.flyTiles ? { area: true, cap: def.flyTiles } : {}), path: lpath });
           // (gone a moment after its flight: it lay on at the row's end a second, striking nothing)
           const f = G.fxs[G.fxs.length - 1];
           if (f && f.mv) f.life = Math.min(f.life, dur + 0.35);
@@ -8065,7 +8157,7 @@ function castNow(skill, st) {
       later(0.04, () => meleeImpact(2));
       for (const e of hit) {
         const d = Math.max(Math.abs(e.tx - lx), Math.abs(e.ty - ly));
-        later(0.04 + (beam ? 0.06 : dur * Math.min(1, d / def.depth)), () => {
+        later(0.04 + (beam ? 0.06 : lpj && lpj.sp ? dur * Math.max(0, d - 0.5) / (def.depth - 0.5) : dur * Math.min(1, d / def.depth)), () => {
           hitOn(e);
           smite(e, st.dmg * lk, [dx, dy]);
           // A thrust drives them on along it; one that went through throws them aside.
@@ -8073,6 +8165,11 @@ function castNow(skill, st) {
         });
       }
       if (MELEE_LOOK[G.cls.id]) streak(p.x, p.y - 22, dx, dy, def.depth);
+      if (lpj && lpj.trail && !beam) {
+        const row = [];
+        for (let k2 = 1; k2 <= def.depth; k2++) row.push([lx + dx * k2, ly + dy * k2, 0.04 + dur * (k2 - 0.5) / (def.depth - 0.5)]);
+        projTrail(def, lpj.trail, row, st.dmg, smite);
+      }
       afterAt(p.x + dx * len, p.y - 10 + dy * len, dur);
       if (def.dash) {
         const x0 = p.x, y0 = p.y;
@@ -9019,6 +9116,80 @@ function tkLoop(id, x, y, life, o = {}) {
   G.fxs.push(f);
   return f;
 }
+// ---- 투사체 성격 (사용자 2026-11-28: 날아가는 기술이 모두 같은 속도라 그림만 다르고 특색이 없음). data.js PROJ → def.proj:
+//   sp     칸/초, 고른 속도로 (빠른 화살 30~40 · 보통 14~20 · 느린 구슬·불새 6~9). 맞는 때 = 그림이 닿는 때(거리/속도).
+//   path   'arc' 포물선(h칸 높이) · 'wave' 너울(h칸, n번) · 'spin' 나선(h칸, n바퀴) · 'home' 옆으로 휘어 몬스터를 쫓아감(h칸)
+//   spinV  그림이 도는 빠르기(라디안/초: 표창·회천), turn false: 휘는 길을 따라 그림을 돌리지 않음
+//   trail  {k, t, every, pic, slow}: 지나간 칸에 불길·서리가 t초 남아 every초마다 그 칸의 몬스터에게 k배(그림 한 칸 = 맞는 칸)
+//   bounce 맞은 몬스터에서 가장 가까운 다음 몬스터로 튀어(hop칸 안) 대상 수만큼 차례로 · pierce 겨눈 몬스터를 지나 사거리 끝까지,
+//          길 위의 몬스터에게 그 몫
+// 그림 크기 규칙은 그대로(addFx: 날아가는 것 1.4칸, shotTiles·flyTiles). 맞는 몫은 data.js에서 기술마다 초당 피해가 비슷하게.
+const PROJ_TRAIL = { fire: 'k_a_firewall', ice: 'y_seori', water: 'y_seori', poison: 'g_poison_purple', wind: 'k_w_tiger' };
+/** How long a shot of that character takes over px pixels (0: no character — the old way). */
+function projFly(pj, px) {
+  return pj && pj.sp ? Math.max(0.06, px / TILE / pj.sp) : 0;
+}
+/** Its way, as addFx's o.path (flyAt): e the one it chases ('home'). */
+function projPath(pj, e) {
+  if (!pj || !pj.sp) return undefined;
+  return { k: pj.path || 'line', h: (pj.h || 0) * TILE, n: pj.n || 1, spinV: pj.spinV || 0, turn: pj.turn !== false,
+    to: pj.path === 'home' ? e : null, side: Math.random() < 0.5 ? -1 : 1 };
+}
+/** Where a flying picture (f.mv: [dx, dy, seconds]) is at its age, from its start, and how much more it is turned:
+ *  eased out as it always was, or (f.path) at an even pace along its own way. */
+function flyAt(f) {
+  const k = Math.min(1, f.t / f.mv[2]), pa = f.path;
+  if (!pa) { const e = 1 - (1 - k) * (1 - k); return [f.mv[0] * e, f.mv[1] * e, 0]; }
+  if (pa.a0 === undefined) pa.a0 = Math.atan2(f.mv[1], f.mv[0]);
+  let mx = f.mv[0], my = f.mv[1];
+  // (home: to where the one it chases is now; when it falls, on to where it last was)
+  if (pa.to && pa.to.hp > 0 && !f.follow) { pa.mx = pa.to.x - f.x; pa.my = pa.to.y - 20 - f.y; }
+  if (pa.mx !== undefined) { mx = pa.mx; my = pa.my; }
+  const L = Math.hypot(mx, my) || 1, nx = -my / L, ny = mx / L, h = pa.h, n = pa.n;
+  const at = q => {
+    let s = 0, up = 0;
+    if (pa.k === 'arc') up = h * 4 * q * (1 - q);
+    else if (pa.k === 'wave') s = h * Math.sin(q * Math.PI * n);
+    else if (pa.k === 'spin') s = h * Math.sin(q * Math.PI * 2 * n) * (1 - q * 0.5);
+    else if (pa.k === 'home') s = h * Math.sin(Math.PI * q) * pa.side;
+    return [mx * q + nx * s, my * q + ny * s - up];
+  };
+  const [x, y] = at(k);
+  let dr = pa.spinV * f.t;
+  if (pa.turn && pa.k !== 'line') {
+    const q0 = Math.min(k, 0.97), [x0, y0] = at(q0), [x1, y1] = at(q0 + 0.03);
+    dr += Math.atan2(y1 - y0, x1 - x0) - pa.a0;
+  } else if (pa.turn && pa.to) dr += Math.atan2(my, mx) - pa.a0;
+  return [x, y, dr];
+}
+/** The tiles a shot passes from `a` to `b` (pixel spots of its flight, a body's middle), each with when it is over it. */
+function projTiles(a, b, fl) {
+  const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.round(L / TILE)), out = [], seen = new Set();
+  for (let i = 1; i <= n; i++) {
+    const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n, tx = Math.floor(x / TILE), ty = Math.floor((y + 24) / TILE);
+    if (seen.has(tx + ',' + ty) || (tx === G.player.tx && ty === G.player.ty)) continue;
+    seen.add(tx + ',' + ty);
+    out.push([tx, ty, fl * i / n]);
+  }
+  return out;
+}
+/** 투사체 성격 trail: the tiles a slow shot passed burn (or frost) a while — its picture a tile across on each (보이는 범위 =
+ *  맞는 범위), each `every` seconds striking what stands there k times the blow (slow: and slowing it). tiles: [[tx, ty, at]]. */
+function projTrail(def, tr, tiles, dmg, smite) {
+  const pic = tr.pic || PROJ_TRAIL[def.elem] || PROJ_TRAIL.fire;
+  if (!M.fx[pic] || !dmg) return;
+  const run = G, every = tr.every || 0.5, n = Math.max(1, Math.round(tr.t / every)), sp = fxTiles(pic, 1.1, 'ptr');
+  tiles.slice(0, 9).forEach(([tx, ty, at]) => later(at, () => {
+    if (G !== run) return;
+    tkLoopAt(sp, tx * TILE + TILE / 2, ty * TILE + TILE - 18, tr.t, { alpha: settings.calmFx ? 0.55 : 0.85 });
+    for (let i = 1; i <= n; i++) later(i * every, () => {
+      if (G !== run || G.dead) return;
+      G.quietHit = true;
+      for (const o of around(tx, ty, 0)) { smite(o, dmg * tr.k); if (tr.slow) o.slow = Math.max(o.slow || 0, tr.slow); }
+      G.quietHit = false;
+    });
+  }));
+}
 /** The tile a pixel spot stands on. */
 function tkTile(x, y) {
   return [Math.floor(x / TILE), Math.floor((y - TILE / 2 + 6) / TILE)];
@@ -9349,8 +9520,10 @@ const TIER_KINDS = {
     const [dx, dy] = best, x0 = p.x + dx * TILE * 0.4, y0 = p.y - 22 + dy * TILE * 0.4, len = def.depth * TILE, fly = 0.32;
     const tiles = [];
     for (let k = 1; k <= def.depth; k++) tiles.push([p.tx + dx * k, p.ty + dy * k]);
-    addFx(fxid, x0, y0, { mv: [dx * len, dy * len, fly], scale: 0.55 });
-    later(fly, () => addFx(fxid, x0 + dx * len, y0 + dy * len, { mv: [-dx * len, -dy * len, fly], scale: 0.55 }));
+    // (투사체 성격: 돌며 고른 속도로 나갔다 돌아온다 — def.proj spinV)
+    const bpath = () => projPath(def.proj, null);
+    addFx(fxid, x0, y0, { mv: [dx * len, dy * len, fly], scale: 0.55, path: bpath() });
+    later(fly, () => addFx(fxid, x0 + dx * len, y0 + dy * len, { mv: [-dx * len, -dy * len, fly], scale: 0.55, path: bpath() }));
     for (const [h, at] of [[0, 0.05], [1, fly + 0.05]]) {
       later(at, () => {
         const row = onTiles(tiles);
@@ -9391,7 +9564,11 @@ const TIER_KINDS = {
     const p = G.player, best = tkBestRow(def.depth);
     if (!best) return 0.25;
     const [dx, dy, hit] = best;
-    addFx(fxid, p.x + dx * TILE, p.y - 22 + dy * TILE, { mv: [dx * TILE * (def.depth - 1), dy * TILE * (def.depth - 1), 0.18], scale: 0.9 });
+    // (근접기: 창끝으로 꿰찌르는 기술이 날아가는 유성창 그림이었다 — 사용자 2026-11-28 "근접기인데 투사체로 나가는 기술".
+    // 이제 영웅 앞에서 줄 끝까지 한 번에 뻗는 찌르기: 그림이 줄 위에 놓여 그 줄을 친다, 보이는 범위 = 맞는 범위)
+    const mid = (def.depth + 1) / 2;
+    fxAt(fxRect(fxid, LINE_ACROSS, def.depth, 'kn'), p.x + dx * mid * TILE, p.y - 22 + dy * mid * TILE, { rot: Math.atan2(dy, dx) + Math.PI / 2 });
+    if (MELEE_LOOK[G.cls.id]) streak(p.x, p.y - 22, dx, dy, def.depth);
     // the far ones first, so the near ones have room to be shoved into
     hit.sort((a, b) => Math.abs(b.tx - p.tx) + Math.abs(b.ty - p.ty) - Math.abs(a.tx - p.tx) - Math.abs(a.ty - p.ty));
     later(0.08, () => {
@@ -9602,8 +9779,8 @@ const TIER_KINDS = {
         const tx = p.tx + Math.round(cx * k), ty = p.ty + Math.round(cy * k);
         if (around(tx, ty, 0).length) { hitAt = [tx, ty]; break; }
       }
-      const reach = Math.min(k, def.depth) * TILE, fly = 0.05 + 0.03 * Math.min(k, def.depth);
-      later(i * 0.04, () => addFx(fxid, p.x, p.y - 24, { mv: [cx * reach, cy * reach, fly], scale: 0.8 }));
+      const reach = Math.min(k, def.depth) * TILE, fly = projFly(def.proj, reach) || 0.05 + 0.03 * Math.min(k, def.depth);
+      later(i * 0.04, () => addFx(fxid, p.x, p.y - 24, { mv: [cx * reach, cy * reach, fly], scale: 0.8, path: projPath(def.proj, null) }));
       if (hitAt) later(i * 0.04 + fly, () => {
         const br = def.radius === 0 ? 0 : def.radius || 1;
         if (def.fx2) addFx(fxTiles(def.fx2, br * 2 + 1, 'br'), hitAt[0] * TILE + TILE / 2, hitAt[1] * TILE + TILE - 14);
@@ -15795,7 +15972,8 @@ function addFx(id, x, y, o = {}) {
   const skip = FX_LEAD[id] || 0;
   G.fxs.push({ uid: ++fxUid, id, x, y, t: skip - (o.delay || 0), life, scale: o.scale || 1, rot: o.rot || 0,
     follow: o.follow, anchor: o.anchor || 'center', big: area > 120000, mv: o.mv, flip: o.flip, tint: o.tint, skip, fadeIn: skip ? 0.2 : 0,
-    alpha: o.alpha, on: o.on }); // (o.alpha: an AI fighter's picture, see-through: war.js aiAlpha)
+    alpha: o.alpha, on: o.on, path: o.mv && o.path }); // (o.alpha: an AI fighter's picture, see-through: war.js aiAlpha)
+  // (o.path: 투사체 성격 — the way a flying picture goes, flyAt)
   return life;
 }
 
@@ -17518,11 +17696,14 @@ function render(now) {
   for (const f of fxOrder) {
     if (f.t < 0 || f.floor) continue;
     let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
+    let rot = f.rot;
     if (f.mv) {
-      // Travelling (a row's arrow or beam): out to its end over mv[2] seconds, slowing at the last.
-      const k = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - k) * (1 - k);
-      x += f.mv[0] * e;
-      y += f.mv[1] * e;
+      // Travelling (a row's arrow or beam): out to its end over mv[2] seconds, slowing at the last — or at an even
+      // speed along its own way (f.path: 투사체 성격, flyAt).
+      const k = Math.min(1, f.t / f.mv[2]), [ox, oy, dr] = flyAt(f);
+      x += ox;
+      y += oy;
+      rot += dr;
       // An abyss far weapon: black smoke and embers behind it as it flies.
       if (trail && k < 1 && !f.trailFx && G.t >= (f.trailAt || 0) && puffs.length < 6) { f.trailAt = G.t + trail.cd; puffs.push([x, y]); }
     }
@@ -17530,7 +17711,7 @@ function render(now) {
     // (fadeOut: a held picture of one frame — 절섬's crescent — fading over its last fadeOut seconds)
     if (f.fadeOut && f.life) ctx.globalAlpha *= Math.max(0, Math.min(1, (f.life - f.t) / f.fadeOut));
     fxCur = f;
-    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, f.rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
+    drawFx(f.id, x, y, f.loop ? now : f.t, f.scale, rot, f.anchor, f.seenLoop ? fxLife(f.id) : f.loop, f.flip, f.tint);
     ctx.globalAlpha = 1;
   }
   fxCur = null;
@@ -19202,7 +19383,7 @@ window.__fxBoxes = () => {
     if (f.t < 0 || !M.fx[f.id]) continue;
     const d = M.fx[f.id], src = d.src ? M.fx[d.src] : d, k = f.scale * (d.k || 1);
     let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
-    if (f.mv) { const q = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - q) * (1 - q); x += f.mv[0] * e; y += f.mv[1] * e; }
+    if (f.mv) { const [ox, oy] = flyAt(f); x += ox; y += oy; }
     const i = fxFrame(durs(f.id), f.loop ? G.t : f.t, f.seenLoop ? fxLife(f.id) : f.loop) + (d.f0 || 0), bb = src.bb, b4 = i * 4;
     const kv = k * (d.ky || 1), w = d.w * k, h = d.h * kv;
     const dx = d.ax !== undefined && f.anchor !== 'mid' ? -d.ax * k : -w / 2;
@@ -19230,7 +19411,7 @@ window.__fxCover = (g = 48) => {
     ids.add(String(f.id).split('#')[0]);
     const d = M.fx[f.id], src = d.src ? M.fx[d.src] : d, k = f.scale * (d.k || 1);
     let x = f.follow ? p.x + f.x : f.on ? f.on.x + f.x : f.x, y = f.follow ? p.y + f.y : f.on ? f.on.y + f.y : f.y;
-    if (f.mv) { const q = Math.min(1, f.t / f.mv[2]), e = 1 - (1 - q) * (1 - q); x += f.mv[0] * e; y += f.mv[1] * e; }
+    if (f.mv) { const [ox, oy] = flyAt(f); x += ox; y += oy; }
     const i = fxFrame(durs(f.id), f.loop ? G.t : f.t, f.seenLoop ? fxLife(f.id) : f.loop) + (d.f0 || 0), bb = src.bb, b4 = i * 4;
     const kv = k * (d.ky || 1), w = d.w * k, h = d.h * kv;
     const dx = d.ax !== undefined && f.anchor !== 'mid' ? -d.ax * k : -w / 2;

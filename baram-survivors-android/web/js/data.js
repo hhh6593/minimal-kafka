@@ -1789,6 +1789,63 @@ for (const s of Object.values(SKILLS)) {
   }
 }
 
+// ---- 투사체 성격 (사용자 2026-11-28: 날아가는 기술이 모두 같은 속도라 그림만 다르고 특색이 없다). game.js flyAt·projTrail.
+// sp 칸/초 · path(arc 포물선, wave 너울, spin 나선, home 휘어 쫓아감)와 h칸 · spinV 도는 그림 · trail 지나간 칸에 남는 불길·서리
+// (k: 한 번에 기술 피해의 몫, t초, every초마다) · bounce 맞은 몬스터에서 다음으로 튐(hop칸 안) · pierce 겨눈 몬스터를 지나
+// 사거리 끝까지(길 위 몬스터에게 그 몫) · sky 하늘에서 내리꽂힘(그 칸 높이에서).
+// 초당 피해는 비슷하게: 지나간 자리 피해·꿰뚫는 몫을 더한 기술은 본 피해를 그만큼 덜었다(dmgK). 튀는 것은 맞는 수가 그대로.
+// 그림 크기는 그대로(날아가는 것 1.4칸, shotTiles·flyTiles).
+export const PROJ = {
+  // 궁사
+  a_silence: { sp: 40 }, // 빠른 화살: 눈 깜짝할 사이에 일곱 칸
+  a_spiral: { sp: 18, path: 'spin', h: 0.3, n: 2 }, // 나선으로 돌며 나아간다
+  a_inferno: { sp: 10, trail: { k: 0.1, t: 1.5 }, dmgK: 0.85 }, // 무겁게 날아가며 지난 칸을 태운다
+  a_chain: { sp: 17, path: 'arc', h: 0.7, bounce: true, hop: 4 }, // 튕기는 화살: 몬스터에서 몬스터로 포물선을 그리며
+  // 창술사
+  l_javelin: { sp: 34, pierce: 0.08, dmgK: 0.85 }, // 아주 빠르게, 겨눈 몬스터를 지나 사거리 끝까지 꿰뚫는다
+  l_meteor: { sp: 14, sky: 4 }, // 하늘에서 유성처럼 내리꽂힌다
+  l_hoecheon: { sp: 15, spinV: 22 }, // 돌며 나갔다 돌아온다(회천)
+  // 도적
+  r_venom: { sp: 24, spinV: 26 }, // 돌며 날아가는 표창
+  // 도사
+  p_bonghwang: { sp: 7, path: 'wave', h: 0.25, n: 2, trail: { k: 0.1, t: 1.5 }, dmgK: 0.75 }, // 천천히 날갯짓하며 나아가고 지난 자리를 태운다
+  // 마도사
+  md_arrow: { sp: 28 }, // 빠른 마력 화살
+  md_orbice: { sp: 6, path: 'wave', h: 0.3, n: 1, trail: { k: 0.06, t: 2, slow: 1, pic: 'y_seori' }, dmgK: 0.9 }, // 느리게 흔들리며 서리를 남긴다
+  md_orbfire: { sp: 9, path: 'arc', h: 1.6 }, // 높이 던져 떨어진 자리에서 터진다
+  md_orblight: { sp: 22, path: 'wave', h: 0.2, n: 2, bounce: true, hop: 4 }, // 번개처럼 튀어 셋을 이어 친다
+  // 도깨비
+  dk_shock: { sp: 12, path: 'home', h: 1.2 }, // 휘어 날아가 몬스터를 쫓아간다
+  dk_fan: { sp: 10, path: 'wave', h: 0.35, n: 2 }, // 너울거리는 바람
+  dk_wisp3: { sp: 16, path: 'wave', h: 0.25, n: 1 }, // 흔들리며 부채꼴로 퍼지는 도깨비불
+};
+const PROJ_DESC = {
+  a_inferno: '궁사의 궁극오의. 잠력과 심력을 터뜨려 앞쪽 일렬 여덟 칸에 무거운 화염 화살을 쏜다. 화살이 지나간 자리는 잠시 불타 들어선 몬스터를 태운다',
+  a_chain: '탄성이 강한 화살 하나가 몬스터에서 몬스터로 튕겨 다니며 넷을 차례로 터뜨린다',
+  l_javelin: '보이지 않는 창을 아주 빠르게 던진다. 창은 겨눈 몬스터 셋을 지나 사거리 끝까지 날아가며 길 위의 몬스터도 꿰뚫는다',
+  l_meteor: '하늘 높이 던진 창이 유성처럼 떨어져 대상과 그 주위를 친다',
+  p_bonghwang: '봉황 형태의 불꽃이 천천히 날갯짓하며 나아가 몬스터를 태우고, 지나간 자리에 잠시 불길을 남긴다',
+  md_arrow: '빠른 마력의 화살이 몬스터가 가장 많은 쪽 일렬 다섯 칸을 꿰뚫는다',
+  md_orbice: '물의 기공구슬이 느리게 흔들리며 날아가 몬스터 둘과 그 주위를 얼려 느리게 한다. 구슬이 지나간 자리에는 서리가 남아 밟은 몬스터를 느리게 한다. 4·7단에 하나씩 는다',
+  md_orbfire: '불의 기공구슬을 높이 던져, 떨어진 자리의 몬스터 둘과 그 주위를 터뜨린다. 4·7단에 하나씩 는다',
+  md_orblight: '번개의 기공구슬이 몬스터에서 몬스터로 튀며 셋을 이어 치고 잠시 마비시킨다',
+  dk_shock: '번개 도깨비불이 휘어 날아가 몬스터 셋을 쫓아가 치고 잠시 마비시킨다',
+  dk_fan: '도깨비부채를 부쳐 일으킨 너울바람이 몬스터가 가장 많은 쪽 일렬 여섯 칸을 날려 버린다',
+  dk_wisp3: '도깨비불 일곱을 부채꼴로 날린다. 흔들리며 날아간 불은 몬스터에 닿으면 터져 둘레까지 태운다',
+};
+for (const [id, pj] of Object.entries(PROJ)) {
+  const s = SKILLS[id];
+  if (!s) continue;
+  s.proj = pj;
+  if (pj.dmgK && s.dmg) s.dmg = Math.round(s.dmg * pj.dmgK * 10) / 10;
+  if (PROJ_DESC[id]) s.desc = PROJ_DESC[id];
+}
+// 근접기인데 투사체로 나가던 기술 (사용자 2026-11-28, 어검술·무형검·필살검강 다음): 회선돌격은 '돌격'인데 검기가 다섯 칸을 날아갔다 →
+// 영웅이 회오리치며 그 줄을 돌진한다(파천검무·환영쇄도처럼). 뇌기침투는 창끝으로 꿰찌르는데 유성창 그림이 날아갔다 → game.js knock이
+// 줄 위에 한 번에 뻗는 찌르기로 그린다.
+// (돌진은 바라보는 쪽 한 줄만 — 네 방향 중 가장 많은 줄을 고르던 때보다 맞는 수가 적어 피해 ×1.35, 측정 2026-11-28)
+Object.assign(SKILLS.w_rush, { dash: true, dmg: Math.round(SKILLS.w_rush.dmg * 1.35 * 10) / 10, desc: '회오리치며 바라보는 쪽 일렬 다섯 칸을 돌진해 꿰뚫고, 지난 자리에 검기가 남는다' });
+
 // ---- 필살기의 길 (ULT_TIERS): four a class, by 승급 band (ULT_BANDS: 0~2차, 3~5차, 6~8차, 9차). Each by a
 // name of the class's own (연 Skills_Player / 원작 list), its own way of striking (game.js ULT_MECH), and
 // its own pictures in stages: cast (the call over the hero), main (the great picture), hit (on each

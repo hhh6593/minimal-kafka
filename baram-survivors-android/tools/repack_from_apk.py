@@ -83,6 +83,23 @@ def main():
             shutil.copyfile(os.path.join(htmp, "fx", fid + ".png"), os.path.join(assets, "fx", fid + ".png"))
         man["fxWebp"] = [x for x in man.get("fxWebp", []) if x not in hm["fx"]]
         print(f"replaced {len(hm['fx'])} 격 pictures from ygyeok_hd")
+    # 연's spell sheets made again since that APK (GEAR_DIR/yskill_add/: tools/yeon_skills.py with
+    # tools/yeon_skill_add.json — 무형지창's was cut before the renderer knew its shader), over the old k_<id> (as .png)
+    ya = os.path.join(gear, "yskill_add")
+    if os.path.isfile(os.path.join(ya, "index.json")):
+        ytmp = tempfile.mkdtemp()
+        for d in ("fx", "icon"):
+            os.makedirs(os.path.join(ytmp, d))
+        ym = {"fx": {}}
+        for fid in pa.add_yskill(ya, ytmp, ym):
+            man["fx"][fid] = ym["fx"][fid]
+            for ext in (".png", ".webp"):
+                if os.path.exists(os.path.join(assets, "fx", fid + ext)):
+                    os.remove(os.path.join(assets, "fx", fid + ext))
+            shutil.copyfile(os.path.join(ytmp, "fx", fid + ".png"), os.path.join(assets, "fx", fid + ".png"))
+            shutil.copyfile(os.path.join(ytmp, "icon", fid + ".png"), os.path.join(assets, "icon", fid + ".png"))
+        man["fxWebp"] = [x for x in man.get("fxWebp", []) if x not in ym["fx"]]
+        print(f"replaced {len(ym['fx'])} 연 spell sheets from yskill_add")
     # Hunting-ground walk grids made again since that APK (tools/yhunt_walk.json, from
     # tools/yeon_grounds.py arena: 화탕지옥's void and cliffs closed), over the old ones.
     fix = json.load(open(os.path.join(HERE, "yhunt_walk.json"), encoding="utf-8"))

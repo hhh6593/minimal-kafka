@@ -37,6 +37,25 @@ const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45, combo
 // Decoded sound kept at most (mono float samples: about 80 seconds at 48 kHz).
 const SFX_BUDGET = 16e6;
 
+// 효과음 겹침 (사용자 2026-11-28: 특정 기술 소리에 다른 소리가 묻혀 같은 패턴이 반복되듯 들림). The fight's sounds as a mix:
+// at most VOICES effects at once (a new one past it takes the place of the oldest less important one, or is let go),
+// the same clip at most SAME_VOICES times over itself, a spell's sound not again within SKILL_GAP (a long clip: LONG_GAP of
+// its own length), each spell's clip brought towards one loudness (LOUD: by its sound's own RMS, NORM_MIN..NORM_MAX),
+// a sound heard over and over within REPEAT_WIN seconds a little softer each time (REPEAT_K, down to REPEAT_MIN), and
+// the battle sounds a little apart in pitch each time (PITCH) or one of their takes (variants: yeon_sounds.js YEON_VARIANTS).
+const VOICES = 10, SAME_VOICES = 2, SKILL_GAP = 0.14, LONG_GAP = 0.4;
+const LOUD = 0.12, NORM_MIN = 0.55, NORM_MAX = 1.3;
+const REPEAT_WIN = 3, REPEAT_K = 0.1, REPEAT_MIN = 0.6;
+const PITCH = 0.045;
+// How much a sound matters when the voices run out: the 필살기, a boss and the rewards over the spells, the spells
+// over the blows that come many times a second.
+function prioOf(key, kind) {
+  if (kind === 'ult' || /^(boss|levelup|promote|chest|win|lose|revive|enter|quest|combo|click)/.test(key)) return 3;
+  if (key.startsWith('skill_')) return 2;
+  return 1;
+}
+const VARIED = /^(skill_|hit$|crit$|swing$)/; // (not the kill sound: its pitch climbs with the streak)
+
 export class Audio {
   constructor(manifest) {
     this.files = manifest.sfx || {};
@@ -55,6 +74,11 @@ export class Audio {
     this.musicKey = null;
     // Which numbered sound (e.g. "092" for 092.wav) plays for a game event; set by the game.
     this.map = {};
+    // Several takes of one sound (file key -> the takes' keys): one picked each time (set by the game).
+    this.variants = {};
+    this.voices = []; // { end, key, prio, src, g }
+    this.recent = {}; // key -> times it was heard lately (REPEAT_WIN)
+    this.log = null; // test: [t, key, 'play' | 'drop:<why>', file, gain, rate]
   }
 
   /** The numbered sounds in the build (the game's own files are numbered), for the sound picker. */
@@ -96,7 +120,7 @@ export class Audio {
     let p = this.pending[key];
     if (!p) {
       p = this.pending[key] = fetch('assets/' + this.files[key]).then(r => r.arrayBuffer()).then(d => this.ctx.decodeAudioData(d)).then(buf => {
-        this.buffers[key] = { buf, used: ++this.clock, bytes: buf.length * buf.numberOfChannels * 4 };
+        this.buffers[key] = { buf, used: ++this.clock, bytes: buf.length * buf.numberOfChannels * 4, rms: rmsOf(buf) };
         this.bytes += this.buffers[key].bytes;
         if (this.bytes > SFX_BUDGET) this.trim();
         return buf;
@@ -115,17 +139,30 @@ export class Audio {
     }
   }
 
-  start(buffer, gain = 1, rate = 1) {
+  start(buffer, gain = 1, rate = 1, key = '', prio = 3) {
+    const now = this.ctx.currentTime;
+    // (the voices still sounding; past VOICES the oldest less important one gives way, else this one is let go)
+    this.voices = this.voices.filter(v => v.end > now);
+    if (key && this.voices.filter(v => v.key === key).length >= SAME_VOICES) return this.note(key, 'drop:same');
+    if (this.voices.length >= VOICES) {
+      const out = this.voices.filter(v => v.prio < prio || (v.prio === prio && prio < 3)).sort((a, b) => a.prio - b.prio || a.end - b.end)[0];
+      if (!out) return this.note(key, 'drop:full');
+      try { out.g.gain.setTargetAtTime(0, now, 0.02); out.src.stop(now + 0.08); } catch (e) { /* gone */ }
+      this.voices.splice(this.voices.indexOf(out), 1);
+    }
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     if (rate !== 1) src.playbackRate.value = rate;
-    if (gain === 1) src.connect(this.master);
-    else {
-      const g = this.ctx.createGain();
-      g.gain.value = gain;
-      src.connect(g).connect(this.master);
-    }
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(this.master);
     src.start();
+    this.voices.push({ end: now + buffer.duration / rate, key, prio, src, g });
+    this.note(key, 'play', gain, rate);
+  }
+
+  note(key, what, gain, rate) {
+    if (this.log && this.ctx) this.log.push([+this.ctx.currentTime.toFixed(3), key, what, gain && +gain.toFixed(2), rate && +rate.toFixed(3), this.voices.length]);
   }
 
   /** Called from the first tap: browsers only let sound start from one. */
@@ -158,7 +195,10 @@ export class Audio {
   play(key, kind, level = 1, rate = 1) {
     if (!this.sfxOn || !this.ctx || this.halted) return;
     const now = this.ctx.currentTime;
-    if (now - (this.last[key] || -1) < (MIN_GAP[key] ?? MIN_GAP[kind] ?? 0.03)) return;
+    const skill = key.startsWith('skill_');
+    // (a spell's clip: not again within SKILL_GAP, nor within LONG_GAP of its own length while it still rings)
+    const gap = Math.max(MIN_GAP[key] ?? MIN_GAP[kind] ?? 0.03, skill ? SKILL_GAP : 0, skill && this.lastLen && this.lastLen[key] ? Math.min(1.2, this.lastLen[key] * LONG_GAP) : 0);
+    if (now - (this.last[key] || -1) < gap) return this.note(key, 'drop:gap');
     this.last[key] = now;
     const chain = key.startsWith('skill_') ? [key, 'skill_' + kind, 'skill'] : [key];
     for (const k of chain) {
@@ -169,9 +209,25 @@ export class Audio {
       const [num, r] = n ? String(n).split('@') : [];
       const fk = num && this.has(num) ? num : this.has(k) ? k : null;
       if (fk) {
-        const b = this.buffer(fk), g = GAIN[key] ?? 1, rt = (+r || 1) * rate;
-        if (b) this.start(b, g, rt);
-        else this.want(fk, x => this.start(x, g, rt));
+        // (one of its takes, where it has several; a little apart in pitch each time)
+        const takes = (this.variants[fk] || []).filter(v => this.has(v));
+        const pick = takes.length ? takes[Math.floor(Math.random() * takes.length)] : fk;
+        const rt = (+r || 1) * rate * (VARIED.test(key) ? 1 + (Math.random() * 2 - 1) * PITCH : 1);
+        // (heard over and over lately: a little softer each time, so one spell does not drown the rest)
+        const rec = (this.recent[key] || []).filter(t => now - t < REPEAT_WIN);
+        rec.push(now);
+        this.recent[key] = rec;
+        const g0 = (GAIN[key] ?? 1) * Math.max(REPEAT_MIN, 1 - REPEAT_K * (rec.length - 1)), prio = prioOf(key, kind);
+        const go = x => {
+          const e = this.buffers[pick];
+          // (each spell's clip towards one loudness: a roaring one softer, a faint one up)
+          const norm = skill && e && e.rms ? Math.max(NORM_MIN, Math.min(NORM_MAX, LOUD / e.rms)) : 1;
+          (this.lastLen || (this.lastLen = {}))[key] = x.duration;
+          this.start(x, g0 * norm, rt, pick, prio);
+        };
+        const b = this.buffer(pick);
+        if (b) go(b);
+        else this.want(pick, go);
         return;
       }
     }
@@ -305,6 +361,14 @@ export class Audio {
       if (this.music && this.bgmOn) this.music.play().catch(() => {});
     }
   }
+}
+
+/** A clip's loudness: the root mean square of its first channel over its loud part (the first two seconds, every 8th sample). */
+function rmsOf(buf) {
+  const d = buf.getChannelData(0), n = Math.min(d.length, Math.round(buf.sampleRate * 2));
+  let s = 0, c = 0;
+  for (let i = 0; i < n; i += 8) { s += d[i] * d[i]; c++; }
+  return c ? Math.sqrt(s / c) : 0;
 }
 
 /** The app's native music as the few bits of an <audio> the game uses (play, pause, paused, volume). */

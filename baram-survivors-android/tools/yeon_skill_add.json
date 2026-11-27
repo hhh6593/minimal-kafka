@@ -1,0 +1,3 @@
+{
+ "l_formless": {"yid": "20721400", "name": "무형지창", "prefab": "Skill_Effect_Lancer_5th_02", "icon": "Skill_Icon_Lancer_5th_02", "add_own": true, "why": "이전 APK의 k_l_formless는 렌더러가 Ifrit_Raid/Explosion 셰이더를 알기 전에 잘라 R·G·B 채널이 무지개 고리로 나옴(아이콘은 푸른 창). 지금 렌더러로 다시: 푸른 창과 빛, 어두운 고리"}
+}

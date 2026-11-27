@@ -557,3 +557,13 @@ export const YEON_RAID_BGM = {
  "raid_goblin": "bgm_boss05_48",
  "raid_sea": "BGM_Raid_YongGung_1stBoss_48"
 };
+
+// 효과음 겹침 (사용자 2026-11-28): sounds the build carries in several takes of the same thing (연's own numbered takes,
+// not a spell's element series like fx_skill_10101_1~4): one picked each time it plays (audio.js variants).
+const TAKES = [
+ ["sfx_bat_hit_normal", "sfx_bat_hit_normal_2"],
+ ["SFX_Common_Explosion_1", "SFX_Common_Explosion_2"],
+ ["SFX_Common_Fire_Whoosh_1", "SFX_Common_Fire_Whoosh_2", "SFX_Common_Fire_Whoosh_3"],
+ ["SFX_Dokkaebi_WispGet_1", "SFX_Dokkaebi_WispGet_2"],
+];
+export const YEON_VARIANTS = Object.fromEntries(TAKES.flatMap(t => t.map(k => [k, t])));
