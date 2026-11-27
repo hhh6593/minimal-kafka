@@ -75,7 +75,7 @@ export const GYEOK = {
   // and 절망 on the struck (they strike softer): the line's balance, a little of blow, heal and guard.
   cheongryongcham: { name: '청룡참', on: 'hit', chance: 0.2, cd: 20, dmg: 3, area: 1, heal: 0.25, fx: 'g_roaring_dragon', sizeK: 0.92, mech: { strikes: { n: 2, gap: 0.35 } } },
   akmasimpan: { name: '악마 심판 격', on: 'hit', chance: 0.22, cd: 18, dmg: 5.5, area: 2, heal: 0.5, st: ['despair', 5], fx: 'g_roaring_dragon', sizeK: 1.06,
-    fx2: 'k_ab_darkburst', fx2K: 1.6, tint: AKMA_GY_TINT, mech: { first: 0.6, zone: { r: 2, sec: 4, k: 0.05, drain: 0.3, color: 'blood' } } },
+    tint: AKMA_GY_TINT, mech: { first: 0.6, zone: { r: 2, sec: 4, k: 0.05, drain: 0.3, color: 'blood' } } },
   // 태초's own (태초광명 격): 천자의분노's wide blow in gold-white light, a stun, and the wearer's pierce.
   taechogwang: { name: '태초광명 격', on: 'hit', chance: 0.2, cd: 15, dmg: 4.5, area: 2, st: ['stun', 1], self: ['pierce', 5, 0.2], fx: 'g_taecho_light', fxK: 1.4,
     fx2: 'g_taecho_light', fx2K: 0.6, tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.2)', mech: { first: 0.8, rays: { n: 3, r: 1, k: 0.3, lone: 0.07, gap: 0.12 }, rally: { k: 0.1, sec: 5 } } },
@@ -138,9 +138,9 @@ export const GYEOK = {
 export const ABYSS_KIN = ['saseong', 'maengdok', 'binggyeol', 'yeomryeong', 'jiok', 'nakroe', 'gijeol'];
 for (const id of ABYSS_KIN) {
   const g = GYEOK[id];
-  // Drawn as the top weapons they are: their own picture larger, and the abyss's dark burst on the struck.
+  // Drawn as the top weapons they are: their own picture larger. (No dark burst on each struck: the purple blotch it
+  // left on every target was taken off, 사용자 2026-11-28.)
   GYEOK['ab_' + id] = { ...g, name: '심연의 ' + g.name, dmg: g.dmg * 1.3, tint: ABYSS_GY_TINT, // (its picture's size: GYEOK_SIZE.final)
-    ...(g.fx2 ? {} : { fx2: 'k_ab_darkburst', fx2K: 0.9 }),
     ...(g.area ? { area: g.area + 1 } : g.targets ? { targets: g.targets + 2 } : g.mech && g.mech.chain ? {} : { area: 1 }),
     // and its way one step further: a chain two more leaps, a ground a second longer
     ...(g.mech ? { mech: { ...g.mech, ...(g.mech.chain ? { chain: { ...g.mech.chain, n: g.mech.chain.n + 2 } } : {}),
