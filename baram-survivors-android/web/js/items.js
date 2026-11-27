@@ -471,7 +471,7 @@ export const FINAL_SHIELD_ROLE = {
   cr_fshield_hyeolgwi: { boss: 0.1, war: 0.1, mob: 0 },
   cr_fshield_haetae: { boss: 0.06, war: 0.06, mob: 0.06 },
 };
-const G_FSHIELD = '조합 · 절세방패 (최고 등급 15 · 최종 무기와 짝을 이루는 다섯 성격)';
+const G_FSHIELD = '조합 · 수호신물 (최고 등급 15 · 최종 무기와 짝을 이루는 다섯 성격)';
 const FS_ONLY = ['warrior', 'rogue', 'mage', 'poet']; // the classes that carry a shield (avatar.js SHIELDED)
 const fsBase = id => Object.fromEntries(FS_ONLY.map(c => [c, [id]]));
 export const FINAL_SHIELDS = [
@@ -1022,15 +1022,15 @@ export const WEAPON_FAMILY = {
   judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·문파전)',
     text: '모든 적에게 같은 피해 보너스(보스·문파전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 11직업 공용.' },
   // 최종 방패 (FINAL_SHIELDS): what each takes less of, as its weapon deals more.
-  fs_dragon: { name: '절세방패 · 브리트라한', role: '보스형 (용무기의 짝)', best: '보스·레이드',
+  fs_dragon: { name: '수호신물 · 브리트라한', role: '보스형 (용무기의 짝)', best: '보스·레이드',
     text: '보스·우두머리에게 받는 피해 -15%. 브리트라한의 용격(맞을 때): 때린 적 둘레 3×3에 용의 두 번 일격과 받는 피해 -20% 4초. 기절을 막음. 등급 15(격 +0.5, ★5 17.5). 선계 레이드 뒤 조합, 선계 레이드에서 드물게.' },
-  fs_jujak: { name: '절세방패 · 금린', role: 'PVP형 (사신수의 짝)', best: '대항전·쟁',
+  fs_jujak: { name: '수호신물 · 금린', role: 'PVP형 (사신수의 짝)', best: '대항전·쟁',
     text: '대항전·쟁의 적에게 받는 피해 -15%. 금린 화염결계(맞을 때): 때린 적 둘레 3×3에 화상과 주작의 불꽃(나에게 받는 피해 +20%). 화상을 막음. 등급 15(격 +0.5, ★5 17.5). 아그니 레이드 뒤 조합(주작혈안), 아그니에서 드물게.' },
-  fs_hwanin: { name: '절세방패 · 환인', role: '사냥+보스 (태초의 짝)', best: '사냥·보스',
+  fs_hwanin: { name: '수호신물 · 환인', role: '사냥+보스 (태초의 짝)', best: '사냥·보스',
     text: '일반 몬스터·챔피언과 보스·우두머리에게 받는 피해 -10%. 환인의 빛(맞을 때): 둘레 5×5에 금빛 일격과 기절, 내 관통 4초. 마비를 막음. 등급 15(격 +0.5, ★5 17.5). 세계석 요새 정복 뒤 조합, 세계석 요새·소 레벨에서 드물게.' },
-  fs_hyeolgwi: { name: '절세방패 · 고대마령', role: 'PVP+보스 (심연의 짝)', best: '대항전·쟁·보스',
+  fs_hyeolgwi: { name: '수호신물 · 고대마령', role: 'PVP+보스 (심연의 짝)', best: '대항전·쟁·보스',
     text: '대항전·쟁의 적과 보스·우두머리에게 받는 피해 -10%. 고대마령 반격(맞을 때): 3×3에 흑적 일격과 절망, 준 피해만큼 흡혈. 절망을 막음. 등급 15(격 +0.5, ★5 17.5). 지하 묘지 정복 뒤 조합, 끝없는 지옥·지하국대적에서 드물게.' },
-  fs_haetae: { name: '절세방패 · 환웅', role: '하이브리드+생명 (심판의낫의 짝)', best: '어디서나',
+  fs_haetae: { name: '수호신물 · 환웅', role: '하이브리드+생명 (심판의낫의 짝)', best: '어디서나',
     text: '모든 적에게 받는 피해 -6%, 체력 옵션. 환웅의 심판(맞을 때): 3×3 일격과 체력·마력 15% 회복, 상태 해제. 저주를 막음. 등급 15(격 +0.5, ★5 17.5). 수라방패 ★5 + 회한옥\'심으로 벼림, 지하국대적에서 드물게.' },
 };
 const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
