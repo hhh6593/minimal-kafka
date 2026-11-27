@@ -78,6 +78,16 @@
   (오른쪽이면 뒤집음). 맞는 범위 = 폭발 반폭 20px(splashR, 예전 26×거리 배율).
   남은 것: 광폭기대방출의 연 그림은 하늘에서 떨어지는 긴 빛기둥(70×206)이라 '몸 하나 1.4칸' 규칙(긴 변 기준)에 맞추면 폭 0.5칸의 가는 바늘이 된다 —
   규칙을 바꿀지(떨어지는 기둥은 폭 기준) 사용자 판단.
+  → [해결 2026-11-28 사용자 결정 "떨어지는 기둥은 폭을 기준으로"] 몸 하나를 치는 그림 중 모든 프레임 합친 상자가 폭의 2배 이상 높은 기둥(FALL_TALL)은
+  폭을 몸 하나(1.4칸)에 맞추고 높이는 제 모양대로(최대 FALL_MAX 5칸), 발이 맞은 몸의 발 위(game.js `fxIsFall`·`fxFitFall`: spell·strike(반지름 0)·
+  삼매진화 줄·stack·hp 돌진·동료 필살기, 그리고 맞은 몸마다의 적중 그림 hitOn·전도체 과전류). 적용되는 것(11직업 전 기술 영웅·AI 시전으로 확인,
+  r_berserk/tools/fallprobe.js·tallhits.js): 광폭기대방출 k_md_bust(분홍 빛기둥), 기공구슬'뇌 k_md_orblight(낙뢰), 잠룡승천 k_l_rise·k_v_l_rise_u,
+  도깨비불'염류 k_dk_wisp, 적중 그림 h_hit_light(천벌·사슬벼락·광폭구슬'뇌의 낙뢰, 전도체), k_u_p_pillar_o(천선파동 빛기둥).
+  넓은 칸(fxSquare)·버프·기원 기둥(SELF_TILES)과 작은 타격 불꽃(sparkOf)은 그대로.
+  광폭기사출의 연 원본: 연 마도사 기술 표(Strings Skill_230xxxxx)에 광폭기사출은 없음(바람 원작 9차, 2662 IMG62) — 연의 광폭 프리팹 23개(Frenzy_Ray·
+  Frenzy_Ray_Hit·Frenzy_Bust_Hit·Orb_Frenzy_Idle·Frenetic_Wing·Magic_Sphere_Frenzy·Decay_Loop …)는 모두 이미 다른 기술이 씀(k_x_md_ray_beam·k_md_ray·
+  k_md_bust·k_u_md_orb·k_u_md_wing·k_md_ult·k_u_md_decay, 겹침 1.0). 안 쓰인 마도사 프리팹 셋(Orb_Cast 파란 마법진, Stat_Enhance_Cast·Boundary_Break_Hit 금빛)은
+  광폭(분홍)이 아님. 그래서 중복 금지를 지키는 한 원작 9차 그림(둘로 자른 것)을 그대로 둠 — 연 그림을 겹쳐 쓸지 사용자 판단.
 - [해결 2026-11-28] 9차 승급 상태에서 이펙트 크기 재측정(패시브 발동 그림, 절섬 9차, 투귀살 연쇄 소용돌이, 황천화). → 아래 전수조사(PROC=1)에 포함.
 - 코디(치장) 무기: 격투가 등 일부 직업은 낄 수 있는 코디 무기가 너무 적다. 직업 공용 코디 무기도 있어야 한다.
   → [해결 2026-11-28] 아래 '공용 무기' 항목과 함께: 연 공용 무기의 치장용 85종을 11직업에(격투가 코디 무기 50 → 135, 주술사 36 → 121).

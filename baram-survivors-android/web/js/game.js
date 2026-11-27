@@ -7762,7 +7762,9 @@ function castNow(skill, st) {
   // shows nothing — its call over the hero went up every 0.3 s while it waited, a blade swung at an empty field)
   const castAt = G.fxs.length, castOk = M.fx[castPic] && (def.fxCast ? def.kind !== 'heal' : ['spell', 'strike', 'nova', 'line'].includes(def.kind));
   let hitN = 0;
-  const hitOn = e => { if (hitPic && hitN++ < 8) fxOn(hitPic, e, { scale: def.hitScale || 1.1 }); };
+  // (a hit that is a bolt or a beam of light falling on the one struck — 천벌·사슬벼락·광폭구슬'뇌의 낙뢰, 천선파동의 빛기둥 —: as wide as
+  // the body, fxFitFall; any other, a body across by its longer side as before)
+  const hitOn = e => { if (hitPic && hitN++ < 8) { if (fxIsFall(hitPic)) fxOnArea(fxFitFall(hitPic, ONE_TILES, 'hf'), e); else fxOn(hitPic, e, { scale: def.hitScale || 1.1 }); } };
   let afterN = 0;
   // (보이는 범위 = 맞는 범위: what stays where it landed no wider than what was struck there — `cap` tiles)
   const afterAt = (x, y, delay = 0, cap = ONE_TILES) => {
@@ -7965,7 +7967,7 @@ function castNow(skill, st) {
       if (!targets.length) return retry(0.25);
       // 이펙트=판정: one foe struck, its picture about a body across (not four tiles round it), the blow
       // spread over the picture's life when it stays (half at once, the rest in beats)
-      const spic = fxFit(fxid, ONE_TILES, 'sp');
+      const spic = fxFitFall(fxid, ONE_TILES, 'sp');
       const land = e => {
           if (e.hp <= 0) return;
           // (fxTurn: a picture that points the way it flew — 1320's, drawn pointing left — turned to the side the foe stands)
@@ -8020,7 +8022,7 @@ function castNow(skill, st) {
             any = true;
             // (이펙트=판정: a picture on every one struck — a burning row's sixth had none, past addFx's four of one
             // picture — a body across, its blow spread over it while it stays)
-            const life = fxOnArea(fxFit(fxid, ONE_TILES, 's4'), b, { must: true }), bx = b.tx, by = b.ty;
+            const life = fxOnArea(fxFitFall(fxid, ONE_TILES, 's4'), b, { must: true }), bx = b.tx, by = b.ty;
             for (const [dt, k] of beatsUnder(life - 0.1)) later(dt, () => { for (const o of bodiesAt(bx, by) || []) if (o.m && !o.ally && o.hp > 0) smite(o, st.dmg * k); });
             if (!def.pierce) break; // 삼매진화 burns the whole row
           }
@@ -8046,7 +8048,7 @@ function castNow(skill, st) {
         const [sf, sflip] = dirFx(fxid, skill.id, tx - p.tx, ty - p.ty);
         // (화질, 사용자 2026-11-28 전수조사: 주술사의 저주·마비·중독·절망처럼 작은 그림이 넓은 칸에 맞춰 뭉개지던 것 — STRIKE_MAX_UP)
         const so = { delay: i * 0.12 + fl, flip: sflip, maxUp: STRIKE_MAX_UP };
-        const life = sr && def.shape !== 'plus' ? fxAtSquare(sf, sr * 2 + 1, tx * TILE + TILE / 2, ty * TILE + TILE - 30, so, 'st') : fxOnArea(fxFit(sf, sr ? sr * 2 + 1 : ONE_TILES, 'st'), e, { ...so, tile: !!sr }), at = def.hitAt || 0.3;
+        const life = sr && def.shape !== 'plus' ? fxAtSquare(sf, sr * 2 + 1, tx * TILE + TILE / 2, ty * TILE + TILE - 30, so, 'st') : fxOnArea(sr ? fxFit(sf, sr * 2 + 1, 'st') : fxFitFall(sf, ONE_TILES, 'st'), e, { ...so, tile: !!sr }), at = def.hitAt || 0.3;
         const inArea = () => (def.shape === 'plus' ? onTiles(plusTiles(tx, ty, sr)) : sr ? around(tx, ty, sr) : onTiles([[tx, ty]]));
         for (const [dt, k] of beatsUnder(life * (1 - at)).slice(1)) later(i * 0.12 + fl + life * at + dt, () => { for (const o of inArea()) smite(o, st.dmg * k); });
         const k0 = beatsUnder(life * (1 - at))[0][1];
@@ -9012,6 +9014,30 @@ function fxFit(id, tiles, tag = 'f') {
   // a bolt on one body stood three or four tiles over it, a 기원's pillar five)
   return fxTiles(id, tiles, tag);
 }
+/** 사용자 2026-11-28 "떨어지는 기둥은 폭을 기준으로": a blow on one body whose picture is a pillar falling from the sky onto it
+ *  (all its frames together at least FALL_TALL times as tall as wide — 광폭기대방출's pink pillar, a bolt, a beam of light) is
+ *  drawn as wide as the body it strikes (`tiles` across), its height its own shape's, at most FALL_MAX tiles (what strikes
+ *  is its foot, on the body); held by its longer side it was a needle half a tile wide. Any other picture: fxFit. */
+const FALL_TALL = 2, FALL_MAX = 5;
+const fallSeen = new Set();
+function fxIsFall(id) {
+  const f = id && M.fx[id];
+  if (!f) return false;
+  const u = fxUnion(id), uw = u ? u.x1 - u.x0 : f.w, uh = (u ? u.y1 - u.y0 : f.h) * (f.ky || 1);
+  return uh >= FALL_TALL * uw;
+}
+function fxFitFall(id, tiles, tag = 'f') {
+  const f = id && M.fx[id];
+  if (!f) return id;
+  const u = fxUnion(id), uw = (u ? u.x1 - u.x0 : f.w) * (f.k || 1), uh = (u ? u.y1 - u.y0 : f.h) * (f.k || 1) * (f.ky || 1);
+  if (!fxIsFall(id)) return fxFit(id, tiles, tag);
+  const m = Math.min((tiles * TILE) / uw, (FALL_MAX * TILE) / uh);
+  if (window.__fallLog) fallSeen.add(id);
+  const key = `${id}#${tag}w${Math.round(tiles * 10)}`;
+  if (!M.fx[key]) M.fx[key] = { ...f, src: f.src || id, k: (f.k || 1) * m };
+  return key;
+}
+window.__fallSeen = () => [...fallSeen]; // test: the pillars fitted by their width
 /** 이펙트=판정 for what strikes nothing — a 기원, a buff, a shield on a body (the hero's, a companion's, a raid or war
  *  fighter's): its drawn part never more than SELF_TILES across (a tall one by its width), shrunk only. (사용자 피드백:
  *  구름의 기원's ring stood about five heroes high round a hero it only mends; 완력 on a raid's 도깨비 four tiles wide.)
@@ -9442,7 +9468,7 @@ const TIER_KINDS = {
       const s = (e.tkStack = e.tkStack || {});
       const n = (s[skill.id] = (s[skill.id] || 0) + 1);
       // (이펙트=판정: its picture on the one struck a body across, the blow spread over it while it stays)
-      const life = fxOnArea(fxFit(fxid, ONE_TILES, 'sk'), e);
+      const life = fxOnArea(fxFitFall(fxid, ONE_TILES, 'sk'), e);
       for (const [dt, k] of beatsUnder(life - 0.1)) later(dt, () => { if (e.hp > 0) smite(e, st.dmg * (1 + def.per * (n - 1)) * k); });
       if (n >= def.stacks) {
         s[skill.id] = 0;
@@ -9780,7 +9806,7 @@ const TIER_KINDS = {
       if (e.hp <= 0 || G.dead) return;
       const dx = Math.sign(e.tx - p.tx), dy = Math.sign(e.ty - p.ty);
       if (!steering()) tkMoveHero(e.tx + dx, e.ty + dy) || tkMoveHero(e.tx - dy, e.ty + dx);
-      const life = fxOnArea(fxFit(fxid, ONE_TILES, 'hp'), e), ex = e.tx, ey = e.ty;
+      const life = fxOnArea(fxFitFall(fxid, ONE_TILES, 'hp'), e), ex = e.tx, ey = e.ty;
       for (const [t, k] of beatsUnder(life - 0.1)) later(t, () => { for (const b of bodiesAt(ex, ey) || []) if (b.m && !b.ally && b.hp > 0) { smite(b, st.dmg * k, [dx, dy]); if (!t) tkAfflict(b, def); } });
       meleeSlash(e.tx, e.ty, dx || 1, dy, i);
     }));
@@ -11012,7 +11038,8 @@ const ECHO = {
     }
     seq.forEach((e, i) => later(i * 0.06, () => {
       if (e.hp <= 0) return;
-      fxOn(def.fxHit || 'h_hit_light', e, { scale: 0.8 });
+      const bolt = def.fxHit || 'h_hit_light';
+      if (fxIsFall(bolt)) fxOnArea(fxFitFall(bolt, ONE_TILES, 'hf'), e); else fxOn(bolt, e, { scale: 0.8 });
       hurtEnemy(e, d * Math.pow(0.85, i));
       if (i === 0) e.slow = Math.max(e.slow || 0, 0.6);
     }));
@@ -14548,7 +14575,7 @@ function partyLv(m) { return m.own ? memberSkillLv(m) : Math.max(1, Math.min(8, 
  *  whole blow of it; also(e) on each struck. A 필살기 (kind ult, the hero's a scene of its own) a body across on t. */
 function memberSkill(m, id, n, t, also) {
   if (SKILLS[id] && SKILLS[id].kind === 'ult') {
-    fxOnArea(fxFit(SKILLS[id].fx, ONE_TILES, 'mu'), t);
+    fxOnArea(fxFitFall(SKILLS[id].fx, ONE_TILES, 'mu'), t);
     later(0.25, () => { if (t.hp > 0) { memberHit(t, n); if (also) also(t); } });
     return true;
   }
@@ -15045,7 +15072,7 @@ function partyAct(m) {
       }
       if (boss && m.cd.d <= 0) {
         m.cd.d = 15;
-        fxOnArea(fxFit(SKILLS.r_ult.fx, ONE_TILES, 'ru'), t);
+        fxOnArea(fxFitFall(SKILLS.r_ult.fx, ONE_TILES, 'ru'), t);
         for (let i = 0; i < 4; i++) later(0.1 + i * 0.1, () => hurtEnemy(t, 15 * pw * (i === 0 ? amb : 1)));
         audio.play('skill_r_ult', 'ult');
         partySay(m, '필살검무');
