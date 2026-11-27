@@ -67,6 +67,22 @@ def main():
             shutil.copyfile(os.path.join(idir, n), os.path.join(assets, "skillicon", n))
             if n[:-4] not in man["skillicon"]:
                 man["skillicon"].append(n[:-4])
+    # 연's 격 made again at their own pixels since that APK (GEAR_DIR/ygyeok_hd/, tools/yeon_gyeok_hd.py), over the old
+    # (as .png: out of the webp list)
+    hd = os.path.join(gear, "ygyeok_hd")
+    if os.path.isfile(os.path.join(hd, "index.json")):
+        htmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(htmp, "fx"))
+        hm = {"fx": {}}
+        pa.add_ygyeok(hd, json.load(open(os.path.join(hd, "index.json"), encoding="utf-8")), htmp, hm)
+        for fid, v in hm["fx"].items():
+            man["fx"][fid] = v
+            for ext in (".png", ".webp"):
+                if os.path.exists(os.path.join(assets, "fx", fid + ext)):
+                    os.remove(os.path.join(assets, "fx", fid + ext))
+            shutil.copyfile(os.path.join(htmp, "fx", fid + ".png"), os.path.join(assets, "fx", fid + ".png"))
+        man["fxWebp"] = [x for x in man.get("fxWebp", []) if x not in hm["fx"]]
+        print(f"replaced {len(hm['fx'])} 격 pictures from ygyeok_hd")
     # Hunting-ground walk grids made again since that APK (tools/yhunt_walk.json, from
     # tools/yeon_grounds.py arena: 화탕지옥's void and cliffs closed), over the old ones.
     fix = json.load(open(os.path.join(HERE, "yhunt_walk.json"), encoding="utf-8"))
