@@ -46,8 +46,12 @@ const squadsOf = mode => (bigOn(mode) ? BIG : SMALL)[mode];
 // By mode (FOE_MODE, on the part over 1): where the war is won on the ground — a 거점 held, the cart's ring — a hero
 // that seldom falls counts for most; in the 대장전's race of kills it is one blade among seventy, and a few percent
 // decide it (a hero of 7.5만: 청룡전 won 6 of 6 at 1.29 and 1 of 6 at 1.39; 대장전 6 of 6 at 1, 0 of 6 at 1.15: balance runs).
-const FIELD_CP = 34500, FOE_HERO = 0.25, FOE_MIN = 1.06, FOE_MAX = 1.32;
-const FOE_MODE = { capture: 1.1, escort: 1.35, commander: 0.25, siege: 1, bosspk: 1 };
+// (FOE_MAX 1.32 → 1.16, 2026-11-28: a strong hero now falls in a war — heroHurtK, heroHealK, the shorter blink — and won
+// 2 of 12 at 7.7만 with the old ceiling, 2 of 12 at 1.2 and 12 of 16 at 1.12 with the floor below at 0.9; its own deaths are now the price of its strength, balance runs.)
+const FIELD_CP = 34500, FOE_HERO = 0.25, FOE_MIN = 1.06, FOE_MAX = 1.16;
+// (escort 1.35 → 1.2, 2026-11-28: the strong hero now falls — heroHurtK, heroHealK, the shorter blink — and the cart is
+// lost while it lies: 0 of 3 주작전 at 7.7만, balance runs.)
+const FOE_MODE = { capture: 1.1, escort: 1.2, commander: 0.25, siege: 1, bosspk: 1 };
 const foeKOf = (cp, mode) => 1 + (clamp(1 + FOE_HERO * (cp / FIELD_CP - 1), FOE_MIN, FOE_MAX) - 1) * (FOE_MODE[mode] ?? 1);
 const ROLES = {
   tank: { name: '탱커', desc: '앞줄에서 적을 붙잡고 도발한다. 받은 피해와 막아 낸 공격이 기여도가 된다.', bonus: '체력 +35% · 받는 피해 -20% · 6초마다 주변 적 도발' },
@@ -917,7 +921,9 @@ export const War = {
     while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
     const span = Math.max(3, Math.min(8, G.t - win[0][0]));
     const rate = W.rawSum / span;
-    const target = W.U * 2.6 * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1) * (W.jaeng ? JAENG.heroK : 1);
+    // (By its 전투력 as one of its guild (W.heroPw, applyPersonas): it was a fighter's worth whatever its 전투력 — a hero
+    // of 1.5만 struck as hard as one of 7.5만 against the same guilds.)
+    const target = W.U * 2.6 * clamp(W.heroPw || 1, 0.4, 2.4) * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1) * (W.jaeng ? JAENG.heroK : 1);
     const out = rate > target ? dmg * target / rate : dmg;
     if (!W.jaeng) return out;
     // 「쟁」: the guild's 역습 and the seals' gift count for the hero too; a hero away barely scratches.
@@ -992,7 +998,16 @@ export const War = {
   raidScale: (dmg, e) => raidScale(dmg, e),
   raidCredit: (e, dmg, killed) => raidCredit(e, dmg, killed),
   raidCut: () => raidHeroCut(),
-  raidHeroHurt: () => 0.75 * raidHurtK(),
+  raidHeroHurt: () => raidHeroHurtK(),
+  /** 대항전·「쟁」: what mends the hero, at this share (game.js heal, its health coming back, 흡혈 buff): by its 전투력
+   * over its guild's middle — a hero at or under it mends as before, a strong one at down to 0.55. A hero of 7.7만 lost
+   * fourteen lives' worth of health in a war and mended it all as it came: 0 deaths in every war (balance runs). */
+  heroHealK: () => {
+    const W = A.G().war;
+    if (!W || W.raid) return 1;
+    const rel = (W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1);
+    return 1 - 0.45 * clamp((rel - 0.7) / 0.8, 0, 1);
+  },
   /** A hero's life at the raid's own level, for the servants' bites on a raider. */
   raidHeroHp: () => { const G = A.G(), W = G.war; return (150 + 20 * Math.floor(W.lvRec / 4)) * (1 + 0.08 * G.level); },
   /** The hero struck in a raid: its share of life, counted as a raider's. */
@@ -1380,7 +1395,7 @@ function packNear(W, t, r) {
 const AOE_CAP = 3;
 // (a fighter's spell cast by the hero's code in a war or 「쟁」, aiCast: each other struck SPLASH of a blow, the
 // whole cast AOE_BUDGET blows at most — the meant one and AOE_CAP-1 others' worth, as above)
-const SPLASH = 0.6, AOE_BUDGET = 1 + SPLASH * (AOE_CAP - 1);
+const SPLASH = 0.6, AOE_BUDGET = 1 + SPLASH * (AOE_CAP - 1), RAID_CAST = 1.5;
 /** Every foe within r of t (the whole drawn area), the struck first. */
 function aoeAll(W, t, r) {
   if (t.team === undefined) return packNear(W, t, r);
@@ -1438,7 +1453,7 @@ function pickFoe(W, b, r) {
     if (W.jaeng && inCamp(W, e)) continue; // (none is struck in its own camp)
     const d = d2(b, e);
     if (d > r || unseen(W, b, e, d)) continue;
-    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
+    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 - 0.8 * heroMark(W) : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
     if (s < bs) { bs = s; best = e; }
   }
   // 「쟁」: a servant in the way is struck too (the boss is the 보스 order's, not a passing blow's).
@@ -1450,6 +1465,16 @@ function pickFoe(W, b, r) {
     if (s < bs) { bs = s; best = e; }
   }
   return best;
+}
+/**
+ * How much the other guilds go for the hero (대항전·「쟁」): by its 전투력 over its guild's middle (W.heroPw against the
+ * guild's, applyPersonas) — a hero at the middle as before (0 → still a little after the others), one well over it a
+ * mark everyone goes for (up to 2.5), as a server's 랭커 is. A strong hero stood among the fighters struck as one of
+ * them and never fell (0 deaths in every war at 7.7만, balance runs).
+ */
+function heroMark(W) {
+  if (W.markK === undefined) W.markK = clamp(2.2 * ((W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1) - 1), 0, 2.5);
+  return W.markK;
 }
 function hpk(b) { return b.hp / b.maxHp; }
 function alive(t) { return t && !t.dead && t.hp > 0 && !(t.gate && A.G().war.gateDown); }
@@ -1620,7 +1645,7 @@ function leaderPick(W, b, order) {
   for (const [e, d] of near) {
     if (b.only !== undefined && e.team !== b.only) continue;
     const s = (e.role === 'healer' ? 3 : e.cls && (e.cls.id === 'mage' || e.cls.id === 'archer') ? 1.5 : 0) + (1 - hpk(e)) * 4 - d * 0.6
-      + (e.carry ? 3 : 0) - (e.hero ? 1 : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0) - 0.4 * Math.min(5, e.engaged || 0);
+      + (e.carry ? 3 : 0) + (e.hero ? heroMark(W) - 1 : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0) - 0.4 * Math.min(5, e.engaged || 0);
     if (s > bs) { bs = s; best = e; }
   }
   if (best !== sq.target) {
@@ -2099,7 +2124,7 @@ function aiCast(W, b, id, o = {}) {
   // its part however many beats or hits the hero's version has, the gate only when it is the one meant. Cast by the
   // hero's code with AOE_CAP struck in full, every spell of the crowd struck three bodies and the gate behind them:
   // twice the deaths of a war, 현무 성문 down and 수성대장 felled in 0:30~1:40 of five minutes (balance runs).
-  const field = !W.raid, got = field ? new Map() : null;
+  const field = !W.raid, got = new Map();
   let spent = 0, lead = o.at && o.at !== b ? o.at : null;
   return A.castAs(pos, id, o.lv || b.skl || 1, {
     cls: o.cls || b.cls || pos.cls, foes: foes || undefined, team: b.team || 0, at: o.at, on: o.on || pos, alpha: aiAlpha(), draw: o.draw !== false,
@@ -2115,8 +2140,14 @@ function aiCast(W, b, id, o = {}) {
         struck.add(e);
         hit(W, b, e, n * s);
       } else {
+        // (A raid: a body takes at most RAID_CAST of one blow from one cast, however many beats the hero's version of
+        // it has — a 탱커's eight-beat spell on the boss struck eight whole blows, and the kit, not the 전투력, said who
+        // led the boss's board: a 이류 탱커 at nine times the 딜러's middle, balance runs.)
+        const room = RAID_CAST - (got.get(e) || 0), s = Math.min(share, room);
+        if (!(s > 0)) return 0;
+        got.set(e, (got.get(e) || 0) + s);
         struck.add(e);
-        hit(W, b, e, n * share * (struck.size <= AOE_CAP ? 1 : AOE_CAP / struck.size));
+        hit(W, b, e, n * s * (struck.size <= AOE_CAP ? 1 : AOE_CAP / struck.size));
       }
       if (o.onHit) o.onHit(e, struck.size);
       return 0;
@@ -2189,7 +2220,9 @@ function hit(W, src, t, dmg) {
   if (src.team === 1 && W.scoutBuff && W.scoutBuff[1] > G.t) dmg *= 1.1;
   if (t.hero) {
     if (G.dead) return;
-    let d = dmg / W.refHp * G.player.maxHp * 0.85 * (W.heroArmorK || 1);
+    // (heroHurtK, 대항전·「쟁」: a hero well over its guild's middle is struck harder, as its 전투력 says it is the one
+    // to bring down — its own mends, shields and 격 kept a hero of 7.7만 up through every war, 0 deaths, balance runs.)
+    let d = dmg / W.refHp * G.player.maxHp * 0.85 * (W.heroArmorK || 1) * (W.raid ? 1 : heroHurtK(W));
     if (W.role === 'tank') d *= 0.8 / W.roleK;
     W.hero.lastHitBy = src;
     W.hero.lastHitT = G.t;
@@ -2294,6 +2327,9 @@ function credit(b, what, n) {
  * (staying in the fight and alive, the red floor stepped off, the blasts cut, the role's work)
  * decides between S and B, and the AI's best are real rivals.
  */
+function heroHurtK(W) {
+  return 1 + 0.35 * clamp((W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1) - 1, 0, 1);
+}
 const CAPPED = new Set(['dmg', 'boss', 'heal', 'taken', 'obj', 'assists']);
 const CAP_OVER = 1.3, CAP_SHARE = 0.25, CAP_WIN = 15;
 function heroCap(what, n) {
@@ -2304,6 +2340,12 @@ function heroCap(what, n) {
     const r = { at: G.t, role: {}, all: {} };
     const peers = W.bodies.filter(b => !b.troop && !b.cmdr && !b.hero);
     const mine = peers.filter(b => b.role === W.role);
+    const ours = peers.filter(b => b.team === 0), oursRole = ours.filter(b => b.role === W.role);
+    // The hero against its peers by the same rule of 전투력 (W.heroPw against their mean pw): its credit kept to what
+    // a fighter of its 전투력 earns, CAP_OVER over it. (Without, any hero showed 1.6 times its role's middle — a hero of
+    // 5천 second of thirty-five on a raid's boss, over the 절정 in the 최종 무기.)
+    const pwOf = l => l.reduce((a, b) => a + (b.pw || 1), 0) / Math.max(1, l.length);
+    r.rel = clamp((W.heroPw || 1) / Math.max(0.1, pwOf(oursRole.length ? oursRole : ours)), 0.25, 3);
     for (const k of CAPPED) {
       r.role[k] = mine.reduce((a, b) => a + b.stats[k], 0) / Math.max(1, mine.length) / W.t;
       r.all[k] = peers.reduce((a, b) => a + b.stats[k], 0) / Math.max(1, peers.length) / W.t;
@@ -2316,7 +2358,7 @@ function heroCap(what, n) {
   while (win.q.length && G.t - win.q[0][0] > CAP_WIN) win.sum -= win.q.shift()[1];
   // Over the whole window, so a single big blow is not taken for a rate.
   const span = CAP_WIN;
-  const target = CAP_OVER * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]);
+  const target = CAP_OVER * (W.rates.rel || 1) * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]);
   const rate = win.sum / span;
   if (!(target > 0) || rate <= target) return n;
   // Past it, a little more for much more: at ten times the AI's rate, about 1.6 times its credit.
@@ -2945,7 +2987,8 @@ function spellFx(id, lv) {
 // gcd: the wait after any skill; n: skills in its kit; ult: its 필살기's wait; heal: a healer's 기원 wait;
 // dodge: how much better it reads a red floor; edge: its hand (how fast it acts on an order).
 // The most 전투력 a class can have (game.js __maxPower at Lv 60): a fighter is never above its class's.
-const AI_MAX_CP = { shield: 75500, other: 68800 };
+// (2026-11-28: 7.8만 with a shield, 7.22만 without, the 최종 무기 in — was 7.55만·6.88만.)
+const AI_MAX_CP = { shield: 78000, other: 72200 };
 const aiMaxCp = cls => (cls && hasShield(cls.id || cls) ? AI_MAX_CP.shield : AI_MAX_CP.other) * rnd(0.97, 1);
 const AI_TIERS = {
   // 여섯 급, 무림식 이름. 상향평준화: 맨 아래(입문자)도 1만1천5백 이상, 맨 위(절정)와 4~6배.
@@ -2954,8 +2997,8 @@ const AI_TIERS = {
   // 6.88만 without (AI_MAX_CP; no fighter above its class's). Their levels likewise to the game's top,
   // Lv 60 (no cap: a whole hunt with every 승급 ends about Lv 55~58), the 절정 Lv 56~60. A hero half way through (청룡신검,
   // 4.7만) was the first of every 문파 against the old 4.2만 top.
-  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 54000, top: 75500, lv: [56, 60], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3, star: 4.3 },
-  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 54000, lv: [50, 57], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2, star: 3.8 },
+  server: { name: '절정고수', short: '절정', col: '#ffd040', cp: 56000, top: 78000, lv: [56, 60], promo: [8, 9], sl: [8, 8], g: [14.5, 17], gcd: 0.62, n: 6, ult: 13, heal: 2.3, dodge: 0.12, edge: 0.25, step: 3, star: 4.3 },
+  high: { name: '일류고수', short: '일류', col: '#ff9a5a', cp: 43000, top: 56000, lv: [50, 57], promo: [6, 8], sl: [7, 8], g: [11, 14], gcd: 0.7, n: 5, ult: 15, heal: 2.6, dodge: 0.08, edge: 0.16, step: 2, star: 3.8 },
   upper: { name: '이류고수', short: '이류', col: '#f0d080', cp: 34500, top: 43000, lv: [44, 51], promo: [4, 6], sl: [6, 7], g: [9, 11.5], gcd: 0.78, n: 5, ult: 17, heal: 2.85, dodge: 0.04, edge: 0.08, step: 2, star: 3.3 },
   mid: { name: '삼류무사', short: '삼류', col: '#a8d8ff', cp: 27000, top: 34500, lv: [37, 45], promo: [3, 5], sl: [5, 6], g: [6, 9], gcd: 0.86, n: 4, ult: 19, heal: 3.1, dodge: 0, edge: 0, step: 1, star: 2.8 },
   low: { name: '하수', short: '하수', col: '#c0c0c0', cp: 19500, top: 27000, lv: [30, 38], promo: [2, 3], sl: [3, 5], g: [4, 6.5], gcd: 0.96, n: 4, ult: 21, heal: 3.4, dodge: -0.03, edge: -0.06, step: 1, star: 2.3 },
@@ -3015,14 +3058,27 @@ function styledName(tier, base) {
  *  band (AI_TIERS cp … top), so the gaps stay those of six 급 a few thousand apart. team → its list. */
 const SIDE_MAKES = [
   // w: the share of each 급 (절정, 일류, 이류, 삼류, 하수, 입문); lead: fixed heads (급 and how close).
-  { name: '절정 하나', w: [0, 0.16, 0.22, 0.27, 0.21, 0.14], lead: [['server']] },
-  { name: '상위권 탄탄', w: [0.16, 0.26, 0.24, 0.18, 0.1, 0.06] },
+  // top: the 절정 at the ceiling (AI_MAX_CP, 최종 무기 at full stars) — one or two of the server's very best.
+  { name: '절정 하나', w: [0, 0.16, 0.22, 0.27, 0.21, 0.14], lead: [['server', 'top']] },
+  { name: '상위권 탄탄', w: [0.2, 0.28, 0.22, 0.16, 0.09, 0.05], lead: [['server', 'top']] },
   { name: '쌍두마차', w: [0.04, 0.14, 0.24, 0.28, 0.18, 0.12], lead: [['server', 'pair'], ['server', 'pair']] },
   { name: '고른 문파', w: [0.1, 0.18, 0.24, 0.24, 0.14, 0.1] },
   { name: '삼류 중심', w: [0, 0.1, 0.24, 0.38, 0.18, 0.1], lead: [['high']] },
+  { name: '절정 군단', w: [0.3, 0.26, 0.18, 0.12, 0.08, 0.06], lead: [['server', 'top'], ['server', 'top']] },
 ];
 // How much a guild's make (SIDE_MAKES) shows in its strength: its mean 전투력 over the field's, to this power.
 const FLAVOUR = 0.12;
+// 전투력 → strength, one rule for the hero and every AI fighter: (전투력 / the side's middle) to CP_EXP. At the square
+// root a 절정 of 7.8만 struck only 1.5 times a 삼류 of 3.4만 and the spread of the kits (a 마도사's spread spell, a
+// 무사's lone blade) hid it; at 0.75 it is 1.85 times.
+const CP_EXP = 0.75;
+// A raid: every raider by its 전투력 against the raid's own (RAID_CP: its rung, 멧돼지왕 1.2만 … 백두선인 6.4만), the hero
+// alike (W.heroPw) — not against the hero's: a weak hero's raid was carried by raiders made stronger for it (×1.35) and
+// its own blows were lifted to a hero's measure whatever its gear (a hero of 5천 was second of thirty-five on the boss
+// of 선계). The raiders are the same crowd whatever the raid (their 급 sets how often they cast as well — gcd, kit —
+// so raiders pulled toward a hard raid's rung made up for it: 선계 fell as fast as 멧돼지왕, balance runs).
+const RAID_CP = level => 8000 + 2000 * level, RAID_EXP = 0.75;
+const raidPwOf = (W, cp) => clamp(Math.pow(cp / W.raidCp, RAID_EXP), 0.3, 2.2);
 const bandCp = t => { const T = AI_TIERS[t], lo = T.bot || T.cp, hi = T.top; return Math.exp(rnd(Math.log(lo), Math.log(hi))); };
 function sidePlan(n, make) {
   const out = [];
@@ -3030,7 +3086,8 @@ function sidePlan(n, make) {
   for (const [t, how] of make.lead || []) {
     if (out.length >= n) break;
     // 쌍두마차: the second head within a few percent of the first.
-    const cp = how === 'pair' && pairCp ? clamp(pairCp * rnd(0.93, 1.05), AI_TIERS[t].cp, AI_TIERS[t].top) : bandCp(t);
+    const cp = how === 'pair' && pairCp ? clamp(pairCp * rnd(0.93, 1.05), AI_TIERS[t].cp, AI_TIERS[t].top)
+      : how === 'top' ? AI_TIERS[t].top * rnd(0.93, 1) : bandCp(t);
     if (how === 'pair') pairCp = pairCp || cp;
     out.push({ cp });
   }
@@ -3071,19 +3128,31 @@ function applyPersonas(W) {
     const own = list.filter(b => !b.alt);
     const plan = plans[team];
     own.forEach((b, i) => setPersona(W, b, plan[i]));
-    // Strength: each by its 전투력 against its side's middle (square root: 1.5만 against 3만 is 0.7×),
+    for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
+    // Strength: each by its 전투력 against its side's middle (to CP_EXP: 1.5만 against 3만 is 0.6×),
     // the side as a whole a little toward the hero's (a weak hero's 문파 carries it, a top hero's
     // leans on it; ×0.8 … ×1.35), as before the field's own balance (전장 보정) on the foe.
-    if (own.length) {
+    if (own.length && W.raid) {
+      // (A raid: each by its own 전투력 against the raid's, the hero the same way — raidPwOf.)
+      for (const b of list) { b.pw = raidPwOf(W, b.cp); b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw * (1 - (b.starLean || 0)); }
+      W.heroPw = raidPwOf(W, W.heroCp);
+    } else if (own.length) {
       const meanCp = own.reduce((x, b) => x + b.cp, 0) / own.length;
-      const ind = own.map(b => Math.sqrt(b.cp / meanCp)), mi = ind.reduce((x, y) => x + y, 0) / ind.length;
+      const ind = own.map(b => Math.pow(b.cp / meanCp, CP_EXP)), mi = ind.reduce((x, y) => x + y, 0) / ind.length;
       // (The field as a whole toward the hero, as before; a guild's own make — 상위권 탄탄, 삼류 중심 … — only a
       // little over or under the field (FLAVOUR): each guild by its own mean against the hero, 상위권 탄탄
       // (4.1만) met 삼류 중심 (3.1만) 10% stronger in blows and life alike, the same make winning most wars.)
-      const sideK = clamp(Math.pow(fieldCp / W.heroCp, 0.35), 0.8, 1.35) * Math.pow(meanCp / fieldCp, FLAVOUR) * (team !== 0 && !W.raid ? W.foeK || 1 : 1);
+      // (Its floor 0.8 → 0.85 with the strong hero falling now: its guild no longer leaned on an untouchable hero.)
+      const sideK = clamp(Math.pow(fieldCp / W.heroCp, 0.35), 0.85, 1.35) * Math.pow(meanCp / fieldCp, FLAVOUR) * (team !== 0 && !W.raid ? W.foeK || 1 : 1);
       own.forEach((b, i) => { b.pw = ind[i] / mi * sideK; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw * (1 - (b.starLean || 0)); });
+      // The hero by the same rule, as one of its guild (heroCap: its credit kept to what a fighter of its 전투력 earns);
+      // the player's other classes too.
+      if (team === 0) {
+        W.heroPw = Math.pow(W.heroCp / meanCp, CP_EXP) / mi * sideK;
+        W.heroSideK = sideK;
+        for (const b of list) if (b.alt && b.cp) { b.pw = Math.pow(b.cp / meanCp, CP_EXP) / mi * sideK; b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw; }
+      }
     }
-    for (const b of list) if (b.alt) setPersona(W, b, { alt: true });
     warmKitFx(W);
     for (const b of own) setPlay(W, b, defaultPlay(b));
     // The ones who play badly: not a squad's leader nor the hero's own healer.
@@ -3144,13 +3213,15 @@ function setPersona(W, b, slot) {
   const T = AI_TIERS[tier];
   // (Its 전투력 is the curve's own (fieldPlan), not its gear's sum: the 급's gear and 승급 ranges stepped at
   // each 급's edge and opened gaps; the gear and 승급 still show its 급.)
-  Object.assign(b, { tier, promo, lv, skl: rint(T.sl), cp: Math.min(aiMaxCp(b.cls), slot.cp ? Math.round(slot.cp) : cpOf(g, promo, lv)), gcd: T.gcd, ultCd: T.ult, healCd: T.heal });
+  // (The player's other class: the 전투력 the game shows for it, its gear and 승급 as they are.)
+  const altCp = slot.alt && A.combatPower ? A.combatPower(b.cls) : 0;
+  Object.assign(b, { tier, promo, lv, skl: rint(T.sl), cp: altCp || Math.min(aiMaxCp(b.cls), slot.cp ? Math.round(slot.cp) : cpOf(g, promo, lv)), gcd: T.gcd, ultCd: T.ult, healCd: T.heal });
   if (!slot.alt) {
     b.gear = aiGear(W, b.cls, tier, g);
     b.name = styledName(tier, b.name);
     aiStars(b, T);
     // Its strength against the hero's (전장 보정 keeps a little of the pull toward the field).
-    const rel = clamp(Math.sqrt(b.cp / heroCp), 0.55, 1.8);
+    const rel = clamp(Math.pow(b.cp / heroCp, CP_EXP), 0.45, 2.2);
     b.pw = (1 + (rel - 1) * 0.85) * (b.team !== 0 && !W.raid ? W.foeK || 1 : 1);
     b.maxHp = b.hp = W.refHp * fighterHpK(b.role, b.cls) * b.pw;
   }
@@ -5110,7 +5181,13 @@ function warState() {
 // difference between beating the boss's rage and not; what it counts for in the contribution is
 // capped apart, see heroCap). hurtLo/Hi: the boss's blows on
 // a raider (see raidHurt). cut: how often a raider with a hold cuts the boss's blast.
-const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroK: 24.0, hurtLo: 1.3, hurtHi: 1.35, cut: 0.25 };
+// heroU: (2026-11-28) the hero's blows a second in the raid's unit at its own strength (W.heroPw: its 전투력 against the
+// raid's, as every raider's) — an AI raider of pw 1 deals about 2.9, so a hero that fights is worth about three raiders
+// of its own 전투력: a hero of 5천 on 선계 a third of one, one of 7.7만 there four. (It was heroK × the hero's own unit —
+// about ten raiders' worth whatever the hero's 전투력 against the raid's.)
+const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroU: 8.0, hurtLo: 1.3, hurtHi: 1.35, cut: 0.25 };
+/** The hero's blows a second in a raid (its unit at its 전투력, see RAID.heroU). */
+const raidHeroRate = W => W.U * RAID.heroU * (W.heroPw || 1);
 /** How many times the hero gets up in a raid of this rung (멧돼지왕 2 … 아이라바타 18). */
 export function raidRevives(level) {
   return level <= 7 ? 5 : level <= 13 ? 4 : 3;
@@ -5150,6 +5227,8 @@ function raidSetup() {
   const lvRec = W.lvRec = clamp(Math.round(12 + 1.4 * G.level), 14, 33);
   W.U = (6 + 1.2 * lvRec) * Math.sqrt(1 + 0.12 * Math.max(0, A.raidPow(st.id) - 2));
   W.refHp = W.U * 22;
+  // The raid's rung as a 전투력 (RAID_CP): every raider's strength and the hero's are taken against it (applyPersonas).
+  W.raidCp = RAID_CP(G.level);
   W.teams = [
     { id: 0, name: '공격대', color: '#7cf08a', cmd: null, squads: [], spawn: W.camp.slice(), kills: 0, troops: [] },
     { id: 1, name: (st.boss && st.boss.name) || '보스', color: '#ff7a6a', cmd: null, squads: [], spawn: W.lair.slice(), kills: 0, troops: [] },
@@ -5174,8 +5253,8 @@ function raidSetup() {
   }
   W.squads[0].members.push(W.hero);
   W.hero.squad = W.squads[0];
-  // The boss's life by the raid's size (the hero counts about three raiders and a half).
-  W.crowdK = (W.bodies.length + 3.5) / (24 + 3.5);
+  // The boss's life by the raid's size (the hero counts about three raiders: RAID.heroU).
+  W.crowdK = (W.bodies.length + 2.8) / (24 + 2.8);
   // The player's own other grown classes come along, by their names and gear, among the crowd.
   const best = A.best();
   const alts = A.CLASSES.filter(c => c.id !== G.cls.id && best[c.id] && best[c.id].lvl >= 8).sort(() => Math.random() - 0.5).slice(0, 4);
@@ -5440,6 +5519,10 @@ function raidHit(W, src, t, dmg) {
     // A task's foe is the hero's to break: the raiders chip at a totem or the 광전사.
     if (t.totem || t.berserk) dmg *= 0.2;
     if (t.kind === 'boss') dmg = raidGuarded(W, dmg, 0.25);
+    // 자리비움: a raid whose hero is away (its spells still firing by themselves) is a raid short of its leader's part —
+    // the raiders' blows on the boss at half. With the hero now worth about three raiders of its 전투력 (RAID.heroU), the
+    // raiders alone took 바루나 at 4:52 while the hero stood idle (balance runs); the raid stays the player's to win.
+    if (t.kind === 'boss' && afk()) dmg *= 0.5;
   }
   if (!(dmg > 0)) return;
   const n = A.strike(t, dmg, onScreen(t));
@@ -5457,7 +5540,15 @@ function raidHurt(m, dmg, from) {
   // The boss's own blows (its swing, bolts, blasts, red tiles) come in shares of the raider's life
   // already weighed by the raid's rung (raidK); a raid of twenty-five with five healers takes
   // them 1.6 times (the first raid) to 2 times (화령 and up) as hard as the old party did.
-  hit(W, from || { name: W.teams[1].name }, m, dmg * (!from || from.kind === 'boss' ? raidHurtK() : 1));
+  // (A raider under the raid's rung takes its blows harder, one over it less: RAID_CP — the boss's blows came as the
+  // same share of every raider's life, so a raid of 선계 was as safe as one of 멧돼지왕.)
+  const boss = !from || from.kind === 'boss';
+  hit(W, from || { name: W.teams[1].name }, m, dmg * (boss ? raidHurtK() * clamp(Math.pow(m.pw || 1, -0.8), 0.6, 1.8) : 1));
+}
+/** The boss's blows on the hero, as on a raider of its 전투력 (the hero's own life, its 전투력 against the raid's). */
+function raidHeroHurtK() {
+  const W = A.G().war;
+  return 0.75 * raidHurtK() * clamp(Math.pow(W.heroPw || 1, -0.8), 0.6, 2.2);
 }
 function raidHurtK() {
   const k = A.raidK();
@@ -5503,7 +5594,7 @@ function raidScaleRaw(dmg) {
   while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
   const span = Math.max(3, Math.min(8, G.t - win[0][0]));
   const rate = W.rawSum / span;
-  const target = W.Uh * RAID.heroK * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
+  const target = raidHeroRate(W) * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
   if (rate > target) return dmg * target / rate;
   // Below it (a caster's spells, which keep to their own reach, reached about 40% of a 도적's capped
   // blows at the boss and its raids ran out of time): lifted toward it, at most 1.6 times.
@@ -5698,7 +5789,7 @@ function taskStart(W, T, kind) {
       const at = raidSpot(2, 4);
       const e = at && A.addEnemy(A.pickMonster(true), 'champ', { name: '토템', scale: 1.1 }, 0, at);
       if (!e) continue;
-      e.hp = e.maxHp = W.Uh * RAID.heroK * 1.3;
+      e.hp = e.maxHp = raidHeroRate(W) * 1.3;
       e.stun = 1e9;
       e.dmg = 0;
       e.totem = true;
@@ -5707,7 +5798,7 @@ function taskStart(W, T, kind) {
     if (!c.list.length) return;
     c.need = c.list.length;
   } else if (kind === 'shield') {
-    c.hp = c.max = W.Uh * RAID.heroK * 5.5;
+    c.hp = c.max = raidHeroRate(W) * 5.5;
     W.shield = c;
     boss.bubble = { text: '보호막!', t: G.t };
   } else if (kind === 'guard') {
@@ -6747,8 +6838,15 @@ function thinkJaeng(W, b) {
   if (b.role !== 'healer' && order.kind === 'boss' && W.boss && W.boss.hp > 0 && b.state !== 'retreat') {
     // At the boss: one of another guild on it (or on its healer, for a tank) is struck first;
     // the rest of the crowd is left be, or the boss is never struck.
-    const close = nearestFighter(W, b, 2);
-    const onMe = close && (close.target === b || (b.role === 'tank' && close.target && close.target.team === b.team && close.target.role === 'healer'));
+    let close = nearestFighter(W, b, 2);
+    let onMe = close && (close.target === b || (b.role === 'tank' && close.target && close.target.team === b.team && close.target.role === 'healer'));
+    // A strong hero (heroMark) by the boss is gone for by the other guilds' blades near it, now and then — as a server's
+    // 랭커 is (it stood among them at the boss untouched: 0 deaths in every 「쟁」, balance runs).
+    const G = A.G(), hm = heroMark(W);
+    if (!onMe && hm > 0 && b.team !== 0 && !G.dead && !unseenHid(W.hero) && !inCamp(W, W.hero) && d2(b, W.hero) <= 5 && G.t >= (b.markT || 0)) {
+      b.markT = G.t + 3;
+      if (Math.random() < 0.45 * hm) { close = W.hero; onMe = true; b.tWhy = 'mark'; }
+    }
     if (!onMe) { thinkJaengBoss(W, b, order); b.only = undefined; return; }
     b.target = close;
     b.retargetT = A.G().t + 2;
