@@ -111,9 +111,14 @@ def main():
             for n in os.listdir(os.path.join(assets, "yhunt")):
                 if n.startswith(gid + "_"):
                     os.remove(os.path.join(assets, "yhunt", n))
+        # As webp (q 72): the 24 grounds' pieces as png took the APK past what can be sent (429MB, 2026-11-28).
+        # The manifest's ext tells hunt.js which.
+        from PIL import Image
         for n in sorted(os.listdir(ha)):
             if n.endswith(".png") and n.rsplit("_", 2)[0] in add:
-                shutil.copyfile(os.path.join(ha, n), os.path.join(assets, "yhunt", n))
+                Image.open(os.path.join(ha, n)).save(os.path.join(assets, "yhunt", n[:-4] + ".webp"), "WEBP", quality=72, method=6)
+        for v in add.values():
+            v["ext"] = "webp"
         man.setdefault("yhunt", {}).update(add)
         print(f"{len(add)} hunting-ground maps from yhunt_add")
     # Hunting-ground walk grids made again since that APK (tools/yhunt_walk.json, from

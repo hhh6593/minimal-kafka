@@ -2008,7 +2008,7 @@ function arenaStart(G) {
   for (const k of Object.keys(A.images)) if (k.startsWith('yhunt/') && !k.startsWith(`yhunt/${G.stage.id}_`)) A.picDrop(k);
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
-      const path = `yhunt/${G.stage.id}_${cx}_${cy}.png`;
+      const path = `yhunt/${G.stage.id}_${cx}_${cy}.${map.ext || 'png'}`; // (ext: webp for the grounds since, repack_from_apk.py)
       if (!A.images[path]) A.loadImage(path);
     }
   const p = G.player, [sx, sy] = map.start;
@@ -2109,7 +2109,7 @@ function drawMap(ctx, camX, camY) {
     let ok = true;
     for (let cy = Math.max(0, Math.floor(y0 / c)); cy * c < Math.min(m.h, y0 + VH); cy++)
       for (let cx = Math.max(0, Math.floor(x0 / c)); cx * c < Math.min(m.w, x0 + VW); cx++) {
-        const path = `yhunt/${R.id}_${cx}_${cy}.png`, im = arenaBms.get(path) || A.images[path];
+        const path = `yhunt/${R.id}_${cx}_${cy}.${m.ext || 'png'}`, im = arenaBms.get(path) || A.images[path];
         if (!im || !im.width) { ok = false; continue; }
         const sx = Math.max(0, Math.floor(x0 - cx * c)), sy = Math.max(0, Math.floor(y0 - cy * c));
         const sw = Math.min(im.width - sx, Math.ceil(x0 + VW - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(y0 + VH - cy * c - sy) + 1);
