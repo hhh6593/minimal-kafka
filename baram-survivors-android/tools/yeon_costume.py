@@ -151,6 +151,10 @@ def candidates(table, names, cfg, kinds):
     fem = re.compile(cfg.get('female', r'\(여\)|여자|여성'))
     skip = {str(x) for x in cfg.get('exclude', [])}
     drop = re.compile(cfg['drop_names']) if cfg.get('drop_names') else None
+    # A rental copy ("[기간제] 은익섬광 의상(남)") is tried only when 연 has no lasting item of that name: the
+    # 은익섬광 set (전설) exists only as [기간제], and dropping every rental left it out altogether.
+    rent = re.compile(cfg['rental']) if cfg.get('rental') else None
+    lasting = {names.get(i, '').strip() for i in table if not (rent and rent.search(names.get(i, '')))}
     out = []
     for iid, it in table.items():
         ty = last(it, 'Type')
@@ -160,8 +164,15 @@ def candidates(table, names, cfg, kinds):
         nm = names.get(iid, '')
         if not nm or fem.search(nm) or (drop and drop.search(nm)) or any(t in (it.get('Tag') or []) for t in cfg.get('skip_tags', [])):
             continue
+        if rent and rent.search(nm) and rent_name(nm, rent) in lasting:
+            continue
         out.append((kind, iid))
     return sorted(out, key=lambda x: (x[0], int(x[1])))
+
+
+def rent_name(nm, rent):
+    """A rental copy's name without its rental mark ("[기간제] 은익섬광 망토" -> "은익섬광 망토")."""
+    return re.sub(r'\s+', ' ', rent.sub('', nm)).strip()
 
 
 def set_name(nm):
@@ -768,6 +779,8 @@ def main():
         result['tried'][f'{kind}:{iid}'] = 1
         if got:
             nm = names.get(iid, '')
+            if cfg.get('rental'):
+                nm = rent_name(nm, re.compile(cfg['rental']))  # (owned for good here: no rental mark)
             e = {'kind': kind, 'name': nm, 'grade': int(last(it, 'MinGrade') or 1), 'classes': got}
             if whole:
                 e['whole'] = 1

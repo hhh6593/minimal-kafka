@@ -4,8 +4,9 @@
  "skip_tags": [
   "WEDDING_DRESS"
  ],
- "about_drop": "Women's pieces the name does not mark (처녀귀신, 족두리, 비녀 ...) and the rental copies of a look (… (7일), [기간제], 대여용).",
- "drop_names": "처녀귀신|족두리|비녀|크롭탑|연지 곤지|여흑산|\\(\\d+일\\)|대여용|\\[기간제\\]",
+ "about_drop": "Women's pieces the name does not mark (처녀귀신, 족두리, 비녀 ...). about_rental: a rental copy (… (7일), [기간제], 대여용) is tried only when 연 has no lasting item of that name (은익섬광, 전설, exists only as [기간제]); its rental mark is left off the name.",
+ "drop_names": "처녀귀신|족두리|비녀|크롭탑|연지 곤지|여흑산",
+ "rental": "\\(\\d+일\\)|대여용|\\[기간제\\]",
  "exclude": [],
  "about_hf": "헤어·얼굴 (yeon_costume.py ... hair head): 연's men's hair styles (Hair_0xxx; the women's are Hair_1xxx) and faces, less those named for women; hf_exclude by id (583 연 올림 머리: 연 is the princess).",
  "hf_drop_names": "처녀귀신|아가씨|춘향|어우동|공실이|꽃의 여신|비녀",
@@ -13,6 +14,8 @@
   583
  ],
  "fill_bare": [
-  "309203"
- ]
+  "309203",
+  "803761"
+ ],
+ "about_fill_bare": "fill_bare: looks whose few undrawn frames take the same direction's nearest drawn frame (309203 주작선장's attack; 803761 환영두로의 영기, 전설 망토, misses one walk_side frame)."
 }
