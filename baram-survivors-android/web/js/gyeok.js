@@ -14,6 +14,10 @@
 // The 끝없는 지옥's black and blood, as a filter over a 격's picture (악마 심판 격, the 심연판 격).
 export const ABYSS_TINT = 'grayscale(1) sepia(1) saturate(8) hue-rotate(-42deg) brightness(0.48) contrast(1.7)';
 // 심연·악마 심판의 격 그림: 흑적색이되 용의 모양이 보이게(0.48은 검은 그림자로만 보였다 — 사용자 2026-11-24)
+// 수호신물(최종 방패) 격의 색: 방패의 금빛·은빛·녹옥.
+const FS_GOLD = 'grayscale(1) sepia(1) saturate(3.2) brightness(1.45)';
+const FS_SILVER = 'grayscale(1) brightness(1.25)';
+const FS_JADE = 'hue-rotate(-95deg) saturate(1.7)';
 export const ABYSS_GY_TINT = 'grayscale(1) sepia(1) saturate(9) hue-rotate(-42deg) brightness(0.78) contrast(1.5)';
 // 악마 심판 격: 연 원본 크기로 다시 뽑은 청룡(밝은 흰빛이 많다)이 ABYSS_GY_TINT로는 금빛이 되어 — 흑적색으로 더 어둡게 (2026-11-28)
 export const AKMA_GY_TINT = 'grayscale(1) sepia(1) saturate(9) hue-rotate(-46deg) brightness(0.56) contrast(1.7)';
@@ -130,18 +134,23 @@ export const GYEOK = {
 
   // 최종 방패의 격 (items.js FINAL_SHIELDS, 2026-11-28): struck, each answers in its weapon's way, on the one who struck
   // and those round it. Drawn at the final tier (GYEOK_SIZE.final × sizeK), held to its reach: 3×3 → 8 × 0.48 = 3.8칸
-  // (3칸 × 1.3), 5×5 → 8 × 0.8 = 6.4칸 (5칸 × 1.3) — 보이는 범위 = 맞는 범위. 연's own 격 pictures.
-  // 브리트라한 (용무기): the 용X격's dragon striking twice the same foe, and the wearer's guard a while.
-  fs_yongmi: { name: '브리트라한의 용격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3, area: 1, fx: 'g_pet_dragon', sizeK: 0.48, self: ['ward', 4, 0.2], mech: { strikes: { n: 2, gap: 0.3, focus: true } } },
-  // 금린 (사신수): 주작비상's fire, a burn and 주작의 불꽃 (the struck take more from the wearer).
-  fs_jujak: { name: '금린 화염결계', on: 'hurt', chance: 0.2, cd: 8, dmg: 2.5, area: 1, fx: 'g_zuzak_kyeog', sizeK: 0.48, st: ['burn', 4, 1], st2: ['mark', 6, 0.2] },
-  // 환인 (태초): 태초광명's gold-white light, wider, a stun and the wearer's pierce.
-  fs_hwanin: { name: '환인의 빛', on: 'hurt', chance: 0.2, cd: 12, dmg: 3, area: 2, fx: 'g_taecho_light', sizeK: 0.8, st: ['stun', 1], self: ['pierce', 4, 0.15],
-    tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.2)' },
-  // 고대마령 (심연): the 끝없는 지옥's black and blood, 절망 on the struck and what it deals drunk back.
-  fs_hyeolgwi: { name: '고대마령 반격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3.5, area: 1, fx: 'g_hell_weapon', sizeK: 0.48, tint: ABYSS_GY_TINT, st: ['despair', 5], drain: 0.6 },
-  // 환웅 (심판의낫): the 심판의낫's 청룡 roar, a blow and a heal, the wearer's statuses cleared.
-  fs_haetae: { name: '환웅의 심판', on: 'hurt', chance: 0.2, cd: 15, dmg: 2, area: 1, heal: 0.15, fx: 'g_roaring_dragon', sizeK: 0.48, mech: { cleanse: true } },
+  // (3칸 × 1.3), 5×5 → 8 × 0.8 = 6.4칸 (5칸 × 1.3) — 보이는 범위 = 맞는 범위. 연's own 격 pictures, each one no other
+  // 격 or spell draws (2026-11-28, 방패 외형에 맞춰: 사용자 '방패 격이 어울리는지'), coloured as its shield.
+  // 브리트라한 (용무기, 금빛 용 가시): 연's 용 (g_zodiac_dragon, the 12지 dragon rising out of a white flash — no 격 or spell's)
+  // in gold, striking twice the same foe; the wearer's guard a while.
+  fs_yongmi: { name: '브리트라한의 용격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3, area: 1, fx: 'g_zodiac_dragon', sizeK: 0.48, tint: FS_GOLD, self: ['ward', 4, 0.2], mech: { strikes: { n: 2, gap: 0.3, focus: true } } },
+  // 금린 (사신수, 불타는 비늘): 주작 격's own fire (g_zuzak_captain: a ring of flame rising into the bird), a burn and
+  // 주작의 불꽃 (the struck take more from the wearer).
+  fs_jujak: { name: '금린 화염결계', on: 'hurt', chance: 0.2, cd: 8, dmg: 2.5, area: 1, fx: 'g_zuzak_captain', sizeK: 0.48, st: ['burn', 4, 1], st2: ['mark', 6, 0.2] },
+  // 환인 (태초, 은빛 날개): 연's 봉황 (y_bonghwang: the bird spreading its wings, falling into a burst — no 격 or spell
+  // draws it) as silver-white light, wider, a stun and the wearer's pierce.
+  fs_hwanin: { name: '환인의 빛', on: 'hurt', chance: 0.2, cd: 12, dmg: 3, area: 2, fx: 'y_bonghwang', sizeK: 0.8, tint: FS_SILVER, st: ['stun', 1], self: ['pierce', 4, 0.15] },
+  // 고대마령 (심연, 검붉은 가시): the 주작 변신's burst (g_tf_zuzak) in the abyss's black and blood, 절망 on the struck and
+  // what it deals drunk back.
+  fs_hyeolgwi: { name: '고대마령 반격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3.5, area: 1, fx: 'g_tf_zuzak', sizeK: 0.48, tint: ABYSS_GY_TINT, st: ['despair', 5], drain: 0.6 },
+  // 환웅 (심판의낫, 금테 녹옥): the 현무 변신's spirit over its lotus (g_tf_hyunmu) in jade green — a blow and a heal,
+  // the wearer's statuses cleared.
+  fs_haetae: { name: '환웅의 심판', on: 'hurt', chance: 0.2, cd: 15, dmg: 2, area: 1, heal: 0.15, fx: 'g_tf_hyunmu', sizeK: 0.48, tint: FS_JADE, mech: { cleanse: true } },
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])
