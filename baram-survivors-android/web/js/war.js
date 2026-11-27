@@ -2222,7 +2222,7 @@ function hit(W, src, t, dmg) {
     if (G.dead) return;
     // (heroHurtK, 대항전·「쟁」: a hero well over its guild's middle is struck harder, as its 전투력 says it is the one
     // to bring down — its own mends, shields and 격 kept a hero of 7.7만 up through every war, 0 deaths, balance runs.)
-    let d = dmg / W.refHp * G.player.maxHp * 0.85 * (W.heroArmorK || 1) * (W.raid ? 1 : heroHurtK(W));
+    let d = dmg / W.refHp * G.player.maxHp * 0.85 * (W.heroArmorK || 1) * (W.raid ? 1 : heroHurtK(W) * heroGearK(W));
     if (W.role === 'tank') d *= 0.8 / W.roleK;
     W.hero.lastHitBy = src;
     W.hero.lastHitT = G.t;
@@ -2329,6 +2329,15 @@ function credit(b, what, n) {
  */
 function heroHurtK(W) {
   return 1 + 0.35 * clamp((W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1) - 1, 0, 1);
+}
+// 장비의 몫 (게임성 점검 2026-11-28): a blow on the hero is a share of its own life, so the life its gear gives never
+// counted — a 9차 격투가 with no gear (전투력 1.4만, rel 0.47) fell 4~5 times a 청룡·주작전, one in the best gear (7.2만,
+// rel 1.76) 4~8 times. The share now follows the hero's 전투력 against its guild's (rel^-GEAR_HURT, mostly its gear):
+// ×1.6 for the bare one, ×0.71 for the best (with heroHurtK's ×1.26, 0.9 in all: the strong still fall). Four wars each:
+// the bare one now falls 7~11 times, the best 1~3.
+const GEAR_HURT = 0.6;
+function heroGearK(W) {
+  return Math.pow(clamp((W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1), 0.3, 3), -GEAR_HURT);
 }
 const CAPPED = new Set(['dmg', 'boss', 'heal', 'taken', 'obj', 'assists']);
 const CAP_OVER = 1.3, CAP_SHARE = 0.25, CAP_WIN = 15;

@@ -4992,6 +4992,23 @@ const FLOOR_OPEN = [24, 30, 36, 44, 52], FLOOR_FIVE = [130, 150, 170, 180, 190];
 const FIELD_MAX = 420;
 // The crowd of a hunt, each one: life and bite against the old one-by-one counts.
 const HORDE = { hp: 1, dmg: 0.85 };
+// 게임성 점검 (2026-11-28): how hard a hunting ground bites, by its depth. Bot runs (no healing cheat) had a hero with the
+// ground's own drops at 55~74% life at the worst on the grounds of 3~11 and a 9차 hero in the best gear at 88~96% on the
+// abyss floors and the 소 레벨 (the last grounds; their monsters grow by the level alone while the best gear is ×6
+// in life and ×4.5 in blows): nothing there to fear. Now:
+//   early — the grounds of 1~11 (the first stays as it was: a new hero learns there) bite ×1.25, easing to ×1 by 15;
+//   elite — champions ×1.5 → ×1.9 and leaders ×1.25 → ×1.6 of a plain one's bite (the spikes of a run);
+//   depth — the abyss floors and the 소 레벨: life and bite for the gear made for them (심연·태초·최종 무기).
+// Measured (bot runs, 2~5 each): the grounds' drops on 3~13, 31~88% → 0~92% (a death at 화산); the best 9차 on the abyss
+// floors and the 소 레벨, 79~98% → 23~86% (the first floor the mildest); the first ground, raids, 대항전, 쟁 as they were.
+const THREAT = { early: 1.25, earlyTo: 11, earlyEnd: 15, champ: 1.25, mini: 1.3, depthHp: 1.8, depthDmg: 5 };
+function threatK(kind) {
+  if (G.war || G.stage.raid || G.training) return 1;
+  const L = G.level;
+  let k = L < 1 ? 1 : L <= THREAT.earlyTo ? THREAT.early : Math.max(1, THREAT.early - (THREAT.early - 1) * (L - THREAT.earlyTo) / (THREAT.earlyEnd - THREAT.earlyTo));
+  if (G.stage.abyss) k *= THREAT.depthDmg;
+  return k * (kind === 'champ' ? THREAT.champ : kind === 'mini' ? THREAT.mini : 1);
+}
 
 /** How many times the 860 x 400 view the field shows (1 to 2): more monsters, each worth less. */
 function viewCrowd() {
@@ -5991,13 +6008,14 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (kind === 'minion') hp = base * 2;
   if (kind === 'mini') hp = Math.max(base * 12, (70 + area / 10) * tough * 2);
   if (kind === 'boss') hp = (180 + area / 5) * tough * 4;
+  if (G.stage.abyss && !G.war && !G.stage.raid) hp *= THREAT.depthHp; // 게임성 점검: the deepest grounds (THREAT)
   const e = {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
     stepTime: kind ? 0.7 : 0.75 - 0.35 * (1 - rank) - Math.min(0.15, t / 2000),
     // Deeper grounds bite harder: +15% a step (흉가, the 7th, twice the first).
     dmg: ((kind === 'boss' ? 13 : kind === 'mini' ? 8 : 1.5 + rank * 3) + t / 120 + G.level * 0.5) * (1 + 0.1 * G.level) * ease
-      * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1)
+      * (kind === 'champ' ? 1.5 : kind === 'mini' ? 1.25 : 1) * threatK(kind)
       // In a raid the boss's red tiles are the danger: the crowd around it strikes softer.
       * (G.stage.raid && kind !== 'boss' ? 0.6 : 1),
     xp: kind === 'boss' ? 60 : (1 + Math.floor(rank * 4 + t / 200)) * (kind === 'champ' ? 3 : kind === 'mini' ? 5 : 1),
@@ -6876,12 +6894,20 @@ function rollSpecial(e) {
   // ~0.7 specials a hunt (career sim: 0.8-1 a hunt in all), hardly "very rare". Now ~0.2 a hunt
   // (plain 0.07, champions 0.045, leaders 0.04, boss 0.03), and 계속 사냥 (3 champions a minute)
   // about one in 40 minutes.
-  const chance = { boss: 0.03, mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003;
-  if (Math.random() >= chance) return;
+  // 게임성 점검 (2026-11-28): the boss's chance grows by SP_PITY with each hunting ground's boss felled since the last
+  // special (progress.spDry): at 0.2 a hunt a player could go twenty hunts without one (bot runs: 1 special in 25 hunts).
+  // Now about one in six or seven hunts at the latest, the average hardly moved.
+  const dry = progress.spDry || 0;
+  const chance = e.kind === 'boss' ? 0.03 + SP_PITY * dry : { mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003;
   // (and a smith's piece this place drops itself now and then: armory.js dropFrom)
   const mine = SPECIALS.filter(s => (s.src === G.stage.id || (s.craft && s.craft.dropFrom && s.craft.dropFrom.includes(G.stage.id)
     && (!s.craft.only || s.craft.only.includes(G.cls.id)))) && (s.kind !== 'shield' || hasShield(G.cls.id)));
   if (!mine.length) return;
+  if (Math.random() >= chance) {
+    if (e.kind === 'boss' && G.hunt) progress.spDry = dry + 1; // (saved with the hunt's record)
+    return;
+  }
+  progress.spDry = 0;
   const sp = mine[Math.floor(Math.random() * mine.length)];
   // 스페셜 드롭의 한 방 (기획 P1-9): a column of gold over it and a call across the field (it
   // looked like any plain drop). The slowed breath comes when it is picked up (specialMoment).
@@ -6900,6 +6926,7 @@ function rollSpecial(e) {
 // hunts. Now about 0.38: boss 20%, two leaders 6% each, nine or so champions 0.6% each.)
 // (사용자 2026-11-23: 심연 템치고 드랍률이 너무 높다 — 약 4분의 1로)
 const ABYSS_DROP = { boss: 0.05, mini: 0.015, champ: 0.0015 };
+const SP_PITY = 0.04; // a hunting ground's boss: +4% to drop a special for each boss since the last (rollSpecial)
 function rollAbyss(e) {
   const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
   // 태초의 무기: the 소 왕 besides his horn, now and then; the 세계석 요새's lord in place of his drop.
@@ -6929,7 +6956,10 @@ function rollMats(e) {
   }
 }
 
-const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200];
+// (게임성 점검 2026-11-28: on a full ground the streak never breaks — 1400~7100 kills a run, all in one streak — and the
+// last call came at 1200, by 1:20~2:00 on the deep grounds: the rest of the run, the boss among it, had none. 2000 takes
+// 연's eighth voice, and every 1000 after it the same.)
+const COMBO_AT = [50, 100, 200, 300, 500, 800, 1200, 2000], COMBO_EVERY = 1000;
 
 function killEnemy(e) {
   if (e.war) return War.down(e); // 대항전: a fighter falls and gets up at its camp
@@ -6974,16 +7004,18 @@ function killEnemy(e) {
   c.t = G.t;
   c.pop = G.t;
   c.best = Math.max(c.best, c.n);
-  if (COMBO_AT.includes(c.n)) {
+  if (COMBO_AT.includes(c.n) || (c.n > COMBO_AT[COMBO_AT.length - 1] && c.n % COMBO_EVERY === 0)) {
     // The mark is shown by the 殺 strip itself (a bigger pop): a banner across the field as well
     // only covered the numbers over the hero.
     c.mark = G.t;
     // 연's kill-streak voice, one step louder at each mark.
-    audio.play('combo', null, COMBO_AT.indexOf(c.n) + 1);
+    audio.play('combo', null, COMBO_AT.includes(c.n) ? COMBO_AT.indexOf(c.n) + 1 : COMBO_AT.length);
     G.flash = G.t;
     G.shake = Math.max(G.shake, 0.15);
     // (the level-up chime no longer rings with it: 연's kill-streak voice alone — 기획 P0-3)
     if (c.n >= 100) emote(c.n >= 300 ? 'godgame' : 'gains', G.player);
+    // From 1000 the call is named across the field too (a mark the run has worked for, not every few seconds).
+    if (c.n >= 1000) { banner(`${c.n}연속 처치!`); hitStop(0.05, 'streak'); }
   }
   rollSpecial(e);
   if (G.stage.abyss) rollAbyss(e);

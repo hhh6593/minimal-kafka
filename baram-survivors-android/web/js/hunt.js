@@ -897,7 +897,7 @@ function hud(ctx, cv) {
 // cast's stance and readies the plain swing. 일망타진: a chain started on twenty or more strikes
 // harder. 속성 반응 between a status and a spell's element. 스타일 등급 at the end.
 
-const MOMENTUM_AT = [10, 40, 100, 200];
+const MOMENTUM_AT = [10, 40, 100, 200], FRENZY_GAP = 35;
 const MOMENTUM_NAME = ['', '기세 1단', '기세 2단', '기세 3단', '폭주'];
 const EXEC_AT = 0.15;
 const DASH = { tiles: 3, inv: 0.25, cd: 2.2, quick: 0.9, cancel: 0.3, dmg: 0.6 }; // (B: 질주 손맛 — cd 3 → 2.2, after a kill 1.2 → 0.9)
@@ -924,8 +924,10 @@ function momentumKill() {
   const G = A.G(), m = mo(), c = G.combo;
   let want = 0;
   for (let i = 0; i < MOMENTUM_AT.length; i++) if (c.n >= MOMENTUM_AT[i]) want = i + 1;
-  // 폭주 again only after another 250 of the same streak.
-  if (want === 4 && c.n < (m.nextFrenzy || 0)) want = 3;
+  // 폭주 again only after another 250 of the same streak, and (게임성 점검 2026-11-28) no sooner than FRENZY_GAP seconds
+  // after the last: on the deep grounds the streak never breaks and 폭주 came every 12~20 s, 8~14 banners a run over
+  // everything else (the boss's own calls among them) — a mark that stood for nothing.
+  if (want === 4 && (c.n < (m.nextFrenzy || 0) || G.t < (m.frenzyAgain || 0))) want = 3;
   if (want > m.tier) {
     m.tier = want;
     m.best = Math.max(m.best, want);
@@ -933,6 +935,8 @@ function momentumKill() {
     if (want === 4) {
       m.frenzy = G.t + 6;
       m.nextFrenzy = c.n + 250;
+      m.frenzyAgain = G.t + FRENZY_GAP;
+      G.shake = Math.max(G.shake, 0.25);
       A.banner('폭주! 피해 +25% · 경험치·토벌도 ×1.5');
       G.flash = G.t;
       note('elite:frenzy');
