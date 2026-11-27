@@ -4789,7 +4789,7 @@ function stepHero(dx, dy, dt) {
   let tx = nx, ty = ny;
   if (red && mv.lvl >= 3 && !there && G.t - (G.galeAt || -9) >= 4) {
     const fx = nx + dx, fy = ny + dy;
-    if (free(fx, fy) && !onRed(fx, fy) && (!G.war || War.open(fx, fy))) {
+    if (free(fx, fy) && !onRed(fx, fy) && (!G.war || War.pass(fx, fy))) {
       tx = fx;
       ty = fy;
       G.galeAt = G.t;
@@ -7730,7 +7730,8 @@ function castNow(skill, st) {
       if (!near.length && def.dash) {
         // 쇄혼비무: only the way the hero faces, to the first monster up to four tiles off.
         let k = 2;
-        while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k)) && (!G.war || G.war.raid || War.open(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
+        // (War.pass: the shut gate and the 쪽문 stop it for either side — a dash is not a walk through them.)
+        while (k <= def.dash && !occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k)) && (!G.war || G.war.raid || War.pass(p.tx + fx0 * k, p.ty + fy0 * k))) k++;
         const b = occ.get(key(p.tx + fx0 * k, p.ty + fy0 * k));
         if (k <= def.dash && b && b.m && !b.ally && !(b.war && b.team === SIDE) && holdGround(p.tx + fx0 * (k - 1), p.ty + fy0 * (k - 1))) {
           // Held (a war's point, the red floor, 제자리): the flurry reaches the foe; the hero stays.
@@ -11053,7 +11054,7 @@ function plainTarget(reach) {
     const d = tdist(e, p);
     if (d < bd && d <= reach) { bd = d; best = e; }
   }
-  if (best && G.war && !G.war.raid && !War.clear(p.tx, p.ty, best.tx, best.ty)) return null; // 대항전: not through a wall
+  if (best && G.war && !G.war.raid && !War.clear(p.tx, p.ty, best.tx, best.ty, true)) return null; // 대항전: not through a wall (its own gate, yes: a sight, not a leap)
   return best;
 }
 
@@ -11662,7 +11663,7 @@ function castUtil() {
       let to = null;
       for (let k = U.range; k >= 1 && !to; k--) {
         const x = p.tx + dx * k, y = p.ty + dy * k;
-        if (!occ.has(key(x, y)) && !holdGround(x, y) && (!G.war || War.open(x, y))) to = [x, y];
+        if (!occ.has(key(x, y)) && !holdGround(x, y) && (!G.war || War.pass(x, y))) to = [x, y];
       }
       if (!to) { say('갈 곳이 없습니다.', 'warn'); return false; }
       if (M.fx[U.fx]) addFx(U.fx, p.x, p.y - 26, { scale: 0.9 });

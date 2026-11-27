@@ -102,6 +102,8 @@ export const WARS = {
     id: 'hyeonmu', name: '현무전', mode: 'siege', title: '수성 · 공성', mat: 'sinsu_hyeonmu', sinsu: '현무', art: 'ui_sinsu_castlebattle_03', pic: 'ui_img_sinsu_2',
     desc: '현무성 남문. 공성은 5분 안에 성문을 부수고 수성대장을 쓰러뜨려야 하고, 수성은 끝까지 버티면 이긴다.',
     time: 300, gate: { x0: 24, x1: 27, y0: 22, y1: 25 }, inside: [26, 1], outside: [26, 41], cmdIn: [26, 7], cmdOut: [26, 43],
+    // 쪽문: the defence's own way out through the castle's wall (rows 24~25), under the inner wall's gaps (x 14~15, 36~37).
+    posterns: [[15, 24], [15, 25], [36, 24], [36, 25]],
     cratesOut: [[8, 33], [44, 33]], cratesIn: [[8, 17], [44, 18]], scouts: [[4, 28], [48, 28]],
   },
 };
@@ -222,6 +224,8 @@ export function initWar(api) {
   window.__jaeng = (cls, role, opts = {}) => startJaeng(typeof cls === 'number' ? A.CLASSES[cls] : cls, role, opts);
   window.__jaengCmd = kind => heroCommand(kind);
   window.__warCmd = kind => warCommand(kind);
+  window.__warTac = kind => warTactic(kind);
+  window.__warTacState = () => tacState();
   // Test: how many composited fighter frames are kept, and how many were made (cache churn).
   window.__warFrames = () => {
     const box = {};
@@ -352,6 +356,12 @@ function injectUi() {
   .jaeng-cmd.cool { opacity: 0.45; }
   #jaeng-cmds { position: fixed; right: calc(env(safe-area-inset-right) + 4px); top: 34%; z-index: 30; display: flex; flex-direction: column; gap: 3px; }
   body:not(.jaeng) #jaeng-cmds { display: none; }
+  #war-tac { position: fixed; right: calc(env(safe-area-inset-right) + 4px); top: 44%; z-index: 30; display: flex; flex-direction: column; gap: 3px; }
+  body.jaeng #war-tac { top: 34%; right: calc(env(safe-area-inset-right) + 62px); }
+  #war-tac[hidden], body:not(.war) #war-tac { display: none; }
+  #war-tac button { font: 700 11px G11, monospace; padding: 2px 5px; color: #f4e2c0; background: #301a0a; border: 2px solid rgb(230,120,60); min-width: 52px; }
+  #war-tac button.cool { opacity: 0.45; }
+  #war-tac button.on { background: #6a2a10; color: #ffe0a0; }
   #war-cmd { position: fixed; left: 50%; top: 21%; transform: translateX(-50%); z-index: 31; display: flex; flex-direction: column; align-items: center; gap: 3px;
     padding: 4px 6px; background: rgba(20,14,6,0.82); border: 2px solid #c08a10; border-radius: 4px; max-width: 96vw; }
   #war-cmd[hidden], body:not(.war) #war-cmd { display: none; }
@@ -397,6 +407,19 @@ function injectUi() {
     const col = document.createElement('div');
     col.id = 'jaeng-cmds';
     document.body.append(col);
+    // 전술 (대항전·「쟁」): the hero's own keys — 집중 · 총공격 · 후퇴 (warTactic), each with its seconds.
+    const tc = document.createElement('div');
+    tc.id = 'war-tac';
+    tc.hidden = true;
+    document.body.append(tc);
+    for (const [kind, def] of Object.entries(TACTICS)) {
+      const k = document.createElement('button');
+      k.dataset.tac = kind;
+      k.textContent = def.name;
+      k.title = def.tip;
+      k.onclick = e => { e.stopPropagation(); warTactic(kind); };
+      tc.append(k);
+    }
     // 대항전 지휘 선택: once a minute, four choices for the guild's squads (warCommands).
     const wc = document.createElement('div');
     wc.id = 'war-cmd';
@@ -686,6 +709,9 @@ function layout(W) {
       tx: Math.round((g.x0 + g.x1) / 2), ty: g.y1, m: { h: 90 }, scale: 1, stats: blankStats(), hitBy: new Map(), flash: 0, prop: null,
     };
     W.gate.x = W.gate.tx * TILE + TILE / 2; W.gate.y = (g.y1 + 1) * TILE - 6;
+    // 쪽문 (gate rule, 2026-11-28): the shut gate passes no one, its own side neither (it walked through its own gate
+    // and the defence spilled out of it at will); the defence goes out and in by the 쪽문, on foot only.
+    W.postern = new Set((d.posterns || []).map(([x, y]) => y * W.map.cols + x));
   }
   for (const t of W.teams) t.spawn = snap(W, t.spawn[0], t.spawn[1]);
   W.zones = (d.scouts || []).map(([x, y]) => { const s = snap(W, x, y); return { x: s[0], y: s[1], owner: -1, prog: 0, kind: 'scout', until: 0 }; });
@@ -795,10 +821,43 @@ function mkTroops(W) {
 
 function open(W, x, y, team = -1) {
   const m = W.map;
-  if (x < 0 || y < 0 || x >= m.cols || y >= m.rows || !m.walk[y * m.cols + x]) return false;
+  if (x < 0 || y < 0 || x >= m.cols || y >= m.rows) return false;
+  // 쪽문: open to the gate's own side, on foot (pass: never to a leap, a dash or a blink).
+  if (W.postern && W.postern.has(y * m.cols + x)) return team === W.gate.team;
+  if (!m.walk[y * m.cols + x]) return false;
+  return !shutGate(W, x, y);
+}
+/** A tile of the standing gate: shut to everyone (its own side goes by the 쪽문). */
+function shutGate(W, x, y) {
   const g = W.gate;
-  if (g && !W.gateDown && x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1 && team !== g.team) return false;
+  return !!(g && !W.gateDown && x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1);
+}
+/** The hero's sight for a blow (not a move): walls stop it, the shut gate only the side it shuts out (its own casters
+ *  strike over it, as the AI's do). */
+function seeOver(W, x0, y0, x1, y1) {
+  const m = W.map, n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 3, g = W.gate;
+  for (let i = 1; i <= n; i++) {
+    const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    if (x < 0 || y < 0 || x >= m.cols || y >= m.rows) return false;
+    if (shutGate(W, x, y)) { if (g.team !== 0) return false; continue; }
+    if (!m.walk[y * m.cols + x] && !(W.postern && W.postern.has(y * m.cols + x))) return false;
+  }
   return true;
+}
+/** A leap refused: counted (W.gateBlock, the tests) when it was the gate or a 쪽문 on its way that refused it. Always false. */
+function gateBlocked(W, x0, y0, x1, y1) {
+  if (!W.gate) return false;
+  const n = Math.max(1, Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 3);
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    if (shutGate(W, x, y) || (W.postern && W.postern.has(y * W.map.cols + x))) { W.gateBlock = (W.gateBlock || 0) + 1; break; }
+  }
+  return false;
+}
+/** A tile a body may be carried over in one move (a leap, a dash, a blink): open, and neither the shut gate nor a 쪽문. */
+function pass(W, x, y, team) {
+  if (W.postern && W.postern.has(y * W.map.cols + x)) return false;
+  return open(W, x, y, team);
 }
 
 /** The open tile nearest a point (spirals out). */
@@ -814,7 +873,7 @@ function snap(W, x, y) {
 
 /** Steps from every open tile to (x, y): a breadth-first field, kept for reuse. */
 function flowTo(W, x, y, team) {
-  const key = x + ',' + y + ',' + (W.gate && !W.gateDown ? team === W.gate.team ? 'g' : 'n' : '');
+  const key = x + ',' + y + ',' + (W.gate && (!W.gateDown || W.postern) ? (team === W.gate.team ? 'g' : 'n') + (W.gateDown ? 'd' : '') : '');
   let f = W.flow.get(key);
   if (f) return f;
   const { cols, rows } = W.map, n = cols * rows;
@@ -897,14 +956,19 @@ export const War = {
   share: (b, x, y) => share(b, x, y),
   /** Whether a body can be carried from (x0, y0) to (x1, y1) in one move (a leap, a dash, a pull):
    * the tile is open and no wall or shut gate stands on the straight line between. */
-  clear: (x0, y0, x1, y1) => {
+  clear: (x0, y0, x1, y1, sight = false) => {
     const W = A.G().war;
     if (W.raid) return true;
-    if (!open(W, x1, y1, 0)) return false;
+    if (sight) return seeOver(W, x0, y0, x1, y1);
+    // (The shut gate and the 쪽문 stop every leap, its own side's too: the defence's hero leapt out through its own
+    // gate and back, and a 돌진 at a foe beyond the wall carried it over — gate rule, 2026-11-28.)
+    if (!pass(W, x1, y1, 0)) return gateBlocked(W, x0, y0, x1, y1);
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 3;
-    for (let i = 1; i < n; i++) if (!open(W, Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), 0)) return false;
+    for (let i = 1; i < n; i++) if (!pass(W, Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), 0)) return gateBlocked(W, x0, y0, x1, y1);
     return true;
   },
+  /** A tile the hero may be carried onto or over (a dash's steps, a blink's): not the shut gate nor a 쪽문. */
+  pass: (x, y) => { const W = A.G().war; return W.raid ? open(W, x, y, 0) : pass(W, x, y, 0) || gateBlocked(W, x, y, x, y); },
   down: e => kill(A.G().war, e, A.G().war.hero),
   credit: (e, dmg) => heroHit(e, dmg),
   /** 전장 보정 for the hero's own blows: past about four fighters' blows a second (more for a
@@ -1071,6 +1135,7 @@ function update(dt) {
     heroLead(W);
   }
   if (!W.jaeng) warCommands(W, dt);
+  tacTick(W, dt);
   W.ghosts = W.ghosts.filter(g => !g.b.dead ? false : G.t < g.until);
   W.feed = W.feed.filter(f => G.t - f.t < 6);
   // Budgets for a field of fifty: numbers (each is several glyph pictures) and effects.
@@ -1152,7 +1217,7 @@ function walk(W, b) {
     }
     opts.sort((a, c) => a[2] - c[2]);
   }
-  const dur = 0.25 * 70 / b.speed * (b.slow > 0 ? 1.6 : 1) * (b.carry && b.role !== 'support' ? 1.25 : 1) * (b.cmdr ? 1.3 : 1);
+  const dur = 0.25 * 70 / b.speed * (b.slow > 0 ? 1.6 : 1) * (surging(W, b) ? 1 / TACTICS.surge.speed : 1) * (b.carry && b.role !== 'support' ? 1.25 : 1) * (b.cmdr ? 1.3 : 1);
   const safe = (W.raid || W.jaeng) && W.danger.size && !W.danger.has(dk(b.tx, b.ty));
   // A free tile first; else through one of its own side (연's players pass through each other and
   // stand on one another: the crowd at a gate or round a boss no longer jams). A foe's tile stays shut.
@@ -1453,7 +1518,7 @@ function pickFoe(W, b, r) {
     if (W.jaeng && inCamp(W, e)) continue; // (none is struck in its own camp)
     const d = d2(b, e);
     if (d > r || unseen(W, b, e, d)) continue;
-    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 - 0.8 * heroMark(W) : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
+    const s = d - (e.role === 'tank' ? 1.6 : 0) + 0.8 * Math.min(4, e.engaged || 0) + (e.hero ? 0.8 - 0.8 * heroMark(W) - (W.jaeng && b.only === 0 ? 2 : 0) : 0) + (e.troop || e.cmdr ? 1 : 0) + (inDuel(W, b, e) ? 6 : 0);
     if (s < bs) { bs = s; best = e; }
   }
   // 「쟁」: a servant in the way is struck too (the boss is the 보스 order's, not a passing blow's).
@@ -1474,7 +1539,12 @@ function pickFoe(W, b, r) {
  */
 function heroMark(W) {
   if (W.markK === undefined) W.markK = clamp(2.2 * ((W.heroPw || 1) / Math.max(0.5, W.heroSideK || 1) - 1), 0, 2.5);
-  return W.markK;
+  if (!W.jaeng) return W.markK;
+  // 「쟁」 (2026-11-28): the hero is its guild's caller (the 보스·견제·봉인 keys), its name over its head — the other guilds'
+  // blades go for it whatever its 전투력 (a floor, JAENG.heroMark), the more while its guild leads. By 전투력 alone the mark
+  // was 0 for any hero at its guild's middle, and the hero fell 0~1 times a 「쟁」 (balance runs).
+  const lead = W.score && W.score[0] >= Math.max(...W.score.filter((x, i) => i !== 0)) && W.t > JAENG.bossAt ? JAENG.heroLead : 0;
+  return Math.max(W.markK, JAENG.heroMark) + lead;
 }
 function hpk(b) { return b.hp / b.maxHp; }
 function alive(t) { return t && !t.dead && t.hp > 0 && !(t.gate && A.G().war.gateDown); }
@@ -1489,6 +1559,8 @@ function think(W, b) {
   const k = hpk(b);
   // Taunted: the taunter is the target for a while.
   if (b.taunt && b.taunt.until > G.t && alive(b.taunt.by)) b.target = b.taunt.by;
+  // 전술 후퇴: falling back with the hero's call.
+  if (b.team === 0 && tacThink(W, b)) return;
   // The timid: tucked behind a wall or in a corner while the odds are bad (hideThink).
   if (hideThink(W, b, order)) return;
   // Low: back to a healer or the camp; back in once mended.
@@ -1547,6 +1619,8 @@ function think(W, b) {
   // healer keep the defenders off them). Struck only when it was the one meant (aiCast), it was left standing while
   // the crowd before it fought on: the gate held to the end in every war (balance runs).
   if (!t && order.kind === 'gate' && (b.role === 'dps' || b.role === 'support') && alive(order.obj) && order.obj.gate && gateDist(order.obj, b) <= Math.max(2, b.kit.range) + 2) { t = order.obj; why = 'obj'; }
+  // 전술 집중: the hero's called foe, while the call lasts.
+  if (!t) { const f = tacFocus(W, b); if (f) { t = f; why = 'focus'; } }
   // Taunted: the taunter, while the taunt lasts.
   if (!t && b.taunt && b.taunt.until > G.t && alive(b.taunt.by) && d2(b, b.taunt.by) < 9) { t = b.taunt.by; why = 'taunt'; }
   // A target is held a few seconds, then looked at again.
@@ -1599,17 +1673,60 @@ function think(W, b) {
   gateHold(W, b, order);
 }
 /**
- * 현무전, the defence while its gate stands: it fights from behind the gate (its casters over it, its blades held
- * for the breach). Out on the field it came one by one from its camp far behind into the whole attack (1 kill to
- * 300 in a war); in the gate's own passage one side or the other was cut down in the crowd there (125 : 0 one
- * war, 19 : 86 the next): balance runs. The hero's 돌격 still takes our guild out.
+ * 현무전, the defence while its gate stands. Out on the field it came one by one from its camp far behind into the whole
+ * attack (1 kill to 300 in a war); in the gate's own passage one side or the other was cut down in the crowd there
+ * (125 : 0 one war, 19 : 86 the next): balance runs. So (gate rule, 2026-11-28) each by its part, as 연's 수성:
+ * - the close-in (탱커, 근접 딜러) go out by the 쪽문 and meet the siege before the gate, kept within a few tiles of it;
+ * - the casters and archers stay behind the gate and strike over it;
+ * - the healer goes with the close-in (the nearest of them outside), else stays in with the casters.
+ * The hero's 지휘: 돌격 (출격) takes everyone out, 수비 keeps everyone in, 우회 (양옆) is the close-in's way as above.
  */
+function gatePart(b) {
+  if (b.role === 'healer') return 'healer';
+  return b.role === 'tank' || (b.kit && b.kit.range <= 1) ? 'melee' : 'ranged';
+}
 function gateHold(W, b, order) {
-  if (W.mode !== 'siege' || W.gateDown || b.team === W.attacker || !b.dest || b.cmdr || b.troop) return;
-  if (b.team === 0 && W.cmds && W.cmds.cur && W.cmds.cur.kind === 'charge') return;
+  if (W.mode !== 'siege' || W.gateDown || b.team === W.attacker || b.cmdr || b.troop) return;
+  const cmd = b.team === 0 && W.cmds && W.cmds.cur ? W.cmds.cur.kind : null;
+  if (cmd === 'charge' || (order && order.kind === 'follow')) return; // (out with the hero or the 출격, by the 쪽문)
   if (order && order.kind !== 'hold' && order.kind !== 'defend' && order.kind !== 'patrol') return;
-  const g = W.gate;
-  if (b.dest[1] >= g.y0) b.dest = [b.dest[0], g.y0 - 1];
+  const g = W.gate, part = gatePart(b);
+  let out = part === 'melee' && cmd !== 'hold';
+  let with_ = null;
+  if (part === 'healer' && cmd !== 'hold') {
+    // The nearest of its side's close-in outside the gate (its own squad's first).
+    let bd = 1e9;
+    for (const m of W.alive[b.team]) {
+      if (m === b || m.hero || m.gate || m.cmdr || m.troop || gatePart(m) !== 'melee' || m.ty <= g.y1) continue;
+      const d = d2(m, b) - (m.squad === b.squad ? 6 : 0);
+      if (d < bd) { bd = d; with_ = m; }
+    }
+    out = !!with_;
+  }
+  b.gatePart = out ? 'out' : 'in';
+  if (!out) {
+    if (b.dest && b.dest[1] >= g.y0) b.dest = [b.dest[0], g.y0 - 1];
+    return;
+  }
+  if (with_) {
+    // The healer a step behind the one it follows (toward the wall), unless it is mending or fleeing in reach already.
+    if ((b.dest && b.dest[1] <= g.y1) || b.ty <= g.y1 || d2(b, with_) > 3) b.dest = snap(W, with_.tx + (b.id % 3 - 1), Math.max(g.y1 + 1, with_.ty - 1));
+    return;
+  }
+  // The close-in: out together, not one by one. Inside, it waits at its 쪽문's mouth until two more of its side's close-in
+  // stand there or are out already (alone through the 쪽문 each met the whole siege: 14 kills to 310 in a war).
+  // Out, it holds the ground before the gate, within the casters' reach over it, never far off.
+  if (!b.dest && b.ty > g.y1) return;
+  const ps = W.def.posterns || [], side = b.id % 2 ? 0 : ps.length - 1, px = ps.length ? ps[side][0] : g.tx;
+  if (b.ty <= g.y1) {
+    const outN = W.alive[b.team].filter(m => m.ty > g.y1 && !m.hero && !m.cmdr && !m.troop && gatePart(m) === 'melee').length;
+    const atMouth = W.alive[b.team].filter(m => m !== b && !m.hero && gatePart(m) === 'melee' && Math.abs(m.tx - px) <= 2 && m.ty <= g.y1 && m.ty >= g.y0 - 2).length;
+    if (outN < 2 && atMouth < 2 && b.state !== 'retreat') { b.dest = snap(W, px + (b.id % 3 - 1), g.y0 + (b.id % 2)); b.gatePart = 'wait'; return; }
+  }
+  if (!b.dest || b.dest[1] < g.y0) {
+    const k = b.id % 3;
+    b.dest = snap(W, px < g.tx ? g.x0 - 1 - k : g.x1 + 1 + k, g.y1 + 1 + (b.id % 2));
+  } else b.dest = [clamp(b.dest[0], g.x0 - 7, g.x1 + 7), clamp(b.dest[1], g.y1 + 1, g.y1 + 4)];
 }
 
 function gateDist(g, b) {
@@ -1645,7 +1762,7 @@ function leaderPick(W, b, order) {
   for (const [e, d] of near) {
     if (b.only !== undefined && e.team !== b.only) continue;
     const s = (e.role === 'healer' ? 3 : e.cls && (e.cls.id === 'mage' || e.cls.id === 'archer') ? 1.5 : 0) + (1 - hpk(e)) * 4 - d * 0.6
-      + (e.carry ? 3 : 0) + (e.hero ? heroMark(W) - 1 : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0) - 0.4 * Math.min(5, e.engaged || 0);
+      + (e.carry ? 3 : 0) + (e.hero ? heroMark(W) - 1 + (W.jaeng && b.only === 0 ? 2 : 0) : 0) - (e.cmdr ? 2 : 0) - (e.troop ? 1.5 : 0) - 0.4 * Math.min(5, e.engaged || 0);
     if (s > bs) { bs = s; best = e; }
   }
   if (best !== sq.target) {
@@ -1751,6 +1868,8 @@ function thinkHealer(W, b, order) {
     } else at = formation(W, b, order);
     const [sx, sy] = snap(W, at[0], at[1]);
     b.dest = Math.abs(sx - b.tx) + Math.abs(sy - b.ty) <= 1 ? null : [sx, sy];
+    // 현무전's defence: with the close-in outside the gate, or behind it with the casters (gateHold).
+    gateHold(W, b, order);
   }
 }
 
@@ -2204,6 +2323,7 @@ function hit(W, src, t, dmg) {
   }
   if (src.team === 0 && !src.hero && A.auraK) dmg *= A.auraK(src); // 주작의 기운 (game.js auraK): the hero's aura on its side
   if (W.cmds && W.cmds.cur && !W.raid && !W.jaeng) dmg *= commandK(W, src, t);
+  if (W.tac && !W.raid) dmg *= tacK(W, src, t); // (전술: 집중 · 총공격 · 후퇴)
   if (src.starLean) dmg *= 1 + src.starLean; // (강화: the weapon's ★ over the armour's, aiStars)
   if ((W.raid || W.mobs) && !t.war && !t.hero) return raidHit(W, src, t, dmg);
   if (src.dead && !src.cmdr) dmg *= 0.5;
@@ -2825,7 +2945,9 @@ function escort(W, dt) {
 // minutes of a whole attack on it with the 공성 화약 carried in, longer when the defence holds them off it, a minute
 // and a half left for the 수성대장 (at 160 the gate fell at 2:40~2:55 and the attack won 9 of 12 wars; at 200, at
 // 3:15~3:30 and the attack won 17 of 24).
-const GATE_SEC = 240;
+// (240 → 215, 2026-11-28: with the defence's close-in out by the 쪽문 on the siege's crowd the gate fell at 3:50~4:45 against
+// 3:30~4:25 before, once not at all; 215 gives back the gate's old time.)
+const GATE_SEC = 215;
 function siege(W, dt) {
   // The commander of the defence can be reached only once the gate is down.
   const def = 1 - W.attacker, c = W.teams[def].cmd;
@@ -3808,10 +3930,10 @@ function heroCall() {
 function cmdDesc(W, kind) {
   const att = W.mode === 'siege' ? W.attacker === 0 : W.mode === 'escort' ? W.attacker === 0 : true;
   const m = {
-    capture: { charge: '목표 거점에 전원', hold: '우리 거점 지키기', flank: '두 분대가 다른 거점', rally: '나를 따라' },
+    capture: { charge: '내 곁(12칸)의 적 거점에 전원', hold: '우리 거점 지키기', flank: '두 분대가 다른 거점', rally: '나를 따라' },
     commander: { charge: '적 진영대장 돌격', hold: '우리 대장 곁 수비', flank: '옆길로 대장 기습', rally: '나를 따라' },
     escort: att ? { charge: '수레 앞으로 밀기', hold: '수레 곁 지키기', flank: '앞길 미리 정리', rally: '나를 따라' } : { charge: '수레로 요격', hold: '길목에서 막기', flank: '앞길 매복', rally: '나를 따라' },
-    siege: att ? { charge: '성문 총공격', hold: '물러나 정비', flank: '성문 양옆 공격', rally: '나를 따라' } : { charge: '성문 밖으로 출격', hold: '성문 뒤 수비', flank: '성문 양옆 막기', rally: '나를 따라' },
+    siege: att ? { charge: '성문 총공격', hold: '물러나 정비', flank: '성문 양옆 공격', rally: '나를 따라' } : { charge: '쪽문으로 전원 출격', hold: '전원 성문 안 수비', flank: '근접만 쪽문 출격·양옆 막기', rally: '나를 따라' },
   }[W.mode] || {};
   return m[kind] || WAR_COMMANDS[kind].desc;
 }
@@ -3872,6 +3994,203 @@ function warCommand(kind) {
   answers(W, near, ['ㅇㅋ 갑니다!', '넵 지휘 따라요', '알겠어요!', 'ㄱㄱ'], 2);
   return true;
 }
+// ------------------------------------------------ 전술: the hero's own keys in a war (집중 · 총공격 · 후퇴)
+// (2026-11-28) A war fought by itself was won or lost by the dice whatever the player did: the minute's command was
+// worth a tenth either way and nothing else the hero did reached its guild. Three keys of the hero's own, each with its
+// cooldown, each worth something only when used at the right moment:
+// - 집중: the foe the hero picks (its healer, the weakest, the 진영대장 near it) is the target of every ally near it for
+//   8 s, struck 50% harder — a fight's numbers turned by a kill made at once rather than blows spread over five;
+// - 총공격: the allies about the hero strike 35% harder, take 25% less and walk a fifth quicker for 12 s — wasted on an
+//   empty field, decisive when both sides are in;
+// - 후퇴: the allies about the hero fall back (toward our camp) for 8 s, taking 35% less and mending 4% a second —
+//   a lost fight left alive rather than fed one by one.
+// Shown: the keys' seconds, the focus ring over the foe, a ring under each ally in a 총공격 or 후퇴, the HUD's line;
+// and the results (what each brought: kills for and against while it lasted).
+const TACTICS = {
+  focus: { name: '집중', cd: 8, sec: 8, k: 1.5, r: 12, tip: '내 곁의 적 하나(힐러·약한 적·대장 우선)를 주변 12칸 아군 모두가 8초 동안 노린다 (그 적에게 피해 +50%)' },
+  surge: { name: '총공격', cd: 30, sec: 12, k: 1.35, taken: 0.75, speed: 1.2, r: 12, tip: '내 주변 12칸 아군: 12초 동안 공격 +35% · 받는 피해 −25% · 이동 +20%' },
+  regroup: { name: '후퇴', cd: 40, sec: 8, taken: 0.65, mend: 0.04, r: 14, tip: '내 주변 14칸 아군이 우리 쪽으로 물러나 8초 동안 받는 피해 −35% · 초당 체력 4% 회복' },
+};
+function tacOf(W) { return W.tac || (W.tac = { at: {}, focus: null, surge: null, regroup: null, log: [], uiT: 0 }); }
+function tacWait(W, kind) { const T = tacOf(W), at = T.at[kind]; return at === undefined ? 0 : Math.max(0, TACTICS[kind].cd - (A.G().t - at)); }
+function foeKills(W) { return W.teams.reduce((a, t, i) => a + (i === 0 ? 0 : t.kills), 0); }
+/** The foe the hero would call: near it, its healer and the weakest and a 대장 first. */
+function tacPick(W) {
+  const G = A.G(), p = G.player;
+  let best = null, bs = 1e9;
+  for (const e of foesOf(W, 0)) {
+    if (e.gate || e.dead || !(e.hp > 0) || unseenHid(e) || e.troop || (W.jaeng && inCamp(W, e))) continue;
+    const d = Math.hypot(e.tx - p.tx, e.ty - p.ty);
+    if (d > 7) continue;
+    const s = d - (e.role === 'healer' ? 2.5 : 0) - (1 - hpk(e)) * 4 - (e.cmdr ? 4 : 0) - (e.carry ? 2 : 0) - (e.hero ? 1 : 0);
+    if (s < bs) { bs = s; best = e; }
+  }
+  return best;
+}
+/** The hero's tactic (the keys, or window.__warTac(kind)); false when it cannot be used now. */
+function warTactic(kind) {
+  const G = A.G(), W = G && G.war;
+  const def = TACTICS[kind];
+  if (!W || W.raid || W.over || !def || G.dead || (W.countdown || 0) > 1 || W.aiOnly) return false;
+  if (tacWait(W, kind) > 0) return false;
+  const T = tacOf(W), p = G.player, now = G.t;
+  const who = new Set(W.alive[0].filter(b => !b.troop && !b.gate && !b.cmdr && !b.dead && Math.hypot(b.tx - p.tx, b.ty - p.ty) <= def.r));
+  let text, what;
+  if (kind === 'focus') {
+    const e = tacPick(W);
+    if (!e) { A.say('[전술] 집중: 7칸 안에 노릴 적이 없습니다', 'warn'); return false; }
+    T.focus = { e, until: now + def.sec, k0: W.teams[0].kills, k1: foeKills(W) };
+    for (const b of W.alive[0]) if (!b.hero && !b.troop && !b.gate && b.role !== 'healer' && d2(b, e) <= def.r) { b.target = e; b.tWhy = 'focus'; b.retargetT = now + def.sec; }
+    what = e.cmdr ? e.name : e.cls ? `${e.cls.name} ${e.name}` : e.name;
+    text = pick([`${what} 집중!`, `${what}부터 잡아요!`, `${what} 다 같이 쳐요!`]);
+  } else if (kind === 'surge') {
+    if (who.size < 3) { A.say('[전술] 총공격: 주변에 아군이 너무 적습니다', 'warn'); return false; }
+    T.surge = { who, until: now + def.sec, k0: W.teams[0].kills, k1: foeKills(W) };
+    text = pick(['총공격! 지금 밀어요!', '전원 돌격!! 지금이에요!', '다 같이 들어가요!']);
+  } else {
+    if (who.size < 2) { A.say('[전술] 후퇴: 주변에 아군이 없습니다', 'warn'); return false; }
+    const sp = W.teams[0].spawn, dx = sp[0] - p.tx, dy = sp[1] - p.ty, n = Math.hypot(dx, dy) || 1;
+    const at = snap(W, p.tx + dx / n * Math.min(7, n), p.ty + dy / n * Math.min(7, n));
+    T.regroup = { who, at, until: now + def.sec, k0: W.teams[0].kills, k1: foeKills(W) };
+    text = pick(['다들 빠져요! 뒤에서 정비!', '후퇴! 모여서 다시 가요!', '빠져요 빠져! 정비하고 다시!']);
+  }
+  T.at[kind] = now;
+  G.bubble = { text, t: now };
+  A.say(`[전술] ${def.name} — ${text}`, 'party');
+  A.banner(`전술 · ${def.name}${kind === 'focus' ? ` → ${what}` : ` (${who.size}명)`}`);
+  W.chatT = now;
+  if (kind !== 'focus') answers(W, [...who].filter(b => !b.hero), kind === 'surge' ? ['가즈아!', 'ㄱㄱㄱ', '돌격!!'] : ['빠짐!', 'ㅇㅋ 빠져요', '정비!'], 2);
+  if (W.diag) (W.diag.tac = W.diag.tac || {})[kind] = (W.diag.tac[kind] || 0) + 1;
+  tacKeys(W, true);
+  return true;
+}
+/** Per frame: the ends (what each brought, told and logged), the mending of a 후퇴, the keys' seconds. */
+function tacTick(W, dt) {
+  const T = tacOf(W), G = A.G();
+  for (const kind of ['focus', 'surge', 'regroup']) {
+    const c = T[kind];
+    if (!c) continue;
+    if (kind === 'focus' && !alive(c.e) && !c.killedT) c.killedT = G.t;
+    if (kind === 'regroup') for (const b of c.who) if (!b.hero && !b.dead && b.hp > 0) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * TACTICS.regroup.mend * dt);
+    if (G.t >= c.until || (kind === 'focus' && c.killedT && G.t - c.killedT > 0.5)) {
+      T[kind] = null;
+      const k0 = W.teams[0].kills - c.k0, k1 = foeKills(W) - c.k1;
+      T.log.push({ kind, t: Math.round(W.t), kills: [k0, k1], got: kind === 'focus' ? !!c.killedT : undefined });
+      const ok = kind === 'focus' ? !!c.killedT : k0 >= k1;
+      A.say(kind === 'focus' ? `[전술] 집중 ${c.killedT ? '성공 — 처치!' : '실패 — 놓쳤습니다'} (그동안 처치 ${k0} : ${k1})` : `[전술] ${TACTICS[kind].name} 끝 — 그동안 처치 ${k0} : ${k1}`, ok ? 'sys' : 'warn');
+    }
+  }
+  T.uiT -= dt;
+  if (T.uiT <= 0) { T.uiT = 0.25; tacKeys(W); }
+}
+function tacKeys(W, now = false) {
+  const col = document.getElementById('war-tac');
+  if (!col) return;
+  if (col.hidden) col.hidden = false;
+  for (const k of col.querySelectorAll('[data-tac]')) {
+    const kind = k.dataset.tac, w = Math.ceil(tacWait(W, kind)), on = !!tacOf(W)[kind];
+    const label = TACTICS[kind].name + (on ? ' ●' : w > 0 ? ` ${w}` : '');
+    if (k.textContent !== label || now) { k.textContent = label; k.classList.toggle('cool', w > 0 && !on); k.classList.toggle('on', on); }
+  }
+}
+/** In a 후퇴: back to the spot, striking only what is in reach on the way. True when it took the fighter's thought. */
+function tacThink(W, b) {
+  const c = W.tac && W.tac.regroup;
+  if (!c || !c.who.has(b) || A.G().t >= c.until) return false;
+  b.dest = snap(W, c.at[0] + (b.id % 5) - 2, c.at[1] + ((b.id >> 2) % 3) - 1);
+  const t = nearest(W, b, b.kit.range + 0.5);
+  if (t) act(W, b, t);
+  return true;
+}
+/** The foe a 집중 has this fighter on (alive, near enough), else null. */
+function tacFocus(W, b) {
+  const c = W.tac && W.tac.focus;
+  if (!c || b.team !== 0 || A.G().t >= c.until || !alive(c.e) || unseenHid(c.e) || d2(b, c.e) > TACTICS.focus.r) return null;
+  return c.e;
+}
+/** The tactics' weight on a blow (hit). */
+function tacK(W, src, t) {
+  const T = W.tac, now = A.G().t;
+  let k = 1;
+  if (src.team === 0) {
+    if (T.focus && T.focus.e === t && now < T.focus.until) k *= TACTICS.focus.k;
+    if (T.surge && now < T.surge.until && T.surge.who.has(src)) k *= TACTICS.surge.k;
+  }
+  if (t.team === 0) {
+    if (T.surge && now < T.surge.until && T.surge.who.has(t)) k *= TACTICS.surge.taken;
+    if (T.regroup && now < T.regroup.until && T.regroup.who.has(t)) k *= TACTICS.regroup.taken;
+  }
+  return k;
+}
+function surging(W, b) { const c = W.tac && W.tac.surge; return !!(c && A.G().t < c.until && c.who.has(b)); }
+/** The HUD's line for a tactic under way. */
+function drawTacHud(G, W, ctx, cw, ch, u, y) {
+  const T = W.tac;
+  if (!T) return;
+  const parts = [];
+  if (T.focus && G.t < T.focus.until) parts.push(`집중: ${T.focus.e.name}${alive(T.focus.e) ? ` ${Math.round(hpk(T.focus.e) * 100)}%` : ' 처치!'} · ${Math.ceil(T.focus.until - G.t)}초`);
+  if (T.surge && G.t < T.surge.until) parts.push(`총공격 ${[...T.surge.who].filter(b => !b.dead).length}명 · ${Math.ceil(T.surge.until - G.t)}초`);
+  if (T.regroup && G.t < T.regroup.until) parts.push(`후퇴·정비 ${[...T.regroup.who].filter(b => !b.dead).length}명 · ${Math.ceil(T.regroup.until - G.t)}초`);
+  if (!parts.length) return;
+  ctx.textAlign = 'center';
+  ctx.font = `bold ${Math.round(10 * u)}px G11`;
+  hudText(`전술 — ${parts.join(' / ')}`, cw / 2, y, '#ff9a6a');
+}
+/** Under a body: the 집중's ring on its foe, a 총공격's under each ally in it, a 후퇴's under each falling back. */
+function drawTacMark(W, b) {
+  const T = W.tac, G = A.G(), ctx = A.ctx;
+  if (!T || b.dead) return;
+  let col = null, label = null;
+  if (T.focus && T.focus.e === b && G.t < T.focus.until) { col = '#ff3a2a'; label = '집중'; }
+  else if (b.team === 0 && T.surge && G.t < T.surge.until && T.surge.who.has(b)) col = '#ffc040';
+  else if (b.team === 0 && T.regroup && G.t < T.regroup.until && T.regroup.who.has(b)) col = '#7ad8ff';
+  if (!col) return;
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = label ? 3 : 2;
+  ctx.globalAlpha = label ? 0.75 + 0.25 * Math.sin(G.t * 8) : 0.7;
+  ctx.beginPath();
+  ctx.ellipse(b.x, b.y - 2, TILE * (label ? 0.62 : 0.45), TILE * (label ? 0.34 : 0.24), 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  if (label) drawLabel(label, b.x, b.y - 72, '#ff8a7a', 'bold 10px G11');
+}
+/** Test: what the keys offer now, and where the hero's objective is (a directing bot's eye). */
+function tacState() {
+  const G = A.G(), W = G && G.war;
+  if (!W || W.raid) return null;
+  const p = G.player, foes = foesOf(W, 0).filter(e => !e.gate && !e.dead && !(W.jaeng && inCamp(W, e)) && Math.hypot(e.tx - p.tx, e.ty - p.ty) <= 8);
+  const mates = W.alive[0].filter(b => !b.hero && !b.troop && !b.gate && Math.hypot(b.tx - p.tx, b.ty - p.ty) <= 8);
+  return {
+    ready: Object.fromEntries(Object.keys(TACTICS).map(k => [k, tacWait(W, k) <= 0 && !G.dead])),
+    near: { foes: foes.length, mates: mates.length, hurt: mates.filter(b => hpk(b) < 0.5).length },
+    goal: heroGoal(W), log: tacOf(W).log,
+  };
+}
+/** Where the guild's objective is for the hero (a bot's way): the point to take, the cart, the gate, the 대장, the boss. */
+function heroGoal(W) {
+  const G = A.G(), p = G.player;
+  const nearOf = l => l.slice().sort((a, b) => Math.hypot(a.x - p.tx, a.y - p.ty) - Math.hypot(b.x - p.tx, b.y - p.ty))[0];
+  if (W.jaeng) {
+    if (W.boss && W.boss.hp > 0) return [W.boss.tx, W.boss.ty + 2];
+    const s = W.seals && nearOf(W.seals.filter(f => f.owner !== 0));
+    return s ? [s.x, s.y] : null;
+  }
+  if (W.mode === 'capture') {
+    const P = W.plans && W.plans[0], t = P && P.target && P.target.owner !== 0 ? P.target : nearOf(W.flags.filter(f => f.owner !== 0));
+    return t ? [t.x, t.y] : null;
+  }
+  if (W.mode === 'commander') return null; // (with its squad: the 대장 is the 돌격's, not one hero's)
+  if (W.mode === 'escort') return W.cart ? [W.cart.tx, W.cart.ty] : null;
+  if (W.mode === 'siege') {
+    const g = W.gate;
+    if (W.gateDown) { const c = W.teams[1 - W.attacker].cmd; return [c.tx, c.ty + 1]; }
+    // (the defence: a close-in hero out before the gate by the 쪽문, a caster behind it)
+    return W.attacker === 0 ? [g.tx, g.y1 + 1] : ['warrior', 'rogue', 'lancer', 'monk', 'dokkaebi', 'reaper', 'celestial'].includes(G.cls.id) ? [g.tx, g.y1 + 2] : [g.tx, g.y0 - 1];
+  }
+  return null;
+}
+
 /** A measure of how the war stands for us (for what a minute's command brought). */
 function progressNow(W) {
   const p = sideProgress(W);
@@ -3891,14 +4210,16 @@ function cmdEnd(W, C) {
 /** The command's weight on a blow (hit): the side's attack and guard, the flankers', the hero's crowd. */
 function commandK(W, src, t) {
   const c = W.cmds.cur, def = WAR_COMMANDS[c.kind];
+  // (지휘 사기, 2026-11-28: a guild under its hero's call — any of the four — fights as one: +8% · −5% taken. Left to its
+  // commander, none: the minute's choice was worth a tenth either way and a war left alone was the dice's.)
   let k = 1;
   if (src.team === 0) {
-    k *= def.dmg || 1;
+    k *= (def.dmg || 1) * 1.08;
     if (def.flankDmg && src.squad && src.squad.flank) k *= def.flankDmg;
     if (def.nearDmg && !src.hero && d2(src, W.hero) <= 5 && !A.G().dead) k *= def.nearDmg;
   }
   if (t.team === 0) {
-    k *= def.taken || 1;
+    k *= (def.taken || 1) * 0.95;
     if (c.kind === 'rally' && !t.hero && d2(t, W.hero) <= 5 && !A.G().dead) k *= 0.9;
   }
   return k;
@@ -3916,7 +4237,10 @@ function commandOrders(W) {
   const all = squads.slice(), half = squads.filter((q, i) => i % 2 === 0), flankers = squads.filter(q => q.flank), rest = squads.filter(q => !q.flank);
   if (W.mode === 'capture') {
     const P = W.plans && W.plans[0], byNear = W.flags.slice().sort((a, b) => Math.hypot(a.x - mine[0], a.y - mine[1]) - Math.hypot(b.x - mine[0], b.y - mine[1]));
-    const target = (P && P.target && P.target.owner !== 0 && P.target) || byNear.find(f => f.owner !== 0) || byNear[byNear.length - 1];
+    // 돌격's point is the hero's to choose (2026-11-28): the one not ours it stands nearest (within 12 tiles), else the plan's.
+    const hp = A.G().player, heroAt = !A.G().dead && W.flags.filter(f => f.owner !== 0 && Math.hypot(f.x - hp.tx, f.y - hp.ty) <= 12)
+      .sort((a, b) => Math.hypot(a.x - hp.tx, a.y - hp.ty) - Math.hypot(b.x - hp.tx, b.y - hp.ty))[0];
+    const target = heroAt || (P && P.target && P.target.owner !== 0 && P.target) || byNear.find(f => f.owner !== 0) || byNear[byNear.length - 1];
     const owned = byNear.filter(f => f.owner === 0);
     if (c.kind === 'charge') spreadOn(all, target.x, target.y, 'capture');
     else if (c.kind === 'hold') {
@@ -3999,7 +4323,7 @@ function warGoal(W) {
   if (W.mode === 'siege') {
     const att = W.attacker === 0, dc = W.teams[1 - W.attacker].cmd;
     if (W.gateDown) return att ? `목표: 수성대장(${Math.round(hpk(dc) * 100)}%) 쓰러뜨리기` : `목표: 수성대장(${Math.round(hpk(dc) * 100)}%) 지키기 — 본진으로`;
-    return att ? `목표: 현무 성문 부수기 (${Math.ceil(W.gate.hp / W.gate.maxHp * 100)}%)` : `목표: 성문(${Math.ceil(W.gate.hp / W.gate.maxHp * 100)}%) 앞 적 막기 · 시간까지 버티기`;
+    return att ? `목표: 현무 성문 부수기 (${Math.ceil(W.gate.hp / W.gate.maxHp * 100)}%)` : `목표: 성문(${Math.ceil(W.gate.hp / W.gate.maxHp * 100)}%) 지키기 · 근접은 쪽문으로 나가 막고 원거리는 문 안에서`;
   }
   return '';
 }
@@ -4965,6 +5289,8 @@ function leaveWar(again) {
   document.getElementById('war-sb').hidden = true;
   const wc = document.getElementById('war-cmd');
   if (wc) wc.hidden = true;
+  const tc = document.getElementById('war-tac');
+  if (tc) tc.hidden = true;
   document.body.classList.remove('war', 'jaeng');
   const share = document.getElementById('jaeng-share');
   if (share) share.hidden = true;
@@ -6171,6 +6497,8 @@ const JAENG = {
   gather: 20, bossAt: 70, rage: 300, time: 360, bossU: 6600, campR: 3, pkK: 0.45,
   pts: { boss: 1000, last: 100, cut: 15, seal: 1, sealBoss: 0.5, kill: 3, assist: 1, mob: 0.2, mobCap: 60 },
   sealBuff: 0.15, sealBuffT: 30, heroK: 0.85, afkK: 0.05, bossPw: 1.3,
+  // The other guilds' mark on the hero (heroMark): its floor, and more while our guild leads the scores.
+  heroMark: 1.6, heroLead: 0.4, hunters: 3,
 };
 /** The week's 「쟁」: its boss by the hero's 승급 (하급 ~6차, 중급 7~8차, 상급 9차), its arena by the boss. */
 export function jaengWeek(tier, week = gwoeWeek()) {
@@ -6843,7 +7171,11 @@ function thinkJaeng(W, b) {
   const order = myOrder(W, b);
   if (dodge(W, b)) return;
   b.only = order.kind === 'pk' ? order.team : undefined;
-  if (b.role !== 'healer' && order.kind === 'boss' && W.boss && W.boss.hp > 0 && b.state !== 'retreat') {
+  // (전술: a 후퇴 or a 집중 of the hero's takes its fighters off the boss — think.)
+  const tac = b.team === 0 && W.tac && ((W.tac.regroup && W.tac.regroup.who.has(b)) || tacFocus(W, b));
+  // The hero hunted: a few of each other guild's blades go for it wherever it is out of its camp (think holds the target).
+  if (heroHunt(W, b)) { think(W, b); b.only = undefined; return; }
+  if (b.role !== 'healer' && order.kind === 'boss' && W.boss && W.boss.hp > 0 && b.state !== 'retreat' && !tac) {
     // At the boss: one of another guild on it (or on its healer, for a tank) is struck first;
     // the rest of the crowd is left be, or the boss is never struck.
     let close = nearestFighter(W, b, 2);
@@ -6851,8 +7183,8 @@ function thinkJaeng(W, b) {
     // A strong hero (heroMark) by the boss is gone for by the other guilds' blades near it, now and then — as a server's
     // 랭커 is (it stood among them at the boss untouched: 0 deaths in every 「쟁」, balance runs).
     const G = A.G(), hm = heroMark(W);
-    if (!onMe && hm > 0 && b.team !== 0 && !G.dead && !unseenHid(W.hero) && !inCamp(W, W.hero) && d2(b, W.hero) <= 5 && G.t >= (b.markT || 0)) {
-      b.markT = G.t + 3;
+    if (!onMe && hm > 0 && b.team !== 0 && !G.dead && !unseenHid(W.hero) && !inCamp(W, W.hero) && d2(b, W.hero) <= 6 && G.t >= (b.markT || 0)) {
+      b.markT = G.t + 2.5;
       if (Math.random() < 0.45 * hm) { close = W.hero; onMe = true; b.tWhy = 'mark'; }
     }
     if (!onMe) { thinkJaengBoss(W, b, order); b.only = undefined; return; }
@@ -6861,6 +7193,28 @@ function thinkJaeng(W, b) {
   }
   think(W, b);
   b.only = undefined;
+}
+/**
+ * 「쟁」's hunters (2026-11-28): each other guild keeps JAENG.hunters of its blades (one more while our guild leads, more
+ * by heroMark) on the hero while it is out of its camp within 10 tiles of them, for six seconds at a time. The mark alone
+ * turned a blade near the boss now and then: the hero was struck 0~400 times in a 「쟁」 against the others' 2~3천
+ * and fell 0~1 times, hiding among the boss's crowd (balance runs).
+ */
+function heroHunt(W, b) {
+  const G = A.G(), h = W.hero;
+  if (b.team === 0 || b.role === 'healer' || b.state === 'retreat' || G.dead || W.aiOnly || W.t < JAENG.gather || inCamp(W, h) || unseenHid(h)) return false;
+  if (b.target === h && b.tWhy === 'hunt' && G.t < (b.retargetT || 0) && d2(b, h) <= 12) return true;
+  if (d2(b, h) > 10 || G.t < (b.huntAskT || 0)) return false;
+  b.huntAskT = G.t + 1.5;
+  const lead = W.score[0] >= Math.max(...W.score.filter((x, i) => i !== 0)) && W.t > JAENG.bossAt;
+  const want = JAENG.hunters + (lead ? 1 : 0) + Math.floor(Math.max(0, heroMark(W) - JAENG.heroMark - (lead ? JAENG.heroLead : 0)));
+  const n = W.alive[b.team].filter(m => m.target === h && m.tWhy === 'hunt' && G.t < (m.retargetT || 0)).length;
+  if (n >= want) return false;
+  b.target = h;
+  b.tWhy = 'hunt';
+  b.retargetT = G.t + 6;
+  if (W.diag) W.diag.hunt = (W.diag.hunt || 0) + 1;
+  return true;
 }
 function nearestFighter(W, b, r) {
   let best = null, bd = r;
@@ -7335,6 +7689,7 @@ function drawBody(b) {
   if (b.gate || !onScreen(b) || (window.__dbgWar && window.__dbgWar.nobody)) return;
   const dbg = window.__dbgWar || {};
   if (b.wprop) return dbg.noprop ? null : drawWarProp(W, b);
+  if (W.tac && !W.raid) drawTacMark(W, b);
   const alpha = (b.hidden > G.t ? 0.4 : 1) * overAlpha(W, b);
   const pose = b.poseT > 0 ? b.pose : b.moving ? 'walk' : 'idle';
   let top = 50;
@@ -7847,6 +8202,8 @@ function warProps() {
   if (W.flags) for (const f of W.flags) out.push({ war: true, wprop: 'flag', f, x: f.x * TILE + TILE / 2, y: f.y * TILE + TILE - 4 });
   if (W.cart) out.push({ war: true, wprop: 'cart', x: W.cart.x, y: W.cart.y + 4 });
   if (W.gate && !W.gateDown) out.push({ war: true, wprop: 'gate', x: (W.gate.x0 + W.gate.x1 + 1) / 2 * TILE, y: (W.gate.y1 + 1) * TILE });
+  // 쪽문: the defence's way out (open to it on foot only; the gate's own door picture, small).
+  if (W.postern) for (const [x, y] of (W.def.posterns || []).filter(([, y]) => y === W.gate.y1)) out.push({ war: true, wprop: 'postern', x: (x + 0.5) * TILE, y: (y + 1) * TILE });
   for (const c of W.crates) if (!c.by) out.push({ war: true, wprop: 'crate', x: c.x * TILE + TILE / 2, y: c.y * TILE + TILE - 6 });
   for (const z of W.zones) out.push({ war: true, wprop: 'post', z, x: z.x * TILE + TILE / 2, y: z.y * TILE + TILE - 8 });
   for (const g of W.ghosts) out.push({ war: true, wprop: 'ghost', g, x: g.x, y: g.y });
@@ -7889,6 +8246,11 @@ function drawWarProp(W, b) {
     ctx.textAlign = 'center';
     drawLabel(`현무 성문 ${Math.ceil(g.hp / g.maxHp * 100)}%`, b.x, b.y - 136, '#efe3c2', '10px G9');
     if (g.flash > 0) g.flash -= 0.016;
+  } else if (b.wprop === 'postern') {
+    prop('war_door', b.x, b.y - 2, 0.3);
+    ctx.font = '8px G7';
+    ctx.textAlign = 'center';
+    drawLabel(W.gate.team === 0 ? '쪽문 (우리 출입구)' : '쪽문', b.x, b.y + 8, W.gate.team === 0 ? '#9ff08a' : '#ff9a8a');
   } else if (b.wprop === 'crate') {
     prop('war_cart3', b.x, b.y, 0.45) || prop('field_barrel', b.x, b.y, 0.5);
     ctx.font = '8px G7';
@@ -7969,6 +8331,7 @@ function hud() {
   if (line) hudText(line, cw / 2, 32 * u, '#ffd27a');
   if (W.raid) drawTaskHud(G, W, ctx, cw, ch, u);
   else if (!W.jaeng) drawCmdHud(G, W, ctx, cw, ch, u);
+  if (!W.raid) drawTacHud(G, W, ctx, cw, ch, u, (W.jaeng ? 58 : 81) * u);
   // Kill feed, top right.
   ctx.textAlign = 'right';
   const icon = img('ui_Icon_KillLog');
