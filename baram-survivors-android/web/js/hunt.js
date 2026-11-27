@@ -251,7 +251,9 @@ function champs(n = 1, aff = null) {
   for (let j = 0; j < n * k; j++) {
     const m = A.pickMonster(true), a = aff || affixOf(G);
     // Later in the run (or on 정예 토벌) a pack may carry a second affix of the ground's or the common ones.
-    const a2 = !aff && (H.prog >= 0.5 || H.paths.elite) && Math.random() < 0.35 ? affixOf(G, a) : null;
+    // (위험도, game.js DANGER: from the start, and more often, the higher it is)
+    const dz = G.danger && G.danger.t || 0;
+    const a2 = !aff && (H.prog >= 0.5 || H.paths.elite || dz >= 2) && Math.random() < 0.35 + 0.08 * dz ? affixOf(G, a) : null;
     pack = ++G.packs;
     for (let i = 0; i < 3; i++) { const e = A.addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack); if (e) { affix(e, a); affix(e, a2); named = e.name; } }
   }
@@ -298,7 +300,7 @@ function beats(dt) {
   }
   if (H.act >= 2) fieldTick();
   if (H.act >= 2) {
-    if (H.champsAt.length && H.prog >= H.champsAt[0]) { H.champsAt.shift(); champs(); }
+    if (H.champsAt.length && H.prog >= H.champsAt[0]) { H.champsAt.shift(); champs((G.danger && G.danger.t || 0) >= 4 ? 2 : 1); } // (위험도 IV부터 한 무리 더)
     if (H.minisAt.length && H.prog >= H.minisAt[0] && G.mini && leader()) H.minisAt.shift();
     else if (H.minisAt.length && H.prog >= H.minisAt[0] && !G.mini) { H.minisAt.shift(); champs(); }
     // 보물 사냥: three treasure goblins, one at once and then every 35 s.
@@ -311,7 +313,11 @@ function beats(dt) {
     if (k === 'treasure' && H.treasures < 4) { H.treasures++; goblin(); } else champs();
   }
   // The boss is called: at 100%, or at the latest by 3:30 (a weak hero still gets there).
-  if (H.warnAt === null && H.act >= 2 && (H.prog >= 1 || t >= (H.maxBoss || PACE.maxBoss))) {
+  // (an objective under way holds the boss a while: a strong hero filled the gauge before it could be done, and it failed —
+  // GOAL_TUNE.hold seconds at most past the full gauge)
+  if (H.prog >= 1 && H.fullAt === undefined) H.fullAt = t;
+  const goalOn = H.goal && !H.goal.over && t - H.fullAt < GOAL_TUNE.hold;
+  if (H.warnAt === null && H.act >= 2 && ((H.prog >= 1 && !goalOn) || t >= (H.maxBoss || PACE.maxBoss))) {
     H.warnAt = t;
     H.warn = PACE.warn;
     A.banner(`${G.boss.name}의 기운이 다가온다!`);
@@ -600,6 +606,9 @@ function pickPattern() {
   const list = pool.length > 1 ? pool.filter(k => k !== G.lastPattern) : pool;
   // From the second phase a common blow joins in now and then.
   if (G.phase >= 1 && Math.random() < 0.3) list.push(['cross', 'ring', 'meteor'][G.phase - 1] || 'rain');
+  // (위험도 III부터: from its first phase, and more often, one of the common blows besides its own two)
+  const dz = G.danger && G.danger.t || 0;
+  if (dz >= 3 && Math.random() < 0.15 + 0.05 * dz) list.push(['cross', 'ring', 'meteor', 'plus', 'rain'][Math.floor(Math.random() * 5)]);
   return G.lastPattern = list[Math.floor(Math.random() * list.length)];
 }
 
@@ -649,7 +658,7 @@ function bossFight(dt) {
   }
   G.raidT -= dt;
   if (G.raidT <= 0 && !(t < (G.seqTill || 0))) {
-    G.raidT = [4.5, 3.8, 3.2][G.phase] * (G.enraged ? 0.7 : 1);
+    G.raidT = [4.5, 3.8, 3.2][G.phase] * (G.enraged ? 0.7 : 1) * (1 - 0.03 * (G.danger && G.danger.t || 0)); // (위험도: blows quicker)
     const k = pickPattern();
     A.raidPattern(b, k);
     note('pat:' + k);
@@ -711,6 +720,15 @@ function kill(e) {
   if (e.affix) affixDeath(e);
   if (e.wave && H.wv.id === e.wave) H.wv.killed++;
   if (e.field) fieldDeath(e);
+  const g = H.goal;
+  if (g && !g.over && g.kind === 'destroy' && e.goal === 'nest') goalStep(`${g.label.split(' ')[0]} 하나를 부쉈습니다!`);
+  if (g && !g.over && g.kind === 'purify' && g.items[0] && !e.goal) {
+    const it = g.items[0], [cx, cy] = ringAt(it.at);
+    if (Math.hypot(e.x - cx, e.y - cy) <= GOAL_TUNE.cap.r * A.TILE && (it.kc || 0) < GOAL_TUNE.cap.killMax) {
+      it.kc = (it.kc || 0) + GOAL_TUNE.cap.kill; // (at most killMax of a spot from kills: the rest is standing in it)
+      it.fill = Math.min(0.999, it.fill + GOAL_TUNE.cap.kill);
+    }
+  }
   // During the boss: each of the crowd felled fills its 그로기 a little (개편 A, P0-1).
   const b = H.bossE;
   if (H.act >= 3 && b && b !== e && b.hp > 0 && b.gro !== undefined && !(b.groggyT > G.t) && e.kind !== 'boss') {
@@ -1332,13 +1350,35 @@ function spotNear(r0, r1) {
 }
 
 // ---------------- the objective
+//
+// (사용자 2026-11-28: 토벌도 미션은 재미없고 어디 있는지 찾기도, 깨기도 어렵다 — 특히 점령은 기술 시전·자동 돌진에 밀려
+// 가만히 서 있을 수가 없어 깨기 불가능.) Measured (bot that heads for the objective, 21 grounds): 파괴 never moved
+// (a nest's fall counted for nothing), 점령 2~3 of 4~5 spots by the boss. Now:
+//   점령 (purify) — a ring of r tiles drawn as it judges (the hero's feet in the ring, in pixels): time inside adds up,
+//     a step out keeps it for `hold` s and then it ebbs slowly; each kill in the ring fills it a little (at most killMax of it); foes in it
+//     slow it less (at most 4 counted).
+//   줍기 (collect) — picked up within `pick` tiles (the ring drawn), not on the very tile.
+//   파괴 (destroy) — each nest felled is a step.
+//   every kind — a time limit (`limit`, shown with the line), a clear reward (a chest and gold; within `fast` of the limit
+//     a second chest: 신속 달성) and a failure that shows (the banner, the screen shaken); the HUD names how far it is
+//     (an arrow and N칸 at the screen's edge, a marker over it on screen); with the 토벌도 full the boss waits for it
+//     (`hold` s at most).
+export const GOAL_TUNE = {
+  cap: { r: 2.2, fill: 4.5, foe: 0.15, foeMax: 4, kill: 0.015, killMax: 0.4, hold: 3, decay: 30 },
+  pick: 1.1, escortR: 3, hold: 40,
+  limit: { collect: 50, purify: 70, destroy: 70, chase: 60, duel: 110, floors: 120, drive: 80 }, fast: 0.6,
+  gold: 0.6, // a chest's worth of gold as coins, × the ground's level + 4
+};
 
 function goalStart() {
   const G = A.G(), H = G.hunt, gd = ground().goal;
   if (!gd) return;
   const g = H.goal = { kind: gd.kind, n: gd.n, label: gd.label, prop: gd.prop, mode: gd.mode, step: 0, at: G.t, items: [], ok: true };
-  A.banner(`목표 · ${g.label}`);
-  A.say(`목표: ${g.label}`, 'sys');
+  // (the kinds that run on a clock of their own — 지키기·버티기·호위 — keep it; the rest get a limit)
+  const lim = GOAL_TUNE.limit[gd.kind];
+  if (lim && H.mode !== 'rush') g.limit = G.t + lim;
+  A.banner(`목표 · ${g.label}${lim ? ` (${lim}초)` : ''}`);
+  A.say(`목표: ${g.label}${lim ? ` — ${lim}초 안에 (보상: 보물 상자·돈, ${Math.round(lim * GOAL_TUNE.fast)}초 안이면 상자 하나 더)` : ''}`, 'sys');
   note('goal:start');
   const k = g.kind;
   if (k === 'collect') for (let i = 0; i < g.n; i++) g.items.push({ at: spotNear(5 + i * 2, 9 + i * 2), done: false });
@@ -1381,10 +1421,21 @@ function goalDone(ok) {
   H.goalBonus = ok && g.ok;
   for (const e of G.enemies) if (e.goal && e.hp > 0 && e.kind !== 'mini') { e.hp = 0; A.killEnemy(e); }
   if (ok) {
-    A.banner(`목표 달성 · ${g.label}`);
+    const took = G.t - g.at, lim = g.limit ? g.limit - g.at : 0, fast = lim && took <= lim * GOAL_TUNE.fast;
+    A.banner(`목표 달성 · ${g.label}${fast ? ' · 신속 달성!' : ''}`);
     gain(0.1);
     A.G().drops.push({ x: G.player.x, y: G.player.y + 26, kind: 'chest' });
-  } else A.banner(`목표 실패 · ${g.label}`);
+    if (fast) A.G().drops.push({ x: G.player.x + 30, y: G.player.y + 26, kind: 'chest' });
+    for (let i = 0; i < 8; i++) G.drops.push({ x: G.player.x + Math.cos(i * 0.8) * 40, y: G.player.y + Math.sin(i * 0.8) * 26, kind: 'coin' });
+    G.gold += Math.round(GOAL_TUNE.gold * 25 * (G.level + 4));
+    A.say(`목표 달성 (${Math.round(took)}초): 보물 상자${fast ? ' 둘(신속 달성)' : ''}과 돈을 얻었습니다.`, 'sys');
+    G.slowmo = Math.max(G.slowmo || 0, 0.3);
+    if (A.audio()) A.audio().play('levelup');
+  } else {
+    A.banner(`목표 실패 · ${g.label}`);
+    A.say(`목표 실패: ${g.label}`, 'warn');
+    G.shake = Math.max(G.shake || 0, 0.4);
+  }
   note(ok ? 'goal:done' : 'goal:fail');
 }
 
@@ -1423,15 +1474,18 @@ function survivePrep(g) {
 function goalTick(dt) {
   const G = A.G(), H = G.hunt, g = H.goal, p = G.player, t = G.t;
   if (!g || g.over) return;
+  if (g.limit && t >= g.limit) { goalDone(false); return; }
   const near = (at, r) => Math.abs(at[0] - p.tx) <= r && Math.abs(at[1] - p.ty) <= r;
   if (g.kind === 'collect') {
-    for (const it of g.items) if (!it.done && near(it.at, 0.5)) { it.done = true; A.addFx && A.M().fx.h_kill && A.addFx('h_kill', it.at[0] * A.TILE + 24, it.at[1] * A.TILE + 24, { scale: 0.6 }); goalStep(); }
+    for (const it of g.items) if (!it.done && inRing(it.at, GOAL_TUNE.pick)) { it.done = true; A.addFx && A.M().fx.h_kill && A.addFx('h_kill', it.at[0] * A.TILE + 24, it.at[1] * A.TILE + 24, { scale: 0.6 }); goalStep(); }
   } else if (g.kind === 'purify') {
     const it = g.items[0];
     if (it) {
-      const foes = G.enemies.filter(e => !e.goal && Math.abs(e.tx - it.at[0]) <= 1 && Math.abs(e.ty - it.at[1]) <= 1).length;
-      if (near(it.at, 1)) it.fill = Math.min(1, it.fill + dt / 5 / (1 + foes * 0.3));
-      else it.fill = Math.max(0, it.fill - dt / 20);
+      const C = GOAL_TUNE.cap, [cx, cy] = ringAt(it.at), R = C.r * A.TILE;
+      const foes = Math.min(C.foeMax, G.enemies.filter(e => !e.goal && e.hp > 0 && Math.hypot(e.x - cx, e.y - cy) <= R).length);
+      it.inside = inRing(it.at, C.r);
+      if (it.inside) { it.out = 0; it.fill = Math.min(1, it.fill + dt / C.fill / (1 + foes * C.foe)); }
+      else if ((it.out = (it.out || 0) + dt) > C.hold) it.fill = Math.max(0, it.fill - dt / C.decay);
       if (it.fill >= 1) {
         g.items.shift();
         (g.lit = g.lit || []).push(it.at);
@@ -1463,7 +1517,7 @@ function goalTick(dt) {
     if (it.hp <= 0) goalDone(false);
   } else if (g.kind === 'escort') {
     const c = g.cart;
-    const by = Math.abs(c.x - p.tx - 0.5) <= 3 && Math.abs(c.y - p.ty - 0.5) <= 3;
+    const by = Math.hypot(p.x - c.x * A.TILE, p.y - (c.y * A.TILE + A.TILE / 2 - 6)) <= GOAL_TUNE.escortR * A.TILE; // (the ring drawn round it)
     let bite = 0;
     for (const e of G.enemies) if (!e.kind && Math.abs(e.tx + 0.5 - c.x) <= 1.5 && Math.abs(e.ty + 0.5 - c.y) <= 1.5) bite++;
     c.hp -= bite * dt * 0.004;
@@ -1561,7 +1615,7 @@ function cartPath(x, y, n) {
 function survivTick(g, dt) {
   const G = A.G(), p = G.player, t = G.t;
   if (g.mode === 'warm' || g.mode === 'moon') {
-    const warm = g.items.some(it => Math.hypot(it.at[0] - p.tx, it.at[1] - p.ty) <= it.r);
+    const warm = g.items.some(it => inRing(it.at, it.r));
     if (g.mode === 'warm' && !warm && t - (g.coldT || 0) > 1.5) { g.coldT = t; A.heroStatus('slow'); g.cold = (g.cold || 0) + 1; if (g.cold % 4 === 0) A.heroStatus('freeze'); g.ok = g.ok && g.cold < 12; }
     if (warm) g.cold = Math.max(0, (g.cold || 0) - dt);
     if (g.mode === 'moon') for (const e of G.enemies) if (!e.kind) e.dmg = e.baseDmg ? e.baseDmg * (warm ? 0.8 : 1.3) : (e.baseDmg = e.dmg, e.dmg);
@@ -1736,6 +1790,17 @@ function move(e) {
 }
 
 /** Where the bot (tools/pace.js) heads for the objective. */
+/** An objective's ring on the ground: its centre in pixels (the tile's foot, where it is drawn). */
+function ringAt(at) {
+  const T = A.TILE;
+  return [at[0] * T + T / 2, at[1] * T + T - 6];
+}
+/** The hero's feet within r tiles of an objective's ring centre: what the drawn ring shows. */
+function inRing(at, r) {
+  const p = A.G().player, [cx, cy] = ringAt(at);
+  return Math.hypot(p.x - cx, p.y - cy) <= r * A.TILE;
+}
+
 function goalSpot() {
   const G = A.G(), H = G && G.hunt, g = H && H.goal;
   if (!g || g.over) return null;
@@ -1780,10 +1845,20 @@ function drawGoal(ctx) {
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
   };
-  if (g.kind === 'collect') for (const it of g.items) { if (it.done) continue; const [x, y] = at(...it.at); pic(g.prop, x, y + Math.sin(G.t * 4) * 2); ring(x, y - 8, 16, 1, 'rgba(120,200,255,0.6)'); }
+  if (g.kind === 'collect') for (const it of g.items) { if (it.done) continue; const [x, y] = at(...it.at); pic(g.prop, x, y + Math.sin(G.t * 4) * 2); ring(x, y, GOAL_TUNE.pick * T, 1, 'rgba(120,200,255,0.6)'); }
   if (g.kind === 'purify') {
     for (const l of g.lit || []) { const [x, y] = at(...l); pic(g.prop, x, y); }
-    for (const it of g.items) { const [x, y] = at(...it.at); pic(g.prop, x, y, 0.7); ring(x, y - 10, 30, it.fill, '#7ad0ff'); }
+    for (const it of g.items) {
+      // the ring is the judgement (inRing): its floor lit while the hero is in it, the fill round its edge
+      const [x, y] = at(...it.at), R = GOAL_TUNE.cap.r * T;
+      ctx.fillStyle = it.inside ? 'rgba(122,208,255,0.16)' : 'rgba(122,208,255,0.06)';
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      ring(x, y, R, 1, 'rgba(255,255,255,0.25)');
+      ring(x, y, R, it.fill, '#7ad0ff');
+      pic(g.prop, x, y, 0.7);
+      ctx.font = 'bold 11px G9'; ctx.textAlign = 'center';
+      A.outline(`${Math.floor(it.fill * 100)}%`, x, y - 78, it.inside ? '#bfe8ff' : '#7aa0c0');
+    }
   }
   if (g.kind === 'defend' && g.items[0]) {
     const it = g.items[0], [x, y] = at(...it.at);
@@ -1791,17 +1866,24 @@ function drawGoal(ctx) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 21, y + 4, 42, 5);
     ctx.fillStyle = it.hp > 0.5 ? '#6ad04a' : '#e05a3a'; ctx.fillRect(x - 20, y + 5, 40 * Math.max(0, it.hp), 3);
   }
-  if (g.kind === 'survive') for (const it of g.items) { const [x, y] = at(...it.at); pic(g.prop, x, y); ring(x, y - 6, it.r * T, 1, 'rgba(255,190,80,0.35)'); }
+  if (g.kind === 'survive') for (const it of g.items) { const [x, y] = at(...it.at); pic(g.prop, x, y); ring(x, y, it.r * T, 1, 'rgba(255,190,80,0.35)'); }
   if (g.kind === 'escort' && g.cart) {
     const c = g.cart, x = c.x * T, y = c.y * T + T / 2 - 6;
     const im = propImg(g.prop);
     if (im) { ctx.save(); ctx.translate(x, y); if (c.dx < 0) ctx.scale(-1, 1); const s = Math.min(1, 80 / im.width); ctx.drawImage(im, -im.width * s / 2, -im.height * s, im.width * s, im.height * s); ctx.restore(); }
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 21, y + 4, 42, 5);
     ctx.fillStyle = c.hp > 0.5 ? '#6ad04a' : '#e05a3a'; ctx.fillRect(x - 20, y + 5, 40 * Math.max(0, c.hp), 3);
-    ring(x, y - 10, 3 * T, 1, c.moving ? 'rgba(120,220,120,0.35)' : 'rgba(255,255,255,0.15)');
+    ring(x, y, GOAL_TUNE.escortR * T, 1, c.moving ? 'rgba(120,220,120,0.35)' : 'rgba(255,255,255,0.15)');
   }
   // Nests: their prop over the monster's place.
   for (const e of G.enemies) if (e.goal === 'nest' && e.hunt) pic(e.hunt.prop, e.x, e.y + 4);
+  // Where to go next: a marker bobbing over it (the HUD's arrow and 칸 when it is off the screen).
+  const gs = !g.over && G.bossT === undefined && goalSpot();
+  if (gs) {
+    const [x, y0] = at(...gs), y = y0 - 96 + Math.sin(G.t * 5) * 4;
+    ctx.fillStyle = '#9ad8ff'; ctx.strokeStyle = '#0a2030'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y + 10); ctx.lineTo(x - 8, y - 4); ctx.lineTo(x + 8, y - 4); ctx.closePath(); ctx.stroke(); ctx.fill();
+  }
 }
 
 /** 몰이 파도 on the screen: arrows on the edge it comes from, and how much of it is left. */
@@ -1843,7 +1925,7 @@ function drawGoalHud(ctx, cv) {
   if (!g || G.bossT !== undefined) return;
   const n = goalSteps(g);
   let txt = `${g.label} ${Math.min(g.step, n)}/${n}`;
-  if (g.end && !g.over) txt += ` · ${Math.max(0, Math.ceil(g.end - G.t))}초`;
+  if ((g.end || g.limit) && !g.over) txt += ` · ${Math.max(0, Math.ceil((g.end || g.limit) - G.t))}초`;
   if (g.over) txt = `${g.label} · ${H.goalDone ? '달성' : '실패'}`;
   ctx.font = `${Math.round(10 * s)}px G9`;
   ctx.textAlign = 'center';
@@ -1853,6 +1935,8 @@ function drawGoalHud(ctx, cv) {
   const p = G.player, dx = at[0] - p.tx, dy = at[1] - p.ty;
   const sw = A.VW() / A.TILE / 2, sh = A.VH() / A.TILE / 2;
   if (Math.abs(dx) < sw - 0.5 && Math.abs(dy) < sh - 0.5) return;
+  // how far on foot (the walled map's walk, else as the crow flies)
+  const walk = G.arena && flowAt(at[0], at[1]) >= 0 ? flowAt(at[0], at[1]) : Math.round(Math.hypot(dx, dy));
   const a = Math.atan2(dy, dx), cx = cv.width / 2, cy = cv.height / 2;
   const r = Math.min(cx / Math.abs(Math.cos(a) || 1e-6), cy / Math.abs(Math.sin(a) || 1e-6)) - 26 * s;
   const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
@@ -1865,6 +1949,9 @@ function drawGoalHud(ctx, cv) {
   ctx.beginPath(); ctx.moveTo(12 * s, 0); ctx.lineTo(-8 * s, -8 * s); ctx.lineTo(-4 * s, 0); ctx.lineTo(-8 * s, 8 * s); ctx.closePath();
   ctx.stroke(); ctx.fill();
   ctx.restore();
+  ctx.font = `${Math.round(10 * s)}px G9`;
+  ctx.textAlign = 'center';
+  A.outline(`${walk}칸`, x - Math.cos(a) * 22 * s, y - Math.sin(a) * 16 * s + 4 * s, '#9ad8ff');
 }
 
 /** 모래폭풍 (아람 황무지): the light closes in and opens again while it lasts. */
