@@ -1283,9 +1283,33 @@ function stageInfo() {
     for (const b of row.querySelectorAll('button')) b.onclick = () => { pickedMode = b.dataset.mode; stageInfo(); };
     $('#stage-info').append(row);
   }
+  dangerRow(s);
   pactRow(buildStages);
   $('#go').disabled = !open;
   $('#go').textContent = open ? `${josa(chosenClass.name, '으로', '로')} 입장` : '잠긴 사냥터';
+}
+
+/** The 위험도 under a ground's card: 맞춤 by the class's power, a step lower or higher by choice. */
+function dangerRow(s) {
+  if (!chosenClass || s.raid || s.id === 'novice') return;
+  const d = dangerOf(chosenClass, s), k = dangerK(d.t), box = document.createElement('div');
+  box.className = 'pacts danger';
+  box.innerHTML = `<small>위험도 <b>${ROMAN[d.t]}</b>${d.t === d.auto ? ' (맞춤)' : ` (맞춤 ${ROMAN[d.auto]})`}`
+    + (d.t ? ` · 피해 ×${k.dmg.toFixed(1)}(정예 ×${(k.dmg * k.elite).toFixed(1)}) 생명 ×${k.hp.toFixed(1)} 회복 −${Math.round(k.heal * 100)}% · 보상 +${Math.round((k.rew - 1) * 100)}%` : '') + '</small>';
+  box.title = `전투력 ${d.pow.toLocaleString()} / 이 사냥터 기준 ${d.par.toLocaleString()}: 기준을 넘는 만큼 몬스터가 세지고 보상(돈·재료·스페셜)이 늘어납니다.`;
+  for (const [txt, f] of [['−', o => o - 1], ['맞춤', () => 0], ['+', o => o + 1]]) {
+    const b = document.createElement('button');
+    b.className = 'pact' + (txt === '맞춤' && d.t === d.auto ? ' on' : '');
+    b.textContent = txt;
+    b.onclick = () => {
+      // kept as a step off the 맞춤 (the same choice means as much on every ground), within 0 … 맞춤 + DANGER.up
+      settings.dangerOff = Math.max(-d.auto, Math.min(DANGER.up, f(d.t - d.auto)));
+      saveJson('bs_settings', settings);
+      stageInfo();
+    };
+    box.append(b);
+  }
+  $('#stage-info').append(box);
 }
 
 /** The 규약 toggles under a ground's or raid's card: harder monsters for richer spoils. */
@@ -1625,6 +1649,8 @@ function startRun(cls, stage, training = false) {
   heroTile();
   applyGear();
   Hunt.start(G); // 사냥 기믹 (hunt.js)
+  // 위험도 (DANGER): a hunting ground only, by the class's power against the ground's par.
+  G.danger = G.hunt && !training ? Object.assign(dangerOf(cls, stage), dangerK(dangerOf(cls, stage).t)) : null;
   $('#dash-btn').hidden = !G.hunt;
   // A run starts with the weapon's plain attack only; the first card comes at once.
   // (사냥 기믹 보스 직행: the build comes made, as a raid's.)
@@ -1639,6 +1665,11 @@ function startRun(cls, stage, training = false) {
   $('#vert').innerHTML = '';
   say(`${stage.name}에 들어왔습니다.`, 'sys');
   say(stage.intro);
+  if (G.danger && G.danger.t > 0) {
+    const d = G.danger;
+    say(`위험도 ${ROMAN[d.t]}${d.t === d.auto ? ' (전투력 맞춤)' : ''}: 몬스터 피해 ×${d.dmg.toFixed(1)}(정예 ×${(d.dmg * d.elite).toFixed(1)}) · 생명 ×${d.hp.toFixed(1)} · 회복 −${Math.round(d.heal * 100)}% · 보상(돈·재료·스페셜) +${Math.round((d.rew - 1) * 100)}%`, 'warn');
+    banner(`위험도 ${ROMAN[d.t]} · 보상 +${Math.round((d.rew - 1) * 100)}%`);
+  }
   if (stage.raid) raidSetup();
   if (stage.war) War.setup();
   G.wasCleared = stage.raid ? !!(progress.raids || {})[stage.id] : !!progress.cleared[stage.id];
@@ -3948,6 +3979,9 @@ function openCraft(sink = null) {
   // 레이드 상점: 레이드주화 for today's makers' goods, as the client's raid shop.
   head(`레이드 상점 · 레이드주화 ${progress.coins || 0}개`);
   const SHOP = [['scroll', 1, 5], ['kalpa', 5, 8], ['silver1', 5, 6], ['silver2', 2, 15], ['essence', 3, 20], ['silver3', 1, 250], ['pearl', 1, 60]];
+  // 사신수 성물 (파밍 점검 2026-11-28): a piece ★5 takes 36 of its 성물 (8 to make, 28 for the stars), 3~5 a win of its own
+  // raid and nothing else — nine wins of the same raid a piece. Once that raid is won, 60 주화 each here (about 5~6 wins).
+  for (const [id, gate] of Object.entries(SINSU_GATE)) if (gate.some(r => (progress.raids || {})[r])) SHOP.push([id, 1, SINSU_PRICE]);
   for (const [id, n, price] of SHOP) {
     icon = matIcon(id) || null; // (the shop's goods had no picture: 사용자 2026-11-24, 조합창 이미지 누락)
     row(`${MATS[id].name} ${n}개`, `레이드주화 ${price}개`, '교환', (progress.coins || 0) >= price, () => {
@@ -5014,6 +5048,38 @@ const HORDE = { hp: 1, dmg: 0.85 };
 // Measured (bot runs, 2~5 each): the grounds' drops on 3~13, 31~88% → 0~92% (a death at 화산); the best 9차 on the abyss
 // floors and the 소 레벨, 79~98% → 23~86% (the first floor the mildest); the first ground, raids, 대항전, 쟁 as they were.
 const THREAT = { early: 1.25, earlyTo: 11, earlyEnd: 15, champ: 1.25, mini: 1.3, depthHp: 1.8, depthDmg: 5 };
+// 위험도 (2026-11-28, 사용자: 최고 장비도 사냥터가 어렵게): a hunting ground bites as hard as the hero is strong. Its par is
+// the power a hero in the ground's own gear has there (PAR: ×(1 + 0.1 L)·√(4.5 + 0.5 L), the monsters' life and bite by level;
+// ×3 on the abyss floors for THREAT.depth); a hero past it meets 위험도 t = log₁.₂₅ of the excess (맞춤 at most `max`, by
+// choice up to `top`): monsters ×dmg^t bite (champions, leaders and the boss ×elite^t more), ×hp^t life, the hero's own mending
+// −heal·t (the best gear's regen and kill-heals outran any bite: ×3.7 bite still left it at 76~85%), no monster's blow past
+// `blow` of the hero's life (no felling at a stroke), champion packs more often twice-affixed and from IV one more at each
+// beat, the boss's blows quicker and from III mixed with the common ones — and the spoils grow (gold, materials, specials
+// ×(1 + rew·t)). 0 for a hero in the ground's gear (drop/fit): as it was. The stage card shows it (맞춤, chosen −/+:
+// settings.dangerOff, a step off the 맞춤) and the run says it.
+// Measured (bot runs, best 9차): 화탕지옥 82~94% → 위험도 V 5~47% (격투가 70, 도적 46~74); 아람 황무지 95% → IV 40%;
+// 타계 62% (98); 쥐굴·산적굴 VI~VII 63~68% (99); the abyss floors as they were (0: 32~65%).
+const DANGER = { par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 3, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
+function dangerPar(stage) {
+  const L = stage.level !== undefined ? stage.level : STAGES.indexOf(stage);
+  return DANGER.par * (1 + 0.1 * L) * Math.sqrt(4.5 + 0.5 * L) * (stage.abyss ? DANGER.abyss : 1) * Math.sqrt(stage.ease || 1);
+}
+/** The 위험도 a class meets on a ground: its 맞춤 (by power) and the one chosen (settings.dangerOff on it). */
+function dangerOf(cls, stage) {
+  if (!stage || stage.raid || stage.war || stage.id === 'novice') return { t: 0, auto: 0, par: 0, pow: 0 };
+  const pow = combatPower(cls), par = dangerPar(stage), gap = pow / (par * DANGER.free);
+  const auto = gap > 1 ? Math.min(DANGER.max, Math.round(Math.log(gap) / Math.log(DANGER.step))) : 0;
+  const t = Math.max(0, Math.min(DANGER.top, auto + DANGER.up, auto + (settings.dangerOff || 0)));
+  return { t, auto, par: Math.round(par), pow };
+}
+function dangerK(t) {
+  return { t, dmg: DANGER.dmg ** t, elite: DANGER.elite ** t, hp: DANGER.hp ** t, heal: Math.min(0.7, DANGER.heal * t), rew: 1 + DANGER.rew * t };
+}
+const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII'];
+/** The hunt's own 위험도 (G.danger), or none. */
+function dangerNow() {
+  return G && G.danger && G.danger.t > 0 && !G.war && !G.stage.raid && !G.training ? G.danger : null;
+}
 function threatK(kind) {
   if (G.war || G.stage.raid || G.training) return 1;
   const L = G.level;
@@ -6022,6 +6088,8 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
   if (kind === 'mini') hp = Math.max(base * 12, (70 + area / 10) * tough * 2);
   if (kind === 'boss') hp = (180 + area / 5) * tough * 4;
   if (G.stage.abyss && !G.war && !G.stage.raid) hp *= THREAT.depthHp; // 게임성 점검: the deepest grounds (THREAT)
+  const dz = dangerNow();
+  if (dz) hp *= dz.hp; // 위험도 (DANGER)
   const e = {
     m, hp, maxHp: hp, kind, pack, name: named && named.name, scale: named ? named.scale : 1, weak: 1, beast: named && named.beast,
     // Seconds per tile: small monsters scurry, big ones lumber.
@@ -6041,6 +6109,7 @@ function addEnemy(m, kind = null, named = null, pack = 0, spot = null) {
     e.hp = e.maxHp = e.hp * HORDE.hp;
     e.dmg *= HORDE.dmg * (1 + 0.12 * (G.press || 0));
   }
+  if (dz) e.dmg *= dz.dmg * (kind && kind !== 'minion' ? dz.elite : 1); // 위험도 (DANGER): the elite and the boss more
   if (pactOn('hp')) { e.hp *= 1.4; e.maxHp *= 1.4; }
   if (pactOn('fang')) e.dmg *= 1.35;
   place(e, at[0], at[1]);
@@ -6313,6 +6382,8 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   // 공대: the boss of a raid of twenty-five strikes harder (war.js raidHurt; a little less on the hero).
   if (G.war && (G.war.raid || G.stage.jaeng) && (pierce || (from && from.kind === 'boss'))) dmg *= War.raidHeroHurt();
   let taken = Math.max(1, dmg * Math.max(0.3, 20 / (20 + ac)));
+  // 위험도: no blow of a monster past DANGER.blow of the hero's life (a strong one's bite ×20 felled at a stroke, no warning)
+  if (from && from.m && dangerNow()) taken = Math.min(taken, p.maxHp * DANGER.blow);
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
   // 절망 on the attacker weakens its blow; 저주 on the hero lets more through; 현무의 철옹's ward.
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
@@ -6399,7 +6470,9 @@ function hurtEnemy(e, dmg, push = null) {
   // of the roll, 최종 피해 the whole; 치명타 확률·피해 below. A companion's blows are its own.
   const own = !G.allyHitting;
   const lo = own ? Math.min(1.08, 0.9 + GEAR_OPT.floor * opt('floor')) : 0.9;
-  if (own && G.coat9 && G.t < G.coat9.win) coatInfect(e); // 묵혈독바르기: a striking skill's blows while it is on
+  // 묵혈독바르기: a striking skill's blows while it is on — not a burst's (직업 점검 2026-11-28: a burst infected the ones it struck,
+  // their fall burst again, and the chain ran through the whole field: 도적 9차 best gear 23~33만 a second, five to ten times any other)
+  if (own && G.coat9 && G.t < G.coat9.win && !G.venomBursting && !G.procHitting) coatInfect(e);
   dmg *= (lo + Math.random() * (1.1 - lo)) * might() * (e.curse > 0 ? 1.4 : 1) * (e.weak || 1)
     * (e.venom9 && e.venom9.until > G.t ? 1 + (e.venom9.k || 0) : 1)
     * (own ? 1 + GEAR_OPT.final * opt('final') : 1)
@@ -6917,7 +6990,8 @@ function rollSpecial(e) {
   // special (progress.spDry): at 0.2 a hunt a player could go twenty hunts without one (bot runs: 1 special in 25 hunts).
   // Now about one in six or seven hunts at the latest, the average hardly moved.
   const dry = progress.spDry || 0;
-  const chance = e.kind === 'boss' ? 0.03 + SP_PITY * dry : { mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003;
+  const dz = dangerNow();
+  const chance = (e.kind === 'boss' ? 0.03 + SP_PITY * dry : { mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003) * (dz ? dz.rew : 1);
   // (and a smith's piece this place drops itself now and then: armory.js dropFrom)
   const mine = SPECIALS.filter(s => (s.src === G.stage.id || (s.craft && s.craft.dropFrom && s.craft.dropFrom.includes(G.stage.id)
     && (!s.craft.only || s.craft.only.includes(G.cls.id)))) && (s.kind !== 'shield' || hasShield(G.cls.id)));
@@ -6945,13 +7019,31 @@ function rollSpecial(e) {
 // hunts. Now about 0.38: boss 20%, two leaders 6% each, nine or so champions 0.6% each.)
 // (사용자 2026-11-23: 심연 템치고 드랍률이 너무 높다 — 약 4분의 1로)
 const ABYSS_DROP = { boss: 0.05, mini: 0.015, champ: 0.0015 };
+const SINSU_PRICE = 60; // 레이드 상점: a 사신수 성물 for so many 레이드주화, its raid won (openCraft)
 const SP_PITY = 0.04; // a hunting ground's boss: +4% to drop a special for each boss since the last (rollSpecial)
+// 천장 (파밍 점검 2026-11-28): the rates stay the user's (÷4), the long dry runs go. A floor's boss felled `unique` times
+// in a row with no 고유 at all drops one surely; the 세계석 요새's lord or the 소 왕 felled `taecho` times with no 태초, a 태초
+// (progress.abDry / tcDry; the averages hardly move: 8 → 7.9 hunts a 고유, 8.3 → 8.1 소 레벨 hunts a 태초; the worst
+// one in a hundred 35 → 25 and 36 → 30).
+const ABYSS_PITY = { unique: 25, taecho: 30 };
 function rollAbyss(e) {
   const cowKing = G.stage.id === 'cow' && e.kind === 'boss';
+  const lord = e.kind === 'boss' && (cowKing || G.stage.id === 'abyss4');
+  const tcDue = lord && (progress.tcDry || 0) + 1 >= ABYSS_PITY.taecho;
+  const abDue = e.kind === 'boss' && !cowKing && (progress.abDry || 0) + 1 >= ABYSS_PITY.unique;
   // 태초의 무기: the 소 왕 besides his horn, now and then; the 세계석 요새's lord in place of his drop.
-  if (cowKing && Math.random() < taechoChance('cow')) dropAbyss(e, true);
-  if (!cowKing && !(Math.random() < (ABYSS_DROP[e.kind] || 0))) return;
-  dropAbyss(e, e.kind === 'boss' && G.stage.id === 'abyss4' && Math.random() < taechoChance('abyss4'), cowKing);
+  let taecho = false;
+  if (cowKing && (tcDue || Math.random() < taechoChance('cow'))) { dropAbyss(e, true); taecho = true; }
+  if (!cowKing && !abDue && !(Math.random() < (ABYSS_DROP[e.kind] || 0))) {
+    if (e.kind === 'boss') { progress.abDry = (progress.abDry || 0) + 1; if (lord) progress.tcDry = (progress.tcDry || 0) + 1; }
+    return;
+  }
+  if (!cowKing) {
+    taecho = e.kind === 'boss' && G.stage.id === 'abyss4' && (tcDue || Math.random() < taechoChance('abyss4'));
+    dropAbyss(e, taecho, false);
+  } else dropAbyss(e, false, true);
+  progress.abDry = 0;
+  if (lord) progress.tcDry = taecho ? 0 : (progress.tcDry || 0) + 1;
 }
 function dropAbyss(e, taecho, cowKing = false) {
   progress.abyssLoot = progress.abyssLoot || {};
@@ -6971,6 +7063,8 @@ function rollMats(e) {
     // 금린 set came by the 12th hunt and skipped the raid sets and the craft ladder between.
     if (id === 'gold' && G.level < 8) n = e.kind === 'boss' && Math.random() < 0.35 ? 1 : 0;
     if (n && Math.random() < pactReward() - 1) n++; // 규약: richer spoils
+    const dz = dangerNow();
+    if (n && dz && Math.random() < dz.rew - 1) n++; // 위험도: richer spoils
     for (let i = 0; i < n; i++) G.drops.push({ x: e.x + (i - n / 2) * 14, y: e.y + 6, kind: 'mat', mat: id });
   }
 }
@@ -11246,12 +11340,12 @@ function venomBurst(e) {
   const f = M.fx.o_r_mukdok;
   if (!f) {
     if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 10, { scale: 0.9, anchor: 'bottom' });
-    later(0.05, () => { for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); });
+    later(0.05, () => { G.venomBursting = true; for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); G.venomBursting = false; });
     return;
   }
   if (fxBudget('venom9', 3)) addFx('o_r_mukdok', e.x, e.y - 10, { anchor: 'bottom' });
   const k = f.k || 1, hx = f.w * k / 2, hy = f.h * k / 2, cx = e.x + (f.w / 2 - f.ax) * k, cy = e.y - 10 + (f.h / 2 - f.ay) * k;
-  later(0.05, () => { for (const o of G.enemies) if (o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1) hurtEnemy(o, v.burst); });
+  later(0.05, () => { G.venomBursting = true; for (const o of G.enemies.slice()) if (o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1) hurtEnemy(o, v.burst); G.venomBursting = false; });
 }
 
 /** A companion's view of a 차수별 기술: the plain kind it casts it as (def.ck), or the skill as it is. */
@@ -15178,7 +15272,8 @@ function updatePickups(dt) {
 
 // 대항전·「쟁」 (PvP): what mends the hero — its own 기원, 흡혈, the healers', its health coming back — less for a hero well
 // over its guild (war.js heroHealK); a war's guilds are the hero's match only once it can fall. (Not a raid.)
-const healK = () => (G.war && !G.war.raid ? War.heroHealK() : 1);
+// (위험도: the hero's own mending −DANGER.heal a step — the best gear's regen, kill-heals and drain outran any bite)
+const healK = () => (G.war && !G.war.raid ? War.heroHealK() : 1) * (dangerNow() ? 1 - G.danger.heal : 1);
 const WAR_INV = 0.1;
 function heal(n, sound, quiet = false) {
   if (SH) return; // (an AI's cast mends by its own rule)
@@ -15859,7 +15954,7 @@ function leaveHunt() {
 function bankGold() {
   if (!G || G.banked) return;
   G.banked = true;
-  G.gold = Math.round(G.gold * pactReward());
+  G.gold = Math.round(G.gold * pactReward() * (G.danger && G.danger.t > 0 ? G.danger.rew : 1)); // 규약, 위험도
   progress.gold = (progress.gold || 0) + G.gold;
   saveJson('bs_progress', progress);
 }

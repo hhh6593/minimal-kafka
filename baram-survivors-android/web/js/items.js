@@ -901,10 +901,10 @@ export const HIDDEN_HINTS = {
   andariel: '"묘지 밑 어둠에 독니가 잠들어 있소. 지옥 네 층 어디든 주인이 다섯에 한 번 흘리고, 우두머리는 그보다 한참 드물다오."',
   mephisto: '"증오는 깊은 곳일수록 짙은 법이라네. 끝없는 지옥의 주인 다섯에 하나, 아래층에서 얻은 것일수록 더 매섭지."',
   diablo: '"공포의 군주라 하나 그 뿔은 어느 층 주인의 손에도 쥐여 있으니… 주인 다섯에 하나, 졸개 정예는 백을 베어도 어렵다네."',
-  baal: '"세계석의 부서진 조각이 지옥 네 층에 흩어졌소. 층의 주인이 다섯에 한 번 쥐고 있고, 세계석 요새의 것이 가장 밝다 하지."',
+  baal: '"세계석의 부서진 조각이 지옥 네 층에 흩어졌소. 층의 주인이 다섯에 한 번 쥐고 있고, 세계석 요새의 것이 가장 밝다 하지. 스물다섯을 연달아 빈손으로 보내는 주인은 없다네."',
   tyrael: '"타락한 천사의 맹세는 빛이 닿지 않는 곳에 묻혔다네. 끝없는 지옥의 주인 다섯에 하나, 우두머리는 열여섯에 하나 꼴이라 하오."',
   cow: '"세계석 요새의 군주를 꺾고 나면, 네 번에 한 번쯤 어디선가 음매 소리가 들린다지. 그 들판의 소 왕은 쓰러질 때 반드시 뿔을 떨군다네."',
-  taecho: '"태초의 빛은 두 곳에 잠들었느니라. 세계석 요새의 군주가 스무 번에 한 번 흘리고, 음매 우는 들판의 소 왕이 여덟 번에 한 번 뿔과 함께 내어 주리라."',
+  taecho: '"태초의 빛은 두 곳에 잠들었느니라. 세계석 요새의 군주가 스무 번에 한 번 흘리고, 음매 우는 들판의 소 왕이 여덟 번에 한 번 뿔과 함께 내어 주리라. 서른 번을 헛되이 베게 두지는 않느니라."',
   cr_judge_weapon3: '"지하국의 대적, 아홉 머리를 다 베어도 그 낫을 내주는 건 스물다섯 번에 한 번뿐이라네. 기다리기 싫거든 회한옥\'심을 모아 군주의 낫을 벼리게."',
   gate: '(그 문은 철상지옥을 세 번 정복한 자의 발밑에서 열린다 하네)',
 };
@@ -929,7 +929,9 @@ export function loadAbyssLoot(loot) {
 /** A new abyss weapon, kept; returns its special. One of the uniques (not the 소 왕's horn, which
  *  only he drops) unless named. */
 export function rollAbyssItem(loot, rank, uniq = null) {
-  const pool = ABYSS_UNIQUES.filter(x => x.u !== 'cow' && x.u !== 'taecho');
+  const all = ABYSS_UNIQUES.filter(x => x.u !== 'cow' && x.u !== 'taecho');
+  // (파밍 점검 2026-11-28: one not found yet first — six by chance took ~15 finds, now six)
+  const have = new Set(Object.values(loot).map(x => x.u)), fresh = all.filter(x => !have.has(x.u)), pool = fresh.length ? fresh : all;
   const d = { kind: 'weapon', rarity: 'unique', rank, u: uniq || pool[Math.floor(Math.random() * pool.length)].u };
   let n = Object.keys(loot).length + 1;
   while (loot['ab' + n]) n++;
