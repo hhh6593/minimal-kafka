@@ -4,7 +4,7 @@ import {
   skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS,
 } from './data.js';
 import { Audio } from './audio.js';
-import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT } from './gyeok.js';
+import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT, GYEOK_SIZE, GYEOK_SIZE_MAX } from './gyeok.js';
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
@@ -1780,9 +1780,9 @@ function applyGear() {
     if (!sp) continue;
     if (sp.gyeok && GYEOK[sp.gyeok]) {
       const g0 = tierGyeok({ id: sp.gyeok, ...GYEOK[sp.gyeok] }, k === 'weapon' ? eff : null, familyTint(sp));
-      // The abyss uniques: their 격 drawn larger still (태초 is already at the top tier of tierGyeok).
+      // The abyss uniques: their 격's ways' pictures larger still (태초 is already at the top tier of tierGyeok).
       const top = k === 'weapon' && !sp.taecho && sp.rarity ? TOP_GYEOK_FX.abyss : 0;
-      gy.push(top ? { ...g0, fxK: (g0.fxK || 1) * top } : g0);
+      gy.push({ ...g0, fxK: (g0.fxK || 1) * (top || 1), tier: gyeokTierOf(k, sp, k === 'weapon' ? eff : 0) });
     }
     if (sp.ward) p.wards.add(sp.ward);
   }
@@ -1792,9 +1792,10 @@ function applyGear() {
     const ss = (progress.dragonSinsu || {})[c];
     // The 제십's flash: its 사신수's colour where it took one, 선계's light after its 천상 각성.
     const dtint = step >= 10 && heavenOn(c) ? FAMILY_TINT.heaven : ss && step >= 10 ? SINSU_TINT[ss] : FAMILY_TINT.dragon;
-    gy.push(tierGyeok({ id: 'dragon', ...dg }, eff, dtint));
+    const dtier = step >= 9 ? 'final' : eff >= GYEOK_LEGEND_RANK ? 'legend' : 'normal';
+    gy.push({ ...tierGyeok({ id: 'dragon', ...dg }, eff, dtint), tier: dtier });
     p.dragonCut = dg.cdCut;
-    if (ss && SINSU[ss] && step >= 10) gy.push(tierGyeok({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] }, eff, dtint));
+    if (ss && SINSU[ss] && step >= 10) gy.push({ ...tierGyeok({ id: SINSU[ss].gyeok, ...GYEOK[SINSU[ss].gyeok] }, eff, dtint), tier: 'final' });
   }
   p.gyeoks = gy;
   p.judge = g.weaponSp && SPECIAL[g.weaponSp] && SPECIAL[g.weaponSp].craft && SPECIAL[g.weaponSp].craft.judge ? JUDGE_EDGE[g.weaponSp] || 0 : 0;
@@ -1819,6 +1820,34 @@ function applyGear() {
   const fxTint = ws && ws.dress && ws.dress.fxTint || null; // a filter, or one per effect (TAECHO_DRESS)
   p.swing = ws && ws.swing && have(set.hit).length ? { ...ws.swing, hit: have(set.hit), heavy: ws.swing.heavy ? have(set.heavy) : null, tint: fxTint } : null;
   p.trail = far && ws && ws.rarity && have(ABYSS_TRAIL.layers).length ? { ...ABYSS_TRAIL, layers: have(ABYSS_TRAIL.layers), tint: fxTint } : null;
+}
+
+// 격 크기 공통 (gyeok.js GYEOK_SIZE, 사용자 2026-11-28): which of its three sizes a worn piece's 격 is drawn at.
+// final: 최종 등급 (심연·태초·심판의낫·사신수 — 무기·현무불괴갑·백호환령부 —, 용무기 제구·제십 above); legend: 전설 (금린·무신,
+// 백제·브리트라한·고대마령 조합, or a weapon striking a boss at 14.5+); normal: the rest.
+const GYEOK_FINAL_FAM = new Set(['abyss', 'taecho', 'judge', 'cheong', 'jujak', 'baekho', 'hyeonmu']);
+const GYEOK_LEGEND_FAM = new Set(['gold', 'steel']);
+const GYEOK_LEGEND_CRAFT = new Set(['cr_baekje_weapon', 'cr_baekje_weapon2', 'cr_baekje_weapon3', 'cr_brit_weapon', 'cr_maryeong_weapon']);
+const GYEOK_LEGEND_RANK = 14.5;
+function gyeokTierOf(kind, sp, rank) {
+  const fam = familyOf(sp);
+  if (GYEOK_FINAL_FAM.has(fam)) return 'final';
+  if (kind !== 'weapon') return 'normal';
+  return GYEOK_LEGEND_FAM.has(fam) || GYEOK_LEGEND_CRAFT.has(sp.id) || rank >= GYEOK_LEGEND_RANK ? 'legend' : 'normal';
+}
+// 연's own dark pictures (the abyss's black burst): not filtered again — the abyss filter turned them into black body-shaped
+// blots on every struck (사용자 2026-11-28 전수조사)
+const GY_OWN_DARK = new Set(['k_ab_darkburst']);
+/** How many tiles a 격's own picture is (its longest side, all its frames): its tier's, from the one table. */
+function gyeokSize(g) {
+  const T = GYEOK_SIZE, n = T.normal;
+  const t = g.tier === 'final' ? T.final : g.tier === 'legend' ? T.legend : g.area ? n.area * (2 * g.area + 1) : n.one;
+  return Math.min(GYEOK_SIZE_MAX, t * (g.sizeK || 1));
+}
+/** The scale at which a picture's drawn part (the union of its frames) is `tiles` tiles on its longest side. */
+function gyFit(id, tiles) {
+  const m = fxMid(id), ext = Math.max(m[2], m[3]);
+  return ext > 0 ? (tiles * TILE) / ext : 1;
 }
 
 /** A weapon's 격 grown with the weapon's rank (items.js GYEOK_TIER): a larger picture, and a 격 that
@@ -1867,8 +1896,11 @@ function gyeokProc(on, t) {
     if (G.t >= (G.swingAt || 0)) {
       G.swingAt = G.t + w.cd;
       w.hit.forEach(([id, sc, dy, dl], i) => {
-        const [x, y] = at(i ? 0.95 : 0.6, dy);
-        addFx(id, x, y, { scale: sc * w.scale * ABYSS_FX_K, delay: land + dl, rot: melee && !i ? ang - Math.PI / 2 : 0, tint: fxTintOf(w.tint, id) });
+        // (the slash hung from its pivot at the arc's foot: set a third of the way out, its arc reaches over the struck)
+        const [x, y] = at(i ? 0.95 : melee ? 0.3 : 0.6, dy);
+        // (the slash's top — its arc's outer edge, the blade's way — turned toward the struck: ang + π/2, as meleeSlash
+        // turns the class's own arcs; ang − π/2 turned it back at the hero, 사용자 2026-11-28 전사 심연 무기)
+        addFx(id, x, y, { scale: sc * w.scale * ABYSS_FX_K, delay: land + dl, rot: melee && !i ? ang + Math.PI / 2 : 0, tint: fxTintOf(w.tint, id) });
       });
     }
     if (w.heavy && w.heavy.length && G.t >= (G.heavyAt || 0)) {
@@ -1950,20 +1982,28 @@ function fireGyeok(g, t) {
     : g.targets ? [t, ...nearestEnemies(g.targets, 5, t).filter(e => e !== t).slice(0, g.targets - 1)] : [t];
   const fxId = M.fx[g.fx] ? g.fx : g.fxAlt && M.fx[g.fxAlt] ? g.fxAlt : null;
   const fxK = (g.area ? 0.9 : 0.7) * (g.fxK || 1) * (fxId === g.fx ? 1 : g.altK || 1);
+  // 격 크기 공통 (GYEOK_SIZE): the 격's own picture — or, sizeOn 'self', the one over the wearer — its tier's tiles
+  const size = gyeokSize(g);
   if (fxId && fxBudget('gyeok', 3)) {
     // On the wearer (현무 standing over the one it guards, 주작 over the one it strengthens).
     const self = M.fx[g.fxSelf] ? g.fxSelf : g.selfAlt && M.fx[g.selfAlt] ? g.selfAlt : null;
     if (self) {
-      addFx(self, p.x, p.y + (g.selfDy || 0), { scale: (g.selfK || 1) * (self === g.fxSelf ? 1 : g.selfAltK || 1), anchor: 'bottom' });
+      const sk = g.sizeOn === 'self' ? gyFit(self, size) : (g.selfK || 1) * (self === g.fxSelf ? 1 : g.selfAltK || 1);
+      addFx(self, p.x, p.y + (g.selfDy || 0), { scale: sk, anchor: 'bottom', area: true });
       // (seen through a little: the hero it stands over stays in sight)
       const f = G.fxs[G.fxs.length - 1];
       if (g.selfAlpha && f && f.id === self) f.alpha = g.selfAlpha;
     }
-    // 청린수폭: its 청룡 drawn in parts (crBurst), the rest as one picture.
-    if (g.draw === 'cr' && fxId === g.fx && M.fx.g_cr_brush) crBurst('storm', t, fxK, g);
-    else {
-      // (보이는 범위 = 맞는 범위: an area 격 over the 3×3 it strikes, a single one on the one struck)
-      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null, ...(g.area ? { area: true, cap: g.capT || 3 * 1.25 } : g.capT ? { area: true, cap: g.capT } : {}) });
+    // 청린수폭: its 청룡 drawn in parts (crBurst: the storm cell 256 high at k / 1.3 × 0.78), the rest as one picture.
+    if (g.draw === 'cr' && fxId === g.fx && M.fx.g_cr_brush) crBurst('storm', t, (size * TILE * 1.3) / (256 * 0.78), g);
+    else if (g.sizeOn === 'self') {
+      // (its tier's size is the one over the wearer: on the struck, a body's)
+      fxOn(fxId, t, { scale: gyScale(fxId, fxK), tint: g.tint || null });
+      gyLight(fxId);
+    } else {
+      // (its tier's size, the same for every 격 of the tier — 사용자 승인: 최종 등급 격은 판정보다 크게, 상한 8.5칸)
+      // (no gyScale: the table bounds it — 주작비상's fire three screens high was before it)
+      fxOn(fxId, t, { scale: gyFit(fxId, size), tint: g.tint || null, area: true, cap: size });
       gyLight(fxId);
     }
     // Over every tile of the struck 3x3, the middle first (청린수폭's burst of water; with its 청룡,
@@ -1975,7 +2015,7 @@ function fireGyeok(g, t) {
       }
     }
     // A second picture on each struck (청룡's orbs, 주작's flames), a few at most.
-    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) { fxOn(g.fx2, e, { scale: gyScale(g.fx2, 0.8 * (g.fx2K || g.fxK || 1)), tint: g.tint || null, delay: fxId === g.fx ? g.fx2At || 0 : 0 }); gyLight(g.fx2); }
+    if (g.fx2 && M.fx[g.fx2]) for (const e of hits.slice(0, 4)) if (g.fx2 !== g.fx || e !== t) { fxOn(g.fx2, e, { scale: gyScale(g.fx2, 0.8 * (g.fx2K || g.fxK || 1)), tint: GY_OWN_DARK.has(g.fx2) ? null : g.tint || null, delay: fxId === g.fx ? g.fx2At || 0 : 0 }); gyLight(g.fx2); }
   }
   // The top weapons' 격 (신화, items.js GYEOK_TIER): a soft light round the struck in the family's
   // colour (it was the whole screen; drawn in render), and the blow's way one step further (lv).
@@ -7815,7 +7855,8 @@ function castNow(skill, st) {
       targets.forEach((e, i) => {
         const tx = e.tx, ty = e.ty, fl = shoot(e);
         const [sf, sflip] = dirFx(fxid, skill.id, tx - p.tx, ty - p.ty);
-        const so = { delay: i * 0.12 + fl, flip: sflip };
+        // (화질, 사용자 2026-11-28 전수조사: 주술사의 저주·마비·중독·절망처럼 작은 그림이 넓은 칸에 맞춰 뭉개지던 것 — STRIKE_MAX_UP)
+        const so = { delay: i * 0.12 + fl, flip: sflip, maxUp: STRIKE_MAX_UP };
         const life = sr && def.shape !== 'plus' ? fxAtSquare(sf, sr * 2 + 1, tx * TILE + TILE / 2, ty * TILE + TILE - 30, so, 'st') : fxOnArea(fxFit(sf, sr ? sr * 2 + 1 : ONE_TILES, 'st'), e, { ...so, tile: !!sr }), at = def.hitAt || 0.3;
         const inArea = () => (def.shape === 'plus' ? onTiles(plusTiles(tx, ty, sr)) : sr ? around(tx, ty, sr) : onTiles([[tx, ty]]));
         for (const [dt, k] of beatsUnder(life * (1 - at)).slice(1)) later(i * 0.12 + fl + life * at + dt, () => { for (const o of inArea()) smite(o, st.dmg * k); });
@@ -8030,10 +8071,11 @@ function castNow(skill, st) {
         const order = all.slice().sort(() => Math.random() - 0.5), span = def.span || 1.1;
         const drop = def.fxDrop && M.fx[def.fxDrop] ? bigFx(def.fxDrop, def.dropSize || 110, 'drop') : null;
         // (이펙트=판정: the drops fall on a dozen; more than that on the screen, the screen picture shows too)
-        if ((!def.fxCast && !def.noBig) || !drop || order.length > 12) big(0.15 + span + 0.25);
+        const dmax = def.dropMax || 12; // (서리한파: the ice on each of up to 40, the screen picture only past them)
+        if ((!def.fxCast && !def.noBig) || !drop || order.length > dmax) big(0.15 + span + 0.25);
         order.forEach((e, i) => {
           const at = 0.15 + (i / order.length) * span;
-          if (drop && i < 12) later(at, () => { if (e.hp > 0) addFx(drop, e.x, e.y + 4, { anchor: 'bottom' }); });
+          if (drop && i < dmax) later(at, () => { if (e.hp > 0) addFx(drop, e.x, e.y + 4, { anchor: 'bottom' }); });
           later(at + 0.15, () => { if (hold(e)) { smite(e, st.dmg * far(e)); hitOn(e); G.shake = Math.max(G.shake, 0.08); } });
         });
       } else if (pat === 'ring') {
@@ -8824,9 +8866,15 @@ function fxRect(id, w, h, tag = 'r') {
 }
 /** fxAt of a picture made the square of `tiles` it strikes (fxSquare); one too flat or too narrow for the stretch
  *  (a sword's streak) is laid two or three times across the square, so the whole square is drawn. */
+// A strike's picture over its square at most this many game pixels a pixel of its own (past it, laid twice or more).
+const STRIKE_MAX_UP = 2.6;
 function fxAtSquare(id0, tiles, x, y, o = {}, tag = 'q') {
   const id = fxSquare(id0, tiles, tag);
   if (!id || !M.fx[id]) return 0;
+  // (o.maxUp: a small picture never blown up past that many game pixels a pixel of its own — a 63-pixel 저주 fitted to
+  // 5 tiles was a blur 3.8 times its size; held there, it is laid more than once over the square below instead)
+  const up = (M.fx[id].k || 1) * Math.max(1, M.fx[id].ky || 1);
+  if (o.maxUp && up > o.maxUp) o = { ...o, scale: (o.scale || 1) * (o.maxUp / up) };
   const [, , uw, uh] = fxMid(id), want = tiles * TILE, sc = o.scale || 1;
   const ny = uh * sc < want - TILE ? Math.ceil(want / (uh * sc)) : 1, nx = uw * sc < want - TILE ? Math.ceil(want / (uw * sc)) : 1;
   let life = 0;

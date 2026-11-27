@@ -417,6 +417,29 @@ def add_s9(gear_src, out, manifest):
     return s9icons
 
 
+def add_ygyeok(gdir, gindex, out, manifest):
+    """연's 격 strips (GEAR_DIR/ygyeok/ or ygyeok_hd/, its index.json read) as fx "g_<name>" (OUT/fx/<id>.png)."""
+    for name, k in gindex.items():
+        gsrc = os.path.join(gdir, name + ".png")
+        if not os.path.isfile(gsrc):
+            continue
+        (cw, ch), n = k["cell"], k["n"]
+        sheet = Image.open(gsrc).convert("RGBA")
+        pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
+        # (shrunk to 170 pixels at most; a strip whose index says "cap" keeps up to that many:
+        # 청린수폭's 청룡 pictures, tools/yeon_cheongrin.py; tools/yeon_gyeok_hd.py's at their own pixels)
+        z = min(1.0, k.get("cap", 170) / max(cw, ch))
+        if z < 1:
+            pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
+        fid = "g_" + name
+        strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
+        # ("durs": each frame's own ms — 진청룡마령참's dragon coiling up fast, roaring slow)
+        durs = k["durs"] if len(k.get("durs") or []) == n else [k["ms"]] * n
+        manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": durs,
+                               "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / z, 3),
+                               "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     audio_src = sys.argv[3] if len(sys.argv) > 3 else None
@@ -542,23 +565,12 @@ def main():
     if gdir and os.path.isfile(os.path.join(gdir, "index.json")):
         with open(os.path.join(gdir, "index.json"), encoding="utf-8") as f:
             gindex = json.load(f)
-        for name, k in gindex.items():
-            gsrc = os.path.join(gdir, name + ".png")
-            if not os.path.isfile(gsrc):
-                continue
-            (cw, ch), n = k["cell"], k["n"]
-            sheet = Image.open(gsrc).convert("RGBA")
-            pics = [sheet.crop((i * cw, 0, (i + 1) * cw, ch)) for i in range(n)]
-            # (shrunk to 170 pixels at most; a strip whose index says "cap" keeps up to that many:
-            # 청린수폭's 청룡 pictures, tools/yeon_cheongrin.py)
-            z = min(1.0, k.get("cap", 170) / max(cw, ch))
-            if z < 1:
-                pics = [p.resize((max(1, round(cw * z)), max(1, round(ch * z))), Image.LANCZOS) for p in pics]
-            fid = "g_" + name
-            strip(pics).save(os.path.join(out, "fx", fid + ".png"), optimize=True)
-            manifest["fx"][fid] = {"w": pics[0].width, "h": pics[0].height, "n": n, "durs": [k["ms"]] * n,
-                                   "add": bool(k.get("add")), "cls": "yeon", "k": round(1 / z, 3),
-                                   "ax": round(k["anchor"][0] * z, 1), "ay": round(k["anchor"][1] * z, 1)}
+        add_ygyeok(gdir, gindex, out, manifest)
+    # ...and over them, those made again at their own pixels (tools/yeon_gyeok_hd.py: GEAR_DIR/ygyeok_hd/)
+    hddir = os.path.join(gear_src, "ygyeok_hd") if gear_src else None
+    if hddir and os.path.isfile(os.path.join(hddir, "index.json")):
+        with open(os.path.join(hddir, "index.json"), encoding="utf-8") as f:
+            add_ygyeok(hddir, json.load(f), out, manifest)
         idir = os.path.join(gdir, "icons")
         if os.path.isdir(idir):
             os.makedirs(os.path.join(out, "hud"), exist_ok=True)

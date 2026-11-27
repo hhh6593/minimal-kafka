@@ -1644,6 +1644,12 @@ const PICS1320 = {
 for (const [id, o] of Object.entries(PICS1320)) Object.assign(SKILLS[id], o, { fxs: null, tint: null, modern: null, yeon: true });
 // 사용자 2026-11-23: 너무 크다 — 판정은 그대로, 그림만 (노도성황 화면의 0.9 → 0.5, 선기전도 11칸 → 5.5칸, 혼마염 불꽃 90 → 60px)
 Object.assign(SKILLS.m_nodo, { frac: 0.5 });
+// 사용자 2026-11-28 "주술사 기술이 유독 큼": 화면 기술의 그림이 화면보다 커서(지폭지술 17칸·혼돈 19칸·서리한파 21칸 — 화면 높이 8.6칸)
+// 뭉개진 큰 덩어리로 화면을 덮었다. 판정은 그대로, 그림만 노도성황처럼 화면의 절반 크기로. 서리한파는 몬스터마다 맺히는
+// 얼음(dropMax까지)으로 보이고, 화면 그림은 그보다 많을 때만.
+Object.assign(SKILLS.m_quake, { frac: 0.5 });
+Object.assign(SKILLS.m_chaos, { frac: 0.5 });
+Object.assign(SKILLS.m_frost, { frac: 0.35, dropMax: 40 }); // (그 흰 눈구름은 작은 그림을 키운 것이라 뭉개진다: 얼음을 몬스터마다)
 // 원거리 직업(천인 제외 마법 계열)은 돌진하지 않는다 (사용자 2026-11-24): 마기순보는 몸을 옮기지 않고 바라보는 쪽 몬스터를 푸른 불꽃으로 친다.
 // (추격은 다시 돌진, 사용자 2026-11-24 — 대신 날아가는 화살 그림을 2.4칸으로 키움)
 Object.assign(SKILLS.a_chase, { flyTiles: 2.4 });
