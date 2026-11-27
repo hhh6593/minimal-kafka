@@ -4151,7 +4151,7 @@ window.__forgeKeys = c => { const cls = CLASSES[c]; return ['weapon', 'armor', '
 let forgeTab = null, forgePick = null, forgeFresh = true, forgeBusy = false, forgeOut = null, forgeLast = null;
 const lbScroll = { tab: null };
 const forgeKey = e => e.name.replace(/ ★\d+$/, '').replace(/ \(.*\)$/, '');
-const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['심판의낫', /심판의낫/], ['무신 방어구', /사신수 무신/], ['최종 방패', /최종 방패/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
+const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['심판의낫', /심판의낫/], ['무신 방어구', /사신수 무신/], ['절세방패', /절세방패/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
   ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
   const t = FORGE_TABS.find(([, re]) => re.test(sec));
