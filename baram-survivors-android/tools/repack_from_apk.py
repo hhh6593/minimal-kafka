@@ -93,7 +93,14 @@ def main():
                         ci["files"].append([fn, meta["cols"]] + meta["cell"] + meta["foot"] + ([meta["side"]] if meta.get("side") else []))
                     ci["layers"].setdefault(cls_id, {}).setdefault(kind, {})[v] = fidx[fn]
         for iid, it in ad["items"].items():
-            ci["items"][iid] = [it["kind"], it["name"], it.get("grade", 1), it.get("set") or "", it.get("whole", 0), 0]
+            # Its icon (연's item icon, tools/yeon_costume.py icons/<id>.png) with it: merged with no icon the
+            # 청룡·군주 청룡 심판의낫 showed an old sprite's cut-out in the smith's window (사용자 2026-11-24).
+            ic = os.path.join(assets, "ycostume", "i", f"{iid}.png")
+            src = os.path.join(add, it["icon"]) if it.get("icon") else None
+            if src and os.path.isfile(src):
+                os.makedirs(os.path.dirname(ic), exist_ok=True)
+                shutil.copyfile(src, ic)
+            ci["items"][iid] = [it["kind"], it["name"], it.get("grade", 1), it.get("set") or "", it.get("whole", 0), 1 if os.path.isfile(ic) else 0]
         json.dump(ci, open(cip, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         print(f"merged {len(ad['items'])} looks from ycostume_add")
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))

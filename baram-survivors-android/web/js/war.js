@@ -4846,6 +4846,13 @@ function heroShot(G) {
   c.getContext('2d').drawImage(e.pic, e.sx, e.sy, e.w, e.h, 0, 0, e.w, e.h);
   try { return c.toDataURL(); } catch (err) { return ''; }
 }
+/** (사용자 2026-11-24: 레이드 결과 창의 캐릭터가 장비·코디 없는 모습) The result's figure as play draws the hero
+ *  (game.js heroShotPic: its pieces, 코디, a weapon's dress), put in once made; the quick shot above until then. */
+function heroLookShot(G, box) {
+  if (!A.heroShotPic || !G.player) return;
+  const gear = G.player.gear || {};
+  A.heroShotPic(G.cls, gear).then(url => { const el = url && box.querySelector('.wr-hero'); if (el) el.src = url; });
+}
 
 function showResult(W) {
   const G = A.G();
@@ -4873,6 +4880,7 @@ function showResult(W) {
     <div class="wr-sub"><small>${tierLine} · 기여는 역할별로, 쓰러져 있던 시간은 절반만 뺍니다 (힐러·탱커도 1위가 될 수 있습니다)</small></div>
     ${tables(W, r.rows)}
     <div class="row" style="justify-content:center;display:flex;gap:8px"><button class="btn" id="wr-again">${W.raid ? '다시 도전' : '다시 출전'}</button><button class="btn" id="wr-town">마을로</button></div>`;
+  heroLookShot(G, box);
   document.getElementById('wr-town').onclick = () => leaveWar(false);
   document.getElementById('wr-again').onclick = () => leaveWar(true);
   A.showScreen('war-result');
@@ -7102,6 +7110,7 @@ function showJaengResult(W) {
     ${medals}
     ${tables(W, r.rows)}
     <div class="row" style="justify-content:center;display:flex;gap:8px"><button class="btn" id="wr-again">다시 출전</button><button class="btn" id="wr-town">마을로</button></div>`;
+  heroLookShot(G, box);
   document.getElementById('wr-town').onclick = () => leaveWar(false);
   document.getElementById('wr-again').onclick = () => leaveWar(true);
   A.showScreen('war-result');

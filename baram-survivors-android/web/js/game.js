@@ -1006,62 +1006,124 @@ function buildSelect() {
     b.innerHTML = `<div class="slot"><img class="hero" src="${heroPicture(c)}" alt=""></div>
       <b>${c.name}</b><span>${c.desc}</span>
       <em>필살기 ${ultLook(c.id).name}</em>
-      <small>${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급${(PROMO_NAMES[c.id] || [])[promoOf(c.id) - 1] ? ` (${PROMO_NAMES[c.id][promoOf(c.id) - 1]})` : ''}` : ''}</small>`;
+      <small><b class="cp">전투력 ${combatPower(c).toLocaleString()}</b> · ${rec ? `최고 Lv ${rec.lvl} · ${rec.kills}마리` : '기록 없음'}${promoOf(c.id) ? ` · ${promoOf(c.id)}차 승급${(PROMO_NAMES[c.id] || [])[promoOf(c.id) - 1] ? ` (${PROMO_NAMES[c.id][promoOf(c.id) - 1]})` : ''}` : ''}</small>`;
     b.onclick = () => {
       chosenClass = c;
       enterTown(c);
     };
     box.append(b);
     // The hero as it is now: its worn pieces and 코디 (연's layers), not the class's bare portrait.
-    lookPicture(c).then(url => { if (url) b.querySelector('.hero').src = url; });
+    heroPic(b.querySelector('.hero'), c);
   }
+  cardsAfterCostumes('#select', buildSelect);
+}
+/** (사용자 2026-11-24: 직업 선택창에 코디가 빠진 모습) The cards drawn before the 코디 list is read wear none
+ *  (wornCostume is null until loadCostumes is done): drawn again once it is, if the screen is still up. */
+function cardsAfterCostumes(sel, again) {
+  if (!M.ycostume || !M.ycostume.index || Object.keys(costumeItems()).length) return;
+  loadCostumes().then(() => { if (Object.keys(costumeItems()).length && $(sel) && !$(sel).hidden) again(); });
 }
 
 /** A class's look as saved (gear and 코디), standing facing down: a data URL, or null without 연's heroes. */
 const lookPics = new Map();
 let lookChain = Promise.resolve();
-async function lookPicture(cls) {
+function lookPicture(cls) {
+  return heroShotPic(cls, savedGear(cls));
+}
+/**
+ * A still of a hero as play draws it (heroLookOf: its pieces, 코디 and dye, an abyss weapon's dress and
+ * flames), standing facing down, for a card or a result window: a data URL, or null without 연's heroes.
+ * Framed by the class's own body (feet to the top of its bare head, bodyTall), not by its cell or by
+ * what it holds: the cells run 140 to 201 px and a wing or a long weapon made a card's figure small, so
+ * the classes stood at different heights; framed so, every class's body is the same share of its picture.
+ */
+function heroShotPic(cls, gear) {
   const H = M.yhero2 && M.yhero2[cls.id];
-  if (!H) return null;
-  const want = yGearVariants(cls, savedGear(cls) || {});
-  const key = cls.id + JSON.stringify(want);
-  // (one class after another: each look's sheets are 40 to 80 MB while its picture is made)
-  if (!lookPics.has(key)) lookPics.set(key, (lookChain = lookChain.then(() => drawLook(cls, H, want)).catch(() => null)));
+  if (!H || !gear) return Promise.resolve(null);
+  const want = yGearVariants(cls, gear);
+  const key = cls.id + JSON.stringify(want) + '|' + (gear.weaponSp || '') + '|' + (gear.armorSp || '') + '|' + (gear.weaponSp ? starOf(cls, 'sp:' + gear.weaponSp) : '');
+  // (one class after another: each look's sheets are 40 to 80 MB while its picture is made; a picture that
+  // failed is tried again the next time it is asked for)
+  if (!lookPics.has(key)) {
+    const p = lookChain = lookChain.then(() => heroShotMake(cls, H, gear, want)).catch(() => null);
+    lookPics.set(key, p);
+    p.then(u => { if (!u && lookPics.get(key) === p) lookPics.delete(key); });
+  }
   return lookPics.get(key);
 }
-async function drawLook(cls, H, want) {
-  const sheets = {}, parts = heroLookParts(H, want);
-  await Promise.all(parts.map(x => layerEntry(x[2]).p));
+async function heroShotMake(cls, H, gear, want) {
+  const tall = await bodyTall(cls, H);
+  const n0 = heroLooks.size, L = heroLookOf(cls, H, gear, {}, want), made = heroLooks.size > n0;
+  const a = H.anims.idle_down || H.anims.walk_down, fk = a.row * 64;
   try {
-    for (const [kind, meta, path] of parts) {
-      const e = layerBms.get(path), im = e && e.bm;
-      if (im && im.width) sheets[kind] = { im: dyeImage(sinsuDressed(savedGear(cls) || {}, kind, im, path), meta), meta };
+    for (let i = 0; i < 160 && !L.gone; i++) {
+      L.used = bitmapClock;
+      let pic = L.ready ? L.frames.get(fk) : null;
+      if (!pic) {
+        const sheets = heroLookSheets(L);
+        if (sheets && L.ready) pic = L.frames.get(fk) || heroFrameMake(L, sheets, a, 0);
+        else if (L.done) return null; // (its body or head is not in the build)
+      }
+      if (pic) return heroShotFrame(L, pic, fk, tall);
+      await Promise.all(L.parts.map(x => layerEntry(x[2]).p));
+      await new Promise(r => setTimeout(r, 40));
     }
-    return lookFrame(H, sheets);
+    return null;
   } finally {
-    layerDone(parts.map(x => x[2]));
+    // (a look made only for the picture goes with it: its other frames are not needed)
+    if (made && !L.mine) heroLookDrop(L.key);
   }
 }
-function lookFrame(H, sheets) {
-  if (!sheets.body) return null;
-  const a = H.anims.idle_down || H.anims.walk_down;
-  const box = frameBox(H, Object.values(sheets).map(x => x.meta));
+/** The look's frame on a picture SHOT_TALL bodies tall, the feet near its foot, cut across to what is drawn. */
+const SHOT_TALL = 1.6;
+function heroShotFrame(L, pic, fk, tall) {
+  const h = Math.round(tall * SHOT_TALL), w = Math.round(h * 1.5), fy = h - Math.max(2, Math.round(tall * 0.05)), fx = Math.round(w / 2);
   const c = document.createElement('canvas');
-  c.width = box.cw;
-  c.height = box.ch;
-  drawLayers(c.getContext('2d'), H, sheets, a, 0, box);
-  // Cropped to what is drawn, so the card shows the hero, not the empty cell around it.
-  const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
-  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 8) {
-    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-  }
-  if (x1 < 0) return null;
-  const out = document.createElement('canvas');
-  out.width = x1 - x0 + 3;
-  out.height = y1 - y0 + 3;
-  out.getContext('2d').drawImage(c, x0 - 1, y0 - 1, out.width, out.height, 0, 0, out.width, out.height);
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(pic, fx - L.box.fx, fy - L.box.fy);
+  if (L.dz) drawBladeFlames(L.pts.get(fk), fx - L.box.fx, fy - L.box.fy, L.dz, g);
+  // Cut across to what is drawn, evenly about the feet (the hero stays in the middle of its card).
+  const d = g.getImageData(0, 0, w, h).data;
+  let reach = Math.round(tall * 0.45);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 8) reach = Math.max(reach, Math.abs(x - fx) + 1);
+  const ow = Math.min(w, reach * 2 + 2), out = document.createElement('canvas');
+  out.width = ow;
+  out.height = h;
+  out.getContext('2d').drawImage(c, fx - ow / 2, 0, ow, h, 0, 0, ow, h);
   return out.toDataURL();
+}
+/** A class's body as tall as it stands, feet to the top of its bare head (base body and head, idle facing down), once. */
+const bodyTalls = new Map();
+function bodyTall(cls, H) {
+  if (!bodyTalls.has(cls.id)) bodyTalls.set(cls.id, (async () => {
+    const parts = heroLookParts(H, { body: 'base', head: 'base' }), paths = parts.map(x => x[2]);
+    let t = 0;
+    try {
+      const bms = await Promise.all(paths.map(p => layerEntry(p).p));
+      const sheets = {};
+      parts.forEach(([kind, meta], i) => { if (bms[i] && bms[i].width) sheets[kind] = { im: bms[i], meta }; });
+      if (sheets.body) {
+        const a = H.anims.idle_down || H.anims.walk_down, box = frameBox(H, Object.values(sheets).map(x => x.meta));
+        const c = document.createElement('canvas');
+        c.width = box.cw;
+        c.height = box.ch;
+        const g = c.getContext('2d');
+        drawLayers(g, H, sheets, a, 0, box);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let top = -1;
+        for (let y = 0; y < c.height && top < 0; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 8) { top = y; break; }
+        if (top >= 0) t = box.fy - top;
+      }
+    } finally {
+      layerDone(paths);
+    }
+    if (!t) bodyTalls.delete(cls.id);
+    return t || 48;
+  })());
+  return bodyTalls.get(cls.id);
 }
 
 /** What opens a closed ground: the boss of the ground before it (or of the ground it hangs on). */
@@ -2753,6 +2815,15 @@ function pieceIcon(cls, kind, t, spId) {
   const ab = spId && SPECIAL[spId] && SPECIAL[spId].base && SPECIAL[spId].base[cls.id];
   const abIt = ab && costumeItems()[ab[0]];
   if (abIt && abIt.icon && M.yhero2 && M.yhero2[cls.id] && M.yhero2[cls.id].layers[kind] && M.yhero2[cls.id].layers[kind]['c' + ab[0]]) return 'assets/' + abIt.icon;
+  // 청룡·군주 청룡 심판의낫 (공용): 연's own item icon of its step (치장용 7100334 … by star), for every class —
+  // a class not wearing that item fell to the old sprite's cut-out of 심판의낫 (조합창 이미지, 사용자 2026-11-24).
+  const jd = spId && SPECIAL[spId] && SPECIAL[spId].craft && SPECIAL[spId].craft.judge && SPECIAL[spId].base ? SPECIAL[spId] : null;
+  if (jd) {
+    const ls = jd.lookSteps, st = starOf(cls, 'sp:' + spId);
+    const at = ls && Object.keys(ls).map(Number).filter(k => k <= st).sort((a, b) => b - a)[0];
+    const it = costumeItems()[at ? ls[at] : Object.values(jd.base)[0][0]];
+    if (it && it.icon) return 'assets/' + it.icon;
+  }
   const lt = spId && SPECIAL[spId] && SPECIAL[spId].lookTier ? SPECIAL[spId].lookTier[cls.id] : undefined;
   if (lt !== undefined) return yItemIcon(cls, kind, lt, null) || (hasAvatars() ? gearIcon(cls.id, kind, lt) : null);
   // A crafted piece with the original's own name and picture (the legendary sets, the original's
@@ -2885,7 +2956,8 @@ function wear(kind, tier, sp = null) {
   progress.gear[cls.id] = g;
   saveJson('bs_progress', progress);
   if (G) {
-    G.player.gear = { ...g };
+    // (the 코디 with it: a piece put on in a hunt took the worn looks off until the next run)
+    G.player.gear = Object.defineProperty({ ...g }, 'cos', { value: g.cos, enumerable: false, writable: true });
     applyGear();
   }
 }
@@ -3809,7 +3881,7 @@ function openCraft(sink = null) {
   const ok = !has && b.includes(baseKey) && starOf(cls, baseKey) >= rc.star && (progress.gold || 0) >= rc.gold
     && Object.entries(rc.mats).every(([id, n]) => (mats[id] || 0) >= n);
   icon = dragonIcon(cls, 1) || picture(dragonName(cls.id, 1)); // as it is worn (연's), today's picture without 연's heroes
-  meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, gyeok: dragonGyeok(cls.id, 1) };
+  meta = { mats: rc.mats, gold: rc.gold, base: `${baseName} ★${rc.star}`, baseIcon: pieceIcon(cls, 'weapon', rc.base, null), gyeok: dragonGyeok(cls.id, 1) };
   row(`${dragonName(cls.id, 1)} (${CRAFT_POWER}등급 · 제십까지 ${CRAFT_POWER + (DRAGON_MAX - 1) * DRAGON_STEP}등급)`, `${baseName} ★${rc.star} (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + `
     + Object.entries(rc.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(rc.gold)}`,
     has ? '보유' : '조합', ok, () => {
@@ -3828,6 +3900,7 @@ function openCraft(sink = null) {
   head(`레이드 상점 · 레이드주화 ${progress.coins || 0}개`);
   const SHOP = [['scroll', 1, 5], ['kalpa', 5, 8], ['silver1', 5, 6], ['silver2', 2, 15], ['essence', 3, 20], ['silver3', 1, 250], ['pearl', 1, 60]];
   for (const [id, n, price] of SHOP) {
+    icon = matIcon(id) || null; // (the shop's goods had no picture: 사용자 2026-11-24, 조합창 이미지 누락)
     row(`${MATS[id].name} ${n}개`, `레이드주화 ${price}개`, '교환', (progress.coins || 0) >= price, () => {
       progress.coins -= price;
       mats[id] = (mats[id] || 0) + n;
@@ -3843,7 +3916,7 @@ function openCraft(sink = null) {
     const ok = !got && baseOk && (bt.coins ? (progress.coins || 0) >= bt.coins
       : Object.entries(bt.mats).every(([id, n]) => (mats[id] || 0) >= n) && (progress.gold || 0) >= bt.gold);
     icon = picture(bt.name);
-    meta = bt.coins ? { opt: `이동속도 +${bt.pct}%`, got } : { mats: bt.mats, gold: bt.gold, base: bt.from ? BOOT[bt.from].name : null, opt: `이동속도 +${bt.pct}%`, got };
+    meta = bt.coins ? { opt: `이동속도 +${bt.pct}%`, got } : { mats: bt.mats, gold: bt.gold, base: bt.from ? BOOT[bt.from].name : null, baseIcon: bt.from ? picture(BOOT[bt.from].name) : null, opt: `이동속도 +${bt.pct}%`, got };
     row(`${bt.name} (이동속도 +${bt.pct}%)`, bt.coins ? `레이드주화 ${bt.coins}개` : `${bt.from ? BOOT[bt.from].name + ' + ' : ''}`
       + Object.entries(bt.mats).map(([id, n]) => `${MATS[id].name} ${mats[id] || 0}/${n}`).join(' + ') + ` + ${won(bt.gold)}`,
     got ? '보유' : bt.coins ? '교환' : '조합', ok, () => {
@@ -3879,7 +3952,7 @@ function openCraft(sink = null) {
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
     icon = pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id) || picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
-    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text + (c.set && MUSIN_SET[c.set] ? ` · 세트 ${MUSIN_SET[c.set].name}: ${MUSIN_SET[c.set].text}` : ''), got };
+    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, baseIcon: c.from ? pieceIcon(cls, base.kind, specialBase(base, cls.id), base.id) : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text + (c.set && MUSIN_SET[c.set] ? ` · 세트 ${MUSIN_SET[c.set].name}: ${MUSIN_SET[c.set].text}` : ''), got };
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
     // A recipe of the story's gate (items.js needs): shut until that ground or raid is won.
     const gateOk = got || needsMet(c.needs, progress);
@@ -3941,11 +4014,20 @@ function openCraft(sink = null) {
     settings.chanceUp = !settings.chanceUp;
     saveJson('bs_settings', settings);
   });
-  const owned = b.filter(k => !k.startsWith('sp:') || SPECIAL[k.slice(3)]);
+  // Every owned piece is listed (사용자 2026-11-24: 도깨비 파천퇴가 강화 목록에 없음). A piece raised by copies
+  // (a grounds' or raid's piece, a boss's special ★) was left out while it had no copy at ★1, and at its top
+  // star unless it was crafted ('sp:cr_') — so a piece found once never showed, though it is worn and can be
+  // raised as soon as a copy comes. Now all are shown, the worn ones first, then those with copies to spend.
+  const worn = savedGear(cls), wornKey = k => {
+    if (k.startsWith('sp:')) return ['weapon', 'armor', 'shield', 'helmet', 'cape'].some(x => worn[x + 'Sp'] === k.slice(3));
+    const [kind, t] = k.split(':');
+    return !worn[kind + 'Sp'] && worn[kind] === +t;
+  };
+  const owned = [...new Set(b.filter(k => !k.startsWith('sp:') || SPECIAL[k.slice(3)]))]
+    .map((k, i) => [k, (wornKey(k) ? 0 : copiesOf(cls, k) ? 1 : 2) * 1e4 + i]).sort((x, y) => x[1] - y[1]).map(x => x[0]);
   let any = false;
   for (const key of owned) {
     const star = starOf(cls, key), copies = copiesOf(cls, key);
-    if (star >= STAR_MAX && !copies && !key.startsWith('sp:cr_') && !isDragonKey(cls, key)) continue;
     const [kind, t] = key.split(':');
     const sp0 = key.startsWith('sp:') ? SPECIAL[key.slice(3)] : null;
     const name = sp0 ? (sp0.craft ? '◆' : '★') + specialName(sp0, cls.id) : pieceName(cls, kind, +t);
@@ -3987,8 +4069,8 @@ function openCraft(sink = null) {
       continue;
     }
     const cost = starCost(star);
-    if (!copies && star === 1) continue;
     any = true;
+    icon = pieceIcon(cls, sp0 ? sp0.kind : kind, sp0 ? specialBase(sp0, cls.id) : +t, sp0 && sp0.id);
     const can = star < STAR_MAX && copies >= cost.copies && (progress.gold || 0) >= cost.gold;
     fxs = { n: star };
     row(`${name} ★${star}`, star >= STAR_MAX ? '최고 별' : `★${star + 1}: 사본 ${copies}/${cost.copies} + ${won(cost.gold)} · 별마다 반 등급`,
@@ -4007,6 +4089,11 @@ function openCraft(sink = null) {
 }
 
 $('#equip-craft').onclick = () => openForge();
+// test: the smith's rows for a class as the window lists them ([section, name, icon], tools: the 강화 audit)
+window.__forgeRows = c => { const was = chosenClass; if (!G) chosenClass = CLASSES[c]; const l = []; try { openCraft(l); } finally { if (!G) chosenClass = was; } return l.map(e => [e.sec, e.name, e.icon, e.label]); };
+window.__matIcons = () => Object.keys(MATS).map(id => [id, MATS[id].name, matIcon(id)]);
+window.__forgeKeys = c => { const cls = CLASSES[c]; return ['weapon', 'armor', 'shield', 'helmet', 'cape'].flatMap(k => (GEAR[cls.id][k] || []).map((_, i) => `${k}:${i}`))
+  .concat(SPECIALS.filter(s => (!s.craft || !s.craft.only || s.craft.only.includes(cls.id)) && (s.kind !== 'shield' || hasShield(cls.id))).map(s => 'sp:' + s.id)); };
 
 // ---------------------------------------------------------------- 조합 window
 // Every recipe of the smith in one place: a tab per kind of making, the list of that tab,
@@ -4066,7 +4153,7 @@ function openForge() {
     d.innerHTML = `<div class="fd-head">${pick.icon ? `<img src="${pick.icon}" alt="">` : ''}<div><b>${pick.name}</b><span>${pick.sec}</span></div></div>`
       + (m.gyeok ? `<div class="fd-gyeok">${gyeokLine(m.gyeok)}</div>` : '')
       + (m.opt ? `<div class="fd-opt">옵션: ${m.opt}</div>` : '')
-      + (m.base ? `<div class="fd-mat">재료 장비: ${m.base}</div>` : '')
+      + (m.base ? `<div class="fd-mat"><span>${m.baseIcon ? `<img src="${m.baseIcon}" alt="">` : ''}재료 장비: ${m.base}</span></div>` : '')
       + (m.mats ? Object.entries(m.mats).map(([id, n]) => `<div class="fd-mat ${(mats[id] || 0) >= n ? 'ok' : 'no'}"><span>${matIcon(id) ? `<img src="${matIcon(id)}" alt="">` : ''}${MATS[id].name} ${mats[id] || 0}/${n}</span><small>${where(id)}</small></div>`).join('') : '')
       + (m.gold ? `<div class="fd-mat ${(progress.gold || 0) >= m.gold ? 'ok' : 'no'}"><span>${won(m.gold)}</span></div>` : '')
       + (!m.mats ? `<div class="fd-desc">${pick.desc}</div>` : '');
@@ -16282,11 +16369,19 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   // 도깨비 and 궁사 cells are 193 px a side) were a fifth of a phone's frame.
   const fk = a.row * 64 + f;
   let pic = L.frames.get(fk), S = L;
-  if (!pic && !L.done) {
+  // (사용자 2026-11-24: 코디·장비 창을 닫으면 움직이기 전까지 벌거벗은 모습) A frame made while a piece was still
+  // loading (only body and head in) was kept and shown for good: the look was asked again only for a frame it
+  // lacked, so standing still the bare frame stayed until a walk asked for new ones. While the look is not
+  // ready it is asked each frame (heroLookSheets clears its early frames once every piece is in), and the
+  // look shown before stays on screen meanwhile: an early, bare frame only where there is nothing else to show.
+  if (!L.done && (!pic || !L.ready)) {
     // (the passers-by and companions one look at a time: a look's sheets are 40 to 80 MB while its frames are made)
     if (!L.asked && (L.mine || heroLoading < 1)) { L.asked = true; heroLoading++; }
     const sheets = L.asked ? heroLookSheets(L) : null;
-    if (sheets) pic = heroFrameMake(L, sheets, a, f);
+    pic = L.frames.get(fk);
+    const prev = b.yvShown && !b.yvShown.gone && b.yvShown !== L && b.yvShown.frames.size;
+    if (!L.ready && prev) pic = null;
+    else if (!pic && sheets) pic = heroFrameMake(L, sheets, a, f);
   }
   if (!pic) {
     // Its new look still loading (a piece just put on): the look it showed last, until then.
@@ -16476,11 +16571,6 @@ function armorDressed(gear, kind, im, path) {
   if (az && gear.cos && gear.cos.armor && gear.cos.armor !== 'hide') return im;
   return az && az.armor && !path.includes('/sinsu/') ? dressedSheet(im, path, az.tint, az.pal) : im;
 }
-/** The same for a still picture of the hero (the class card): 청룡신검's blade too. */
-function sinsuDressed(gear, kind, im, path) {
-  const w = (kind === 'weapon' || kind === 'wback') && gear.weaponSp && SPECIAL[gear.weaponSp] && !(gear.cos && gear.cos.weapon);
-  return w && w.craft && w.dress && !path.includes('/sinsu/') ? dressedSheet(im, path, w.dress.tint, w.dress.pal) : armorDressed(gear, kind, im, path);
-}
 function dressedSheet(im, path, t, pal, swing) {
   const k = path + '|' + t + '|' + (pal || '') + (swing ? '|w' : '');
   let c = dressSheets.get(k);
@@ -16607,14 +16697,14 @@ function tongues(color = '#ff8c4c') {
   flameSets.set(color, out);
   return (flameTongues = out);
 }
-function drawBladeFlames(pts, ox, oy, dz) {
+function drawBladeFlames(pts, ox, oy, dz, g = ctx) {
   const T = pts && pts.length && tongues(dz.pal === 'gold' || dz.pal === 'heaven' ? '#ffe7a0' : undefined);
   if (!T) return;
   const now = performance.now() / 70;
   for (let j = 0; j < pts.length; j++) {
     const im = T[(Math.floor(now) + j * 7) % T.length], k = 0.2 * dz.fsc * (0.85 + 0.3 * ((j * 37) % 10) / 10);
     const w = im.width * k, h = im.height * k;
-    ctx.drawImage(im, ox + pts[j][0] - w / 2, oy + pts[j][1] - h * 0.85, w, h);
+    g.drawImage(im, ox + pts[j][0] - w / 2, oy + pts[j][1] - h * 0.85, w, h);
   }
 }
 
@@ -18235,12 +18325,13 @@ function openPartyPick() {
       openPartyPick();
     };
     box.append(b);
-    lookPicture(c).then(url => { if (url) b.querySelector('.hero').src = url; });
+    heroPic(b.querySelector('.hero'), c);
   }
   $('#pp-mode').textContent = '동료 모드: ' + (settings.party ? '켬' : '끔');
   $('#pp-mode').classList.toggle('on', !!settings.party);
   $('#party-pick').hidden = false;
   syncPartyLine();
+  cardsAfterCostumes('#party-pick', openPartyPick);
 }
 /** The 사냥터 panel's line: 동료 모드 and how many companions are picked, with a shortcut. */
 function syncPartyLine() {
@@ -19069,7 +19160,7 @@ const War = initWar({
   raidSet, raidTier, pickGear, bag: c => bag(c),
   // AI 동료 (war.js personas): the hero's 전투력 (the spread of the fighters' specs), a skill's own
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
-  combatPower: c => combatPower(c), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
+  combatPower: c => combatPower(c), heroShotPic: (cls, gear) => heroShotPic(cls, gear), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
   castAs, skillSheets, plainLook,
 });
 
