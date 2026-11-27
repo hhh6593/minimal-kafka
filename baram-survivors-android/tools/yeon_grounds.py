@@ -332,10 +332,15 @@ ARENA_RIM = 2
 # Arenas whose void, chasms and cliff faces are bare floor ground (연's hell): yeon_war.blocked32's
 # unseen-blocker rule would open them (화탕지옥: the hero and the monsters walked off the cliffs).
 NO_UNSEEN = {'hwatang', 'hanbing', 'geohae', 'cheolsang', 'abyss4'}
-# Closed ground that reads as ground (bare floor tiles, nothing drawn over them: the rim of dirt
-# round a meadow, a strip of sand past 연's unseen edge) is drawn darker, so what holds the
-# bodies back is what the eye sees as out of bounds (보이는 것 = 맞는 것). The factor of light kept.
-SHADE = 0.45
+# The closed ground is drawn dimmer (shade_closed; not on the void-and-island hell maps, NO_SHADE: there the void
+# and the cliff faces down to it are the edge already, and the dimmed snow / stone lip round the
+# walkable ground made a grey band on 한빙지옥), so what holds the bodies back is what the eye
+# sees as out of bounds (보이는 것 = 맞는 것): the factor of light kept, the feather of its edge, and
+# how far into an open / closed cell its core is held to the walk grid (the rest follows 연's tiles).
+SHADE = 0.62
+NO_SHADE = {'hanbing', 'geohae', 'cheolsang'}
+FEATHER = 6
+CORE_OPEN, CORE_SHUT = 8, 16
 BARE = 0.2      # a closed cell under a fifth covered by the upper layers: bare
 OPEN_BIT = 4    # a patch of bare closed cells this small, inside the field: opened
 
@@ -411,23 +416,36 @@ def open_bits(walk, bare):
     return [''.join('.' if c else '#' for c in row) for row in cells]
 
 
-def shade_closed(img, walk, bare):
-    """Darken the bare closed cells (closed ground that reads as ground: the rim round a meadow,
-    a fort's yard past its wall, a cliff's top, the sea), feathered a few pixels into the open
-    ones, so a closed edge is seen where it is. Cells with a wall, a cliff face or a rock drawn
-    in them are left as drawn: those read as closed already."""
-    from PIL import Image, ImageDraw, ImageFilter
-    G = 48
-    mask = Image.new('L', img.size, 0)
-    d = ImageDraw.Draw(mask)
+def shade_closed(img, walk, blk):
+    """Dim the whole closed ground (walls, cliffs, water, a fort's yard, a meadow's rim — what holds
+    the bodies back), so the field the bodies walk on stands lit and its edge is seen where it is.
+
+    The edge follows 연's own 32-pixel tiles (blk: yeon_war.blocked32, the line the art draws: a
+    cliff's rim, a shore), not the 48-pixel walk cells: a cell's core is held to the walk grid
+    (an open cell lit, a closed one dim), the band between follows the tiles, and the whole is
+    feathered (FEATHER px). Dimmed alike, a closed area reads as one (by closed cells, bare ones
+    only, it was a patchwork of grey squares on 한빙지옥's snow and 로비해변's cliff tops)."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+    T, G = 32, 48
+    w, h = img.size
+    m = np.kron(np.array(blk, dtype=np.uint8), np.ones((T, T), dtype=np.uint8))[:h, :w] * 255
     rows, cols = len(walk), len(walk[0])
-    for gx, gy in bare:
-        if walk[gy][gx] == '.':
-            continue
-        # (the last column / row: on to the picture's edge, the strip past the last whole cell)
-        d.rectangle((gx * G, gy * G, img.width if gx == cols - 1 else gx * G + G - 1,
-                     img.height if gy == rows - 1 else gy * G + G - 1), fill=255)
-    mask = mask.filter(ImageFilter.GaussianBlur(5))
+    for gy in range(rows):
+        for gx in range(cols):
+            if walk[gy][gx] == '.':
+                m[gy * G + CORE_OPEN:gy * G + G - CORE_OPEN, gx * G + CORE_OPEN:gx * G + G - CORE_OPEN] = 0
+            elif all(not (0 <= gx + dx < cols and 0 <= gy + dy < rows) or walk[gy + dy][gx + dx] != '.'
+                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                # a closed cell with no open one beside it (a pocket on a cliff top, the far side of
+                # a wall): dim whole, whatever 연's tiles say (its few movable tiles made pale squares)
+                m[gy * G:gy * G + G, gx * G:gx * G + G] = 255
+            else:
+                m[gy * G + CORE_SHUT:gy * G + G - CORE_SHUT, gx * G + CORE_SHUT:gx * G + G - CORE_SHUT] = 255
+    # the strip past the last whole cell: as the cells beside it
+    m[rows * G:, :] = m[rows * G - 1:rows * G, :]
+    m[:, cols * G:] = m[:, cols * G - 1:cols * G]
+    mask = Image.fromarray(m, 'L').filter(ImageFilter.GaussianBlur(FEATHER))
     dark = img.point(lambda v: int(v * SHADE))
     return Image.composite(dark, img, mask)
 
@@ -463,12 +481,14 @@ def arena(dec, gear, only=None):
         img = img.convert('RGB')
         w, h = img.size
         cols, rows = w // G, h // G
-        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1), gid not in NO_UNSEEN), cols, rows)
+        blk = yeon_war.blocked32(data, (x0, y0, x1, y1), gid not in NO_UNSEEN)
+        walk = yeon_war.walk_grid(blk, cols, rows)
         if gid in ARENA_AUTO:
             up = Image.new('RGBA', (w, h))
             up.alpha_composite(yeon_maps.render(b, name, layers={1, 2, 3, 4}).crop((x0 * T, y0 * T, x1 * T, y1 * T)))
             walk = open_bits(walk, bare_cells(up, walk))
-            img = shade_closed(img, walk, bare_cells(up, walk))
+            if gid not in NO_SHADE:
+                img = shade_closed(img, walk, blk)
         for cy in range(-(-h // CH)):
             for cx in range(-(-w // CH)):
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
