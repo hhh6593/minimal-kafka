@@ -9243,7 +9243,8 @@ function projTrail(def, tr, tiles, dmg, smite) {
   const pic = tr.pic || PROJ_TRAIL[def.elem] || PROJ_TRAIL.fire;
   if (!M.fx[pic] || !dmg) return;
   const run = G, every = tr.every || 0.5, n = Math.max(1, Math.round(tr.t / every)), sp = fxTiles(pic, 1.1, 'ptr');
-  tiles.slice(0, 9).forEach(([tx, ty, at]) => later(at, () => {
+  // (사냥터 지형: not on a closed tile — fire left burning on a wall or over the void hurt no one there)
+  tiles.filter(([tx, ty]) => !G.arena || Hunt.open(tx, ty)).slice(0, 9).forEach(([tx, ty, at]) => later(at, () => {
     if (G !== run) return;
     tkLoopAt(sp, tx * TILE + TILE / 2, ty * TILE + TILE - 18, tr.t, { alpha: settings.calmFx ? 0.55 : 0.85 });
     for (let i = 1; i <= n; i++) later(i * every, () => {

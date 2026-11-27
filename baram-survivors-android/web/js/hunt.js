@@ -1314,7 +1314,19 @@ function spotNear(r0, r1) {
   for (let i = 0; i < 40; i++) {
     const a = Math.random() * Math.PI * 2, r = r0 + Math.random() * (r1 - r0);
     const tx = p.tx + Math.round(Math.cos(a) * r), ty = p.ty + Math.round(Math.sin(a) * r * 0.75);
-    if (A.free(tx, ty) && !(A.walled(tx, ty))) return [tx, ty];
+    // (사냥터 지형: on 연's own map a spot across a chasm or a wall is near by eye but far on foot —
+    // the objective is put where the walk to it is not much longer than its distance)
+    if (A.free(tx, ty) && !(A.walled(tx, ty)) && (!G.arena || (flowAt(tx, ty) >= 0 && flowAt(tx, ty) <= r1 * 2 + 4))) return [tx, ty];
+  }
+  if (G.arena) {
+    // none drawn: the open tile whose walk is nearest the wanted distance
+    const R = G.arena, m = R.map, f = flowFresh();
+    let best = -1;
+    for (let c = 0; c < f.length; c++) {
+      const x = c % m.cols, y = (c - x) / m.cols;
+      if (f[c] >= r0 && (best < 0 || Math.abs(f[c] - r0) < Math.abs(f[best] - r0)) && A.free(x, y)) best = c;
+    }
+    if (best >= 0) return [best % m.cols, Math.floor(best / m.cols)];
   }
   return [p.tx + r0, p.ty];
 }

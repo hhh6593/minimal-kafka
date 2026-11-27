@@ -100,8 +100,24 @@ def main():
             shutil.copyfile(os.path.join(ytmp, "icon", fid + ".png"), os.path.join(assets, "icon", fid + ".png"))
         man["fxWebp"] = [x for x in man.get("fxWebp", []) if x not in ym["fx"]]
         print(f"replaced {len(ym['fx'])} 연 spell sheets from yskill_add")
+    # Hunting grounds fought on 연's own map made since that APK (GEAR_DIR/yhunt_add/: tools/yeon_grounds.py
+    # arena with YHUNT_OUT=GEAR_DIR/yhunt_add — the 9차 사냥터 지형, every 연 ground but the few too small):
+    # their pieces into assets/yhunt and their entries over the manifest's.
+    ha = os.path.join(gear, "yhunt_add")
+    if os.path.isfile(os.path.join(ha, "index.json")):
+        os.makedirs(os.path.join(assets, "yhunt"), exist_ok=True)
+        add = json.load(open(os.path.join(ha, "index.json"), encoding="utf-8"))
+        for gid in add:
+            for n in os.listdir(os.path.join(assets, "yhunt")):
+                if n.startswith(gid + "_"):
+                    os.remove(os.path.join(assets, "yhunt", n))
+        for n in sorted(os.listdir(ha)):
+            if n.endswith(".png") and n.rsplit("_", 2)[0] in add:
+                shutil.copyfile(os.path.join(ha, n), os.path.join(assets, "yhunt", n))
+        man.setdefault("yhunt", {}).update(add)
+        print(f"{len(add)} hunting-ground maps from yhunt_add")
     # Hunting-ground walk grids made again since that APK (tools/yhunt_walk.json, from
-    # tools/yeon_grounds.py arena: 화탕지옥's void and cliffs closed), over the old ones.
+    # tools/yeon_grounds.py arena: 화탕지옥's void and cliffs closed, and every ground's since), over the old ones.
     fix = json.load(open(os.path.join(HERE, "yhunt_walk.json"), encoding="utf-8"))
     for gid, v in fix.items():
         old_g = man.get("yhunt", {}).get(gid)
