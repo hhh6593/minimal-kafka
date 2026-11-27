@@ -131,17 +131,17 @@ export const GYEOK = {
   // 최종 방패의 격 (items.js FINAL_SHIELDS, 2026-11-28): struck, each answers in its weapon's way, on the one who struck
   // and those round it. Drawn at the final tier (GYEOK_SIZE.final × sizeK), held to its reach: 3×3 → 8 × 0.48 = 3.8칸
   // (3칸 × 1.3), 5×5 → 8 × 0.8 = 6.4칸 (5칸 × 1.3) — 보이는 범위 = 맞는 범위. 연's own 격 pictures.
-  // 용미 (용무기): the 용X격's dragon striking twice the same foe, and the wearer's guard a while.
-  fs_yongmi: { name: '용미격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3, area: 1, fx: 'g_pet_dragon', sizeK: 0.48, self: ['ward', 4, 0.2], mech: { strikes: { n: 2, gap: 0.3, focus: true } } },
-  // 주작 (사신수): 주작비상's fire, a burn and 주작의 불꽃 (the struck take more from the wearer).
-  fs_jujak: { name: '주작의 결계', on: 'hurt', chance: 0.2, cd: 8, dmg: 2.5, area: 1, fx: 'g_zuzak_kyeog', sizeK: 0.48, st: ['burn', 4, 1], st2: ['mark', 6, 0.2] },
+  // 브리트라한 (용무기): the 용X격's dragon striking twice the same foe, and the wearer's guard a while.
+  fs_yongmi: { name: '브리트라한의 용격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3, area: 1, fx: 'g_pet_dragon', sizeK: 0.48, self: ['ward', 4, 0.2], mech: { strikes: { n: 2, gap: 0.3, focus: true } } },
+  // 금린 (사신수): 주작비상's fire, a burn and 주작의 불꽃 (the struck take more from the wearer).
+  fs_jujak: { name: '금린 화염결계', on: 'hurt', chance: 0.2, cd: 8, dmg: 2.5, area: 1, fx: 'g_zuzak_kyeog', sizeK: 0.48, st: ['burn', 4, 1], st2: ['mark', 6, 0.2] },
   // 환인 (태초): 태초광명's gold-white light, wider, a stun and the wearer's pierce.
   fs_hwanin: { name: '환인의 빛', on: 'hurt', chance: 0.2, cd: 12, dmg: 3, area: 2, fx: 'g_taecho_light', sizeK: 0.8, st: ['stun', 1], self: ['pierce', 4, 0.15],
     tint: 'grayscale(1) sepia(0.8) saturate(2.4) brightness(1.2)' },
-  // 혈귀혼 (심연): the 끝없는 지옥's black and blood, 절망 on the struck and what it deals drunk back.
-  fs_hyeolgwi: { name: '혈귀혼 반격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3.5, area: 1, fx: 'g_hell_weapon', sizeK: 0.48, tint: ABYSS_GY_TINT, st: ['despair', 5], drain: 0.6 },
-  // 해태 (심판의낫): the 심판의낫's 청룡 roar, a blow and a heal, the wearer's statuses cleared.
-  fs_haetae: { name: '해태의 심판', on: 'hurt', chance: 0.2, cd: 15, dmg: 2, area: 1, heal: 0.15, fx: 'g_roaring_dragon', sizeK: 0.48, mech: { cleanse: true } },
+  // 고대마령 (심연): the 끝없는 지옥's black and blood, 절망 on the struck and what it deals drunk back.
+  fs_hyeolgwi: { name: '고대마령 반격', on: 'hurt', chance: 0.2, cd: 10, dmg: 3.5, area: 1, fx: 'g_hell_weapon', sizeK: 0.48, tint: ABYSS_GY_TINT, st: ['despair', 5], drain: 0.6 },
+  // 환웅 (심판의낫): the 심판의낫's 청룡 roar, a blow and a heal, the wearer's statuses cleared.
+  fs_haetae: { name: '환웅의 심판', on: 'hurt', chance: 0.2, cd: 15, dmg: 2, area: 1, heal: 0.15, fx: 'g_roaring_dragon', sizeK: 0.48, mech: { cleanse: true } },
 
   // 갑옷의 반격 격 (a boss's armour): struck, it answers in the boss's own way.
   // (made per boss below: GYEOK['ban_' + status])
