@@ -367,7 +367,9 @@ export const CRAFTS = [
   // 청룡신검 the 백사월도(치장용) (코디 309106, the same hooked blade), blued.
   { id: 'cr_sinsu_cheong', kind: 'weapon', only: ['warrior'], name: '청룡신검', look: '청룡의검', base: { warrior: [309106, '백사월도'] }, dress: SINSU_DRESS.cheong, worn: { warrior: 's_cheong' }, pow: 13, opt: 'life', pic: 'name', picTop: "진'청룡신검",
     mats: { sinsu_cheong: 8, essence: 10, scroll: 2 }, gold: 30000, sinsu: true },
-  { id: 'cr_sinsu_jujak', kind: 'weapon', only: ['mage', 'poet', 'magus', 'celestial'], name: '주작선장', look: '흑단화염장', base: { mage: [309203, '주작선장'], poet: [309203, '주작선장'], magus: [309203, '주작선장'], celestial: [309203, '주작선장'] }, /* (사용자 2026-11-24: 도사·주술사·마도사·천인 모두 착용) */ /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
+  // (공용 무기 2026-11-28: 연의 무기표 Items_Weapon에서 주작선장 503030은 Job 칸이 없는 공용 — 11직업 모두. 손의 그림은 연의
+  // 주작선장(치장용) 309203: 전사 몸틀 8직업은 그대로, 격투가·궁사·무사는 같은 그림을 자세 이름별로 옮겨 듦(같은 들기 동작))
+  { id: 'cr_sinsu_jujak', kind: 'weapon', name: '주작선장', look: { warrior: '주작의검', rogue: '횃불', mage: '흑단화염장', poet: '흑단화염장', archer: '흑일멸화궁', lancer: '금홍비창', monk: '바람홍옥권갑', magus: '흑단화염장', celestial: '흑단화염장', dokkaebi: '바람홍옥퇴', reaper: '바람홍옥명도' }, /* (연 영웅 없는 빌드의 모양: 이미 줄에 있는 이름 — 저장된 자리가 밀리지 않게) */ base: Object.fromEntries(CLASSES.map(k => [k.id, [309203, '주작선장']])), /* 연's own 주작선장 look (코디 309203): the orb with the bird in it */ pow: 13, opt: 'mana', pic: 'name', picTop: "진'주작선장",
     mats: { sinsu_jujak: 8, ember: 20, scroll: 2 }, gold: 30000, sinsu: true },
   // 백호환령부: the original's mount, here a weapon that lives — the white tiger follows and pounces.
   { id: 'cr_sinsu_baekho', kind: 'cape', pet: true, name: '백호환령부', look: '얼음망토', pow: 13, opt: 'speed', pic: 'name',
@@ -446,6 +448,53 @@ for (const c of ARMORY) {
   SPECIALS.push(sp);
   SPECIAL[c.id] = sp;
   for (const k of c.only || CLASSES.map(x => x.id)) specialBase(sp, k);
+}
+
+// ---------------------------------------------------------------- 최종 방패 (docs/9cha_rules.md, 2026-11-28)
+// The shields' top, as the weapons': one grade for all (15 + 0.5 for its 격, ★5 17.5 — 현무불괴갑's, the armour's top, over 지배자방패 14.5),
+// five of them, each the shield of one final weapon's nature (FINAL_ROLE): what it is good for is the blows it takes
+// less of (FINAL_SHIELD_ROLE: from a boss or its lieutenant / a war's fighter / the crowd), its 격 when struck
+// (gyeok.js FINAL_SHIELD_GYEOK), its lines and the status it wards. Worn as 연's own shield looks (코디 "c<id>": base),
+// their icons 연's. Made at the smith (needs: the place that opens it) or, now and then, dropped there (dropFrom).
+//   무휼의 용미방패 — 용무기의 짝, 보스형     선홍빛 주작 방패 — 사신수의 짝, PVP형
+//   환인의 성오깃방패 — 태초의 짝, 사냥+보스   혈귀혼방패 — 심연의 짝, PVP+보스
+//   해태방패 — 심판의낫의 짝, 하이브리드+생명 (수라방패 ★5에서 벼림, 악마 심판의낫이 군주에서 나오듯)
+// ---- final shield tuning (retune here) ----
+export const FINAL_SHIELD_POW = 15;
+// The share of a blow taken off, by who strikes (boss: a boss or its lieutenant; war: a fighter of 대항전·쟁; mob: the rest).
+// The weapons' FINAL_ROLE numbers mirrored: 0.15 for a one-sided one, 0.1 + 0.1 for a two-sided, 0.06 on all for the 해태.
+export const FINAL_SHIELD_ROLE = {
+  cr_fshield_dragon: { boss: 0.15, war: 0, mob: 0 },
+  cr_fshield_jujak: { boss: 0, war: 0.15, mob: 0 },
+  cr_fshield_hwanin: { boss: 0.1, war: 0, mob: 0.1 },
+  cr_fshield_hyeolgwi: { boss: 0.1, war: 0.1, mob: 0 },
+  cr_fshield_haetae: { boss: 0.06, war: 0.06, mob: 0.06 },
+};
+const G_FSHIELD = '조합 · 최종 방패 (최고 등급 15 · 최종 무기와 짝을 이루는 다섯 성격)';
+const FS_ONLY = ['warrior', 'rogue', 'mage', 'poet']; // the classes that carry a shield (avatar.js SHIELDED)
+const fsBase = id => Object.fromEntries(FS_ONLY.map(c => [c, [id]]));
+export const FINAL_SHIELDS = [
+  { id: 'cr_fshield_dragon', name: '무휼의 용미방패', base: fsBase(803916), opt: 'boss', extra: 'critdmg', proc: 'barrier', ward: 'stun', gyeok: 'fs_yongmi',
+    mats: { scale: 30, pearl: 3, silver3: 3, essence: 15, scroll: 3 }, gold: 45000, needs: 'raid_heaven', dropFrom: ['raid_heaven'] },
+  { id: 'cr_fshield_jujak', name: '선홍빛 주작 방패', base: fsBase(9988242), opt: 'guard', extra: 'final', proc: 'shock', ward: 'burn', gyeok: 'fs_jujak',
+    mats: { sinsu_jujak: 8, ember: 25, kalpa: 20, scroll: 3 }, gold: 45000, needs: 'raid_agni', dropFrom: ['raid_agni'] },
+  { id: 'cr_fshield_hwanin', name: '환인의 성오깃방패', base: fsBase(804054), opt: 'haste', extra: 'floor', proc: 'shock', ward: 'para', gyeok: 'fs_hwanin',
+    mats: { essence: 25, kalpa: 30, silver3: 2, scroll: 3 }, gold: 45000, needs: 'abyss4', dropFrom: ['abyss4', 'cow'] },
+  { id: 'cr_fshield_hyeolgwi', name: '혈귀혼방패', base: fsBase(309353), opt: 'guard', extra: 'vamp', proc: 'barrier', ward: 'despair', gyeok: 'fs_hyeolgwi',
+    mats: { soul: 25, hoehan: 6, kalpa: 25, scroll: 3 }, gold: 45000, needs: 'abyss', dropFrom: ['abyss2', 'abyss3', 'raid_hell'] },
+  { id: 'cr_fshield_haetae', name: '해태방패', base: fsBase(309360), opt: 'life', extra: 'regen', proc: 'barrier', ward: 'curse', gyeok: 'fs_haetae', from: 'cr_shield_sura',
+    mats: { hoehan: 8, essence: 20, kalpa: 25, scroll: 3 }, gold: 45000, needs: 'raid_hell', dropFrom: ['raid_hell'] },
+];
+for (const f of FINAL_SHIELDS) {
+  // (look: a name every shield line has, for a build without 연's heroes — no saved place moves)
+  const c = { ...f, group: G_FSHIELD, kind: 'shield', only: FS_ONLY, look: '천성대방패', pow: FINAL_SHIELD_POW, legend: true, final: true };
+  f.craft = c;
+  CRAFTS.push(c);
+  const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
+    gyeok: c.gyeok, ward: c.ward, base: c.base };
+  SPECIALS.push(sp);
+  SPECIAL[c.id] = sp;
+  for (const k of FS_ONLY) specialBase(sp, k);
 }
 
 // ---------------------------------------------------------------- 장비 티어 (README "장비 티어")
@@ -970,10 +1019,22 @@ export const WEAPON_FAMILY = {
   steel: { name: '전설 · 무신', role: '기술 회전·출혈', best: '사냥·기술 난사',
     text: '사성격 출혈(일반 몬스터)과 이동·기술 재사용 옵션. 보스에게는 출혈이 듣지 않음.' },
   judge: { name: '심판의낫', role: '균형 딜·회복', best: '어디서나 (사냥·보스·레이드·문파전)',
-    text: '모든 적에게 같은 피해 보너스(보스·문파전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 전사·도적·주술사.' },
+    text: '모든 적에게 같은 피해 보너스(보스·문파전 상대 포함): 청룡 +4% → 군주 +6% → 악마 +8%. 격은 일격과 회복(청룡참 → 진청룡마령참 → 악마 심판 격). 청룡(용궁 뒤) 12.5 → 군주(황무지 뒤) 13 → 악마 심판의낫(지하국대적 레이드의 회한옥\'심) 15등급(보스 16.9). 어느 한 곳의 최고는 아니지만 빈 곳이 없음. 11직업 공용.' },
+  // 최종 방패 (FINAL_SHIELDS): what each takes less of, as its weapon deals more.
+  fs_dragon: { name: '최종 방패 · 용미', role: '보스형 (용무기의 짝)', best: '보스·레이드',
+    text: '보스·우두머리에게 받는 피해 -15%. 용미격(맞을 때): 때린 적 둘레 3×3에 용의 두 번 일격과 받는 피해 -20% 4초. 기절을 막음. 등급 15(격 +0.5, ★5 17.5). 선계 레이드 뒤 조합, 선계 레이드에서 드물게.' },
+  fs_jujak: { name: '최종 방패 · 주작', role: 'PVP형 (사신수의 짝)', best: '대항전·쟁',
+    text: '대항전·쟁의 적에게 받는 피해 -15%. 주작의 결계(맞을 때): 때린 적 둘레 3×3에 화상과 주작의 불꽃(나에게 받는 피해 +20%). 화상을 막음. 등급 15(격 +0.5, ★5 17.5). 아그니 레이드 뒤 조합(주작혈안), 아그니에서 드물게.' },
+  fs_hwanin: { name: '최종 방패 · 환인', role: '사냥+보스 (태초의 짝)', best: '사냥·보스',
+    text: '일반 몬스터·챔피언과 보스·우두머리에게 받는 피해 -10%. 환인의 빛(맞을 때): 둘레 5×5에 금빛 일격과 기절, 내 관통 4초. 마비를 막음. 등급 15(격 +0.5, ★5 17.5). 세계석 요새 정복 뒤 조합, 세계석 요새·소 레벨에서 드물게.' },
+  fs_hyeolgwi: { name: '최종 방패 · 혈귀혼', role: 'PVP+보스 (심연의 짝)', best: '대항전·쟁·보스',
+    text: '대항전·쟁의 적과 보스·우두머리에게 받는 피해 -10%. 혈귀혼 반격(맞을 때): 3×3에 흑적 일격과 절망, 준 피해만큼 흡혈. 절망을 막음. 등급 15(격 +0.5, ★5 17.5). 지하 묘지 정복 뒤 조합, 끝없는 지옥·지하국대적에서 드물게.' },
+  fs_haetae: { name: '최종 방패 · 해태', role: '하이브리드+생명 (심판의낫의 짝)', best: '어디서나',
+    text: '모든 적에게 받는 피해 -6%, 체력 옵션. 해태의 심판(맞을 때): 3×3 일격과 체력·마력 15% 회복, 상태 해제. 저주를 막음. 등급 15(격 +0.5, ★5 17.5). 수라방패 ★5 + 회한옥\'심으로 벼림, 지하국대적에서 드물게.' },
 };
 const FAMILY_OF_CRAFT = { cr_sinsu_cheong: 'cheong', cr_sinsu_jujak: 'jujak', cr_sinsu_baekho: 'baekho', cr_sinsu_hyeonmu: 'hyeonmu',
-  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge', cr_judge_weapon3: 'judge' };
+  cr_gold_weapon: 'gold', cr_gold_weapon2: 'gold', cr_steel_weapon: 'steel', cr_steel_weapon2: 'steel', cr_judge_weapon: 'judge', cr_judge_weapon2: 'judge', cr_judge_weapon3: 'judge',
+  cr_fshield_dragon: 'fs_dragon', cr_fshield_jujak: 'fs_jujak', cr_fshield_hwanin: 'fs_hwanin', cr_fshield_hyeolgwi: 'fs_hyeolgwi', cr_fshield_haetae: 'fs_haetae' };
 /** A piece's family (a key of WEAPON_FAMILY): sp its special (or null); dragon: the 용무기; raid: a raid's piece. */
 export function familyOf(sp, dragon = false, raid = false) {
   if (dragon) return 'dragon';

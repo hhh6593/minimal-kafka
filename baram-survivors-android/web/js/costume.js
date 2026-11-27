@@ -213,6 +213,9 @@ export function loadCostumes() {
     }
     // 심판의낫 치장용 낫 (공용 무기, 사용자 2026-11-24): the classes on a rig of their own — 격투가·궁사·무사 — hold the
     // warrior's drawn scythe, laid by its foot on theirs, as the warrior holds it.
+    // (공용 무기 2026-11-28: 연의 무기표에서 직업 칸이 없는 공용 무기의 치장용 85종 — 심판의낫·주작선장 포함 — 은
+    // tools/yeon_costume.py COSTUME_ALL_CLASSES=1로 전사 몸틀 8직업에, tools/yeon_costume_lend.py로 격투가·궁사·무사에
+    // 자세 이름별로 옮겨 뽑아 GEAR_DIR/ycostume_add에 둔다. 그 그림이 있으면 아래 빌려 쓰기는 건너뛴다 — 이전 빌드용으로만 남김.)
     const WJ = H2.warrior && H2.warrior.layers.weapon;
     for (const id of ['c7100334', 'c7100335', 'c7100336', 'c7100443']) {
       if (!WJ || !WJ[id]) continue;

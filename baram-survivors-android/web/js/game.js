@@ -15,7 +15,7 @@ import {
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
   RARITY, loadAbyssLoot, rollAbyssItem, taechoChance, CLASSIC_AXIS, TAECHO_EDGE, ABYSS_SWING, MELEE_WEAPON, ABYSS_TRAIL, ABYSS_FX_K,
   DRAGON_STEP, ABYSS_HUNT, JUJAK_AURA, WEAPON_FAMILY, familyOf, familyLine, DRAGON_LOOK, LOOK_FIX,
-  GEAR_OPT, PROCS, optIds, specialRank, MUSIN_SET, musinSetOf, JUDGE_EDGE, FINAL_ROLE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
+  GEAR_OPT, PROCS, optIds, specialRank, MUSIN_SET, musinSetOf, JUDGE_EDGE, FINAL_ROLE, FINAL_SHIELD_ROLE, gyeokTier, NAME_ICONS, TOP_GYEOK_FX,
   sinsuCount, SINSU_GATE, needsMet, needsName, AKMA_DROP, FAMILY_TINT, SINSU_TINT, HEAVEN_DRESS, HEAVEN_COST,
 } from './items.js';
 import {
@@ -1812,6 +1812,8 @@ function applyGear() {
   const dstep = !g.weaponSp && g.weapon === dragonTier(G.cls) ? starOf(G.cls, `weapon:${g.weapon}`) : 0;
   p.role = dstep >= 9 ? FINAL_ROLE.dragon : wsp && wsp.craft && wsp.craft.sinsu && wsp.kind === 'weapon' ? FINAL_ROLE.sinsu
     : p.abyssHunt ? FINAL_ROLE.abyss : p.taecho ? FINAL_ROLE.taecho : null;
+  // 최종 방패의 성격 (items.js FINAL_SHIELD_ROLE): the blows taken less of, by who strikes (hurtPlayer).
+  p.guardRole = hasShield(c) && g.shieldSp ? FINAL_SHIELD_ROLE[g.shieldSp] || null : null;
   p.aura = 0;
   if (g.weaponSp === 'cr_sinsu_jujak') p.aura = JUJAK_AURA.k + JUJAK_AURA.perStar * (starOf(G.cls, 'sp:cr_sinsu_jujak') - 1);
   else if (!g.weaponSp && g.weapon === dragonTier(G.cls) && starOf(G.cls, `weapon:${g.weapon}`) >= 10 && (progress.dragonSinsu || {})[c] === 'jujak') p.aura = JUJAK_AURA.dragonK;
@@ -1833,7 +1835,7 @@ const GYEOK_LEGEND_CRAFT = new Set(['cr_baekje_weapon', 'cr_baekje_weapon2', 'cr
 const GYEOK_LEGEND_RANK = 14.5;
 function gyeokTierOf(kind, sp, rank) {
   const fam = familyOf(sp);
-  if (GYEOK_FINAL_FAM.has(fam)) return 'final';
+  if (GYEOK_FINAL_FAM.has(fam) || (sp.craft && sp.craft.final)) return 'final'; // (최종 방패: items.js FINAL_SHIELDS)
   if (kind !== 'weapon') return 'normal';
   return GYEOK_LEGEND_FAM.has(fam) || GYEOK_LEGEND_CRAFT.has(sp.id) || rank >= GYEOK_LEGEND_RANK ? 'legend' : 'normal';
 }
@@ -1859,6 +1861,11 @@ function tierGyeok(g, rank, tint = null) {
   const t = rank === null ? null : gyeokTier(rank);
   if (!t) return g;
   return { ...g, fxK: (g.fxK || 1) * t.fxK, area: g.area ? g.area + t.area : g.area, lv: t.lv || 0, flash: t.flash ? tint || '#fff2c0' : null };
+}
+/** 최종 방패의 성격 (items.js FINAL_SHIELD_ROLE) in a line: "받는 피해 보스 -15%". */
+function guardRoleText(r) {
+  const parts = [['보스·우두머리', r.boss], ['대항전·쟁의 적', r.war], ['일반 몬스터', r.mob]].filter(x => x[1] > 0);
+  return r.boss === r.war && r.war === r.mob ? `모든 적에게 받는 피해 -${Math.round(r.boss * 100)}%` : `받는 피해 ${parts.map(([n, k]) => `${n} -${Math.round(k * 100)}%`).join(' · ')}`;
 }
 /** The colour of a worn piece's family (items.js FAMILY_TINT): the top 격's flash. */
 function familyTint(sp) {
@@ -3287,7 +3294,7 @@ function buildEquip() {
       btn.dataset.k = kind; btn.dataset.t = t; btn.dataset.sp = id;
       const icon = pieceIcon(cls, kind, t, id), st = starOf(cls, 'sp:' + id);
       btn.innerHTML = (icon ? `<img src="${icon}" alt="">` : '') + `<span${sp.rarity ? ` style="color:${RARITY.unique.ui}"` : ''}>${sp.rarity ? `[${RARITY.unique.name}] ` : sp.craft ? '◆' : '★'}${specialName(sp, cls.id)}${st > 1 ? ` ★${st}` : ''}</span><small>${sp.gyeok && GYEOK[sp.gyeok] ? `${GYEOK[sp.gyeok].name}` : sp.ward ? `${STATUS[sp.ward].name} 막기` : sp.opt.text}</small>`;
-      const fam = kind === 'weapon' || sp.craft && sp.craft.sinsu ? familyOf(sp) : null;
+      const fam = kind === 'weapon' || sp.craft && (sp.craft.sinsu || sp.craft.final) ? familyOf(sp) : null;
       btn.title = [fam ? familyTitle(fam) : '', sp.opt.text, sp.gyeok ? gyeokText(sp.gyeok) : '', sp.ward ? `${STATUS[sp.ward].name}에 걸리지 않는다` : '',
         id === 'cr_sinsu_jujak' ? `주작의 기운: 주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round((JUJAK_AURA.k + JUJAK_AURA.perStar * (st - 1)) * 100)}%` : ''].filter(Boolean).join('\n');
       if (fam && WEAPON_FAMILY[fam]) {
@@ -3462,7 +3469,7 @@ function openPiecePop(kind, t, spId = null) {
       if (sp.proc) L.push(`<div class="pr">특수 · ${PROCS[sp.proc].name}: ${PROCS[sp.proc].text}</div>`);
       if (sp.ward) L.push(`<div class="gy">방어 · ${STATUS[sp.ward].name} 막기: ${STATUS[sp.ward].name}에 걸리지 않는다</div>`);
     } else L.push('<div class="none">옵션 없음 (일반 장비는 등급과 ★로 강해집니다)</div>');
-    const fam = kind === 'weapon' ? weaponFamilyOf(cls, t, spId) : sp && sp.craft && sp.craft.sinsu ? familyOf(sp) : null;
+    const fam = kind === 'weapon' ? weaponFamilyOf(cls, t, spId) : sp && sp.craft && (sp.craft.sinsu || sp.craft.final) ? familyOf(sp) : null;
     if (fam && WEAPON_FAMILY[fam]) L.push(`<div class="fam">${familyLine(fam)}<br>${WEAPON_FAMILY[fam].text}</div>`);
     // 격: the rule and what it does
     const gys = [];
@@ -3994,7 +4001,7 @@ function openCraft(sink = null) {
     const baseOk = !c.from || (b.includes(baseKey) && starOf(cls, baseKey) >= 5);
     const baseText = c.from ? `${specialName(base, cls.id)} ★5 (지금 ${b.includes(baseKey) ? '★' + starOf(cls, baseKey) : '없음'}) + ` : '';
     icon = pieceIcon(cls, c.kind, specialBase(sp, cls.id), c.id) || picture(craftPicture(sp, cls.id, got ? starOf(cls, key) : 1));
-    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, baseIcon: c.from ? pieceIcon(cls, base.kind, specialBase(base, cls.id), base.id) : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text + (c.set && MUSIN_SET[c.set] ? ` · 세트 ${MUSIN_SET[c.set].name}: ${MUSIN_SET[c.set].text}` : ''), got };
+    meta = { mats: c.mats, gold: c.gold, base: c.from ? `${specialName(base, cls.id)} ★5` : null, baseIcon: c.from ? pieceIcon(cls, base.kind, specialBase(base, cls.id), base.id) : null, gyeok: sp.gyeok && GYEOK[sp.gyeok], opt: sp.opt.text + (c.set && MUSIN_SET[c.set] ? ` · 세트 ${MUSIN_SET[c.set].name}: ${MUSIN_SET[c.set].text}` : '') + (FINAL_SHIELD_ROLE[c.id] ? ` · ${guardRoleText(FINAL_SHIELD_ROLE[c.id])}` : ''), got };
     const fam = familyOf(sp), famText = fam !== 'craft' && WEAPON_FAMILY[fam] ? ` · ${WEAPON_FAMILY[fam].role}${c.id === 'cr_sinsu_jujak' ? ` (주변 ${JUJAK_AURA.r}칸 아군 공격력 +${Math.round(JUJAK_AURA.k * 100)}%)` : ''}` : '';
     // A recipe of the story's gate (items.js needs): shut until that ground or raid is won.
     const gateOk = got || needsMet(c.needs, progress);
@@ -4144,7 +4151,7 @@ window.__forgeKeys = c => { const cls = CLASSES[c]; return ['weapon', 'armor', '
 let forgeTab = null, forgePick = null, forgeFresh = true, forgeBusy = false, forgeOut = null, forgeLast = null;
 const lbScroll = { tab: null };
 const forgeKey = e => e.name.replace(/ ★\d+$/, '').replace(/ \(.*\)$/, '');
-const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['심판의낫', /심판의낫/], ['무신 방어구', /사신수 무신/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
+const FORGE_TABS = [['용무기', /용무기/], ['재료 장비', /재료 장비/], ['전설', /전설/], ['사신수', /사신수 지존/], ['심판의낫', /심판의낫/], ['무신 방어구', /사신수 무신/], ['최종 방패', /최종 방패/], ['투구·방패·망토', /^조합 · (투구|방패|망토)/], ['각인', /각인/],
   ['강화', /강화/], ['신발', /^신발/], ['레이드 상점', /레이드 상점/]];
 function forgeTabOf(sec) {
   const t = FORGE_TABS.find(([, re]) => re.test(sec));
@@ -6311,6 +6318,9 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
   if (p.sts && heroStatusOn('curse')) taken *= 1.25;
   if (G.buffs.g_ward > G.t) taken *= 1 - (G.buffs.g_wardK || 0);
+  // 최종 방패 (items.js FINAL_SHIELD_ROLE): a boss or its lieutenant, a war's fighter, or the crowd
+  const gr = p.guardRole && from && from.m ? p.guardRole : null;
+  if (gr) taken *= 1 - (from.kind === 'boss' || from.kind === 'mini' ? gr.boss : from.war ? gr.war : gr.mob);
   if (G.buffs.ward9 > G.t) {
     // 9차 아우라 (data.js S9: ward); 천신의권역's (zone9 wardHits): so many blows at the first cut, the rest at the second
     const wh = G.ward9Hits && G.ward9Hits.inside && G.ward9Hits.until > G.t ? G.ward9Hits : null;
