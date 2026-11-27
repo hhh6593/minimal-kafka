@@ -319,40 +319,160 @@ ARENAS = {
     'wreck': ('Maps_409180.unity3d', 'kow_ship_dragonpalace_07_04_shipgraveyard_01', (9, 6, 52, 50)),
     'sandolim': ('Maps_415501.unity3d', 'kow_skybelow_01_first_01_01_sandolim_canyon_01', (14, 10, 78, 64)),
 }
+# 9차 사냥터 지형 (2026-11-28): every other 연 ground of tools/yeon_grounds.json on its own map too
+# (before, a plain field of its floor tiles with a few props). Crop None: the box round the map's
+# movable tiles, ARENA_RIM tiles wider (the cliffs and shores that close it, not the blurred
+# rim). Left out: the ones too small to hunt on (늑대인간의 굴 163 movable tiles, the hidden 철상
+# 지옥 178, 소굴 336: a few rooms' worth, the horde had nowhere to come from) and the endless
+# hell's suwoo cave (its torches, fog and rooms are a mode of their own).
+ARENA_AUTO = ['reef', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu2', 'baekdu3',
+              'baekdu4', 'hanbing', 'geohae', 'cheolsang', 'zud', 'zud2', 'fallforest', 'jagwi', 'oldaram',
+              'haya', 'lobi', 'aram', 'ancient', 'abyss2', 'abyss4']
+ARENA_RIM = 2
 # Arenas whose void, chasms and cliff faces are bare floor ground (연's hell): yeon_war.blocked32's
 # unseen-blocker rule would open them (화탕지옥: the hero and the monsters walked off the cliffs).
-NO_UNSEEN = {'hwatang'}
+NO_UNSEEN = {'hwatang', 'hanbing', 'geohae', 'cheolsang', 'abyss4'}
+# Closed ground that reads as ground (bare floor tiles, nothing drawn over them: the rim of dirt
+# round a meadow, a strip of sand past 연's unseen edge) is drawn darker, so what holds the
+# bodies back is what the eye sees as out of bounds (보이는 것 = 맞는 것). The factor of light kept.
+SHADE = 0.45
+BARE = 0.2      # a closed cell under a fifth covered by the upper layers: bare
+OPEN_BIT = 4    # a patch of bare closed cells this small, inside the field: opened
+
+
+def arena_crop(data):
+    """The movable tiles' box, ARENA_RIM wider, inside the map."""
+    W, H, mv = data['width'], data['height'], data['movables']
+    xs = [i % W for i in range(W * H) if mv[i]]
+    ys = [i // W for i in range(W * H) if mv[i]]
+    return (max(0, min(xs) - ARENA_RIM), max(0, min(ys) - ARENA_RIM),
+            min(W, max(xs) + 1 + ARENA_RIM), min(H, max(ys) + 1 + ARENA_RIM))
+
+
+def bare_cells(up, walk):
+    """The closed cells with (almost) nothing drawn over the ground in them: up is the crop's
+    upper tile layers (1..4) rendered, a cell is bare when under a fifth of it is covered."""
+    G = 48
+    a = up.getchannel('A').point(lambda v: 255 if v > 40 else 0)
+    rows, cols = len(walk), len(walk[0])
+    out = set()
+    for gy in range(rows):
+        for gx in range(cols):
+            if walk[gy][gx] != '.':
+                hist = a.crop((gx * G, gy * G, gx * G + G, gy * G + G)).histogram()
+                if hist[255] < G * G * BARE:
+                    out.add((gx, gy))
+    return out
+
+
+def open_bits(walk, bare):
+    """Small patches of bare closed cells (OPEN_BIT cells or fewer, off the picture's edge) opened:
+    연 stood a tree, a rock or a tent there (its map objects, which this field does not draw), and
+    such a cell held the bodies back over a meadow that showed nothing. The walk grid's pocket
+    rule again after (a patch walled round by drawn things stays shut)."""
+    rows, cols = len(walk), len(walk[0])
+    cells = [[c == '.' for c in row] for row in walk]
+    seen = set()
+    for c in sorted(bare):
+        if c in seen:
+            continue
+        part, st = [c], [c]
+        seen.add(c)
+        while st:
+            x, y = st.pop()
+            for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if n in bare and n not in seen:
+                    seen.add(n)
+                    part.append(n)
+                    st.append(n)
+        if len(part) <= OPEN_BIT and not any(x in (0, cols - 1) or y in (0, rows - 1) for x, y in part):
+            for x, y in part:
+                cells[y][x] = True
+    # the field: the part the most open cells are in; the rest shut
+    comp, best = {}, None
+    for gy in range(rows):
+        for gx in range(cols):
+            if not cells[gy][gx] or (gx, gy) in comp:
+                continue
+            part, st = [(gx, gy)], [(gx, gy)]
+            comp[(gx, gy)] = part
+            while st:
+                x, y = st.pop()
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < cols and 0 <= ny < rows and cells[ny][nx] and (nx, ny) not in comp:
+                        comp[(nx, ny)] = part
+                        part.append((nx, ny))
+                        st.append((nx, ny))
+            if best is None or len(part) > len(best):
+                best = part
+    for (x, y), part in comp.items():
+        if part is not best:
+            cells[y][x] = False
+    return [''.join('.' if c else '#' for c in row) for row in cells]
+
+
+def shade_closed(img, walk, bare):
+    """Darken the bare closed cells (closed ground that reads as ground: the rim round a meadow,
+    a fort's yard past its wall, a cliff's top, the sea), feathered a few pixels into the open
+    ones, so a closed edge is seen where it is. Cells with a wall, a cliff face or a rock drawn
+    in them are left as drawn: those read as closed already."""
+    from PIL import Image, ImageDraw, ImageFilter
+    G = 48
+    mask = Image.new('L', img.size, 0)
+    d = ImageDraw.Draw(mask)
+    rows, cols = len(walk), len(walk[0])
+    for gx, gy in bare:
+        if walk[gy][gx] == '.':
+            continue
+        # (the last column / row: on to the picture's edge, the strip past the last whole cell)
+        d.rectangle((gx * G, gy * G, img.width if gx == cols - 1 else gx * G + G - 1,
+                     img.height if gy == rows - 1 else gy * G + G - 1), fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(5))
+    dark = img.point(lambda v: int(v * SHADE))
+    return Image.composite(dark, img, mask)
 
 
 def arena(dec, gear, only=None):
     """GEAR_DIR/yhunt/<id>_<cx>_<cy>.png (1024-pixel pieces of the crop, every tile layer) and
     GEAR_DIR/yhunt/index.json: {"<id>": {"w", "h", "chunk", "cols", "rows", "walk", "start", "map",
     "crop"}} - walk is the 48-pixel walk grid (tools/yeon_war.py walk_grid, the wars' rules), start
-    the open cell nearest the middle, where the hero comes in."""
+    the open cell nearest the middle, where the hero comes in.
+    (env YHUNT_OUT: another folder than GEAR_DIR/yhunt, e.g. GEAR_DIR/yhunt_add, which
+    tools/repack_from_apk.py lays over an earlier APK's.)"""
     import yeon_maps
     import yeon_war
     from PIL import Image
     T, G, CH = 32, 48, 1024
-    d = os.path.join(gear, 'yhunt')
+    d = os.environ.get('YHUNT_OUT') or os.path.join(gear, 'yhunt')
     os.makedirs(d, exist_ok=True)
     ip = os.path.join(d, 'index.json')
     index = json.load(open(ip, encoding='utf-8')) if os.path.isfile(ip) else {}
-    for gid, (bundle, name, (x0, y0, x1, y1)) in ARENAS.items():
+    spec = {g['id']: g for g in json.load(open(os.path.join(HERE, 'yeon_grounds.json'), encoding='utf-8'))['grounds']}
+    todo = dict(ARENAS)
+    for gid in ARENA_AUTO:
+        todo[gid] = (spec[gid]['bundle'], spec[gid]['map'], None)
+    for gid, (bundle, name, crop) in todo.items():
         if only and gid not in only:
             continue
         b = os.path.join(dec, bundle)
         data, _ = yeon_maps.load_map(b, name)
+        x0, y0, x1, y1 = crop or arena_crop(data)
         full = yeon_maps.render(b, name)
         img = Image.new('RGBA', ((x1 - x0) * T, (y1 - y0) * T), (0, 0, 0, 255))
         img.alpha_composite(full.crop((x0 * T, y0 * T, x1 * T, y1 * T)))
         img = img.convert('RGB')
         w, h = img.size
+        cols, rows = w // G, h // G
+        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1), gid not in NO_UNSEEN), cols, rows)
+        if gid in ARENA_AUTO:
+            up = Image.new('RGBA', (w, h))
+            up.alpha_composite(yeon_maps.render(b, name, layers={1, 2, 3, 4}).crop((x0 * T, y0 * T, x1 * T, y1 * T)))
+            walk = open_bits(walk, bare_cells(up, walk))
+            img = shade_closed(img, walk, bare_cells(up, walk))
         for cy in range(-(-h // CH)):
             for cx in range(-(-w // CH)):
                 img.crop((cx * CH, cy * CH, min(w, (cx + 1) * CH), min(h, (cy + 1) * CH))).save(
                     os.path.join(d, f'{gid}_{cx}_{cy}.png'), optimize=True)
-        cols, rows = w // G, h // G
-        walk = yeon_war.walk_grid(yeon_war.blocked32(data, (x0, y0, x1, y1), gid not in NO_UNSEEN), cols, rows)
         cells = [(x, y) for y in range(rows) for x in range(cols) if walk[y][x] == '.']
         start = min(cells, key=lambda c: (c[0] - cols / 2) ** 2 + (c[1] - rows / 2) ** 2)
         index[gid] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'start': list(start),
