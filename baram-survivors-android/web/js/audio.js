@@ -30,11 +30,13 @@ const SYNTH = {
 const MIN_GAP = { hit: 0.12, kill: 0.09, crit: 0.18, pickup: 0.03, skill_aura: 0.5, click: 0,
   // 피격 (타격감 점검 2026-11-28): the hero struck, a companion struck, a fighter struck near the hero in a war
   hurt: 0.3, mate_hurt: 0.4, war_hit: 0.2,
+  // 영웅 강타음 (2026-11-28): the hero struck hard — 연's sfx_bat_critical_mon (1 s long), not over itself
+  hurt_big: 0.9,
   // The last spells come fast but sound long: let each ring out before it starts again.
   skill_w_sword: 1.6, skill_m_fire3: 1.8, skill_p_wave: 1.4, skill_r_dance: 0.6, skill_r_storm: 0.7,
   skill_r_heaven: 0.9, skill_r_formless: 2.0 };
 // Sounds that come many times a second play softer than spells.
-const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45, combo: 0.9, hurt: 0.6, mate_hurt: 0.3, war_hit: 0.2 };
+const GAIN = { hit: 0.35, pickup: 0.5, click: 0.6, kill: 0.28, crit: 0.45, combo: 0.9, hurt: 0.6, hurt_big: 0.75, mate_hurt: 0.3, war_hit: 0.2 };
 
 // Decoded sound kept at most (mono float samples: about 80 seconds at 48 kHz).
 const SFX_BUDGET = 16e6;
@@ -53,10 +55,10 @@ const PITCH = 0.045;
 // over the blows that come many times a second.
 function prioOf(key, kind) {
   if (kind === 'ult' || /^(boss|levelup|promote|chest|win|lose|revive|enter|quest|combo|click)/.test(key)) return 3;
-  if (key.startsWith('skill_') || key === 'hurt') return 2; // (the hero's own blow taken: over the crowd's hits)
+  if (key.startsWith('skill_') || key === 'hurt' || key === 'hurt_big') return 2; // (the hero's own blow taken: over the crowd's hits)
   return 1;
 }
-const VARIED = /^(skill_|hit$|crit$|swing$|hurt$|mate_hurt$|war_hit$)/; // (not the kill sound: its pitch climbs with the streak)
+const VARIED = /^(skill_|hit$|crit$|swing$|hurt$|hurt_big$|mate_hurt$|war_hit$)/; // (not the kill sound: its pitch climbs with the streak)
 
 export class Audio {
   constructor(manifest) {
@@ -177,7 +179,7 @@ export class Audio {
       this.master.gain.value = this.sfxVolume;
       this.master.connect(this.ctx.destination);
       // The sounds heard all the time, ready from the first blow; the rest as they are first played.
-      for (const k of ['hit', 'kill', 'crit', 'hurt', 'pickup', 'click', 'combo', 'levelup', 'enter']) { const f = this.fileOf(k); if (f) this.want(f); }
+      for (const k of ['hit', 'kill', 'crit', 'hurt', 'hurt_big', 'pickup', 'click', 'combo', 'levelup', 'enter']) { const f = this.fileOf(k); if (f) this.want(f); }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
     if (this.music && this.bgmOn && this.music.paused && !this.halted) this.music.play().catch(() => {});

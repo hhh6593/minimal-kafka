@@ -3,6 +3,7 @@
 
     yeon_sounds.py RES_ZIP WORK_DIR
     yeon_sounds.py --js web/js/yeon_sounds.js      (rewrite the game's table from MAP only)
+    yeon_sounds.py --add RES_ZIP|DEC_DIR GEAR_DIR/ysfx_add   (only ADD_SFX: the clips the last APK lacks)
 
 RES_ZIP is the zip of the game's downloaded resources (Android/data/com.nexon.baram/...: the
 *.unity3d bundles). The bundles are stored XOR'd with a 20-byte key; the key is recovered from
@@ -43,6 +44,8 @@ MAP = {
         'hit': 'sfx_bat_hit_normal', 'crit': 'sfx_bat_critical', 'kill': 'sfx_unit_dead_grass1',
         # 피격 (타격감 점검 2026-11-28): 연's blow sound, a little lower for the hero and its companions struck
         'hurt': 'sfx_bat_hit_normal_2@0.85', 'mate_hurt': 'sfx_bat_hit_normal_2@0.95', 'war_hit': 'sfx_bat_hit_normal',
+        # 영웅 강타음 (2026-11-28): the hero struck hard (a blow of 12% of its life or more) — 연's own monster critical
+        'hurt_big': 'sfx_bat_critical_mon',
         'swing': 'sfx_bat_swing_normal_1', 'levelup': 'sfx_fx_levelup', 'pickup': 'sfx_ui_get_coin',
         'heal': 'fx_skill_heal_01', 'chest': 'SFX_UI_GlobalCloset_BoxOpen_1', 'boss': 'sfx_ui_tower_boss',
         'win': 'sfx_ui_muhan_win', 'lose': 'sfx_ui_muhan_defeat', 'revive': 'sfx_ui_resurrection_normal',
@@ -220,6 +223,42 @@ MAP = {
 }
 
 
+# The clips the game uses that the last APK's build does not carry: made on their own (--add) into
+# GEAR_DIR/ysfx_add/sfx/, which tools/repack_from_apk.py ysfx_add() merges into assets/audio/sfx as OGG.
+ADD_SFX = ['sfx_bat_critical_mon']
+
+
+def add_sfx(src, out, clips=None):
+    """yeon_sounds.py --add RES_ZIP|DEC_DIR OUT_DIR [clip ...]: only the named clips of Sounds.unity3d (ADD_SFX by
+    default), loudness-matched as sound_pick/ (norm), into OUT_DIR/sfx/<clip>.wav. DEC_DIR: the bundles already
+    un-XOR'd (Sounds.unity3d starts 'UnityFS')."""
+    import UnityPy
+    clips = set(clips or ADD_SFX)
+    if os.path.isdir(src):
+        raw = open(os.path.join(src, 'Sounds.unity3d'), 'rb').read()
+        if not raw.startswith(b'UnityFS'):
+            raw = dexor(raw)
+    else:
+        z = zipfile.ZipFile(src)
+        member = {n.split('/')[-1]: n for n in z.namelist()}
+        raw = dexor(z.read(member['Sounds.unity3d']))
+    os.makedirs(os.path.join(out, 'sfx'), exist_ok=True)
+    tmp = os.path.join(out, 'raw')
+    os.makedirs(tmp, exist_ok=True)
+    got = []
+    for o in UnityPy.load(raw).objects:
+        if o.type.name != 'AudioClip':
+            continue
+        c = o.read()
+        if c.m_Name not in clips:
+            continue
+        for _, data in c.samples.items():
+            open(os.path.join(tmp, c.m_Name + '.wav'), 'wb').write(data)
+        norm(os.path.join(tmp, c.m_Name + '.wav'), os.path.join(out, 'sfx', c.m_Name + '.wav'))
+        got.append(c.m_Name)
+    print('added:', sorted(got), 'missing:', sorted(clips - set(got)))
+
+
 def dexor(raw):
     head = raw[:40]
     key = bytes([a ^ b for a, b in zip(head, KEY_PLAIN)] + [head[38], head[39]])
@@ -323,6 +362,9 @@ def main():
     import UnityPy
     if sys.argv[1] == '--js':
         write_js(sys.argv[2])
+        return
+    if sys.argv[1] == '--add':
+        add_sfx(sys.argv[2], sys.argv[3], sys.argv[4:])
         return
     res, work = sys.argv[1], sys.argv[2]
     for d in ('sounds', 'tables', 'sound_pick'):

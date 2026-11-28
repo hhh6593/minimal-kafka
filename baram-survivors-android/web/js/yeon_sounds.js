@@ -76,6 +76,7 @@ export const YEON_SOUNDS = {
  "hit": "sfx_bat_hit_normal",
  "hurt": "sfx_bat_hit_normal_2@0.85",
  "mate_hurt": "sfx_bat_hit_normal_2@0.95",
+ "hurt_big": "sfx_bat_critical_mon",
  "war_hit": "sfx_bat_hit_normal",
  "crit": "sfx_bat_critical",
  "kill": "sfx_unit_dead_grass1",
