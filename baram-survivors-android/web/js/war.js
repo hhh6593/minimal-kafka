@@ -951,8 +951,6 @@ function heroTo(x, y) {
 export const War = {
   setup: () => setup(),
   update: dt => update(dt),
-  /** A tap on the war's minimap (game.js pointerup, canvas pixels): it is made larger or smaller. */
-  mmTap: (x, y) => mmTap(x, y),
   open: (x, y) => { const G = A.G(); return open(G.war, x, y, 0); },
   /** May fighter b step onto (x, y), taken already (game.js step)? Its own side's tile, yes. */
   share: (b, x, y) => share(b, x, y),
@@ -2405,7 +2403,7 @@ function hit(W, src, t, dmg) {
     return;
   }
   t.hp -= dmg;
-  t.flash = 0.12;
+  struck(G, W, t, src);
   t.lastHitBy = src;
   t.lastHitT = G.t;
   t.hitBy.set(src, G.t);
@@ -2416,6 +2414,51 @@ function hit(W, src, t, dmg) {
   if (!src.floor) credit(t, 'taken', dmg);
   num(W, t, dmg, false);
   if (t.hp <= 0) kill(W, t, src);
+}
+
+// 피격 연출 (타격감 점검 2026-11-28): a fighter struck showed nothing but its bar (its flash was set and never drawn).
+// Now a blink (a foe's white, ours red: drawFighter / drawUnit) no more than three times a second, a jolt of a few pixels
+// away from the blow, and on the hero's screen 연's blow sound, soft (audio 'war_hit': no more than five a second, quieter
+// as it repeats — audio.js).
+
+function struck(G, W, t, src) {
+  if (G.t - (t.flashAt ?? -9) < 0.34) return;
+  t.flashAt = G.t;
+  t.flash = 0.12;
+  t.kickAt = G.t;
+  const dx = src && src.x !== undefined ? t.x - src.x : 0, dy = src && src.y !== undefined ? t.y - src.y : 0, d = Math.hypot(dx, dy);
+  t.kdx = d ? dx / d : 0;
+  t.kdy = d ? dy / d : 0;
+  const p = G.player;
+  if (Math.abs(t.x - p.x) < A.VW() / 2 && Math.abs(t.y - p.y) < A.VH() / 2) A.audio().play('war_hit');
+}
+/** The jolt of a struck body (pixels, x and y), easing back over a tenth of a second. */
+function kick(b) {
+  const kt = b.kickAt !== undefined ? A.G().t - b.kickAt : 9;
+  if (kt >= 0.12) return [0, 0];
+  const k = 3 * (1 - kt / 0.12);
+  return [(b.kdx || 0) * k, (b.kdy || 0) * k * 0.6];
+}
+/** A frame's tint for a blink (kept with the frame entry). */
+function flashPic(e, color) {
+  const key = color === '#ffffff' ? 'wh' : 'rd';
+  if (!e[key]) {
+    const c = document.createElement('canvas');
+    c.width = e.w;
+    c.height = e.h;
+    const g = c.getContext('2d');
+    g.drawImage(e.pic, e.sx, e.sy, e.w, e.h, 0, 0, e.w, e.h);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, e.w, e.h);
+    e[key] = c;
+  }
+  return e[key];
+}
+function blitFlash(ctx, b, e, x, y, alpha) {
+  if (!(b.flash > 0) || b.dead) return;
+  ctx.globalAlpha = alpha * Math.min(1, b.flash / 0.12) * (A.settings().calmFx ? 0.25 : 0.45);
+  ctx.drawImage(flashPic(e, b.team === 0 ? '#ff3a24' : '#ffffff'), x + e.ox, y + e.oy);
 }
 
 function num(W, t, n, healing) {
@@ -7987,7 +8030,6 @@ function drawBody(b) {
     if (b.cue && G.t - b.cue.t < 0.5 && !dbg.nocue) drawCue(ctx, b, G.t - b.cue.t);
     if (b.gear && b.gear.glow && !b.dead && !dbg.noglow) drawGlow(ctx, b, b.gear.glow);
     drawFighter(b, b.x, b.y, pose, alpha) || A.drawYhero2(b.cls, b.gear, b, b.x, b.y, pose, alpha) || A.drawYhero(b.cls.id, b.gear ? b.gear.armor : 0, b, b.x, b.y, pose, alpha);
-    if (b.flash > 0) { /* a struck fighter shows it in its bar */ }
     top = 50;
   } else {
     const yu = b.unit && A.yunit({ id: b.unit });
@@ -8251,9 +8293,11 @@ function drawUnit(yu, b, row, f, mirror, alpha) {
     g.drawImage(im, (f % cols) * cw, (row + Math.floor(f / cols)) * ch, cw, ch, 0, 0, cw * s, ch * s);
     c = keepFrame(key, c);
   }
-  const ctx = A.ctx;
+  const ctx = A.ctx, [kx, ky] = kick(b);
   ctx.globalAlpha = alpha;
-  blit(ctx, c, Math.round(b.x - (mirror ? cw - fx : fx) * s), Math.round(b.y - fy * s));
+  const bx = Math.round(b.x + kx - (mirror ? cw - fx : fx) * s), by = Math.round(b.y + ky - fy * s);
+  blit(ctx, c, bx, by);
+  blitFlash(ctx, b, c, bx, by, alpha);
   ctx.globalAlpha = 1;
 }
 
@@ -8469,7 +8513,9 @@ function drawFighter(b, x, y, pose, alpha, noDraw = false) {
   }
   ctx.globalAlpha = alpha;
   const { cw, fx, fy } = c.box || { cw: H.cell[0], fx: H.foot[0], fy: H.foot[1] };
-  blit(ctx, c, Math.round(x) - (mirror ? cw - fx : fx), Math.round(y) - fy);
+  const [kx, ky] = kick(b), bx = Math.round(x + kx) - (mirror ? cw - fx : fx), by = Math.round(y + ky) - fy;
+  blit(ctx, c, bx, by);
+  blitFlash(ctx, b, c, bx, by, alpha);
   ctx.globalAlpha = 1;
   return true;
 }
@@ -8573,51 +8619,43 @@ function drawWarProp(W, b) {
 // and what they do were out of sight. 연's own field art made small (its chunks, once loaded), under the hero's HP panel:
 // the objectives in their owners' colours, our fighters, the foes our side can see (within 9 tiles of one of ours — a
 // 매복 not until it springs), each of our squads' way (a line to its order; 우회 · 매복 · 재집결 by its tag's colour), the
-// screen's own frame. A tap on it makes it larger or smaller (War.mmTap).
-let mmBig = false;
+// screen's own frame. A tap on it makes it larger or smaller; in 크게 it zooms and moves (game.js mmFrame / mmChrome:
+// 미니맵 확대·이동 2026-11-28), and it folds away to a tab.
 function mmRect(W) {
-  const cw = A.canvas.width, ch = A.canvas.height, d = cw / (A.boxOf(A.canvas).width || cw), m = W.map;
-  const maxW = (mmBig ? 300 : 132) * d, maxH = (mmBig ? 230 : 104) * d;
+  const cw = A.canvas.width, d = cw / (A.boxOf(A.canvas).width || cw), m = W.map, big = A.mmView('war').mode === 'big';
+  const maxW = (big ? 300 : 132) * d, maxH = (big ? 230 : 104) * d;
   const k = Math.min(maxW / m.w, maxH / m.h);
-  return { x: 8 * d, y: (mmBig ? 64 : 64) * d, w: m.w * k, h: m.h * k, k, d };
+  return { x: 8 * d, y: 64 * d, w: m.w * k, h: m.h * k, d };
 }
-function mmBack(W, r) {
-  const m = W.map, key = W.def.id + ':' + Math.round(r.w);
-  if (W.mm && W.mm.key === key && (W.mm.ok || A.G().t - W.mm.at < 1)) return W.mm.c;
-  const c = (W.mm && W.mm.key === key && W.mm.c) || document.createElement('canvas');
-  c.width = Math.max(1, Math.round(r.w));
-  c.height = Math.max(1, Math.round(r.h));
-  const g = c.getContext('2d'), s = c.width / m.w;
-  g.imageSmoothingEnabled = true;
-  let ok = true;
-  for (let cy = 0; cy * m.chunk < m.h; cy++)
-    for (let cx = 0; cx * m.chunk < m.w; cx++) {
-      const path = `ywar/${W.def.id}_${cx}_${cy}.${m.ext || 'png'}`, im = mapBms.get(path) || A.images[path];
-      if (!im || !im.width) { ok = false; continue; }
-      g.drawImage(im, cx * m.chunk * s, cy * m.chunk * s, im.width * s, im.height * s);
-    }
-  // The closed ground a shade darker: the ways read at a glance.
-  g.fillStyle = 'rgba(0,0,0,0.35)';
-  const ts = TILE * s;
-  for (let y = 0; y < m.rows; y++) for (let x = 0; x < m.cols; x++) if (!m.walk[y * m.cols + x]) g.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5);
-  W.mm = { key, c, ok, at: A.G().t };
-  return c;
+function mmBack(W) {
+  const m = W.map;
+  return A.mmBackOf('war:' + W.def.id, m.w, m.h, (g, s) => {
+    let ok = true;
+    for (let cy = 0; cy * m.chunk < m.h; cy++)
+      for (let cx = 0; cx * m.chunk < m.w; cx++) {
+        const path = `ywar/${W.def.id}_${cx}_${cy}.${m.ext || 'png'}`, im = mapBms.get(path) || A.images[path];
+        if (!im || !im.width) { ok = false; continue; }
+        g.drawImage(im, cx * m.chunk * s, cy * m.chunk * s, im.width * s, im.height * s);
+      }
+    // The closed ground a shade darker: the ways read at a glance.
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    const ts = TILE * s;
+    for (let y = 0; y < m.rows; y++) for (let x = 0; x < m.cols; x++) if (!m.walk[y * m.cols + x]) g.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5);
+    return ok;
+  });
 }
 function drawWarMinimap(G, W, ctx) {
   if (W.raid || (window.__dbgWar && window.__dbgWar.nomm)) return;
-  const r = mmRect(W), bg = mmBack(W, r), { x, y, w, h, d } = r, ts = TILE * r.k;
-  const X = tx => x + (tx + 0.5) * ts, Y = ty => y + (ty + 0.5) * ts;
+  if (A.mmView('war').mode === 'fold') { A.mmFoldTab('war', 8 * (A.canvas.width / (A.boxOf(A.canvas).width || A.canvas.width)), 64 * (A.canvas.width / (A.boxOf(A.canvas).width || A.canvas.width))); return; }
+  const r = mmRect(W), d = r.d, p0 = G.player, T = A.mmFrame('war', r, W.map.w, W.map.h, p0.x, p0.y), ts = TILE * T.k;
+  const X = tx => T.X((tx + 0.5) * TILE), Y = ty => T.Y((ty + 0.5) * TILE);
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(x - 3 * d, y - 3 * d, w + 6 * d, h + 6 * d);
-  ctx.strokeStyle = 'rgb(201,162,74)';
-  ctx.lineWidth = d;
-  ctx.strokeRect(x - 2.5 * d, y - 2.5 * d, w + 5 * d, h + 5 * d);
-  ctx.globalAlpha = 0.9;
-  ctx.drawImage(bg, x, y, w, h);
-  ctx.globalAlpha = 1;
+  A.mmBackDraw(T, mmBack(W));
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
   const dot = (tx, ty, col, s, shape) => {
     const px = X(tx), py = Y(ty);
     ctx.fillStyle = '#000';
@@ -8670,20 +8708,15 @@ function drawWarMinimap(G, W, ctx) {
   for (const b of W.alive[0]) if (!b.hero && !b.gate && !b.troop) dot(b.tx, b.ty, b.lurk > G.t ? '#c8ff8a' : '#58e868', 2 * d);
   for (const e of W.mmSeen.seen) if (!e.dead) dot(e.tx, e.ty, teamCol('bar', e.team), 2 * d);
   // The screen's frame and the hero.
-  const VW = A.VW(), VH = A.VH(), p = G.player;
+  const VW = A.VW(), VH = A.VH(), p = G.player, [cx0, cy0] = G.camAt || [p.x - VW / 2, p.y - VH / 2];
   ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.strokeRect(x + (p.x - VW / 2) * r.k, y + (p.y - VH / 2) * r.k, VW * r.k, VH * r.k);
-  if (!G.dead && (Math.floor(performance.now() / 400) % 2 === 0 || mmBig)) dot(p.tx, p.ty, '#fff', 4 * d);
+  ctx.strokeRect(T.X(cx0), T.Y(cy0), VW * T.k, VH * T.k);
+  if (!G.dead && (Math.floor(performance.now() / 400) % 2 === 0 || T.v.mode === 'big')) dot(p.tx, p.ty, '#fff', 4 * d);
   ctx.restore();
-}
-/** A tap at (cx, cy) in canvas pixels: on the minimap, it is made larger or smaller (true when it was). */
-function mmTap(cx, cy) {
-  const G = A.G(), W = G && G.war;
-  if (!W || W.raid) return false;
-  const r = mmRect(W);
-  if (cx < r.x - 4 * r.d || cy < r.y - 4 * r.d || cx > r.x + r.w + 4 * r.d || cy > r.y + r.h + 4 * r.d) return false;
-  mmBig = !mmBig;
-  return true;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  A.mmChrome(T);
+  ctx.restore();
 }
 
 function hud() {

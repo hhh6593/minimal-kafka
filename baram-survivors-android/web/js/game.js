@@ -613,7 +613,8 @@ async function boot() {
   // (not over the original's own 9차 picture, o_<id>: 해일강타 had 연's water storm before the original's wave)
   for (const id of Object.keys(SKILLS)) {
     const fx = 'k_' + id;
-    if (M.fx[fx] && !String(SKILLS[id].fx || '').startsWith('o_')) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
+    // (fxOwn: a 연 picture of its own named in data.js — 광폭기조사's whole Frenzy_Ray, its k_<id> the hit — kept)
+    if (M.fx[fx] && !String(SKILLS[id].fx || '').startsWith('o_') && !SKILLS[id].fxOwn) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
   // 태초광명 격: 천자의분노's blow drawn additive (its dark strokes drop out), a gold-white light.
   if (M.fx.g_anger_son) M.fx.g_taecho_light = { ...M.fx.g_anger_son, src: M.fx.g_anger_son.src || 'g_anger_son', add: true };
@@ -1228,7 +1229,11 @@ function buildStages() {
   }
   // 연's own map for the tab where the build has it (the 대륙, 환상의 섬); the old one else.
   const ym = M.ymap && M.ymap[mapTab];
-  map.innerHTML = ym ? `<img src="assets/ymap/${ym.file}" alt="">` : `<img src="assets/ui/${mapTab}.webp" alt="">`;
+  // (the picture and its pins in one layer that zooms and moves: mapZoomBind; the goal's line and the keys stay put)
+  map.innerHTML = `<div id="map-in">${ym ? `<img src="assets/ymap/${ym.file}" alt="">` : `<img src="assets/ui/${mapTab}.webp" alt="">`}</div>`
+    + '<div class="map-zoom"><button data-z="in" title="확대">+</button><button data-z="out" title="축소">-</button><button data-z="goal" title="고른 곳으로">◎</button><button data-z="fit" title="전체">전체</button></div>';
+  const inner = $('#map-in');
+  inner.querySelector('img').onload = () => mapApply();
   map.classList.toggle('ymap', !!ym);
   // The goal: the first ground open and not yet conquered, named over the map wherever it is.
   const nextI = STAGES.findIndex((s, i) => unlocked(i) && !progress.cleared[s.id]);
@@ -1245,7 +1250,7 @@ function buildStages() {
     t.style.top = townAt[1] * 100 + '%';
     t.innerHTML = '<b>마을</b><i></i><span>국내성</span>';
     t.onclick = () => enterTown(chosenClass);
-    map.append(t);
+    inner.append(t);
   }
   STAGES.forEach((s, i) => {
     if (s.map !== mapTab || !hiddenShown(s)) return;
@@ -1261,10 +1266,113 @@ function buildStages() {
       pickedStage = s;
       buildStages();
     };
-    map.append(b);
+    inner.append(b);
   });
+  mapApply();
   stageInfo();
 }
+
+// ---- 지도 확대·이동 (사용자 2026-11-28 "지도는 줄였다 펼쳤다가 가능한지"): the ground map (대륙·국내성·환상의 섬·하늘 아래·
+// 지옥) was one fixed picture, its pins crowded on a phone (the picture is the screen's height, some 360 px). Now two fingers
+// pinch it larger or smaller, one finger drags it, the wheel zooms where it points, and the keys at its corner zoom in (+),
+// out (-), to the ground picked (◎) and back to the whole (전체). Each map keeps its own zoom while the screen is open; the
+// pins keep their size (their own scale undoes the map's), and a drag is never taken for a tap on a pin.
+const MAP_ZMAX = 4;
+const mapZoom = {}; // tab -> { z, x, y } (x, y: the layer's offset in CSS px)
+function mapZ() { return mapZoom[mapTab] || (mapZoom[mapTab] = { z: 1, x: 0, y: 0 }); }
+function mapApply() {
+  const inner = $('#map-in'), map = $('#map');
+  if (!inner) return;
+  const v = mapZ(), w = map.clientWidth, h = map.clientHeight;
+  v.z = Math.max(1, Math.min(MAP_ZMAX, v.z));
+  v.x = Math.min(0, Math.max(w - w * v.z, v.x));
+  v.y = Math.min(0, Math.max(h - h * v.z, v.y));
+  inner.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`;
+  map.style.setProperty('--iz', (1 / v.z).toFixed(3));
+  map.classList.toggle('zoomed', v.z > 1.01);
+}
+/** Zoom by k about (cx, cy), in the map's own CSS px. */
+function mapZoomAt(k, cx, cy) {
+  const v = mapZ(), z1 = Math.max(1, Math.min(MAP_ZMAX, v.z * k)), r = z1 / v.z;
+  v.x = cx - (cx - v.x) * r;
+  v.y = cy - (cy - v.y) * r;
+  v.z = z1;
+  mapApply();
+}
+function mapZoomBind() {
+  const map = $('#map'), pts = new Map();
+  let drag = null, pinch = null, moved = false;
+  const at = e => { const r = map.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const off = () => mapTab === 'list' || mapTab === 'raid' || !$('#map-in');
+  map.addEventListener('pointerdown', e => {
+    if (off() || e.target.closest('.map-zoom')) return;
+    pts.set(e.pointerId, at(e));
+    if (pts.size === 1) { const v = mapZ(); drag = { p: at(e), x: v.x, y: v.y }; moved = false; pinch = null; }
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z: mapZ().z, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+      moved = true;
+    }
+  });
+  map.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId) || off()) return;
+    pts.set(e.pointerId, at(e));
+    const v = mapZ();
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      // (about the fingers' middle, which may move as well)
+      v.x += m[0] - pinch.m[0];
+      v.y += m[1] - pinch.m[1];
+      pinch.m = m;
+      mapZoomAt(pinch.z * d / pinch.d / v.z, m[0], m[1]);
+      return;
+    }
+    if (!drag) return;
+    const p = at(e), dx = p[0] - drag.p[0], dy = p[1] - drag.p[1];
+    if (!moved && Math.hypot(dx, dy) < 8) return;
+    if (!moved) { moved = true; try { map.setPointerCapture(e.pointerId); } catch (x) { /* gone */ } }
+    v.x = drag.x + dx;
+    v.y = drag.y + dy;
+    mapApply();
+  });
+  const up = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 1) { const v = mapZ(); drag = { p: [...pts.values()][0], x: v.x, y: v.y }; }
+    if (!pts.size) drag = null;
+  };
+  map.addEventListener('pointerup', up);
+  map.addEventListener('pointercancel', up);
+  // A drag or a pinch is not a tap on the pin it ended on.
+  map.addEventListener('click', e => { if (moved && !e.target.closest('.map-zoom')) { e.stopPropagation(); e.preventDefault(); } moved = false; }, true);
+  map.addEventListener('wheel', e => {
+    if (off()) return;
+    e.preventDefault();
+    const [x, y] = at(e);
+    mapZoomAt(e.deltaY < 0 ? 1.25 : 0.8, x, y);
+  }, { passive: false });
+  map.addEventListener('click', e => {
+    const b = e.target.closest('.map-zoom button');
+    if (!b || off()) return;
+    e.stopPropagation();
+    const w = map.clientWidth, h = map.clientHeight, v = mapZ();
+    if (b.dataset.z === 'in') mapZoomAt(1.5, w / 2, h / 2);
+    else if (b.dataset.z === 'out') mapZoomAt(1 / 1.5, w / 2, h / 2);
+    else if (b.dataset.z === 'fit') { v.z = 1; v.x = v.y = 0; mapApply(); }
+    else if (b.dataset.z === 'goal') {
+      // The ground picked (or the next to take), brought to the middle at twice the size at least.
+      const pin = map.querySelector('.pin.on') || map.querySelector('.pin.next');
+      if (!pin) return;
+      const px = parseFloat(pin.style.left) / 100 * w, py = parseFloat(pin.style.top) / 100 * h;
+      v.z = Math.max(v.z, 2.2);
+      v.x = w / 2 - px * v.z;
+      v.y = h / 2 - py * v.z;
+      mapApply();
+    }
+  });
+}
+mapZoomBind();
+window.__mapZoom = () => ({ tab: mapTab, ...mapZ() });
 
 /** The picked ground's card beside the map or list, and the way in. */
 function stageInfo() {
@@ -3842,6 +3950,9 @@ function codexHidden(cls, b) {
   return out;
 }
 
+// (test: every piece of a class with where it drops — 무기 드랍처 점검)
+window.__codexItems = ci => codexItems(CLASSES[ci]).map(o => ({ grade: o.grade, kind: o.kind, name: o.name, pow: o.pow, from: o.from, tag: o.tag || null, shadow: !!o.shadow }));
+
 function buildCodex() {
   const cls = codexCls || (G ? G.cls : chosenClass) || CLASSES[0];
   codexCls = cls;
@@ -4908,6 +5019,7 @@ function update(dt) {
     }
     }
     p.inv = Math.max(0, p.inv - dt);
+    p.flash = Math.max(0, (p.flash || 0) - dt);
     p.poseT = Math.max(0, p.poseT - dt);
     p.mp = Math.min(p.maxMp, p.mp + (p.maxMp / 45) * (1 + 0.25 * G.passives.mana) * (1 + 0.3 * opt('mana')) * dt);
     // Health comes back slowly by itself, as it did in the old game.
@@ -6542,9 +6654,63 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   // (The blink after a blow: in 대항전·「쟁」 a guild's crowd strikes together and a quarter second let four blows a
   // second through whatever stood round — a hero of 7.7만 in the middle of a guild was never felled, balance runs.)
   p.inv = G.war && !G.war.raid ? WAR_INV : 0.25;
-  audio.play('hurt');
+  heroStruck(taken, from);
   floatText(p.x, p.y - 64, '-' + shownNum(taken), '#ff6060');
   if (p.hp <= 0) die();
+}
+
+// 피격 연출 (타격감 점검 2026-11-28): the hero struck showed only its red number — no motion, no sound ('hurt' was '-'),
+// nothing at the screen's edge. 연 has no struck frame for its figures (its unit and hero sheets carry walk/idle/atk/cast/dead
+// only), so: a short red tint over the figure (STRUCK.tint), a jolt of a few pixels away from the blow, 연's own blow sound
+// (sfx_bat_hit_normal_2, a little lower: yeon_sounds.js 'hurt'), and the screen's edge reddening by how much of its life
+// the blow took (STRUCK.edge); under STRUCK.low of its life a slow red throb at the edge stays on. A heavy blow (STRUCK.heavy
+// of its life) shakes the screen a little. 번쩍임 줄이기 halves the light.
+const STRUCK = { tint: 0.45, jolt: 3, joltT: 0.12, edge: [0.22, 1.6, 0.55], edgeT: 0.45, low: 0.3, lowA: [0.26, 0.1], heavy: 0.12 };
+function heroStruck(taken, from) {
+  const p = G.player, k = taken / Math.max(1, p.maxHp);
+  p.flash = 0.14;
+  p.hurtAt = G.t;
+  const dx = from && from.x !== undefined ? p.x - from.x : 0, dy = from && from.y !== undefined ? p.y - from.y : 0, d = Math.hypot(dx, dy);
+  p.hdx = d ? dx / d : 0;
+  p.hdy = d ? dy / d : 0;
+  G.hurtEdge = { t: G.t, a: Math.min(STRUCK.edge[2], STRUCK.edge[0] + STRUCK.edge[1] * k) };
+  if (k >= STRUCK.heavy && !settings.calmFx) G.shake = Math.max(G.shake, 0.12);
+  audio.play('hurt');
+}
+/** The screen's red edge: the last blow's, fading, and the slow throb of a hero low on life. */
+function drawHurtEdge() {
+  const p = G.player;
+  if (!p || G.dead) return;
+  const h = G.hurtEdge, ha = h ? G.t - h.t : 9;
+  let a = ha < STRUCK.edgeT ? h.a * (1 - ha / STRUCK.edgeT) ** 2 : 0;
+  const life = p.hp / p.maxHp;
+  if (life < STRUCK.low) a = Math.max(a, (0.4 + 0.6 * (STRUCK.low - life) / STRUCK.low) * (STRUCK.lowA[0] + STRUCK.lowA[1] * Math.sin(G.t * 5)));
+  if (a < 0.01) return;
+  if (settings.calmFx) a *= 0.5;
+  const w = canvas.width, hh = canvas.height;
+  const gr = ctx.createRadialGradient(w / 2, hh / 2, hh * 0.32, w / 2, hh / 2, Math.hypot(w, hh) / 2);
+  gr.addColorStop(0, 'rgba(190,0,0,0)');
+  gr.addColorStop(1, `rgba(210,16,8,${a.toFixed(3)})`);
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, w, hh);
+}
+// A struck figure's tint (one copy of the frame in that colour, kept with the frame).
+const struckCache = new WeakMap();
+function struckTint(pic, color) {
+  let m = struckCache.get(pic);
+  if (!m) struckCache.set(pic, (m = {}));
+  if (!m[color]) {
+    const c = document.createElement('canvas');
+    c.width = pic.width;
+    c.height = pic.height;
+    const g = c.getContext('2d');
+    g.drawImage(pic, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, c.width, c.height);
+    m[color] = c;
+  }
+  return m[color];
 }
 
 /** How white a struck body goes: a boss or its lieutenant (a big shape) at 0.45, 번쩍임 줄이기 lower still. */
@@ -6569,7 +6735,9 @@ function hurtEnemy(e, dmg, push = null) {
   // (손맛 예산: a heavy blow on a big one no longer stops the world; only the big moments do.)
   // A struck monster jerks back a little, away from the blow: each hit of a 오중공격 shows.
   const p = G.player;
-  e.kickAt = G.t;
+  // (a boss or its lieutenant, struck by a crowd of blows, jerked at the rate of the blows — a big shape shaking all the
+  // while: as its white blink, no more than three times a second, and half as far: the draw's kick)
+  if (!(e.kind === 'boss' || e.kind === 'mini') || G.t - (e.kickAt ?? -9) >= 0.34) e.kickAt = G.t;
   e.kickBig = false;
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
@@ -13015,6 +13183,206 @@ function drawWayOut(pt, now) {
   portalPlate(pt.label, pt.sub, pt.x, pt.y - PLATE_UP, '#ffd27a');
 }
 
+// ---------------------------------------------------------------- 미니맵 확대·이동 (사냥터 지형·대규모 전투)
+// (사용자 2026-11-28 "지도는 줄였다 펼쳤다가 가능한지") The canvas minimaps of a walled hunting ground (hunt.js minimap) and of a
+// war (war.js drawWarMinimap) share one way of being looked at: three states — 접힘 (a small tab), 작게 (the whole map, small),
+// 크게 (larger, and there two fingers pinch it nearer or further, one finger drags it, the wheel zooms where it points).
+// A tap on it goes 작게 ↔ 크게; the keys under it: in 크게 + · - · 나 (back on the hero, following) · 작게; in 작게 접기;
+// folded, its tab opens it. Each map's state is kept in the settings (settings.mm).
+const MM_ZMAX = 3;
+const mmViews = {};
+const mmDrawn = {}; // id -> { T, keys, hit, at } (the minimap as last drawn: what a touch lands on)
+function mmView(id, mode = 'small') {
+  if (!mmViews[id]) mmViews[id] = { mode: (settings.mm && settings.mm[id]) || mode, z: 1, cx: 0.5, cy: 0.5, follow: true };
+  return mmViews[id];
+}
+function mmSetMode(id, mode) {
+  const v = mmView(id);
+  v.mode = mode;
+  if (mode !== 'big') { v.z = 1; v.follow = true; }
+  settings.mm = { ...(settings.mm || {}), [id]: mode };
+  saveJson('bs_settings', settings);
+  audio && audio.play('click');
+}
+/**
+ * The minimap's window on its map this frame. r: its rect on the canvas (px), of the map's own proportions; mw, mh: the
+ * map (world px); fx, fy: whom it follows. X, Y: world px to canvas px; k: canvas px a world px.
+ */
+function mmFrame(id, r, mw, mh, fx, fy) {
+  const v = mmView(id), z = v.mode === 'big' ? v.z : 1, vw = mw / z, vh = mh / z;
+  if (v.follow || z <= 1) { v.cx = fx / mw; v.cy = fy / mh; }
+  const x0 = Math.max(0, Math.min(mw - vw, v.cx * mw - vw / 2)), y0 = Math.max(0, Math.min(mh - vh, v.cy * mh - vh / 2));
+  if (!v.follow) { v.cx = (x0 + vw / 2) / mw; v.cy = (y0 + vh / 2) / mh; }
+  const k = r.w / vw;
+  return { id, v, r, mw, mh, x0, y0, vw, vh, k, X: wx => r.x + (wx - x0) * k, Y: wy => r.y + (wy - y0) * k };
+}
+/** The map's small picture (bg: drawn of the whole map, any scale) in the window, inside a dark frame. */
+function mmBackDraw(T, bg, alpha = 0.9) {
+  const { r } = T, d = r.d || 1, bs = bg.width / T.mw;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(r.x - 3 * d, r.y - 3 * d, r.w + 6 * d, r.h + 6 * d);
+  ctx.strokeStyle = 'rgb(201,162,74)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(r.x - 2.5 * d, r.y - 2.5 * d, r.w + 5 * d, r.h + 5 * d);
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(bg, T.x0 * bs, T.y0 * bs, T.vw * bs, T.vh * bs, r.x, r.y, r.w, r.h);
+  ctx.globalAlpha = 1;
+}
+/** The keys under the minimap (or its folded tab), drawn and kept for a touch. */
+function mmChrome(T, label = '') {
+  const { id, v, r } = T, d = r.d || 1, keys = [];
+  ctx.save();
+  ctx.font = `${Math.round(9 * d)}px G9`;
+  ctx.textAlign = 'center';
+  const key = (x, y, w, txt, act) => {
+    const h = 15 * d;
+    ctx.fillStyle = 'rgba(16,10,4,0.82)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgb(201,162,74)';
+    ctx.lineWidth = d;
+    ctx.strokeRect(x + 0.5 * d, y + 0.5 * d, w - d, h - d);
+    outline(txt, x + w / 2, y + h - 4 * d, '#f4e2b0');
+    keys.push({ x, y, w, h, act });
+  };
+  if (v.mode === 'big') {
+    // (zoom shown at the corner while it is nearer than the whole)
+    if (v.z > 1.01) { ctx.textAlign = 'right'; outline(`×${v.z.toFixed(1)}`, r.x + r.w - 2 * d, r.y + 10 * d, '#fff'); ctx.textAlign = 'center'; }
+    const w = 24 * d, g = 3 * d;
+    let x = r.x;
+    for (const [t, a] of [['+', 'in'], ['-', 'out'], ['나', 'me'], ['작게', 'small']]) { key(x, r.y + r.h + 4 * d, t === '작게' ? 32 * d : w, t, a); x += (t === '작게' ? 32 * d : w) + g; }
+  } else if (v.mode === 'small') {
+    key(r.x + r.w - 28 * d, r.y + r.h + 4 * d, 28 * d, '접기', 'fold');
+    if (label) { ctx.textAlign = 'left'; outline(label, r.x, r.y + r.h + 15 * d, '#f4e2b0'); }
+  }
+  ctx.restore();
+  mmDrawn[id] = { T, keys, hit: v.mode === 'fold' ? null : { x: r.x - 4 * d, y: r.y - 4 * d, w: r.w + 8 * d, h: r.h + 8 * d }, at: performance.now() };
+}
+/** Folded: only a tab, which opens it. */
+function mmFoldTab(id, x, y, right = false) {
+  const d = canvas.width / (boxOf(canvas).width || canvas.width), w = 40 * d, h = 15 * d, x0 = right ? x - w : x;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = 'rgba(16,10,4,0.82)';
+  ctx.fillRect(x0, y, w, h);
+  ctx.strokeStyle = 'rgb(201,162,74)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(x0 + 0.5 * d, y + 0.5 * d, w - d, h - d);
+  ctx.font = `${Math.round(9 * d)}px G9`;
+  ctx.textAlign = 'center';
+  outline('지도 ▼', x0 + w / 2, y + h - 4 * d, '#f4e2b0');
+  ctx.restore();
+  mmDrawn[id] = { T: { id, v: mmView(id) }, keys: [{ x: x0, y, w, h, act: 'open' }], hit: null, at: performance.now() };
+  return y + h;
+}
+/** Kept maps' small pictures: made again (a second apart) until every piece was in. */
+const mmBacks = new Map();
+function mmBackOf(key, mw, mh, paint) {
+  const o = mmBacks.get(key), now = performance.now();
+  if (o && (o.ok || now - o.at < 1000)) return o.c;
+  const s = Math.min(0.45, 1500 / Math.max(mw, mh)), c = (o && o.c) || document.createElement('canvas');
+  c.width = Math.max(1, Math.round(mw * s));
+  c.height = Math.max(1, Math.round(mh * s));
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  const ok = paint(g, s) !== false;
+  if (mmBacks.size > 2 && !o) mmBacks.delete(mmBacks.keys().next().value);
+  mmBacks.set(key, { c, ok, at: now });
+  return c;
+}
+// Touches on a minimap (canvas px): taken before the joystick sees them.
+const mmTouch = new Map(); // pointerId -> { id, key, p0, p, moved }
+let mmPinch = null;
+function mmCanvasAt(e) {
+  const r = canvas.getBoundingClientRect();
+  return [(e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)];
+}
+function mmHitAt(x, y) {
+  const now = performance.now();
+  for (const m of Object.values(mmDrawn)) {
+    if (now - m.at > 400) continue;
+    for (const k of m.keys) if (x >= k.x - 3 && x <= k.x + k.w + 3 && y >= k.y - 3 && y <= k.y + k.h + 3) return { m, key: k.act };
+    if (m.hit && x >= m.hit.x && x <= m.hit.x + m.hit.w && y >= m.hit.y && y <= m.hit.y + m.hit.h) return { m, key: null };
+  }
+  return null;
+}
+/** Zoom a big minimap by f about (px, py) on the canvas (null: its middle). */
+function mmZoom(T, f, px = null, py = null) {
+  const v = T.v, r = T.r;
+  if (v.mode !== 'big') return;
+  if (px === null) { px = r.x + r.w / 2; py = r.y + r.h / 2; }
+  const wx = T.x0 + (px - r.x) / T.k, wy = T.y0 + (py - r.y) / T.k;
+  const z1 = Math.max(1, Math.min(MM_ZMAX, v.z * f)), k1 = r.w / (T.mw / z1);
+  const x0 = wx - (px - r.x) / k1, y0 = wy - (py - r.y) / k1;
+  v.z = z1;
+  v.follow = z1 <= 1;
+  v.cx = (x0 + T.mw / z1 / 2) / T.mw;
+  v.cy = (y0 + T.mh / z1 / 2) / T.mh;
+}
+function mmDown(e) {
+  if (!G || G.over) return false;
+  const [x, y] = mmCanvasAt(e), h = mmHitAt(x, y);
+  if (!h) return false;
+  mmTouch.set(e.pointerId, { id: h.m.T.id, key: h.key, p0: [x, y], p: [x, y], moved: false });
+  const same = [...mmTouch.values()].filter(t => t.id === h.m.T.id && !t.key);
+  if (same.length === 2 && h.m.T.v.mode === 'big') {
+    const [a, b] = same;
+    mmPinch = { id: h.m.T.id, d: Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) || 1, z: h.m.T.v.z };
+    a.moved = b.moved = true;
+  }
+  try { canvas.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+  return true;
+}
+function mmMove(e) {
+  const t = mmTouch.get(e.pointerId);
+  if (!t) return false;
+  const [x, y] = mmCanvasAt(e), m = mmDrawn[t.id];
+  const dx = x - t.p[0], dy = y - t.p[1];
+  t.p = [x, y];
+  if (!m || t.key || m.T.v.mode !== 'big') return true;
+  if (mmPinch && mmPinch.id === t.id) {
+    const both = [...mmTouch.values()].filter(o => o.id === t.id && !o.key);
+    if (both.length >= 2) {
+      const [a, b] = both, dd = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) || 1;
+      mmZoom(m.T, mmPinch.z * dd / mmPinch.d / m.T.v.z, (a.p[0] + b.p[0]) / 2, (a.p[1] + b.p[1]) / 2);
+      // (its window again for the next move: it was drawn before the zoom)
+      Object.assign(m.T, mmFrame(t.id, m.T.r, m.T.mw, m.T.mh, 0, 0));
+      return true;
+    }
+  }
+  if (!t.moved && Math.hypot(x - t.p0[0], y - t.p0[1]) < 8) return true;
+  t.moved = true;
+  const v = m.T.v;
+  v.follow = false;
+  v.cx -= dx / m.T.k / m.T.mw;
+  v.cy -= dy / m.T.k / m.T.mh;
+  Object.assign(m.T, mmFrame(t.id, m.T.r, m.T.mw, m.T.mh, 0, 0));
+  return true;
+}
+function mmUp(e) {
+  const t = mmTouch.get(e.pointerId);
+  if (!t) return false;
+  mmTouch.delete(e.pointerId);
+  if (mmPinch && mmPinch.id === t.id && [...mmTouch.values()].filter(o => o.id === t.id).length < 2) mmPinch = null;
+  if (e.type !== 'pointerup' || t.moved) return true;
+  const m = mmDrawn[t.id], v = mmView(t.id);
+  if (t.key === 'open') mmSetMode(t.id, 'small');
+  else if (t.key === 'fold') mmSetMode(t.id, 'fold');
+  else if (t.key === 'small') mmSetMode(t.id, 'small');
+  else if (t.key === 'me') { v.follow = true; audio && audio.play('click'); }
+  else if ((t.key === 'in' || t.key === 'out') && m) { mmZoom(m.T, t.key === 'in' ? 1.5 : 1 / 1.5); audio && audio.play('click'); }
+  else if (!t.key) mmSetMode(t.id, v.mode === 'big' ? 'small' : 'big');
+  return true;
+}
+canvas.addEventListener('wheel', e => {
+  if (!G) return;
+  const [x, y] = mmCanvasAt(e), h = mmHitAt(x, y);
+  if (!h || h.key || h.m.T.v.mode !== 'big') return;
+  e.preventDefault();
+  mmZoom(h.m.T, e.deltaY < 0 ? 1.25 : 0.8, x, y);
+}, { passive: false });
+window.__mm = id => { const v = mmViews[id], m = mmDrawn[id]; return v && { mode: v.mode, z: +v.z.toFixed(2), follow: v.follow, cx: +v.cx.toFixed(3), cy: +v.cy.toFixed(3), r: m && m.T.r ? { x: Math.round(m.T.r.x), y: Math.round(m.T.r.y), w: Math.round(m.T.r.w), h: Math.round(m.T.r.h) } : null, keys: m ? m.keys.map(k => ({ act: k.act, x: Math.round(k.x + k.w / 2), y: Math.round(k.y + k.h / 2) })) : [] }; };
+
 // 연's minimap at the top right: the area small, the hero, its people and the ways out on it.
 // A tap on it makes it larger or smaller.
 let townMapBig = false;
@@ -14118,7 +14486,8 @@ function hurtMember(m, dmg, from = null) {
   if (G.buffs.guard > G.t) return;
   dmg *= 1 - shellWard(m); // inside the hero's 현무 shell
   m.hp -= dmg;
-  m.flash = 0.12;
+  // 피격 연출: a blink of red (no more than three a second, as a big one's white) and 연's blow sound, softer than the hero's.
+  if (G.t - (m.flashAt ?? -9) >= 0.34) { m.flashAt = G.t; m.flash = 0.12; audio.play('mate_hurt'); }
   floatText(m.x, m.y - 58, '-' + Math.round(dmg), '#ff8060');
   if (m.hp > 0) return;
   m.hp = 0;
@@ -14590,7 +14959,8 @@ function drawLootFeed() {
   const cr = boxOf(canvas), d = canvas.width / cr.width;
   // Right of it the 상태창 tab; above it the 연속 처치 count.
   // In a war or raid, under its kill feed (which is under the 연속 처치 count), not across it.
-  const xr = canvas.width - 26 * d, y0 = Math.max(G.hunt ? Math.max(112 * d, 106 * canvas.width / 860) : 96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0), h = 16 * d, gap = 19 * d;
+  const xr = canvas.width - 26 * d, y0 = Math.max(G.hunt ? Math.max(112 * d, 106 * canvas.width / 860) : 96 * d, G.war && G.war.feedBottom ? G.war.feedBottom + 4 * d : 0,
+    G.mmBottom ? G.mmBottom + 60 * d : 0), h = 16 * d, gap = 19 * d;
   ctx.save();
   ctx.textAlign = 'left';
   ctx.font = `${Math.round(10 * d)}px G9`;
@@ -16405,6 +16775,7 @@ const JOY_R = 44;
 
 canvas.addEventListener('pointerdown', e => {
   audio && audio.unlock();
+  if (mmDown(e)) return; // a minimap's (미니맵 확대·이동)
   if (joy.id !== null) return;
   joy.id = e.pointerId;
   joy.ox = joy.x = e.clientX;
@@ -16412,17 +16783,18 @@ canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {
+  if (mmMove(e)) return;
   if (e.pointerId !== joy.id) return;
   joy.x = e.clientX;
   joy.y = e.clientY;
 });
 for (const t of ['pointerup', 'pointercancel']) {
   canvas.addEventListener(t, e => {
+    if (mmUp(e)) return;
     if (e.pointerId !== joy.id) return;
     // In town, a short tap on someone is talking to them, wherever the hero stands.
     if (t === 'pointerup' && T && !G && !$('#town').hidden && Math.hypot(joy.x - joy.ox, joy.y - joy.oy) < 12) tapTown(e);
-    // 대항전·「쟁」: a tap on the field's minimap (war.js) makes it larger or smaller.
-    if (t === 'pointerup' && G && G.war && Math.hypot(joy.x - joy.ox, joy.y - joy.oy) < 12) { const r = canvas.getBoundingClientRect(); War.mmTap((e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)); }
+    // (대항전·「쟁」's minimap: its touches are taken before the joystick, mmDown)
     joy.id = null;
   });
 }
@@ -16991,6 +17363,11 @@ function drawYhero2(cls, gear, b, x, y, pose, alpha) {
   if (mirror) ctx.scale(-1, 1);
   ctx.drawImage(pic, -fx, -fy);
   if (S.dz) drawBladeFlames(S.pts.get(fk), -fx, -fy, S.dz);
+  // Struck (피격 연출): the hero and its companions a blink of red, a foe's fighter of white.
+  if (b.flash > 0 && name !== 'dead') {
+    ctx.globalAlpha = alpha * Math.min(1, b.flash / 0.12) * STRUCK.tint * (settings.calmFx ? 0.5 : 1);
+    ctx.drawImage(struckTint(pic, b.team > 0 ? '#ffffff' : '#ff3a24'), -fx, -fy);
+  }
   ctx.restore();
   return true;
 }
@@ -17796,6 +18173,7 @@ function render(now) {
   // 대항전 (war.js): the camera stays on the battlefield's map.
   if (G.war) [camX, camY] = War.cam(camX, camY);
   if (G.arena) [camX, camY] = Hunt.cam(camX, camY); // 사냥 기믹: held inside the map
+  G.camAt = [camX, camY]; // (the screen's frame on the minimaps)
   // 수련장: the hero and the dummy in the middle of what the panel leaves free.
   if (G.training) camX -= trainShift();
   G.camView = [camX, camY]; // (where it looks before any shake: tests trace it)
@@ -17916,8 +18294,9 @@ function render(now) {
     // Flung by a heavy technique: out half a tile at once, back over a quarter second.
     const kick = hard && b.kickBig ? (kt < 0.26 ? 22 * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
       : hard ? (kt < 0.16 ? 8 * (1 - kt / 0.16) : 0) : kt < 0.1 ? 4 : 0;
-    const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
-    const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
+    const kk = b.kind === 'boss' || b.kind === 'mini' ? kick * 0.5 : kick;
+    const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kk;
+    const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kk;
     // The treasure-bearer in gold, from a tinted copy made once.
     monsterTint = b.flee ? GOLD_TINT : G.stage.abyss ? (b.kind && b.kind !== 'minion' ? ABYSS_LEAD_TINT : ABYSS_TINT) : null;
     if (b.beast) drawBeast(b, 1, lx, ly, 0.62 * s);
@@ -18165,6 +18544,7 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+  drawHurtEdge(); // 피격 연출: the last blow's red edge, a slow red throb when low on life
   // 절망 on the hero: the screen darkens round its edge, as the original's 절망 blinds.
   if (p.sts && heroStatusOn('despair')) {
     const gr = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.25,
@@ -18182,7 +18562,7 @@ function render(now) {
     const tier = c.n >= 200 ? 0.24 : c.n >= 100 ? 0.16 : c.n >= 40 ? 0.08 : 0;
     const sc = (1 + tier + 0.25 * pop + 0.6 * mark * mark) * (canvas.width / 860);
     ctx.save();
-    ctx.translate(canvas.width - 70 * (canvas.width / 860), 64 * (canvas.width / 860));
+    ctx.translate(canvas.width - 70 * (canvas.width / 860), Math.max(64 * (canvas.width / 860), (G.mmBottom || 0) + 34 * (canvas.width / 860)));
     ctx.scale(sc, sc);
     ctx.textAlign = 'center';
     ctx.globalAlpha = Math.min(1, (3 - (G.t - c.t)) * 2);
@@ -18211,6 +18591,7 @@ function render(now) {
   drawLootFeed();
   drawBattleInfo();
   if (G.hunt) Hunt.hud(ctx, canvas); // 사냥 기믹: 토벌도, 그로기, the boss's warning
+  G.mmBottom = G.arena && !G.war ? Hunt.minimap(ctx, canvas) : 0; // 사냥터 지형's minimap (top right): where the combo and the finds go under
   if (G.war) War.hud();
   drawJoystick();
 }
@@ -18337,6 +18718,13 @@ function drawHero(now, hidden) {
     const lk = p.lungeK || 1;
     hx += (p.ldx || 0) * 9 * k * lk;
     hy += (p.ldy || 0) * 6 * k * lk;
+  }
+  // Struck: jolted a few pixels away from the blow, easing back (STRUCK.jolt).
+  const ht = p.hurtAt !== undefined ? G.t - p.hurtAt : 9;
+  if (ht < STRUCK.joltT) {
+    const k = STRUCK.jolt * (1 - ht / STRUCK.joltT);
+    hx += (p.hdx || 0) * k;
+    hy += (p.hdy || 0) * k * 0.6;
   }
   if (drawYhero2(G.cls, p.gear, p, hx, hy, yPose, hidden ? 0.45 : 1)) return;
   // (a class 연's layers do not have falls back to 연's first figures; nothing for the moment a sheet is loading)
@@ -19761,6 +20149,7 @@ const War = initWar({
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
   combatPower: c => combatPower(c), heroShotPic: (cls, gear) => heroShotPic(cls, gear), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
   castAs, skillSheets, plainLook,
+  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf,
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
@@ -19773,6 +20162,7 @@ const Hunt = initHunt({
   heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
   VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, drawGroundCached, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
   saveProgress: () => saveJson('bs_progress', progress),
+  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf, boxOf,
 });
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.

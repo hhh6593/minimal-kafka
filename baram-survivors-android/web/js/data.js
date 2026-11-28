@@ -32,7 +32,10 @@ export const CLASSES = [
   { id: 'archer', name: '궁사', hero: '1002', hp: 155, mp: 100, speed: 74, armor: 2, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
   // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
-  { id: 'lancer', name: '무사', hero: '1001', hp: 160, dmgK: 1.25, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
+  // (무사 보강 2026-11-28, 사용자 "조금 보강": the weakest close-in fighter — 9차 best gear 0.8~1.7만 a second, half the 전사's,
+  // and felled at 위험도 V. hp 160 → 185, armor 2 → 3 as every other close-in class, dmgK 1.25 → 1.42; 이계의침식 cd 8 → 7,
+  // 차원개방's discs 15 → 18. Its nature kept: the spear's rows, the sweep, the dash. docs/9cha_rules.md 무사 보강.)
+  { id: 'lancer', name: '무사', hero: '1001', hp: 185, dmgK: 1.42, mp: 80, speed: 70, armor: 3, start: 'l_moon', ult: 'l_ult',
     desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
   // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
   { id: 'monk', name: '격투가', hero: '1001', hp: 210, dmgK: 2.1, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
@@ -1550,9 +1553,9 @@ const S9 = {
   //   아공간전개 (IMG94, PVP → 몬스터: 선 자리에 청룡 문양 영역과 결정 울타리 8초 — 아래 l_agong).
   // Pictures at the original's own size (o_l_*: 0.62 game pixels a capture pixel). 1320의 추정 그림(옛 o_l_sickle·erosion·dimension)은 뺌.
   l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'dim9', echo: undefined, fx: 'o_l_dimshard', fxCast: 'o_l_dimcast', fxLoop: undefined, loopSize: undefined,
-    fxHit: undefined, hit: 15, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
+    fxHit: undefined, hit: 18, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
     desc: '이계의 차원을 몸에 연다. 15초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터 둘에게 푸른 원반으로 거듭 날아들어 그 몬스터와 원반 안의 몬스터를 벤다' },
-  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 8, depth: 9,
+  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 7, depth: 9,
     width: undefined, ways: undefined, pulses: undefined, side: 36, sideV: 26, step: 0.06, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
     desc: '바라보는 쪽으로 이계에서 불러낸 기운을 아홉 칸 쏘아 보낸다. 지나는 자리마다 빛기둥이 솟고 검은 잔해가 세 줄로 남으며, 맞은 몬스터는 침식되어(받는 피해 증가) 옆으로 밀쳐진다' },
   l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 75, cd: 2.5, range: undefined,
@@ -1659,6 +1662,12 @@ Object.assign(SKILLS.m_frost, { frac: 0.35, dropMax: 40 }); // (그 흰 눈구�
 // 연 궁사 그림(Skill_Effect_Acher_ReinForceArrowTornado_Hit → k_a_chasearrow, 쓰이지 않던 프리팹)으로. 한 칸에 몸 하나 크기(1.4×1.3칸),
 // 화살이 꽂히는 0.76초(10번째 그림)에 그 칸의 몬스터가 맞음 — game.js line rowFx. 돌진은 그대로.
 Object.assign(SKILLS.a_chase, { rowFx: 'k_a_chasearrow', rowHit: 0.76 });
+// 광폭기조사 (사용자 2026-11-28, 공식 미리보기 GIF 4_gwangpokgijosa = 연 Skill_Effect_Warlock_Frenzy_Ray = k_x_md_ray_beam, 겹침 1.0):
+// 연 설명 "대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아낸다" — 하늘에서 보랏빛 줄기가 대상에 내리꽂히고 가시 고리가 둘레로 퍼진다.
+// 우리 게임은 이 그림을 일곱 칸 줄 위에 1.3칸 폭으로 눌러 펴 그렸다(보라 기둥이 줄을 따라 누움). → 대상 둘레(5×5, 고리 지름과 같음)를 치는
+// strike로, 그림은 그 칸 위에 원래 모양 그대로(고리가 맞는 칸), 맞은 몸마다 연의 적중 그림(k_md_ray). 고리가 터지는 0.2초(4번째 그림)에 맞음.
+Object.assign(SKILLS.md_ray, { kind: 'strike', fx: 'k_x_md_ray_beam', fxOwn: true, yeon: true, fxHit: 'k_md_ray', range: 7, radius: 2, count: 1, hitAt: 0.2, depth: undefined, dmg: 24, oneCast: true,
+  desc: '대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아부어 대상과 그 둘레 두 칸의 몬스터를 친다' });
 Object.assign(SKILLS.m_shift, { kind: 'spell', range: 5, count: 1, desc: '마기를 실은 푸른 불꽃을 바라보는 쪽 몬스터에게 순식간에 꽂는다' });
 // 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
 Object.assign(SKILLS.r_formless, { kind: 'cleave', depth: 2, max: 4 });
@@ -2454,7 +2463,7 @@ export function skillStats(id, level, p) {
     // A grown spell reaches as far as 8단 does, but strikes as a 5단 would: its own power is in
     // its shape (a triangle, the whole screen), not in a number grown four times over.
     // +15% a 단 (8단 is 2.7 times 1단).
-    dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
+    dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power) * (s.oneCast ? 1 + 0.25 * ((level >= 4) + (level >= 7)) : 1),
     // A spell striking many (s.aoe, 스킬 2차 개편) quickens less with its 단 (3% a step, not 7%):
     // its weight is in the blow, not in its pace.
     cd: s.cd * Math.pow(s.aoe ? 0.97 : 0.93, l) * Math.pow(0.92, p.haste),
@@ -2464,7 +2473,9 @@ export function skillStats(id, level, p) {
     // (one more tile only at 8단, and none for a spell that already lays several areas at once — 투도멸진's
     // marks, a rain of bursts: grown each at 4단 and 8단 they covered the screen, 사용자: 터무니없이 큼)
     radius: !s.radius ? 0 : s.radius + radiusGrow(s, level) + Math.floor(p.area / 3),
-    count: (s.count || 1) + (level >= 4) + (level >= 7),
+    // (s.oneCast: one blow as 연's own, however high its 단 — 광폭기조사, 사용자 2026-11-28: three rings at once
+    // looked wrong. What the extra targets would have brought goes to the one blow instead, a quarter each.)
+    count: (s.count || 1) + (s.oneCast ? 0 : (level >= 4) + (level >= 7)),
     duration: (s.duration || 0) * (1 + 0.1 * l),
     heal: (s.heal || 0) * (1 + 0.45 * l),
   };
