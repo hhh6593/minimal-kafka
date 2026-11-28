@@ -3120,9 +3120,14 @@ function escort(W, dt) {
     for (const b of W.alive[1 - att]) if (!b.gate && Math.hypot(b.tx - c.tx, b.ty - c.ty) <= 3) credit(b, 'obj', dt * 1.5);
   }
   cartPos(W);
+  // (the half's seconds when its furthest was reached: two carts held at the same spot — 75% : 75%, the 본당's steps — went
+  // to the first half's side; now to the one that got there sooner)
+  if (c.i > c.best[att] + 0.01) (c.bestAt = c.bestAt || [0, 0])[att] = (W.round === 1 ? W.def.time : W.def.half) - Math.max(0, W.left);
   c.best[att] = Math.max(c.best[att], c.i);
   // (the time each took to the end: two carts both at the 본당 went to the first half's side whatever the pace)
-  if (c.i >= W.path.length - 1 && !(c.endAt = c.endAt || [null, null])[att]) c.endAt[att] = W.def.half - Math.max(0, W.left);
+  // (엔드게임 2차: the first half's clock is the whole war's — W.left runs from time, not half — so its side's time came out
+  // negative, "-20초 : 105초", and the first half's side won every race to the 본당: now the seconds of its own half.)
+  if (c.i >= W.path.length - 1 && !(c.endAt = c.endAt || [null, null])[att]) c.endAt[att] = (W.round === 1 ? W.def.time : W.def.half) - Math.max(0, W.left);
   // Half time (or the end reached): the guilds change sides.
   const done = c.i >= W.path.length - 1;
   if (W.round === 1 && (W.left <= W.def.time - W.def.half || done)) {
@@ -5573,6 +5578,7 @@ function checkEnd(W) {
         const e = c.endAt || [];
         // both to the end: the quicker (it went to the first half's side whatever the pace)
         if (c.best[W.attacker] >= c.best[first] - 0.01 && e[W.attacker] != null && e[first] != null) { win = e[W.attacker] < e[first] ? W.attacker : first; why = `둘 다 본당 — 더 빨리 (${Math.round(e[0] ?? 0)}초 : ${Math.round(e[1] ?? 0)}초)`; }
+        else if (Math.abs(c.best[W.attacker] - c.best[first]) <= 0.01 && c.bestAt) { const b = c.bestAt; win = b[W.attacker] < b[first] ? W.attacker : first; why = `같은 곳까지 — 먼저 닿은 쪽 (${Math.round(b[0])}초 : ${Math.round(b[1])}초)`; }
         else { win = c.best[W.attacker] > c.best[first] ? W.attacker : first; why = '더 멀리 호위'; }
       }
     }
