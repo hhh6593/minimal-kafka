@@ -246,3 +246,50 @@ export function leagueGoalClaim(pr, id) {
   return g;
 }
 export const leagueGoalReward = g => [`문파 공훈 ${g.gh}`, g.gold ? `전 ${g.gold.toLocaleString()}` : '', g.coins ? `레이드주화 ${g.coins}` : ''].filter(Boolean).join(' · ');
+
+// ------------------------------------------------ 레이드 주간 변주 (엔드게임 3차, 2026-11-28)
+// The 대항전's weekly rule for the raids (the 쐐기돌 어픽스 idea): one of five a week (the same Monday week, two weeks off the
+// war rule's turn so the two do not move together), on every raid of the week; shown on the raid's card with next week's,
+// in the raid's opening chat and its HUD; a raid won under it pays its coins `rew` more. war.js and game.js read the numbers.
+// paceK: the boss's blows (its floor, bolts and blasts) that much sooner; addK: its called servants that many more, champ: a
+// champion with each call; pool: elemental floors under the raiders every `every` s (3×3 tiles, `life` s, `k` of the life
+// a second — the drawn tiles are what burn); bond: 공대원 `n` within `r` tiles → blows ×dmg, blows taken ×taken, alone ×alone;
+// iron: the boss takes ×bossTaken but its 무력화 gauge breaks `groK` faster and, broken, it takes ×groTake.
+export const RAID_AFFIXES = [
+  { id: 'fury', name: '분노', desc: '보스의 장판·탄·광역기가 25% 빨리 온다', paceK: 0.8, rew: 0.3 },
+  { id: 'surge', name: '쇄도', desc: '보스가 부르는 쫄이 1.6배, 부를 때마다 챔피언 하나가 함께 온다', addK: 1.6, champ: 1, rew: 0.2 },
+  { id: 'element', name: '원소', desc: '10초마다 공대원 발밑에 원소 장판(3×3칸)이 깔려 6초 동안 초당 체력 6%를 태운다 — 칸 밖으로', pool: { every: 10, life: 6, k: 0.06, n: 3 }, rew: 0.2 },
+  { id: 'bond', name: '결속', desc: '2칸 안에 공대원 3명 이상과 함께 서면 주는 피해 +12%·받는 피해 −15%, 아무도 없으면 받는 피해 +20%', bond: { r: 2, n: 3, dmg: 1.12, taken: 0.85, alone: 1.2 }, rew: 0.15 },
+  { id: 'iron', name: '철갑', desc: '보스가 받는 피해 −20% — 대신 무력화 게이지가 1.3배 빨리 깎이고, 무력화되면 받는 피해 +100%', bossTaken: 0.8, groK: 1.3, groTake: 2, rew: 0.25 },
+];
+/** The week's raid affix (window.__raidAffix: an id, or 'none' for none — tests). */
+export function raidAffix(week = gwoeWeek()) {
+  if (typeof window !== 'undefined' && window.__raidAffix) return RAID_AFFIXES.find(r => r.id === window.__raidAffix) || null;
+  const n = RAID_AFFIXES.length;
+  return RAID_AFFIXES[(((week + 2) % n) + n) % n];
+}
+/** A line for the raid's card: this week's and next week's. */
+export function raidAffixLine(week = gwoeWeek()) {
+  const a = raidAffix(week), b = typeof window !== 'undefined' && window.__raidAffix ? null : raidAffix(week + 1);
+  return a ? `이번 주 레이드 변주 「${a.name}」 — ${a.desc} · 이기면 레이드주화 +${Math.round(a.rew * 100)}%${b && b !== a ? ` · 다음 주 「${b.name}」` : ''}` : '';
+}
+
+// ------------------------------------------------ 상대 문파의 문파 기술 (엔드게임 3차)
+// Our guild's skills climbed with every war (all eighteen levels at some 50~60 wars) while the guilds it met stayed as they
+// were: a win rate that only rose. The guilds met at a higher 경지 now have theirs too, as many levels as the 경지 (삼류 0,
+// 이류 2, 일류 5, 절정 8, 초절정 11, 화경 14, 현경 18), learnt in the tree's order (each guild ±1 at random).
+export const FOE_GUILD_LV = [0, 2, 5, 8, 11, 14, 18];
+const FOE_ORDER = ['rise', 'shrine', 'rise', 'shrine', 'rise', 'shrine', 'supply', 'ram', 'supply', 'ram', 'supply', 'ram', 'banner', 'tactic', 'banner', 'tactic', 'banner', 'tactic'];
+/** How many levels a foe guild has at our 경지 (tier), ±jitter; window.__foeGuild (a number of levels) overrides. */
+export function foeGuildLv(tier, jitter = 0) {
+  const ov = typeof window !== 'undefined' && window.__foeGuild !== undefined ? +window.__foeGuild : null;
+  if (ov !== null) return Math.max(0, Math.min(18, ov));
+  const base = FOE_GUILD_LV[Math.max(0, Math.min(6, tier))];
+  return base ? Math.max(0, Math.min(18, base + jitter)) : 0;
+}
+/** A foe guild's skills of n levels: { id: worth }, as guildK gives ours. */
+export function foeGuildK(n) {
+  const lv = {};
+  for (const id of FOE_ORDER.slice(0, n)) lv[id] = (lv[id] || 0) + 1;
+  return Object.fromEntries(GUILD_SKILLS.map(s => [s.id, s.per * Math.min(GUILD_MAX, lv[s.id] || 0)]));
+}

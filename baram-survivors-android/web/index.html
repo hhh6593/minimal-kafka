@@ -161,6 +161,12 @@
   #bossbar i { position: relative; display: block; height: 6px; background: #3a0a06; border: 1px solid #000; }
   #bossbar s { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#e8402a, #a01808); }
   #bossbar span { display: block; margin-top: 1px; font: 8px G9, monospace; color: #f0d8b0; }
+  #bossbar #bb-gro { height: 4px; margin-top: 2px; background: #2a2208; }
+  #bossbar #bb-gro s { background: linear-gradient(#ffe07a, #c89a10); }
+  #bossbar #bb-gro[data-state="down"] s { background: #ffffff; }
+  #bossbar #bb-gro[data-state="ritual"] s { background: linear-gradient(#ff9a5a, #d0401a); }
+  #bossbar #bb-gtx { color: #ffe9a0; }
+  #bossbar #bb-gtx:empty, #bossbar #bb-gro[hidden] { display: none; }
   /* The raid list: one carved plate per raid, its boss standing on it. */
   #map.raids { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: #2a1a0c; width: min(56vw, 420px);
       max-height: calc(100vh - 56px); overflow-y: auto; }
@@ -1050,7 +1056,7 @@
   <button id="unfold" hidden>상태창</button>
   <div id="chat"></div>
   <div id="dialog" hidden><canvas id="dlg-face" width="48" height="48"></canvas><div><b id="dlg-name"></b><span id="dlg-text"></span></div></div>
-  <div id="bossbar" hidden><b id="bb-name"></b><i><s id="bb-fill"></s></i><span id="bb-num"></span></div>
+  <div id="bossbar" hidden><b id="bb-name"></b><i><s id="bb-fill"></s></i><span id="bb-num"></span><i id="bb-gro" hidden><s></s></i><span id="bb-gtx"></span></div>
 </div>
 <div id="train" hidden>
   <div class="caption">수련장 <small id="train-cls"></small><button id="train-close" class="btn">마을로</button></div>

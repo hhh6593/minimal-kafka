@@ -8,7 +8,7 @@ import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM, YEON_VARIANTS } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
-import { leagueGoals, leagueGoalDef, leagueGoalsReady, leagueGoalClaim, leagueGoalReward, guildOf } from './league.js';
+import { leagueGoals, leagueGoalDef, leagueGoalsReady, leagueGoalClaim, leagueGoalReward, guildOf, raidAffixLine } from './league.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
 import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, perilCostume, perilCostumes, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair, dropDyed, releaseCostume } from './costume.js';
 import {
@@ -486,6 +486,40 @@ function fxRoom() {
   let total = 0;
   for (const path of fxPaths) { const im = images[path]; if (im && im.width) total += im.width * im.height * 4; }
   return total < Math.min(FX_ROOM, fxBudgetNow() * 0.6);
+}
+/** A sheet's decoded size by its manifest entry (its atlas, else its strip), before it is loaded. */
+function fxBytesOf(src) {
+  const f = M.fx[src];
+  if (!f) return 0;
+  if (f.at && f.at.length) {
+    let w = 0, h = 0;
+    for (let i = 0; i + 3 < f.at.length; i += 4) { w = Math.max(w, f.at[i] + f.at[i + 2]); h = Math.max(h, f.at[i + 1] + f.at[i + 3]); }
+    return w * h * 4;
+  }
+  return (f.w || 0) * (f.h || 0) * (f.n || 1) * 4;
+}
+/**
+ * Loads ahead (war.js nearKitFx) only what fits under the room fxRoom keeps, counting what is still loading (엔드게임 3차):
+ * every kit near the screen was asked for at once while the room was open — 120 sheets, 100 MB, at a war's start once the
+ * hero's own kit no longer filled it — and the budget then let a third of them go again to be fetched back.
+ */
+function fxWarmRoom(ids) {
+  let total = 0;
+  for (const path of fxPaths) { const im = images[path]; if (im && im.width) total += im.width * im.height * 4; }
+  for (const src of fxPending.keys()) total += fxBytesOf(src);
+  const cap = Math.min(FX_ROOM, fxBudgetNow() * 0.6), out = [];
+  for (const id of ids) {
+    const f = id && M.fx[id];
+    if (!f) continue;
+    const src = f.src || id, im = images[`fx/${src}.png`];
+    if ((im && (im.__ok || im.complete)) || fxPending.has(src)) continue;
+    const n = fxBytesOf(src);
+    if (total + n > cap) continue;
+    total += n;
+    out.push(id);
+  }
+  if (out.length) fxWarm(out);
+  return out.length;
 }
 /** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
 function fxWarm(ids, wait = 0) {
@@ -1583,6 +1617,7 @@ function raidInfo(r) {
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 공격대 25명${party.length ? ` · 내 다른 직업: ${party.slice(0, 4).join(', ')}` : ''}</div>
     <div class="party raid-roles">역할 ${Object.entries(War.ROLES).map(([id, x]) => `<button data-rrole="${id}" title="${x.desc}" style="font:11px G9,sans-serif;padding:0 5px;margin:0 1px;border:1px solid ${id === role ? '#c08a10' : '#8a7050'};background:${id === role ? '#ffe9a8' : '#f4e6c4'};color:${id === role ? '#7a3a00' : '#4a3a28'}${roles.includes(id) ? '' : ';opacity:0.7'}">${x.name}</button>`).join('')} <small>· 보상 등급은 역할별 기여로</small></div>
     <div class="boss">난이도 ${raidStars(r)} · 보상 ${RAID_GEAR[r.id].pow}등급 세트 · ${won(120 * r.level)} · 레이드주화 ${10 * r.level + (r.gwoe ? 30 : 0)}</div>
+    <div class="party raid-affix" style="color:#7a3a00">${raidAffixLine()}</div>
     <div class="party" style="color:${combatPower(chosenClass) >= raidPower(r) ? '#1e6a10' : '#9a1800'}">권장 전투력 ${raidPower(r).toLocaleString()} · 내 전투력 ${combatPower(chosenClass).toLocaleString()}</div>
     <div class="party">${raidSet(r.id, chosenClass.id).map(([k, n]) => {
       const owned = bag(chosenClass).includes(`${k}:${GEAR[chosenClass.id][k].indexOf(n)}`);
@@ -1808,7 +1843,7 @@ function startRun(cls, stage, training = false) {
   heroWarm(cls, gear);
   // The run's own effects, loaded and decoded now (goHunt waits for them; a war's kits are warmed by war.js).
   // (수련장: each spell's as it is picked, trainPick — the whole kit at once was 50 MB)
-  if (!training) fxWarm(runFxIds(cls, stage));
+  if (!training) fxWarm(startFxIds(cls, stage)); // (a fight: the hero's own build, startFxIds)
   G = {
     cls, stage, ...mons, level: stage.level !== undefined ? stage.level : STAGES.indexOf(stage), ground: makeGround(stage.terrain), marks: [],
     t: 0, kills: 0, gold: 0, over: false, dead: false, paused: false, choosing: false, cleared: false, revived: false,
@@ -5417,7 +5452,28 @@ function floorCount(t) {
  * twelve. (It was the last good hunt's build as it was, often a low-level one.)
  */
 function applyBuild(start) {
-  const cls = G.cls.id, rec = (progress.builds || {})[cls], promo = promoOf(cls);
+  const ids = buildIds(G.cls.id, start);
+  G.skills = ids.map(id => {
+    const d = SKILLS[id];
+    // (자동 시전 패턴화: not all at the same moment at the start — each first comes a little apart)
+    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.35 + Math.random() * 0.8 };
+  });
+  const rec = (progress.builds || {})[G.cls.id];
+  // Its 보조 능력 at their best too: the six it may hold (MAX_PASSIVES), its own picks first and then
+  // those a fight wants, each as high as the level allows up to MAX_PASSIVE_LEVEL (it went past 5).
+  const cap = Math.min(MAX_PASSIVE_LEVEL, Math.max(1, Math.floor(start / 4)));
+  const pas = [];
+  for (const k of [...Object.keys(G.passives).filter(k => rec && rec.passives[k] > 0), 'life', 'power', 'haste', 'area', 'armor', 'mana'])
+    if (k in G.passives && !pas.includes(k) && pas.length < MAX_PASSIVES) pas.push(k);
+  for (const k of Object.keys(G.passives)) G.passives[k] = pas.includes(k) ? cap : 0;
+  // 체력 단련 gives its health as when picked on a card.
+  G.player.maxHp += 20 * G.passives.life;
+  G.player.hp = G.player.maxHp;
+  say(`최고 빌드로 시작 (Lv ${start}): ${G.skills.map(s => skillName(s.id, s.lv)).join(', ')}`, 'sys');
+}
+/** The skills of applyBuild for a class at a level (no run needed: a war's or raid's effects are warmed from it, kitFxIds). */
+function buildIds(cls, start) {
+  const rec = (progress.builds || {})[cls], promo = promoOf(cls);
   const fits = (id, d) => d && (d.cls === cls || d.cls === 'all') && d.kind !== 'ult' && promo >= (d.promo || 0)
     && skillReq(d) <= start;
   const ids = [], add = id => { if (ids.length < MAX_SKILLS && !ids.includes(id) && fits(id, SKILLS[id])) ids.push(id); };
@@ -5430,22 +5486,30 @@ function applyBuild(start) {
   if (rec) rec.skills.forEach(([id]) => { if (!SKILLS[id] || !SKILLS[id].evolved) add(id); });
   open.sort((a, b) => (a[1].dmg ? 0 : 1) - (b[1].dmg ? 0 : 1) || (b[1].promo || 0) - (a[1].promo || 0) || (b[1].dmg || 0) - (a[1].dmg || 0)).forEach(([id]) => add(id));
   add('c_heal');
-  G.skills = ids.map(id => {
-    const d = SKILLS[id];
-    // (자동 시전 패턴화: not all at the same moment at the start — each first comes a little apart)
-    return { id, lv: d.evolved ? 1 : Math.max(1, Math.min(start - skillReq(d) + 1, MAX_SKILL_LEVEL)), timer: 0.35 + Math.random() * 0.8 };
-  });
-  // Its 보조 능력 at their best too: the six it may hold (MAX_PASSIVES), its own picks first and then
-  // those a fight wants, each as high as the level allows up to MAX_PASSIVE_LEVEL (it went past 5).
-  const cap = Math.min(MAX_PASSIVE_LEVEL, Math.max(1, Math.floor(start / 4)));
-  const pas = [];
-  for (const k of [...Object.keys(G.passives).filter(k => rec && rec.passives[k] > 0), 'life', 'power', 'haste', 'area', 'armor', 'mana'])
-    if (k in G.passives && !pas.includes(k) && pas.length < MAX_PASSIVES) pas.push(k);
-  for (const k of Object.keys(G.passives)) G.passives[k] = pas.includes(k) ? cap : 0;
-  // 체력 단련 gives its health as when picked on a card.
-  G.player.maxHp += 20 * G.passives.life;
-  G.player.hp = G.player.maxHp;
-  say(`최고 빌드로 시작 (Lv ${start}): ${G.skills.map(s => skillName(s.id, s.lv)).join(', ')}`, 'sys');
+  return ids;
+}
+/**
+ * What a war, 「쟁」 or raid draws of the hero's own from its start (엔드게임 3차): the build it starts with (buildIds — the
+ * game's 12 skills, not every skill of every 승급 its class has opened: 147 sheets for a 9차 class, past the effects' budget at
+ * once, so most were let go again unseen and fetched back as they were cast), its 필살기 band and look, its close-in look,
+ * the ground's effect. A raid played with 직접 고르기 (settings.raidManual) picks from the whole kit: runFxIds then.
+ */
+function kitFxIds(cls, stage, start) {
+  const out = new Set();
+  for (const id of buildIds(cls.id, start)) skillFxIds(id, out);
+  try { fxRefs(ultTier(cls.id, promoOf(cls.id)), out); fxRefs(ultLook(cls.id), out); } catch (e) { /* no tier */ }
+  fxRefs(MELEE_LOOK[cls.id], out);
+  if (stage) { fxRefs([stage.fx, 'new_' + stage.id], out); if (stage.boss) fxRefs(stage.boss, out); }
+  return out;
+}
+/** The start level of a war (and 「쟁」: Lv 22 at least) or raid for the class, as war.js setup and raidSetup take it. */
+function fightStart(cls, stage) {
+  const s = raidStart(best[cls.id], cls.id);
+  return stage.war ? Math.max(s, 22) : s;
+}
+/** The effect ids a run warms at its start: a fight's hero kit (kitFxIds) or a hunt's whole open kit (runFxIds). */
+function startFxIds(cls, stage) {
+  return (stage.war || stage.jaeng || (stage.raid && !settings.raidManual)) && !window.__fxAll ? kitFxIds(cls, stage, fightStart(cls, stage)) : runFxIds(cls, stage);
 }
 
 /** A hunt's build, kept for the class when it went well (its raids start from it). */
@@ -5615,7 +5679,8 @@ function raidSpawn(dt) {
     banner(`${G.boss.name} · ${G.towerSt ? G.towerSt.name : G.stage.title || '레이드 보스'}`);
   }
   if (!b) return;
-  bossBrain(b, dt, { rageAt: RAID_LIMIT - 60 });
+  if (RW && War.groggyOn(b)) return; // 무력화 (엔드게임 3차): it stands, no blows, no calls
+  bossBrain(b, dt, { rageAt: RAID_LIMIT - 60 + (RW ? War.rageDelay() : 0) });
 }
 
 /**
@@ -5672,6 +5737,8 @@ function bossBrain(b, dt, o) {
   const t = G.t, p = G.player;
   const RW = G.war && (G.war.raid || G.stage.jaeng);
   const bodies = () => (o.bodies ? o.bodies() : partyBodies());
+  // 레이드 주간 변주 (엔드게임 3차): 분노 — its blows sooner; 쇄도 — more of its own with a champion.
+  const AF = G.war && G.war.raid ? War.affix() : null, pace = (AF && AF.paceK) || 1;
   // Phases at 70% and 40%; a frenzy below 25% (quicker strikes).
   const phase = b.hp < b.maxHp * 0.4 ? 2 : b.hp < b.maxHp * 0.7 ? 1 : 0;
   if (!G.frenzy && b.hp < b.maxHp * 0.25) {
@@ -5694,7 +5761,8 @@ function bossBrain(b, dt, o) {
   if (t >= G.waveT) {
     G.waveT = t + 30;
     bossSay('summon');
-    raidWave(b, (5 + G.phase * 2) * (RW ? 1.5 : 1));
+    raidWave(b, (5 + G.phase * 2) * (RW ? 1.5 : 1) * ((AF && AF.addK) || 1));
+    if (AF && AF.champ) for (let i = 0; i < AF.champ; i++) addEnemy(pickMonster(true), 'champ', { name: '챔피언', scale: 1.15 }, ++G.packs, War.raidSpot());
   }
   if (!G.saidLow && b.hp < b.maxHp * 0.1) {
     G.saidLow = true;
@@ -5731,7 +5799,7 @@ function bossBrain(b, dt, o) {
   // 마비 from the 주술사 can cut short.
   G.volleyT = (G.volleyT === undefined ? 3 : G.volleyT) - dt;
   if (G.volleyT <= 0 && !G.blast) {
-    G.volleyT = [2.8, 2.2, 1.7][G.phase] * (G.enraged ? 0.7 : 1);
+    G.volleyT = [2.8, 2.2, 1.7][G.phase] * (G.enraged ? 0.7 : 1) * pace;
     const face = RW ? War.raidTarget() : G.aggro && !G.aggro.down ? G.aggro : p;
     // (Not at a hero gone 투명: the bolt finds someone it can see.)
     const pool = bodies().filter(x => x !== face && !(x === p && G.buffs.stealth > G.t));
@@ -5749,7 +5817,7 @@ function bossBrain(b, dt, o) {
     // (레이드 광폭화: no longer every five seconds with no way out — 17 raiders at a time fell; see War.rageBlast:
     // every eight, three seconds' warning and rings of shelter on the floor.)
     const rage = G.enraged && G.war && G.war.raid;
-    G.blastT = [15, 12, 10][G.phase] * (rage ? War.RAGE.every : RW && G.enraged ? 0.5 : 1);
+    G.blastT = [15, 12, 10][G.phase] * (rage ? War.RAGE.every : RW && G.enraged ? 0.5 : 1) * pace;
     G.blast = { at: G.t + (rage ? War.RAGE.warn : 1.6), warn: rage ? War.RAGE.warn : 1.6 };
     b.bubble = { text: '모두 쓸어 주마!', t: G.t };
     if (rage) War.rageBlast(G.blast);
@@ -5775,7 +5843,7 @@ function bossBrain(b, dt, o) {
   G.raidT -= dt;
   // One pattern at a time: a pattern of several waves runs out before the next begins.
   if (G.raidT <= 0 && !(G.t < (G.seqTill || 0))) {
-    G.raidT = [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * (G.frenzy ? 0.85 : 1);
+    G.raidT = [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * (G.frenzy ? 0.85 : 1) * pace;
     raidPattern(b, pickPattern());
   }
 }
@@ -7019,6 +7087,12 @@ function moveEnemies(dt) {
     e.flash = Math.max(0, e.flash - dt);
     e.lunge = Math.max(0, e.lunge - dt);
     e.slow = Math.max(0, e.slow - dt);
+    // 공대 무력화 게이지 (엔드게임 3차): a hold put on the boss since the last frame (its stun risen) — the hero's
+    // (a raider's is told by war.js itself: aiHold) — wears the gauge, held or shaken off.
+    if (e.kind === 'boss' && G.war && G.war.raid) {
+      if ((e.stun || 0) > (e.stPrev || 0) + 0.05 && !e.aiHold) War.groggyHold(e, e.stun - (e.stPrev || 0));
+      e.aiHold = false;
+    }
     e.stun = Math.max(0, e.stun - dt);
     e.curse = Math.max(0, e.curse - dt);
     if (e.st) tickStatus(e);
@@ -7032,11 +7106,13 @@ function moveEnemies(dt) {
     // 공대: twenty-five can hold a boss for ever; a raid's boss shakes a hold off within 1.2 s and
     // cannot be held again for four more (its blast is still cut by the hold that lands).
     if (e.kind === 'boss' && e.stun > 0 && G.war && (G.war.raid || G.stage.jaeng)) {
-      if (G.t < (e.stunFree || 0) && !e.stunned) e.stun = 0;
+      if (G.war.raid && War.groggyOn(e)) e.stun = Math.max(e.stun, e.rg.until - G.t); // (무력화: held to its end)
+      else if (G.t < (e.stunFree || 0) && !e.stunned) e.stun = 0;
       else if (!e.stunned) { e.stun = Math.min(e.stun, 1.2); e.stunned = true; e.stunFree = G.t + e.stun + 4; }
       else e.stun = Math.min(e.stun, e.stunFree - 4 - G.t);
     }
     if (e.stun <= 0) e.stunned = false;
+    if (e.kind === 'boss') e.stPrev = e.stun;
     noticeHero(e, p);
     if (e.moving || e.stun > 0) continue;
     if (e.march || e.flee) {
@@ -19737,6 +19813,15 @@ function syncUlt() {
     put('#bb-name', big.name + (G.stage.raid ? ['', ' · 분노', ' · 광폭'][G.phase || 0] : ''));
     $('#bb-fill').style.width = Math.max(0, big.hp / big.maxHp * 100).toFixed(1) + '%';
     put('#bb-num', `${shownNum(Math.max(0, big.hp))} / ${shownNum(big.maxHp)}`);
+    // 무력화 게이지 (엔드게임 3차): under the boss's life, in a raid
+    const gh = big.kind === 'boss' && G.war && G.war.raid ? War.groHud() : null, gb = $('#bb-gro');
+    gb.hidden = !gh;
+    if (gh) {
+      const w = (Math.max(0, Math.min(1, gh.k)) * 100).toFixed(1) + '%';
+      if (shown.groW !== w) { shown.groW = w; $('#bb-gro s').style.width = w; }
+      if (shown.groS !== gh.state) { shown.groS = gh.state; gb.dataset.state = gh.state; }
+      put('#bb-gtx', gh.text);
+    } else put('#bb-gtx', '');
   }
   if (document.body.classList.contains('panel-off')) {
     put('#mini', `체 ${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}   마 ${Math.floor(p.mp)}/${p.maxMp}   Lv ${p.lvl}`);
@@ -20893,7 +20978,7 @@ const War = initWar({
   ctx, canvas, images, pic, occ, crowd, CLASSES, SKILLS, FX, SHOT_FX, MATS, GYEOK, SPECIAL, GEAR, plainList,
   place, step, advance, free, towards, faceTo, tickStatus, addFx, fxOn, fxOnArea, fxSquare, fxBudget, floatText, say, banner, outline, bar, drawBubble, drawGroundCached, boxOf,
   drawYhero2, drawYhero, yGearVariants, drawYunit, yunit, yunitAnim, tinted, fxWarm, shownNum, addShot, later, hurtPlayer, heal, gainXp, xpFor,
-  applyBuild, raidStart, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
+  applyBuild, raidStart, startFxIds, startRun, showScreen, enterTown, savedGear, wear, bagPieces, gyeokText, loadImage, promo: id => promoOf(id),
   SINSU_GATE, specialName, raidName: id => (RAIDS.find(r => r.id === id) || { name: id }).name,
   heroPicture, matPicture: id => { const im = matImage(id); return im ? im.src : ''; },
   // 공대 (the raid on the war's fighters)
@@ -20904,7 +20989,7 @@ const War = initWar({
   raidSet, raidTier, pickGear, bag: c => bag(c),
   // AI 동료 (war.js personas): the hero's 전투력 (the spread of the fighters' specs), a skill's own
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
-  combatPower: c => combatPower(c), heroShotPic: (cls, gear) => heroShotPic(cls, gear), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
+  combatPower: c => combatPower(c), heroShotPic: (cls, gear) => heroShotPic(cls, gear), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), fxWarmRoom: ids => fxWarmRoom(ids), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
   castAs, skillSheets, plainLook,
   mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf, mmRoom, MM_KEY_H,
 });
