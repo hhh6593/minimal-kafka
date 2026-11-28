@@ -2659,7 +2659,10 @@ function heroCap(what, n) {
   while (win.q.length && G.t - win.q[0][0] > CAP_WIN) win.sum -= win.q.shift()[1];
   // Over the whole window, so a single big blow is not taken for a rate.
   const span = CAP_WIN;
-  const target = CAP_OVER * (W.rates.rel || 1) * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]);
+  // (레이드: the blows' credit by the hero's 직업 효율 too, raidEff — the cap on its blows moved by it, its credit did not:
+  // the results showed the same contribution whatever the class, gear or play.)
+  const effK = W.raid && (what === 'dmg' || what === 'boss') ? W.capEff || 1 : 1;
+  const target = CAP_OVER * (W.rates.rel || 1) * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]) * effK;
   const rate = win.sum / span;
   if (!(target > 0) || rate <= target) return n;
   // Past it, a little more for much more: at ten times the AI's rate, about 1.6 times its credit.
@@ -6388,6 +6391,7 @@ function raidScale(dmg, e = null) {
   if (!(dmg > 0)) return dmg;
   if (e && e.kind === 'boss') {
     dmg = raidGuarded(W, raidScaleRaw(dmg, true));
+    W.heroBoss = (W.heroBoss || 0) + dmg; // (the hero's blows on the boss as they land, for the balance runs)
     return dmg;
   }
   return raidScaleRaw(dmg);

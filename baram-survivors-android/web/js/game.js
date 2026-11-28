@@ -5500,7 +5500,7 @@ function raidWave(b, n) {
   for (let i = 0; i < n; i++) {
     const a = i / n * Math.PI * 2, r = 3 + (i % 2);
     const tx = b.tx + Math.round(Math.cos(a) * r), ty = b.ty + Math.round(Math.sin(a) * r);
-    if (free(tx, ty) && (!G.stage.jaeng || War.open(tx, ty))) addEnemy(pickMonster(i % 4 === 0), null, null, 0, [tx, ty]);
+    if (free(tx, ty) && (!(G.stage.jaeng || (G.war && G.war.raid)) || War.open(tx, ty))) addEnemy(pickMonster(i % 4 === 0), null, null, 0, [tx, ty]);
   }
   addFx(G.stage.fx, b.x, b.y - 30, { scale: 1.2 });
 }
@@ -5643,7 +5643,8 @@ function bossBrain(b, dt, o) {
     G.raidT = Math.max(G.raidT, 2.5);
     raidWave(b, 8 + phase * 2);
     const m = pickMonster(true), pack = ++G.packs;
-    for (let i = 0; i < 1 + phase; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack, G.stage.jaeng ? War.mobSpot() : null);
+    // (레이드: about the boss inside the arena — a ring about the hero put them a row off its edge: wallscan 2026-11-28, 선계 1:31)
+    for (let i = 0; i < 1 + phase; i++) addEnemy(m, 'champ', { name: '챔피언', scale: 1.15 }, pack, G.stage.jaeng ? War.mobSpot() : G.war && G.war.raid ? War.raidSpot() : null);
   }
   // Every half minute it calls its own.
   if (t >= G.waveT) {
@@ -18902,7 +18903,14 @@ function render(now) {
   if (G.blast && G.t < G.blast.at) {
     const k = Math.max(0, 1 - (G.blast.at - G.t) / (G.blast.warn || 1.6));
     ctx.fillStyle = `rgba(210, 30, 25, ${(0.22 + 0.2 * k) * (settings.calmFx ? 0.9 : 0.85 + 0.15 * Math.sin(G.t * 7.5))})`;
-    ctx.fillRect(camX, camY, VW, VH);
+    if (G.blast.safe) {
+      // (레이드 광폭 광역기: the rings of shelter left clear of the red — war.js rageBlast; what is clear is what is safe)
+      const R = War.RAGE.r * TILE;
+      ctx.beginPath();
+      ctx.rect(camX, camY, VW, VH);
+      for (const [tx, ty] of G.blast.safe) { const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2; ctx.moveTo(x + R, y); ctx.ellipse(x, y, R, R * 0.62, 0, 0, Math.PI * 2); }
+      ctx.fill('evenodd');
+    } else ctx.fillRect(camX, camY, VW, VH);
   }
 
   // A 필살기's dark (castUlt): the field goes dark round the bodies for a moment, as in 연.
