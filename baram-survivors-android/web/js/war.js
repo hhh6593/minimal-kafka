@@ -234,6 +234,7 @@ export function initWar(api) {
   window.__jaeng = (cls, role, opts = {}) => startJaeng(typeof cls === 'number' ? A.CLASSES[cls] : cls, role, opts);
   window.__jaengCmd = kind => heroCommand(kind);
   window.__warCmd = kind => warCommand(kind);
+  window.__warPlace = (b, x, y) => { A.leave(b); A.place(b, x, y); moved(b, 'place'); }; // test: a body set down on a tile
   window.__warTac = kind => warTactic(kind);
   window.__warTacState = () => tacState();
   // Test: how many composited fighter frames are kept, and how many were made (cache churn).
@@ -1243,6 +1244,15 @@ function walk(W, b) {
     const [fx0, fy0] = near > 9 ? snap(W, Math.round(dx0 / 3) * 3, Math.round(dy0 / 3) * 3) : [dx0, dy0];
     let f = flowTo(W, fx0, fy0, b.team);
     if (f[b.ty * cols + b.tx] < 0 && (fx0 !== dx0 || fy0 !== dy0)) f = flowTo(W, dx0, dy0, b.team);
+    // A destination it cannot reach (behind the shut gate, in the castle's wall walk, across water): it stood on the spot
+    // for good (엔드게임 점검 2026-11-28: the siege's fighters sent to roam or hunt inside the castle stood still before it,
+    // 6~40 of them a war). Now to the nearest tile it can reach.
+    if (f[b.ty * cols + b.tx] < 0) {
+      const alt = reachNear(W, b, dx0, dy0);
+      b.dest = alt && (alt[0] !== b.tx || alt[1] !== b.ty) ? alt : null;
+      if (W.diag) W.diag.unreach = (W.diag.unreach || 0) + 1;
+      return;
+    }
     const here = f[b.ty * cols + b.tx];
     opts = [];
     for (const [dx, dy] of DIR4) {
@@ -1294,6 +1304,38 @@ function walk(W, b) {
   }
 }
 
+/** The tile nearest (x, y) that body b can walk to from where it stands (by its side's open tiles), or null. */
+function reachNear(W, b, x, y) {
+  // (kept for the body while its destination and the gate stand as they were: no new field a step)
+  x = clamp(Math.round(x), 0, W.map.cols - 1); y = clamp(Math.round(y), 0, W.map.rows - 1);
+  const key = x + ',' + y + ',' + (W.gateDown ? 1 : 0);
+  if (b.rnKey === key) return b.rnAt;
+  const { cols, rows } = W.map, n = cols * rows, f = new Int16Array(n).fill(-1), q = new Int32Array(n);
+  let h = 0, t = 0;
+  f[b.ty * cols + b.tx] = 0; q[t++] = b.ty * cols + b.tx;
+  while (h < t) {
+    const c = q[h++], cx = c % cols, cy = (c - cx) / cols;
+    for (const [dx, dy] of DIR4) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const ni = ny * cols + nx;
+      if (f[ni] >= 0 || !open(W, nx, ny, b.team)) continue;
+      f[ni] = f[c] + 1; q[t++] = ni;
+    }
+  }
+  b.rnKey = key;
+  b.rnAt = null;
+  for (let r = 0; r < 16 && !b.rnAt; r++) {
+    let bd = 1e9;
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || f[ny * cols + nx] < 0) continue;
+      if (f[ny * cols + nx] < bd) { bd = f[ny * cols + nx]; b.rnAt = [nx, ny]; }
+    }
+  }
+  return b.rnAt;
+}
 /** A step to a tile already cleared for it (a swap in a crowd): as game.js's step, without the check. */
 function startStep(b, nx, ny, dur) {
   b.fx = b.tx; b.fy = b.ty;
@@ -3057,6 +3099,8 @@ function escort(W, dt) {
   }
   cartPos(W);
   c.best[att] = Math.max(c.best[att], c.i);
+  // (the time each took to the end: two carts both at the 본당 went to the first half's side whatever the pace)
+  if (c.i >= W.path.length - 1 && !(c.endAt = c.endAt || [null, null])[att]) c.endAt[att] = W.def.half - Math.max(0, W.left);
   // Half time (or the end reached): the guilds change sides.
   const done = c.i >= W.path.length - 1;
   if (W.round === 1 && (W.left <= W.def.time - W.def.half || done)) {
@@ -5479,13 +5523,19 @@ function checkEnd(W) {
   const left = W.left <= 0;
   if (W.mode === 'capture') {
     if (W.score[0] >= W.def.target || W.score[1] >= W.def.target) { win = W.score[0] >= W.score[1] ? 0 : 1; why = `${W.def.target}점 선취`; }
-    else if (left) { win = W.score[0] >= W.score[1] ? 0 : 1; why = `시간 종료 ${W.score[0]} : ${W.score[1]}`; }
+    else if (left) {
+      // (a tie went to our guild: score[0] >= score[1]. Now the 거점 held at the end, then the kills, then the defender's luck
+      // of the first-taken centre is not ours by default)
+      const held = t => W.flags.filter(f => f.owner === t).length;
+      win = W.score[0] !== W.score[1] ? (W.score[0] > W.score[1] ? 0 : 1) : held(0) !== held(1) ? (held(0) > held(1) ? 0 : 1) : W.teams[0].kills !== W.teams[1].kills ? (W.teams[0].kills > W.teams[1].kills ? 0 : 1) : (Math.random() < 0.5 ? 0 : 1);
+      why = `시간 종료 ${W.score[0]} : ${W.score[1]}${W.score[0] === W.score[1] ? ' (동점 — 쥔 거점·처치로)' : ''}`;
+    }
   } else if (W.mode === 'commander') {
     for (const t of [0, 1]) if (W.teams[t].cmd.dead) { win = 1 - t; why = `${W.teams[t].name} 진영대장 격파`; }
     if (win < 0 && W.def.kills) for (const t of [0, 1]) if (W.score[t] >= W.def.kills) { win = t; why = `${W.def.kills}점 선취 ${Math.floor(W.score[0])} : ${Math.floor(W.score[1])}`; }
     if (win < 0 && left) {
       const s = t => W.score[t] + 30 * hpk(W.teams[t].cmd);
-      win = s(0) >= s(1) ? 0 : 1;
+      win = s(0) !== s(1) ? (s(0) > s(1) ? 0 : 1) : W.teams[0].kills !== W.teams[1].kills ? (W.teams[0].kills > W.teams[1].kills ? 0 : 1) : (Math.random() < 0.5 ? 0 : 1); // (a tie was ours)
       why = `시간 종료 · 처치 ${Math.floor(W.score[0])} : ${Math.floor(W.score[1])}`;
     }
   } else if (W.mode === 'escort') {
@@ -5493,7 +5543,12 @@ function checkEnd(W) {
     if (W.round === 2) {
       const first = 1 - W.attacker;
       if (c.best[W.attacker] > c.best[first] + 0.01) { win = W.attacker; why = '더 멀리 호위'; }
-      else if (left || c.i >= W.path.length - 1) { win = c.best[W.attacker] > c.best[first] ? W.attacker : first; why = '더 멀리 호위'; }
+      else if (left || c.i >= W.path.length - 1) {
+        const e = c.endAt || [];
+        // both to the end: the quicker (it went to the first half's side whatever the pace)
+        if (c.best[W.attacker] >= c.best[first] - 0.01 && e[W.attacker] != null && e[first] != null) { win = e[W.attacker] < e[first] ? W.attacker : first; why = `둘 다 본당 — 더 빨리 (${Math.round(e[0] ?? 0)}초 : ${Math.round(e[1] ?? 0)}초)`; }
+        else { win = c.best[W.attacker] > c.best[first] ? W.attacker : first; why = '더 멀리 호위'; }
+      }
     }
     if (win >= 0) {
       const pct = t => Math.round(c.best[t] / (W.path.length - 1) * 100);
@@ -7417,7 +7472,8 @@ function jaengRise(W, team, deaths) {
 /** The guilds' orders (B2: the plain plan; jaengPlan is the commander). */
 function jaengEnd(W, why) {
   if (W.over) return;
-  const order = W.teamIds.slice().sort((a, b) => W.score[b] - W.score[a]);
+  // (a tie in points went to our guild, the first in teamIds: now the boss's share, then the kills)
+  const order = W.teamIds.slice().sort((a, b) => (Math.round(W.score[b]) - Math.round(W.score[a])) || (W.bossDmg[b] - W.bossDmg[a]) || (W.teams[b].kills - W.teams[a].kills));
   W.rank = order;
   finishJaeng(W, order[0], why);
 }
@@ -9069,10 +9125,10 @@ const SHRINE_KINDS = {
 };
 // Side spots of each field, away from the objectives (the shrine draws a squad off the main fight), on the walk grids
 // ($S/r_end/maps.txt): 청룡 off the 거점's diagonal, 백호 the north court and the south garden, 주작 the road's flanks (the
-// two nearest the cart), 현무 before the gate and either side of the field.
+// two nearest the cart), 현무 just outside the walls either side of the gate.
 const SHRINE_SPOTS = {
   cheong: [[30, 16], [46, 58], [12, 40], [64, 30]], baekho: [[37, 14], [37, 48]],
-  jujak: [[8, 52], [46, 52], [10, 24], [44, 24], [10, 66], [44, 66], [8, 40], [46, 34]], hyeonmu: [[40, 36], [18, 40], [58, 40]],
+  jujak: [[8, 52], [46, 52], [10, 24], [44, 24], [10, 66], [44, 66], [8, 40], [46, 34]], hyeonmu: [[33, 29], [47, 29]], // (by the walls either side of the gate, where the 쪽문 sortie can contest it: out in the field only the siege took it, 4 : 0)
 };
 function moment(W, text, team = 0, o = {}) {
   (W.moments = W.moments || []).push({ t: Math.round(W.t), text, team, hero: !!o.hero, big: !!o.big, kind: o.kind || '' });
