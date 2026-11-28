@@ -106,11 +106,17 @@ export const RAID_GEAR = {
     weapon: { warrior: '참마도', rogue: '저주의단검', mage: '원혼의낫', poet: '자월초롱', archer: '대붕지옥궁', lancer: '극독지옥창', monk: '적풍권갑', magus: '독각귀단봉', celestial: '이매망량포', dokkaebi: '극염인화퇴', reaper: '귀면진산명도' } },
   raid_heaven: { pow: 14.5, armor: '선녀의옷', shield: '천성대방패',
     weapon: { warrior: '청룡의검', rogue: '진아광검', mage: '해룡의지팡이', poet: '백운장', archer: "극'흑일신궁", lancer: '천부연극', monk: '백운권갑', magus: '금홍비단봉', celestial: '금홍비포', dokkaebi: '금홍퇴', reaper: '바람홍옥명도' } },
+  // 신 용궁 탑 (L22, V4_RAIDS): the sea's set (용왕의용포, 바루나's weapons), between 아이라바타 and the 지하국대적.
+  raid_yonggung: { pow: 14, armor: '용왕의용포', shield: '거문고',
+    weapon: { warrior: '청룡의검', rogue: '도룡보도', mage: '해룡의지팡이', poet: '하늘개비', archer: '천부연궁', lancer: '금강비창', monk: '권제철갑', magus: '금홍비단봉', celestial: '금홍비포', dokkaebi: '금홍퇴', reaper: '바람홍옥명도' } },
 };
 // Raids added after the crafted looks were laid in the lines: their pieces are placed by
 // settleLateRaids (items.js, last of all), each at the end of its line, so no saved place moves.
 const LATE_RAIDS = new Set(['raid_hell', 'raid_heaven']);
-const EARLY_RAIDS = Object.keys(RAID_GEAR).filter(id => !LATE_RAIDS.has(id));
+// 신 용궁 탑 (2026-11-28): written after every crafted piece, the 수호신물 too; its places come last of all (items.js
+// end: settleLateRaids(V4_RAIDS)), so no place a save holds moves.
+export const V4_RAIDS = new Set(['raid_yonggung']);
+const EARLY_RAIDS = Object.keys(RAID_GEAR).filter(id => !LATE_RAIDS.has(id) && !V4_RAIDS.has(id));
 
 // 용무기: made only by the smith's 조합, never dropped (see items.js for the recipe).
 export const CRAFT_GEAR = { warrior: '용마제일검', rogue: '용천제일검', mage: '용랑제일봉', poet: '용겸제일봉', archer: '용섬제일궁', lancer: '용무제일창', monk: '용비제일권갑', magus: '용화제일단봉', celestial: '용주제일도', dokkaebi: '용린제일퇴', reaper: '용라제일명도' };
@@ -175,8 +181,8 @@ export function settleRaidPieces() {
 }
 /** The late raids' pieces (LATE_RAIDS): each a place of its own at the end of its line, wearing the
  *  look of the first place of its name (lookAt). Called once, after every crafted look is laid. */
-export function settleLateRaids() {
-  for (const id of LATE_RAIDS)
+export function settleLateRaids(ids = LATE_RAIDS) {
+  for (const id of ids)
     for (const cls of Object.keys(GEAR))
       for (const [kind, name] of raidSet(id, cls)) {
         const line = GEAR[cls][kind];

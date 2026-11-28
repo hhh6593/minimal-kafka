@@ -7,7 +7,7 @@
 // what makes a conquered ground worth hunting again; the 도감 shows where each piece drops.
 
 import { STAGES, RAIDS, CLASSES } from './data.js';
-import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, settleLateRaids, RAID_GEAR } from './avatar.js';
+import { GEAR, plainTiers, plainList, gearPower, lookTier, raidTier, raidOwner, settleRaidPieces, settleLateRaids, RAID_GEAR, V4_RAIDS } from './avatar.js';
 import { SOURCE_GYEOK, CRAFT_GYEOK } from './gyeok.js';
 import { ARMORY } from './armory.js';
 export { MUSIN_SET, musinSetOf } from './armory.js';
@@ -29,6 +29,7 @@ const PREFIX = {
   oldaram: '섬망의', haya: '하야의', lobi: '세암의', aram: '황무지의', ancient: '도성의',
   hwatang: '화탕의', cheolsang: '철상의', abyss: '묘지의', abyss2: '고통의', abyss3: '혼돈의', abyss4: '세계석의', cow: '음매의',
   raid_hell: '대적의', raid_heaven: '선계의',
+  haewol: '은월의', sahwido: '모래악어의', raid_yonggung: '불가살의',
 };
 
 // The extra options, in turn. Each special has one.
@@ -50,10 +51,10 @@ export const KIND_NAME = { weapon: '무기', armor: '갑옷', shield: '방패', 
 /** Every special: id, where it drops, its kind and option. */
 export const SPECIALS = [];
 // The 대격변 places (v2) come last, so the older specials keep the options they had.
-// 연's own grounds (v3) after those, for the same reason.
-const era = s => (s.v3 ? 2 : s.v2 ? 1 : 0);
-const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false, v2: s.v2, v3: s.v3 })),
-  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2, v3: r.v3 }))]
+// 연's own grounds (v3) after those, for the same reason; 하월·사휘도·신 용궁 탑 (v4, 2026-11-28) after every v3 one.
+const era = s => (s.v4 ? 3 : s.v3 ? 2 : s.v2 ? 1 : 0);
+const SOURCES = [...STAGES.map((s, i) => ({ id: s.id, name: s.name, i: s.level !== undefined ? s.level : i, raid: false, v2: s.v2, v3: s.v3, v4: s.v4 })),
+  ...RAIDS.map(r => ({ id: r.id, name: r.name.replace(' 레이드', ''), i: r.level, raid: true, v2: r.v2, v3: r.v3, v4: r.v4 }))]
   .sort((a, b) => era(a) - era(b));
 SOURCES.forEach((src, n) => KINDS.forEach((kind, k) => {
   // A boss's specials carry its nature (gyeok.js SOURCE_GYEOK): the weapon its 격, the armour
@@ -175,21 +176,21 @@ export const MATS = {
   horn: { name: '도깨비 탈', icon: 'm_horn', from: ['goblin', 'yogoe', 'raid_goblin', 'hwagwa'] },
   bone: { name: '해골 조각', icon: 'm_bone', yeon: 406062, from: ['haunt', 'skull', 'raid_sorcerer', 'tagye', 'reef', 'wreck', 'greatwall'] },
   ember: { name: '불씨 단지', icon: 'm_ember', from: ['volcano', 'raid_fire', 'raid_agni', 'pokyeom', 'hwatang'] },
-  jade: { name: '백옥', icon: 'm_jade', from: ['island', 'palace', 'royal', 'kirin', 'raid_airavata', 'gogyun', 'gareung'] },
+  jade: { name: '백옥', icon: 'm_jade', from: ['island', 'palace', 'royal', 'kirin', 'raid_airavata', 'gogyun', 'gareung', 'haewol'] },
   scale: { name: '용의 비늘', icon: 'gem2', yeon: 50000962, from: ['bigsnake', 'sea', 'palace', 'raid_hydra', 'raid_sea', 'deepsea', 'raid_varuna', 'reef', 'wreck'] },
-  pearl: { name: '여의주', icon: 'gem4', yeon: 50000719, from: ['raid_hydra', 'palace', 'deepsea', 'raid_varuna'] },
+  pearl: { name: '여의주', icon: 'gem4', yeon: 50000719, from: ['raid_hydra', 'palace', 'deepsea', 'raid_varuna', 'raid_yonggung'] },
   // Today's client's materials, as its smith asks for them: 금린 for the 중국전설 set, 순수의 강철
   // for the 일본전설 set, 조화의 정수 for the 용 set, 거마족의 영혼석 for 고대마령, a 제작 고문서
   // for every legendary piece, 겁화의 파편 for their stars, and the 은나무 파편·조각·가지 that
   // raise the 용무기 from 제일 to 제십.
-  gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong', 'raid_airavata', 'greatwall', 'qin', 'haya'] },
+  gold: { name: '금린', icon: 'm_gold', from: ['palace', 'royal', 'raid_tiger', 'raid_goblin', 'hwagwa', 'kirin', 'raid_wukong', 'raid_airavata', 'greatwall', 'qin', 'haya', 'sahwido'] },
   steel: { name: '순수의 강철', icon: 'm_steel', yeon: 50000606, from: ['volcano', 'japan', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'musin', 'murim', 'raid_musin', 'raid_agni', 'wolf', 'ancient'] },
-  essence: { name: '조화의 정수', icon: 'm_essence', yeon: 21119, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
+  essence: { name: '조화의 정수', icon: 'm_essence', yeon: 21119, from: ['raid_hydra', 'raid_sea', 'raid_fire', 'deepsea', 'kirin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'baekdu4', 'hanbing', 'lobi', 'aram', 'ancient', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven', 'raid_yonggung'] },
   soul: { name: '거마족의 영혼석', icon: 'm_soul', yeon: 509043, from: ['skull', 'yogoe', 'raid_sorcerer', 'tagye', 'raid_brit', 'raid_gwoe', 'geohae', 'hanbing', 'oldaram', 'jagwi', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'raid_hell'] },
-  scroll: { name: '제작 고문서', icon: 'm_scroll', yeon: 50000607, from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'raid_hell', 'raid_heaven'] },
-  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', yeon: 12005, from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
-  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
-  silver2: { name: '은나무 조각', icon: 'm_silver2', yeon: 407099, from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven'] },
+  scroll: { name: '제작 고문서', icon: 'm_scroll', yeon: 50000607, from: ['raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'raid_hell', 'raid_heaven', 'raid_yonggung'] },
+  kalpa: { name: '겁화의 파편', icon: 'm_kalpa', yeon: 12005, from: ['volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven', 'haewol', 'sahwido', 'raid_yonggung'] },
+  silver1: { name: '은나무 파편', icon: 'm_silver1', from: ['sea', 'island', 'volcano', 'palace', 'royal', 'raid_boar', 'raid_tiger', 'raid_goblin', 'raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'hwagwa', 'murim', 'musin', 'deepsea', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'wolf', 'reef', 'wreck', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu', 'baekdu2', 'baekdu3', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven', 'haewol', 'sahwido', 'raid_yonggung'] },
+  silver2: { name: '은나무 조각', icon: 'm_silver2', yeon: 407099, from: ['raid_hydra', 'raid_sorcerer', 'raid_sea', 'raid_fire', 'kirin', 'tagye', 'raid_wukong', 'raid_musin', 'raid_brit', 'raid_varuna', 'raid_agni', 'raid_airavata', 'raid_gwoe', 'baekdu4', 'hanbing', 'geohae', 'zud', 'zud2', 'sandolim', 'fallforest', 'jagwi', 'oldaram', 'haya', 'lobi', 'aram', 'ancient', 'hwatang', 'cheolsang', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'cow', 'raid_hell', 'raid_heaven', 'haewol', 'sahwido', 'raid_yonggung'] },
   // The 사신수's 성물 (the original's 신수현신공성전: four of a 신수 make its 지존 piece; 연 keeps
   // 주작혈안 and 백호광안 among its items, whose icons these are). Each from its 신수's own raid at
   // the end of the 대격변 (SINSU_GATE: 청룡 바루나 L15, 현무 해왕 L11 and 바루나, 주작 아그니 L17,
@@ -200,12 +201,14 @@ export const MATS = {
   sinsu_cheong: { name: '청룡의 비늘', icon: 'gem1', yeon: 407101, from: ['raid_varuna', 'raid_hydra'] },
   sinsu_hyeonmu: { name: '현무의 등딱지', icon: 'gem3', yeon: 406243, from: ['raid_sea', 'raid_varuna'] },
   // 은나무 가지 (the 용무기's 제십): from the last raids and the 끝없는 지옥 only (was 삼두룡 L7 up).
-  silver3: { name: '은나무 가지', icon: 'm_silver3', yeon: 407072, from: ['raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'raid_hell', 'raid_heaven'] },
+  silver3: { name: '은나무 가지', icon: 'm_silver3', yeon: 407072, from: ['raid_agni', 'raid_airavata', 'abyss', 'abyss2', 'abyss3', 'abyss4', 'raid_hell', 'raid_heaven', 'raid_yonggung'] },
   // 지하국대적 레이드's own: 연's 회한옥'심 (the sinners' jade of regret 연 spends on 극'청룡
   // 심판의낫's awakening), what 군주 청룡 심판의낫 becomes 악마 심판의낫 with (JUDGE_CRAFTS).
   hoehan: { name: "회한옥'심", icon: 'm_soul', yeon: 50001035, from: ['raid_hell'] },
   // 선계 레이드's own: 연's 선계의 기운, the light the 용무기 제십 is dressed in (천상 각성: HEAVEN_DRESS).
   seongi: { name: '선계의 기운', icon: 'm_essence', yeon: 303, from: ['raid_heaven'] },
+  // 신 용궁 탑 레이드's own (2026-11-28): 연's 기묘한진주 (Item_50000736, its icon), for the 해군 제독 망토 (armory.js).
+  jinju: { name: '기묘한 진주', icon: 'gem4', yeon: 50000736, from: ['raid_yonggung'] },
 };
 // The 사신수 성물's own raids (above); elsewhere a taste only (SINSU_TASTE a boss). 현무's 해왕 gives
 // its full share only once 바루나 has fallen. A 사신수 recipe's gate (needs) is its 성물's raid.
@@ -234,7 +237,7 @@ export function matCount(id, kind, raid) {
   const r = Math.random();
   if (id === 'pearl') return kind === 'boss' && r < (raid ? 0.6 : 0.12) ? 1 : 0;
   // 회한옥'심 and 선계의 기운: two or three from their raid's boss, every clear.
-  if (id === 'hoehan' || id === 'seongi') return kind === 'boss' ? 2 + (r < 0.5 ? 1 : 0) : 0;
+  if (id === 'hoehan' || id === 'seongi' || id === 'jinju') return kind === 'boss' ? 2 + (r < 0.5 ? 1 : 0) : 0;
   // 은나무 가지: raid bosses 25%; the 끝없는 지옥's bosses (in its list) 10% — they gave none (raid only).
   if (id === 'silver3') return kind === 'boss' && r < (raid ? 0.25 : 0.1) ? 1 : 0;
   if (id === 'scroll') return kind === 'boss' ? 1 + (r < 0.3 ? 1 : 0) : 0;
@@ -497,6 +500,8 @@ for (const f of FINAL_SHIELDS) {
   SPECIAL[c.id] = sp;
   for (const k of FS_ONLY) specialBase(sp, k);
 }
+// 신 용궁 탑 레이드 (avatar.js V4_RAIDS): its set's places last of all, after the 수호신물, so no place a save holds moves.
+settleLateRaids(V4_RAIDS);
 
 // ---------------------------------------------------------------- 장비 티어 (README "장비 티어")
 // The crafted pieces' ranks as the ladder sets them (over the recipes' own pow, kept above as they

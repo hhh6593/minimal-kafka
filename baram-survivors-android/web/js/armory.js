@@ -85,6 +85,8 @@ export const ARMORY = [
   { id: 'cr_cape_bukdu', group: G_CAPE, kind: 'cape', legend: true, name: '북두칠성 문지기의 망토', look: '몰락자망토', base: each(803700), pow: 11.5, opt: 'haste', mats: { steel: 10, kalpa: 6, scroll: 1 }, gold: 9000, needs: 'raid_musin' },
   { id: 'cr_cape_sari', group: G_CAPE, kind: 'cape', legend: true, name: '사리의 망토', look: '몰락자망토', base: each(450511), pow: 13, opt: 'life', mats: { soul: 15, essence: 8, scroll: 2 }, gold: 16000, needs: 'raid_gwoe' },
   { id: 'cr_cape_heukryong', group: G_CAPE, kind: 'cape', legend: true, name: '흑룡의 망토', look: '몰락자망토', base: each(803713), pow: 14.5, opt: 'boss', mats: { hoehan: 8, kalpa: 20, scroll: 2 }, gold: 30000, needs: 'raid_hell' },
+  // 신 용궁 탑 레이드 (2026-11-28): its 기묘한 진주 → 연's 해군 제독 망토 (803689, every class's 코디), now and then from the tower itself.
+  { id: 'cr_cape_jedok', group: G_CAPE, kind: 'cape', legend: true, name: '해군 제독 망토', look: '몰락자망토', base: each(803689), pow: 14, opt: 'regen', mats: { jinju: 6, essence: 12, kalpa: 15, scroll: 2 }, gold: 26000, needs: 'raid_yonggung', dropFrom: ['raid_yonggung'] },
 ];
 
 // ---------------- 사신수 무신 방어구 (after the 신수's own raid, out of its 성물)

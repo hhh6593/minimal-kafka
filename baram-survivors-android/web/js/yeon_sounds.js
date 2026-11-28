@@ -550,12 +550,15 @@ export const YEON_STAGE_BGM = {
  "haya": "BGM_Raid_China_1stField_48",
  "lobi": "BGM_Raid_UnderSky_2ndStoryField",
  "aram": "BGM_Raid_UnderSky_3rdStoryField",
- "ancient": "BGM_Raid_UnderSky_4thStoryField"
+ "ancient": "BGM_Raid_UnderSky_4thStoryField",
+ "haewol": "BGM_Haewol_Night",
+ "sahwido": "BGM_Sahwido_SunsetHill"
 };
 
 export const YEON_RAID_BGM = {
  "raid_goblin": "bgm_boss05_48",
- "raid_sea": "BGM_Raid_YongGung_1stBoss_48"
+ "raid_sea": "BGM_Raid_YongGung_1stBoss_48",
+ "raid_yonggung": "BGM_YeonTower_Field"
 };
 
 // 효과음 겹침 (사용자 2026-11-28): sounds the build carries in several takes of the same thing (연's own numbered takes,

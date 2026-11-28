@@ -507,11 +507,15 @@ const monsterById = {};
  *  boss's 연 sheets, the 괴수 its boss or the class's calls bring. */
 function runPics(cls, stage) {
   const out = new Set();
-  if (stage.terrain && (M.floor || []).includes(stage.terrain)) out.add(`floor/${stage.terrain}.png`);
-  for (const [n] of propKinds(stage.terrain)) out.add(`prop/${n}.png`);
+  // (신 용궁 탑: every floor's ground, props and monsters, and its guardian — towerFloor)
+  for (const t of [stage.terrain, ...(stage.floors || []).map(f => f.terrain)]) {
+    if (t && (M.floor || []).includes(t)) out.add(`floor/${t}.png`);
+    for (const [n] of propKinds(t)) out.add(`prop/${n}.png`);
+  }
   let mons = null;
   try { mons = stageMonsters(stage); } catch (e) { /* a war's ground has none */ }
   for (const m of mons ? [...mons.pool, mons.boss && mons.boss.m, mons.mini && mons.mini.m] : []) if (m && M.yunit && M.yunit[m.id]) out.add(`yunit/${m.id}.png`);
+  for (const f of stage.floors || []) for (const id of [...f.monsters, f.boss && f.boss.id]) if (id && M.yunit && M.yunit[id]) out.add(`yunit/${id}.png`);
   if (mons && mons.boss && mons.boss.beast) out.add(`beast/${mons.boss.beast}.png`);
   for (const d of Object.values(SKILLS)) if (d.beasts && d.cls === cls.id) for (const bk of d.beasts) if (bk && M.beast && M.beast[bk]) out.add(`beast/${bk}.png`);
   if (M.yunit && M.yunit[TRAIN_MOB]) out.add(`yunit/${TRAIN_MOB}.png`);
@@ -734,7 +738,7 @@ const PROP_CELL = 160;
 // it was made anew every frame, some forty objects and closures)
 let propsSeen = null;
 function propsInView(camX, camY) {
-  const kinds = propKinds(G.stage.terrain);
+  const kinds = propKinds(G.terrain || G.stage.terrain);
   if (!kinds.length) return [];
   const list = kinds.filter(([n]) => M.prop[n] && pic(`prop/${n}.png`));
   const total = list.reduce((a, [, w]) => a + w, 0);
@@ -790,7 +794,7 @@ function makeGround(kind) {
     picWarm([fp]).then(() => {
       makeGround.wait.delete(kind);
       if (!pic(fp)) return;
-      if (G && G.stage.terrain === kind) G.ground = makeGround(kind);
+      if (G && (G.terrain || G.stage.terrain) === kind) G.ground = makeGround(kind);
       if (kind === 'field') menuGround = makeGround('field');
     });
   }
@@ -974,7 +978,7 @@ function resize() {
 }
 addEventListener('resize', () => {
   resize();
-  if (G) G.ground = makeGround(G.stage.terrain);
+  if (G) G.ground = makeGround(G.terrain || G.stage.terrain);
   menuGround = makeGround('field');
 });
 
@@ -1393,7 +1397,8 @@ function raidInfo(r) {
   const rec = best[chosenClass.id], start = raidStart(rec, chosenClass.id);
   const roles = War.raidRoles(chosenClass);
   const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
-  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">보스 ${r.boss.name} · ${RAID_BOSS_AT}초에 등장 · ${RAID_LIMIT / 60}분 안에</div>
+  const tower = r.floors ? `${r.floors.length}층 탑 · 문지기 ${r.floors.filter(f => f.boss).map(f => f.boss.name).join('·')} → ` : ''; // 신 용궁 탑
+  $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">${tower}보스 ${r.boss.name} · ${RAID_BOSS_AT}초에${r.floors ? ' 1층 문지기' : ''} 등장 · ${RAID_LIMIT / 60}분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
     <div class="mons"><img src="${monFace((namedMonster(r.boss) || r.boss).id)}" alt=""></div>
     <div class="party">${chosenClass.name}(나) Lv ${start}부터 · 공격대 25명${party.length ? ` · 내 다른 직업: ${party.slice(0, 4).join(', ')}` : ''}</div>
@@ -5190,6 +5195,7 @@ function raidSetup() {
   }
   G.raidT = 3;
   G.phase = 0;
+  if (G.stage.floors) towerFloor(0, true); // 신 용궁 탑: its first floor
   // 공대 (war.js): twenty-four raiders of every class and role gather with the hero — the
   // player's other grown classes among them — on the guild war's fighters.
   War.raidSetup();
@@ -5200,7 +5206,7 @@ function raidSetup() {
  * client, and the line in the chat. kind: enter, p1, p2, summon, kill, low, enrage, death.
  */
 function bossSay(kind) {
-  const L = G.stage.lines;
+  const L = G.towerSt ? G.towerSt.lines : G.stage.lines; // (신 용궁 탑: a floor's guardian speaks its own)
   if (!L || !L[kind]) return;
   if (kind === 'kill' || kind === 'summon' || kind === 'killHealer') {
     if (G.t - (G.saidAt || -99) < 8) return; // the taunts not too often
@@ -5246,7 +5252,12 @@ function raidWave(b, n) {
 function raidSpawn(dt) {
   const t = G.t, p = G.player;
   const b = G.enemies.find(e => e.kind === 'boss');
-  if (G.bossT !== undefined && !b && !G.cleared) {
+  // 신 용궁 탑: a guardian fallen, the raid climbs a few seconds later (towerGateDown).
+  if (G.towerNext && t >= G.towerNext) {
+    G.towerNext = 0;
+    towerFloor(G.floor + 1);
+  }
+  if (G.bossT !== undefined && !b && !G.cleared && !G.towerNext && !G.bossDue) {
     clearStage();
     return;
   }
@@ -5267,13 +5278,18 @@ function raidSpawn(dt) {
       if (!RW || at) addEnemy(pickMonster(), null, null, 0, at);
     }
   }
-  if (G.bossDue && t >= RAID_BOSS_AT) {
+  if (G.bossDue && t >= RAID_BOSS_AT && t >= (G.bossAt || 0)) {
     const e = addEnemy(G.boss.m, 'boss', G.boss, 0, RW ? War.raidLair() : null);
     if (!e) return;
     // Built for a whole party: about four minutes for a party of grown heroes.
     // Tougher for a party that comes in stronger (a start above Lv 20: +6% a level).
     // 공대: in the raid's own measure, for twenty-five (war.js).
     e.hp = e.maxHp = RW ? War.raidBossHp() : 11000 * G.level * (1 + 0.06 * Math.max(0, G.player.lvl - 20));
+    // 신 용궁 탑: a floor's guardian its share of the raid's life, the tower's lord the rest (TOWER_LORD_HP).
+    if (G.stage.floors) {
+      e.hp = e.maxHp = e.maxHp * (G.towerSt ? G.towerSt.hp : TOWER_LORD_HP);
+      e.towerGate = !!G.towerSt;
+    }
     // 공대: the boss stands over the crowd of twenty-five, some three and a half heroes tall,
     // so it shows through their spells. Only the picture grows: its reach stays (baseScale).
     if (RW) {
@@ -5296,10 +5312,54 @@ function raidSpawn(dt) {
     G.shake = 0.6;
     say(`${josa(G.boss.name, '이', '가')} 나타났습니다! 붉은 칸을 피하세요.`, 'warn');
     // Its name card: the name and what it is called.
-    banner(`${G.boss.name} · ${G.stage.title || '레이드 보스'}`);
+    banner(`${G.boss.name} · ${G.towerSt ? G.towerSt.name : G.stage.title || '레이드 보스'}`);
   }
   if (!b) return;
   bossBrain(b, dt, { rageAt: RAID_LIMIT - 60 });
+}
+
+/**
+ * 신 용궁 탑 (data.js RAIDS floors): its floors one after another. Each but the last has its guardian, fought as the
+ * raid's boss while it stands (kind 'boss' with towerGate: a share `hp` of the raid's life, its own blows `patterns`,
+ * its own lines); as it falls the raid climbs: the next floor's ground and props (G.terrain), its sea's monsters
+ * (G.pool), and its guardian or the tower's lord (G.boss) a few seconds later.
+ */
+const TOWER_LORD_HP = 0.58, TOWER_CLIMB = 4, TOWER_RISE = 3;
+function towerFloor(i, first = false) {
+  const st = G.stage, f = st.floors[i], last = i === st.floors.length - 1;
+  G.floor = i;
+  const ms = stageMonsters({ monsters: f.monsters, boss: last ? st.boss : f.boss, big: 9000 });
+  G.pool = ms.pool;
+  G.boss = ms.boss;
+  G.towerSt = last ? null : f;
+  G.terrain = f.terrain;
+  G.ground = makeGround(f.terrain);
+  if (G.war && G.war.teams) G.war.teams[1].name = G.boss.name; // (공대 HUD: the boss now standing)
+  if (first) return;
+  // The floor below is left behind with its monsters; the raid stands on the new one, its blows begun again.
+  for (const e of G.enemies.slice()) { G.enemies.splice(G.enemies.indexOf(e), 1); leave(e); }
+  G.marks.length = 0;
+  G.seqTill = 0;
+  G.phase = 0;
+  G.frenzy = false;
+  G.saidLow = false;
+  G.blast = null;
+  G.bossDue = true;
+  G.bossAt = G.t + TOWER_RISE;
+  G.shake = Math.max(G.shake, 0.5);
+  audio.play('boss');
+  banner(`${f.name}${last ? ` · ${st.boss.name}` : ''}`);
+  say(`[${st.name}] ${f.name}에 올랐습니다${last ? ` — 꼭대기의 ${josa(st.boss.name, '이', '가')} 기다립니다!` : ''}`, 'sys');
+}
+/** A guardian down (killEnemy): its chest and a piece, and the climb in TOWER_CLIMB seconds. */
+function towerGateDown(e) {
+  G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
+  dropGear(e);
+  say(`${josa(e.name, '을', '를')} 쓰러뜨렸습니다! 탑의 다음 층이 열립니다.`, 'sys');
+  bossSay('death');
+  banner(`${G.towerSt.name} 돌파`);
+  hitStop(0.08, 'mini');
+  G.towerNext = G.t + TOWER_CLIMB;
 }
 
 /**
@@ -5431,6 +5491,8 @@ const PATTERN_NAMES = {
   pillars: '불기둥 연쇄', lava: '불바다',
   staff: '여의봉', clones: '분신술',
   xslash: '십자 검기', iai: '발도 일섬',
+  // 2026-11-28: 하월's 은월토, 사휘도's 모래 악어, 신 용궁 탑's 악마불가살
+  crescent: '월광 반달', sinkhole: '모래 소용돌이', spines: '산호 가시밭', devour: '쇠 삼키기',
 };
 // The boss's own blows that share another's shape (by name only).
 const PATTERN_AS = { trample: 'charge', cloud: 'pounce', stomp: 'quake', flare: 'quake', thunder: 'sparks', drought: 'hunt', ward: 'safe', sweep: 'tide' };
@@ -5438,7 +5500,7 @@ const COMMON_PATTERNS = ['cross', 'breath', 'rain', 'ring', 'meteor', 'plus'];
 
 /** The next blow: the raid's own list, more as its phases go (patterns1, patterns2); its own blows twice as often. */
 function pickPattern() {
-  const st = G.stage, pool = [];
+  const st = G.towerSt || G.stage, pool = []; // (신 용궁 탑: a floor's guardian its own blows)
   const add = list => { for (const k of list || []) pool.push(...Array(COMMON_PATTERNS.includes(k) ? 1 : 2).fill(k)); };
   add(st.patterns);
   if (G.phase >= 1) add(st.patterns1);
@@ -5630,6 +5692,51 @@ function raidPattern(b, kind, follow = false) {
       for (let k = -12; k <= 12; k++) tiles.push(horiz ? [t2.tx + k, t.ty] : [t.tx, t2.ty + k]);
       return tiles;
     });
+  } else if (base === 'crescent') {
+    // 은월토 (하월): a half moon of light, two to four tiles out on the side of its mark, then the other half —
+    // step round to the dark side, then back as the second falls. When it is fierce, the first again.
+    const t0 = raidAim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx);
+    const half = side => {
+      const tiles = [];
+      for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) {
+        const d = Math.hypot(x, y);
+        if (d < 1.5 || d > 4.4) continue;
+        let da = Math.atan2(y, x) - a0;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if ((Math.abs(da) <= Math.PI / 2 + 0.01) === side) tiles.push([b.tx + x, b.ty + y]);
+      }
+      return tiles;
+    };
+    waves.push(() => half(true));
+    waves.push(() => half(false));
+    if (ph >= 2) waves.push(() => half(true));
+  } else if (base === 'sinkhole') {
+    // 모래 악어 (사휘도): the sand turns about its mark and is drawn in — a wide ring (four to five out), then the
+    // ring inside it (two to three), then the eye: whoever stays in the middle is swallowed; out over the first ring
+    // once it has fallen.
+    const t0 = raidAim(), cx = t0.tx, cy = t0.ty;
+    waves.push(() => sq(cx, cy, 5, [], 3));
+    waves.push(() => sq(cx, cy, 3, [], 1));
+    waves.push(() => sq(cx, cy, 1));
+  } else if (base === 'spines') {
+    // 악마불가살 (신 용궁 탑): coral spines through the floor about it, every other tile (five out), then the others —
+    // one step aside each time. The third phase: a third wave, the first again.
+    const odd = Math.random() < 0.5 ? 0 : 1;
+    const field = par => sq(b.tx, b.ty, 5, [], 0).filter(([x, y]) => ((x + y) & 1) === par);
+    waves.push(() => field(odd));
+    waves.push(() => field(1 - odd));
+    if (ph >= 2) waves.push(() => field(odd));
+  } else if (base === 'devour') {
+    // 악마불가살: it eats iron — a line from it to the three raiders farthest within ten tiles (it draws their blades),
+    // then it bites all round itself (three out): off the lines, then out of its reach.
+    waves.push(() => {
+      const far = partyBodies().filter(x => !x.down && !x.dead && Math.hypot(x.tx - b.tx, x.ty - b.ty) <= 10)
+        .sort((u, v) => Math.hypot(v.tx - b.tx, v.ty - b.ty) - Math.hypot(u.tx - b.tx, u.ty - b.ty)).slice(0, 3);
+      const tiles = [];
+      for (const x of far.length ? far : [raidAim()]) ray(b.tx, b.ty, Math.atan2(x.ty - b.ty, x.tx - b.tx), 1, Math.hypot(x.tx - b.tx, x.ty - b.ty) + 1, tiles);
+      return tiles;
+    });
+    waves.push(() => sq(b.tx, b.ty, 3, [], 0));
   } else {
     waves.push(() => commonTiles(b, 'cross', raidAim()));
   }
@@ -6991,7 +7098,8 @@ function rollSpecial(e) {
   // Now about one in six or seven hunts at the latest, the average hardly moved.
   const dry = progress.spDry || 0;
   const dz = dangerNow();
-  const chance = (e.kind === 'boss' ? 0.03 + SP_PITY * dry : { mini: 0.02, champ: 0.005, treasure: 0.05 }[e.kind] || 0.00003) * (dz ? dz.rew : 1);
+  const kd = e.towerGate ? 'mini' : e.kind; // (신 용궁 탑's guardians as leaders)
+  const chance = (kd === 'boss' ? 0.03 + SP_PITY * dry : { mini: 0.02, champ: 0.005, treasure: 0.05 }[kd] || 0.00003) * (dz ? dz.rew : 1);
   // (and a smith's piece this place drops itself now and then: armory.js dropFrom)
   const mine = SPECIALS.filter(s => (s.src === G.stage.id || (s.craft && s.craft.dropFrom && s.craft.dropFrom.includes(G.stage.id)
     && (!s.craft.only || s.craft.only.includes(G.cls.id)))) && (s.kind !== 'shield' || hasShield(G.cls.id)));
@@ -7058,7 +7166,8 @@ function rollMats(e) {
   for (const [id, m] of Object.entries(MATS)) {
     if (!m.from.includes(G.stage.id)) continue;
     // 사신수 성물: in full only from their 신수's raid (items.js SINSU_GATE), elsewhere a taste.
-    let n = id.startsWith('sinsu_') ? sinsuCount(id, G.stage.id, e.kind, progress.raids) : matCount(id, e.kind, !!G.stage.raid);
+    const kd = e.towerGate ? 'mini' : e.kind; // (신 용궁 탑's guardians as leaders)
+    let n = id.startsWith('sinsu_') ? sinsuCount(id, G.stage.id, kd, progress.raids) : matCount(id, kd, !!G.stage.raid);
     // 금린 below 8등급 (산군 L3, 도깨비대장 L5): one now and then, not 3-5 a boss — the 11등급
     // 금린 set came by the 12th hunt and skipped the raid sets and the craft ladder between.
     if (id === 'gold' && G.level < 8) n = e.kind === 'boss' && Math.random() < 0.35 ? 1 : 0;
@@ -7137,7 +7246,7 @@ function killEnemy(e) {
   const st = qstats();
   st.kills++;
   st.stageKills[G.stage.id] = (st.stageKills[G.stage.id] || 0) + 1;
-  if (e.kind === 'boss') st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
+  if (e.kind === 'boss' && !e.towerGate) st.bosses[G.stage.id] = (st.bosses[G.stage.id] || 0) + 1;
   G.enemies.splice(at, 1);
   leave(e);
   // The body is thrown a little away from the hero as it falls.
@@ -7182,6 +7291,8 @@ function killEnemy(e) {
     for (let i = 0; i < 6; i++) G.drops.push({ x: e.x + (i % 3 - 1) * 20, y: e.y + (i < 3 ? -14 : 14), kind: 'coin' });
     say('보물을 지닌 몬스터를 잡았습니다!');
     later(0.25, () => pullLoot());
+  } else if (e.kind === 'boss' && e.towerGate) {
+    towerGateDown(e);
   } else if (e.kind === 'boss') {
     if (!G.stage.raid) hitStop(0.1, 'boss');
     G.drops.push({ x: e.x, y: e.y, kind: 'chest' });
@@ -19474,6 +19585,8 @@ window.__mem = () => {
   };
 };
 window.__clear = () => clearStage();
+// Test (2026-11-28): the standing boss strikes one blow by name (a hunting ground's or a raid's, raidPattern).
+window.__bossPattern = kind => { const b = G && G.enemies.find(e => e.kind === 'boss'); if (b) raidPattern(b, kind); return !!b; };
 window.__tierKit = (id, tier) => tierKit(id, tier).map(k => SKILLS[k].promo + "차 " + SKILLS[k].name);
 window.__tierIds = (id, tier) => tierKit(id, tier); // test: a 승급 band's kit (ids)
 window.__start = (c, s, m) => { pickedMode = m || 'conquer'; startRun(CLASSES[c], STAGES[s]); if (m === 'sweep' && G.hunt) Hunt.sweep(G); };

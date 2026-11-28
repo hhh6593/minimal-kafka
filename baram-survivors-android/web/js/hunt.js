@@ -79,6 +79,8 @@ const BOSS_PATTERNS = {
   sandolim: ['charge', 'quake'], fallforest: ['hunt', 'whirl'], jagwi: ['rain', 'drought'], oldaram: ['seal', 'sweep'], haya: ['breath', 'flare'],
   lobi: ['tide', 'whirl'], aram: ['sweep', 'ring'], ancient: ['seal', 'xslash'],
   abyss: ['hunt', 'ring'], abyss2: ['hunt', 'rain'], abyss3: ['pillars', 'seal'], abyss4: ['quake', 'meteor'], cow: ['stampede', 'charge'],
+  // 2026-11-28: each its own blow (game.js raidPattern) — 은월토's 월광 반달, 모래 악어's 모래 소용돌이
+  haewol: ['crescent', 'pounce'], sahwido: ['sinkhole', 'charge'],
 };
 
 // ------------------------------------------------------------------ state
@@ -1246,6 +1248,7 @@ export const GROUPS = {
   snow: { name: '백두산', light: 1, tint: 'rgba(230,240,255,0.12)' },
   sea: { name: '바다', light: 0.85, tint: 'rgba(40,160,170,0.14)' },
   isle: { name: '환상의 섬', light: 0.9, tint: 'rgba(90,200,80,0.08)' },
+  newisle: { name: '하월·사휘도', light: 0.9 },
   house: { name: '집·탑', light: 0.75 },
   hell: { name: '지옥', light: 0.75, tint: 'rgba(230,50,20,0.16)' },
   sky: { name: '하늘 아래', light: 0.9, tint: 'rgba(255,140,40,0.12)' },
@@ -1316,6 +1319,9 @@ export const GROUNDS = {
   abyss3: G_('abyss', ['purify', 3, '봉인 셋 깨기', 'war_seal'], ['pillars'], ['shaman']),
   abyss4: G_('abyss', ['destroy', 3, '세계석 조각 부수기', 'war_rocks'], ['quake'], ['warding']),
   cow: G_('abyss', ['drive', 3, '소 떼 몰이'], ['stampede'], ['swift']),
+  // 하월·사휘도 (2026-11-28): 점령 and 파괴 by today's rules (one circle each step / a nest a step)
+  haewol: G_('newisle', ['purify', 3, '달맞이 제단 점령', 'war_altar'], [], ['cursed', 'swift']),
+  sahwido: G_('newisle', ['destroy', 3, '모래 악어 알둥지 부수기', 'war_rocks'], ['rockfall'], ['burning', 'swift']),
 };
 
 const AFFIX = {
@@ -2158,6 +2164,7 @@ const AMBIENT = {
   snow: { light: 1, tint: 'rgba(225,238,255,0.10)', fx: 'snow' },
   sea: { light: 0.85, tint: 'rgba(30,150,170,0.12)', fx: 'bubble' },
   isle: { light: 0.95, tint: 'rgba(90,200,80,0.06)', fx: 'leaf' },
+  newisle: { light: 0.95 },
   hell: { light: 0.75, tint: 'rgba(230,50,20,0.12)', fx: 'embers', edge: 'rgba(200,30,0,0.35)' },
   sky: { light: 0.9, tint: 'rgba(255,140,40,0.10)', fx: 'leaf' },
 };
@@ -2166,6 +2173,7 @@ const AMBIENT_GROUND = {
   haya: { fx: 'embers' }, hanbing: { fx: 'snow', tint: 'rgba(200,225,255,0.14)' }, jagwi: { fx: 'rain', light: 0.8 }, lobi: { fx: 'rain' },
   aram: { fx: 'dust' }, wolf: { light: 0.65, fx: null }, deepsea: { light: 0.7 }, tagye: { light: 0.65 }, yogoe: { light: 0.7 },
   musin: { light: 0.85 }, royal: { light: 0.9 }, murim: { light: 0.95 }, novice: { light: 1 }, japan: { fx: 'leaf' },
+  haewol: { light: 0.7, fx: null, tint: 'rgba(60,80,200,0.10)' }, sahwido: { fx: 'dust', tint: 'rgba(255,140,50,0.08)' },
 };
 const AMB_PIC = { snow: 'weather_snow', rain: 'csg04_rain', dust: 'weather_tachukbo', bubble: 'bubble_blue', leaf: 'csg04_leaf' };
 

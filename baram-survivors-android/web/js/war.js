@@ -5839,7 +5839,7 @@ function raidSetup() {
   W.raidCp = RAID_CP(G.level);
   W.teams = [
     { id: 0, name: '공격대', color: '#7cf08a', cmd: null, squads: [], spawn: W.camp.slice(), kills: 0, troops: [] },
-    { id: 1, name: (st.boss && st.boss.name) || '보스', color: '#ff7a6a', cmd: null, squads: [], spawn: W.lair.slice(), kills: 0, troops: [] },
+    { id: 1, name: (G.boss && G.boss.name) || (st.boss && st.boss.name) || '보스', color: '#ff7a6a', cmd: null, squads: [], spawn: W.lair.slice(), kills: 0, troops: [] }, // (신 용궁 탑: the floor's guardian first)
   ];
   W.hero = {
     id: 0, hero: true, team: 0, name: `${G.cls.name}(나)`, role, cls: G.cls, tx: 0, ty: 0, x: 0, y: 0, hp: 1, maxHp: 1, dead: false,

@@ -2135,6 +2135,17 @@ export const STAGES = [
     level: 17, open: 'baekdu3', big: 5600, monsters: ['y312036', 'y312037', 'y312038', 'y312039', 'y312040', 'y312041', 'y312042', 'y312043', 'y312044'],
     mini: { id: 'y612013', name: '암흑룡인', scale: 1.3 }, boss: { id: 'y612012', name: '백두선인', scale: 1.4 },
     intro: '백두대간 폭포 뒤의 동굴. 날개 달린 역자룡과 요괴 수목 너머에 선인이 있다' },
+  // 하월·사휘도 (2026-11-28, 연's 하월 Maps_416701 한 밤 구역 and 사휘도 Maps_416801 석양 언덕): two islands for the
+  // narrow L16~18 before the 지옥, on their own 연 maps (tools/yeon_grounds.py arena). v4: after every v3 source in the
+  // specials' order (items.js era), so no older special changes its option.
+  { id: 'haewol', v3: true, v4: true, bgm: 'BGM_Haewol_Night', name: '하월 한밤 구역', lv: '910', terrain: 'y_haewol', map: 'world_1', at: [0.72, 0.68],
+    level: 16, open: 'deepsea', big: 6000, monsters: ['y316407', 'y316408', 'y316409'],
+    mini: { id: 'y617203', name: '밤부엉이', scale: 1.1 }, boss: { id: 'y617206', name: '은월토', scale: 1.2 },
+    intro: '달이 지지 않는 섬 하월의 한밤. 악몽과 몽양이 꿈길을 헤매고, 은빛 달토끼가 달빛을 부린다' },
+  { id: 'sahwido', v3: true, v4: true, bgm: 'BGM_Sahwido_SunsetHill', name: '사휘도 석양 언덕', lv: '918', terrain: 'y_sahwido', map: 'world_1', at: [0.6, 0.8],
+    level: 17, open: 'haewol', big: 7000, monsters: ['y316505', 'y316506', 'y316504', 'y316523'],
+    mini: { id: 'y617302', name: '푸른 맹독전갈', scale: 1.1 }, boss: { id: 'y617305', name: '모래 악어', scale: 1.0 },
+    intro: '모래의 섬 사휘도, 해 지는 붉은 협곡. 황금 낙타 떼가 달리고 모래 밑에서 거대한 악어가 기다린다' },
   // 지옥 (연's own name for the region, Map_414001): its four hells on the 지옥 tab, past 타계.
   { id: 'hwatang', v3: true, bgm: 'bgm_00000128_48', name: '화탕지옥', lv: '710', terrain: 'y_hwatang', map: 'hell', at: [0.27, 0.45],
     level: 18, open: 'tagye', monsters: ['y314001', 'y314002', 'y314003'],
@@ -2316,6 +2327,26 @@ export const RAIDS = [
     monsters: ['y315519', 'y315520', 'y315521', 'y315522', 'y315523', 'y912015'], boss: { id: 'y912014', name: '선계의 백두선인', scale: 1.5 },
     patterns: ['rain', 'ring', 'cross', 'plus', 'eye'], patterns1: ['thunder', 'cloud'], patterns2: ['stomp', 'meteor'], fx: '140',
     intro: '백두산 위 선계의 주인. 하늘의 이치로 번개와 구름을 부린다. 가장 강한 레이드. 선계의 기운을 떨어뜨린다' },
+  // 신 용궁 탑 (2026-11-28): 연's 용궁 탑 (Maps_416501 kow_map_tower_yonggung01~04, its YEON_TOWER floors) for the empty
+  // L19~26. A tower of four floors (game.js tower*): each of the first three has its gate guardian (연's 신 용궁 field
+  // bosses, kind 'boss' while it stands, a share `hp` of the raid's life), its floor (terrain) and its sea's monsters;
+  // the fourth its lord. The floor changes as a guardian falls. v4: after every v3 source (items.js era).
+  // Its spoils: 기묘한 진주 (its own: the 해군 제독 망토, armory.js), 여의주 and 은나무 가지, and its set (avatar.js).
+  { id: 'raid_yonggung', v3: true, v4: true, bgm: 'BGM_YeonTower_Field', raid: true, title: '용궁 탑의 불가살',
+    lines: {'enter': '…쇠를 먹고 불을 삼켜도 죽지 않는다. 탑 꼭대기까지 오른 것을 후회하게 해 주마.', 'p1': '산호야, 가시를 세워라! 이 탑은 내 몸이다!', 'p2': '불가살은 죽지 않는다. 너희 칼부터 먹어 주마!', 'summon': ['산호 지대의 것들아, 올라오라!', '조수가 차오른다. 바다의 아이들아!'], 'kill': ['쇠붙이째 삼켰다.', '탑 아래로 떨어져라.'], 'killHealer': '물을 길어 오던 손부터 삼켰다.', 'low': '이 몸이… 녹슬어 가는가…', 'enrage': '탑의 모든 바다가 너희를 삼키리라!', 'death': '불가살이… 죽는다고…?'},
+    name: '신 용궁 탑 레이드', lv: '공대', terrain: 'y_raid_yonggung', level: 22, open: 'lobi',
+    monsters: ['y316201', 'y316202', 'y316203'], boss: { id: 'y617104', name: '악마불가살', scale: 1.6 },
+    floors: [
+      { name: '1층 · 소금 너울', terrain: 'y_raid_yonggung', monsters: ['y316201', 'y316202', 'y316203'], boss: { id: 'y617101', name: '은홍날치', scale: 1.1 }, hp: 0.13,
+        patterns: ['charge', 'tide', 'cross'], lines: {'enter': '탑에 오르려거든 내 지느러미를 넘어라!', 'death': '지느러미가… 꺾였다…'} },
+      { name: '2층 · 거품 바다', terrain: 'y_raid_yonggung_2', monsters: ['y316204', 'y316205', 'y316206'], boss: { id: 'y617102', name: '파랑 갯민숭달팽이', scale: 1.1 }, hp: 0.13,
+        patterns: ['rain', 'hunt', 'meteor'], lines: {'enter': '거품이 닿으면… 녹아 버릴걸…', 'death': '거품이… 꺼진다…'} },
+      { name: '3층 · 영혼 바다', terrain: 'y_raid_yonggung_3', monsters: ['y316207', 'y316208', 'y316209'], boss: { id: 'y617103', name: '바다영혼의 몸', scale: 1.1 }, hp: 0.13,
+        patterns: ['seal', 'whirl', 'ring'], lines: {'enter': '바다에 잠든 혼들이… 너희를 부른다…', 'death': '혼이… 바다로… 흩어진다…'} },
+      { name: '4층 · 산호 지대', terrain: 'y_raid_yonggung_4', monsters: ['y316210', 'y316211', 'y316212'] },
+    ],
+    patterns: ['spines', 'cross', 'meteor', 'ring'], patterns1: ['devour'], patterns2: ['spines', 'lava'], fx: '123',
+    intro: '해루 앞바다에 솟은 용궁 탑. 층마다 문지기를 쓰러뜨리고 올라가 꼭대기의 악마불가살을 잡는다. 기묘한 진주를 떨어뜨린다' },
 ];
 // 괴력난신 (today's weekly co-op beast hunt): one 괴수 a week, in turn, its ★ cards for the
 // collection (game.js). The week is counted from a fixed Monday, so it turns over on Mondays.

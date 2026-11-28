@@ -68,13 +68,25 @@
   {"id": "aram", "bundle": "Maps_415501.unity3d", "map": "kow_skybelow_01_first_07_01_aramwasteland_01", "music": "BGM_Raid_UnderSky_3rdStoryField",
    "units": [315519, 315520, 315521], "mini": 315521, "boss": 616507, "tab": "skybelow", "at": [0.38, 0.25]},
   {"id": "ancient", "bundle": "Maps_415501.unity3d", "map": "kow_skybelow_01_first_08_01_tracescastle_01", "music": "BGM_Raid_UnderSky_4thStoryField",
-   "units": [315522, 315523, 315524], "mini": 315523, "boss": 616508, "tab": "skybelow", "at": [0.6, 0.2]}
+   "units": [315522, 315523, 315524], "mini": 315523, "boss": 616508, "tab": "skybelow", "at": [0.6, 0.2]},
+  {"id": "haewol", "bundle": "Maps_416701.unity3d", "map": "kow_hawol_01_03_midnight_01", "music": "BGM_Haewol_Night",
+   "units": [316407, 316408, 316409], "mini": 617203, "boss": 617206, "tab": "world_1", "at": [0.72, 0.68]},
+  {"id": "sahwido", "bundle": "Maps_416801.unity3d", "map": "kow_sahwido_01_02_sunsethill_01", "music": "BGM_Sahwido_SunsetHill",
+   "units": [316505, 316506, 316504, 316523], "mini": 617302, "boss": 617305, "tab": "world_1", "at": [0.6, 0.8]}
   ],
  "raids": [
   {"id": "raid_hell", "bundle": "Maps.unity3d", "map": "kow_map_reid_thejudgeofhell04", "music": "BGM_Raid_Hell_1stBoss", "props_extra": [{"name": "torch", "kind": "torch", "obj": "0016"}],
    "units": [314019], "mini": 615019, "boss": 92240},
   {"id": "raid_heaven", "bundle": "Maps_1009.unity3d", "map": "kow_map_cheonsanggyeo", "music": "BGM_Raid_BaekDuSan_4thBoss",
-   "units": [912015], "mini": 912015, "boss": 912014}
+   "units": [912015], "mini": 912015, "boss": 912014},
+  {"id": "raid_yonggung", "bundle": "Maps_416501.unity3d", "map": "kow_map_tower_yonggung01", "music": "BGM_YeonTower_Field",
+   "units": [316201, 316202, 316203], "mini": 617101, "boss": 617104},
+  {"id": "raid_yonggung_2", "bundle": "Maps_416501.unity3d", "map": "kow_map_tower_yonggung02", "music": "BGM_YeonTower_Field",
+   "units": [316204, 316205, 316206], "mini": 617102, "boss": 617104},
+  {"id": "raid_yonggung_3", "bundle": "Maps_416501.unity3d", "map": "kow_map_tower_yonggung03", "music": "BGM_YeonTower_Field",
+   "units": [316207, 316208, 316209], "mini": 617103, "boss": 617104},
+  {"id": "raid_yonggung_4", "bundle": "Maps_416501.unity3d", "map": "kow_map_tower_yonggung04", "music": "BGM_YeonTower_Field",
+   "units": [316210, 316211, 316212], "mini": 617104, "boss": 617104}
  ],
  "bosses_about": "data.js bosses and leaders that wore the old client's few-frame pictures, as 연 units (tools/yeon_grounds.py bosses): for = ground or raid id, boss or mini, name; old = the old picture id (data.js keeps it as was:, for the life it gave); unit = the 연 unit (Units_Field / FieldBoss / RaidBoss id); how = an exact namesake or the nearest by name and kind.",
  "bosses": [

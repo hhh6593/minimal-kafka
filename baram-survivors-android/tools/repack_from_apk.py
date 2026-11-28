@@ -176,8 +176,88 @@ def main():
             v["ext"] = "webp"
             man.setdefault("ywar", {})[war] = v
         print(f"replaced {len(wi)} battlefields from ywar_add")
+    yzone_add(gear, assets, man)
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
+
+
+def yzone_add(gear, assets, man):
+    """Grounds and a raid made from 연's maps since that APK (GEAR_DIR/yzone_add/: tools/yeon_grounds.py build
+    into it, then arena with YHUNT_OUT=GEAR_DIR/yzone_add/yhunt — 2026-11-28 하월·사휘도 and 신 용궁 탑 레이드):
+    its 연 units (as prepare_assets.py gives "own" units: a sheet, a picture and a monster entry), floors,
+    props, the grounds' fields (as webp q72, as yhunt_add) and music (as OGG, as prepare_assets.py)."""
+    za = os.path.join(gear, "yzone_add")
+    if not os.path.isdir(za):
+        return
+    from PIL import Image
+    ud = os.path.join(za, "yunit")
+    if os.path.isfile(os.path.join(ud, "index.json")):
+        idx = json.load(open(os.path.join(ud, "index.json"), encoding="utf-8"))
+        man.setdefault("yunit", {})
+        have = {x["id"] for x in man["monsters"]}
+        for mid, u in idx.items():
+            sheet, nu = pa.repack_unit(os.path.join(ud, mid + ".png"), u)
+            if sheet is None:
+                continue
+            first = nu["anims"].get("idle_down") or nu["anims"].get("walk_down") or next(iter(nu["anims"].values()))
+            cw, ch = nu["cell"]
+            pic = sheet.crop((0, first["row"] * ch, cw, (first["row"] + 1) * ch))
+            pic = pic.crop(pic.getbbox() or (0, 0, cw, ch))
+            pic.save(os.path.join(assets, "mon", mid + ".png"), optimize=True)
+            sheet.save(os.path.join(assets, "yunit", mid + ".png"), optimize=True)
+            nu["foot_w"] = max(10, pic.width // 2)
+            man["yunit"][mid] = nu
+            if mid not in have:
+                man["monsters"].append({"id": mid, "w": pic.width, "h": pic.height, "pages": [], "name": u.get("name", ""),
+                                        "quick": int(float(u.get("move") or 0)) >= 96})
+        print(f"{len(idx)} 연 units from yzone_add")
+    fd = os.path.join(za, "floor_y")
+    if os.path.isdir(fd):
+        for n in sorted(x for x in os.listdir(fd) if x.endswith(".png")):
+            Image.open(os.path.join(fd, n)).convert("RGB").save(os.path.join(assets, "floor", n), optimize=True)
+            if n[:-4] not in man.setdefault("floor", []):
+                man["floor"].append(n[:-4])
+    pd = os.path.join(za, "prop_y")
+    if os.path.isfile(os.path.join(pd, "index.json")):
+        for name, meta in json.load(open(os.path.join(pd, "index.json"), encoding="utf-8"))["props"].items():
+            src = os.path.join(pd, name + ".png")
+            if not os.path.isfile(src):
+                continue
+            im = Image.open(src).convert("RGBA")
+            if im.getchannel("A").getextrema()[0] == 255:
+                continue  # (a whole square of ground: a map piece, as prepare_assets.py)
+            im.save(os.path.join(assets, "prop", name + ".png"), optimize=True)
+            man.setdefault("prop", {})[name] = [im.width, im.height, meta.get("terrain"), meta.get("kind")]
+    hd = os.path.join(za, "yhunt")
+    if os.path.isfile(os.path.join(hd, "index.json")):
+        add = json.load(open(os.path.join(hd, "index.json"), encoding="utf-8"))
+        os.makedirs(os.path.join(assets, "yhunt"), exist_ok=True)
+        for n in sorted(os.listdir(hd)):
+            if n.endswith(".png") and n.rsplit("_", 2)[0] in add:
+                Image.open(os.path.join(hd, n)).save(os.path.join(assets, "yhunt", n[:-4] + ".webp"), "WEBP", quality=72, method=6)
+        for v in add.values():
+            v["ext"] = "webp"
+        man.setdefault("yhunt", {}).update(add)
+        print(f"{len(add)} hunting-ground maps from yzone_add")
+    # A new material's icon (연's item sprite, tools/fetch_icons.py yeon_mats + normalise): gicon/ "mat:<id>".
+    gd = os.path.join(za, "gicon")
+    if os.path.isfile(os.path.join(gd, "index.json")):
+        os.makedirs(os.path.join(assets, "gicon"), exist_ok=True)
+        for key, fn in json.load(open(os.path.join(gd, "index.json"), encoding="utf-8")).items():
+            shutil.copyfile(os.path.join(gd, fn), os.path.join(assets, "gicon", fn))
+            man.setdefault("gicon", {})[key] = fn
+    bd = os.path.join(za, "audio", "bgm")
+    if os.path.isdir(bd):
+        import subprocess
+        os.makedirs(os.path.join(assets, "audio", "bgm"), exist_ok=True)
+        keys = {b["key"] for b in man["audio"]["bgm"]}
+        for n in sorted(os.listdir(bd)):
+            key = os.path.splitext(n)[0]
+            dst = os.path.join(assets, "audio", "bgm", key + ".ogg")
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", os.path.join(bd, n), "-af", "loudnorm=I=-18:TP=-1.5:LRA=11",
+                            "-ac", "1", "-ar", "22050", "-q:a", "1", "-c:a", "libvorbis", dst], check=True)
+            if key not in keys:
+                man["audio"]["bgm"].append({"key": key, "file": "audio/bgm/" + key + ".ogg"})
 
 
 if __name__ == "__main__":

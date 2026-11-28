@@ -327,7 +327,7 @@ ARENAS = {
 # hell's suwoo cave (its torches, fog and rooms are a mode of their own).
 ARENA_AUTO = ['reef', 'greatwall', 'qin', 'gogyun', 'spidercave', 'gareung', 'pokyeom', 'baekdu2', 'baekdu3',
               'baekdu4', 'hanbing', 'geohae', 'cheolsang', 'zud', 'zud2', 'fallforest', 'jagwi', 'oldaram',
-              'haya', 'lobi', 'aram', 'ancient', 'abyss2', 'abyss4']
+              'haya', 'lobi', 'aram', 'ancient', 'abyss2', 'abyss4', 'haewol', 'sahwido']
 ARENA_RIM = 2
 # Arenas whose void, chasms and cliff faces are bare floor ground (연's hell): yeon_war.blocked32's
 # unseen-blocker rule would open them (화탕지옥: the hero and the monsters walked off the cliffs).
