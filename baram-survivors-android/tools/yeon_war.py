@@ -47,6 +47,9 @@ WARS = {
     'bosspk_jp': ('Maps_405500.unity3d', 'kow_japan_35_01_pyo_pk_palace', (9, 42, 141, 108)),
     'bosspk_sea': ('Maps_509001.unity3d', 'kow_dragonpalace_pk_00_00_castle', (36, 66, 126, 138)),
     'bosspk_sky': ('Maps_515701.unity3d', 'kow_map_assembly_skybelow', (12, 58, 148, 148)),
+    # 백호 난투 (엔드게임 2차, 2026-11-28): its own small field — 연's 백호성 정전 마당 (the 백호 statue's hall of the same siege),
+    # 32x36 tiles inside its walls, left and right alike (the fight was on the whole 74x52 castle, its camps drawn in).
+    'nanjeon': ('Maps_5200.unity3d', 'kow_zodiac_whitetiger_siege_01_01_place1', (6, 6, 54, 60)),
 }
 # The world-boss arenas used before (FLOOR_OPEN's rule is theirs).
 OLD_ARENAS = {
@@ -334,6 +337,20 @@ def walk_grid(blk, cols, rows):
     return [''.join('.' if c else '#' for c in row) for row in cells]
 
 
+# Doorways out of a field cut from a room (game tiles x0, y0, x1, y1 inclusive), shut: 백호 난투's hall's north stair and south
+# gate led two tiles out to the crop's edge — dead ends a leap or a shove could land in (wallscan, 2026-11-28).
+SHUT = {'nanjeon': [(15, 3, 16, 3), (15, 32, 16, 34)]}
+
+
+def shut(war, walk):
+    rows = [list(r) for r in walk]
+    for x0, y0, x1, y1 in SHUT.get(war, []):
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                rows[y][x] = '#'
+    return [''.join(r) for r in rows]
+
+
 def main():
     dec, out = sys.argv[1], sys.argv[2]
     if '--assets' in sys.argv:
@@ -364,7 +381,7 @@ def main():
         data, _ = yeon_maps.load_map(b, name)
         if walk_only:
             v = index[war]
-            v['walk'] = walk_grid((floor_open(data, (x0, y0, x1, y1)) if name in FLOOR_OPEN else blocked32(data, (x0, y0, x1, y1), unseen=name not in SEEN_ONLY)), v['cols'], v['rows'])
+            v['walk'] = shut(war, walk_grid((floor_open(data, (x0, y0, x1, y1)) if name in FLOOR_OPEN else blocked32(data, (x0, y0, x1, y1), unseen=name not in SEEN_ONLY)), v['cols'], v['rows']))
             print(war, 'walk', sum(r.count('#') for r in v['walk']), 'closed of', v['cols'] * v['rows'])
             continue
         if (b, name) not in full_cache:
@@ -381,6 +398,7 @@ def main():
                     os.path.join(d, f'{war}_{cx}_{cy}.png'), optimize=True)
         cols, rows = w // G, h // G
         walk = walk_grid((floor_open(data, (x0, y0, x1, y1)) if name in FLOOR_OPEN else blocked32(data, (x0, y0, x1, y1), unseen=name not in SEEN_ONLY)), cols, rows)
+        walk = shut(war, walk)
         index[war] = {'w': w, 'h': h, 'chunk': CH, 'cols': cols, 'rows': rows, 'walk': walk, 'map': name, 'crop': [x0, y0, x1, y1]}
         print(war, name, (w, h), (cols, rows))
         if preview:

@@ -22,7 +22,7 @@ import { frameBox, drawLayers, dyeImage, dropCostume, aiCostume, loadCostumes } 
 import { gwoeWeek, isMend, MEND_FX, RAID_TASKS, RAID_TASK_DEF, WAR_COMMANDS, WAR_COMMAND_EVERY, WAR_COMMAND_PICK } from './data.js';
 import { SPECIAL, specialBase, specialName, DRAGON_LOOK, ABYSS_BASE, STAR_MAX } from './items.js';
 import { GEAR as GEAR_LINES, RAID_GEAR, raidTier, hasShield, gearName } from './avatar.js';
-import { LEAGUE_TIERS, TIER_REWARD, leagueOf, leagueTier, leagueApply, seasonOf, seasonDaysLeft, warRule } from './league.js';
+import { LEAGUE_TIERS, TIER_REWARD, leagueOf, leagueTier, leagueApply, seasonOf, seasonDaysLeft, warRule, GUILD_SKILLS, GUILD_MAX, GUILD_COST, guildOf, guildCan, guildBuy, guildReset, guildEarn, guildK, leagueGoals, leagueGoalDef, leagueGoalBump, leagueGoalsReady, leagueGoalClaim, leagueGoalReward } from './league.js';
 
 let A = null; // game.js internals (initWar)
 const TILE = 48;
@@ -107,14 +107,17 @@ export const WARS = {
     posterns: [[29, 24], [29, 25], [50, 24], [50, 25]],
     cratesOut: [[22, 33], [58, 33], [10, 40], [70, 40]], cratesIn: [[22, 17], [58, 18]], scouts: [[8, 30], [72, 30]],
   },
-  // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) in the
-  // 백호성 court for three minutes, the camps drawn in to the court; first to 70 kill points (40 ended it at 1:00~1:50, 60 at 1:25~2:30), or the 진영대장 felled. Its pay and
-  // its league points are 0.6 / 0.7 of a war's (league.js leagueGain short).
+  // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) for three
+  // minutes; first to 70 kill points (40 ended it at 1:00~1:50, 60 at 1:25~2:30), or the 진영대장 felled. Its pay and its league
+  // points are 0.6 / 0.7 of a war's (league.js leagueGain short).
+  // (엔드게임 2차: its own field, tools/yeon_war.py 'nanjeon' — 연's 백호성 정전 마당, 32x36 tiles, the two camps either side of
+  // the stone yard, the 신단 on the 백호 statue's dais (up its stairs, a narrow way in) or in the hall's two side rooms; it was
+  // fought on the whole 74x52 castle with its camps drawn in.)
   nanjeon: {
-    id: 'nanjeon', map: 'baekho', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
-    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 70점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
-    time: 180, squads: 2, kills: 70, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
-    crates: [[37, 26], [37, 18]], scouts: [],
+    id: 'nanjeon', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
+    desc: '백호성 정전 마당에서 10 대 10으로 3분. 처치 점수 70점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 백호 석상의 단 위와 양쪽 곁방의 신단을 두고 다툰다.',
+    time: 180, squads: 2, kills: 70, spawns: [[4, 25], [26, 25]], cmds: [[3, 29], [27, 29]], mid: [15, 24],
+    crates: [[15, 19], [15, 30]], scouts: [],
   },
 };
 const GUILDS = [['청운', '#7cf08a'], ['흑월', '#ff7a6a']];
@@ -307,6 +310,13 @@ function injectUi() {
   #war-board .wb-load .fit { color: #8cf08a; } #war-board .wb-load .nofit { color: #aa9a80; }
   #war-board .wb-league { max-width: 820px; margin: 4px auto 6px; border: 1px solid #7a6040; background: rgba(40,28,16,0.6); padding: 5px 8px; color: #e8dcc0; font: 12px G11, sans-serif; line-height: 1.5; }
   .lg-bar { height: 5px; background: #2a2016; margin: 2px 0; } .lg-bar i { display: block; height: 100%; }
+  #war-board .wb-guild { max-width: 820px; margin: 0 auto 6px; border: 1px solid #5a4630; padding: 5px 8px; color: #e8dcc0; font: 12px G11, sans-serif; line-height: 1.45; }
+  #war-board .wb-guild summary { cursor: pointer; color: #ffd27a; }
+  #war-board .gt-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 8px; margin-top: 4px; }
+  #war-board .gt-sk { border: 1px solid #4a3a28; padding: 3px 6px; background: rgba(20,14,8,0.5); }
+  #war-board .gt-sk b { color: #ffd27a; } #war-board .gt-sk.lock { opacity: 0.55; } #war-board .gt-sk small { display: block; color: #cbbd9e; }
+  #war-board .gt-pip { color: #ffd040; letter-spacing: 1px; } #war-board .wb-guild button { font-size: 11px; padding: 1px 8px; margin-left: 4px; }
+  #war-board .gt-goal { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } #war-board .gt-goal .lg-bar { flex: 0 0 80px; } #war-board .gt-goal.done { color: #9ff08a; }
   .lg-plus { color: #9ff08a; } .lg-minus { color: #ff9a8a; } .lg-pend { color: #ffd27a; } .lg-pend button { font-size: 11px; padding: 1px 8px; }
   #war-result .lg-line { max-width: 520px; margin: 3px auto; } #war-result .lg-up { color: #ffd040; }
   #war-result .mo-list span { display: inline-block; margin: 0 5px; } #war-result .mo-hero { color: #ffd040; } #war-result .mo-ours { color: #9ff08a; } #war-result .mo-foe { color: #ff9a8a; }
@@ -484,6 +494,7 @@ export function openBoard() {
   const side = w.mode === 'siege' ? `<div class="wb-row"><button class="btn wb-side${pickSide === 'atk' ? ' on' : ''}" data-side="atk">공성 (성문을 부순다)</button><button class="btn wb-side${pickSide === 'def' ? ' on' : ''}" data-side="def">수성 (성문을 지킨다)</button></div>` : '';
   box.innerHTML = `<h2>사신수 문파대항전 · 쟁</h2>
     ${leagueBoardHtml(pr)}
+    ${guildBoardHtml(pr)}
     <div class="wb-cards">${cards}</div>
     <div class="wb-info"><b>${w.name} · ${w.title}</b> — ${w.desc}<br>
     ${w.jaeng ? w.more : `양 문파 ${w.short ? '10명씩 · 3분 · 보상과 리그 점수는 대항전의 0.6·0.7배' : '25명씩'} · 혼자 입장해도 인원이 채워집니다 · 양 진영 전력은 자동 보정됩니다.`}</div>
@@ -501,6 +512,12 @@ export function openBoard() {
   document.getElementById('wb-back').onclick = () => A.enterTown(cls);
   const lc = document.getElementById('lg-claim');
   if (lc) lc.onclick = () => { leagueClaim(); openBoard(); };
+  box.querySelectorAll('[data-gsk]').forEach(b => { b.onclick = () => { if (guildBuy(pr, b.dataset.gsk)) { A.saveProgress(); A.audio().play('levelup'); } guildOpen = true; openBoard(); }; });
+  box.querySelectorAll('[data-lgc]').forEach(b => { b.onclick = () => { const g = leagueGoalClaim(pr, b.dataset.lgc); if (g) { A.saveProgress(); A.audio().play('chest'); A.say(`[리그 주간 목표] ${g.text} — ${leagueGoalReward(g)}`, 'sys'); } guildOpen = true; openBoard(); }; });
+  const gr = document.getElementById('gt-undo');
+  if (gr) gr.onclick = () => { guildReset(pr); A.saveProgress(); guildOpen = true; openBoard(); };
+  const gd = box.querySelector('.wb-guild');
+  if (gd) gd.ontoggle = () => { guildOpen = gd.open; };
   document.getElementById('wb-go').onclick = () => (w.jaeng ? !w.locked && startJaeng(cls, pickRole, {}) : startWar(pickWar, cls, pickRole, { side: pickSide }));
   A.showScreen('war-board');
 }
@@ -1098,6 +1115,9 @@ export const War = {
   raidScale: (dmg, e) => raidScale(dmg, e),
   raidCredit: (e, dmg, killed) => raidCredit(e, dmg, killed),
   raidCut: () => raidHeroCut(),
+  get RAGE() { return RAID_RAGE; },
+  rageBlast: bl => rageBlast(bl),
+  rageBlastK: (x, bl) => rageBlastK(x, bl),
   raidHeroHurt: () => raidHeroHurtK(),
   /** 대항전·「쟁」: what mends the hero, at this share (game.js heal, its health coming back, 흡혈 buff): by its 전투력
    * over its guild's middle — a hero at or under it mends as before, a strong one at down to 0.55. A hero of 7.7만 lost
@@ -1162,7 +1182,7 @@ function update(dt) {
   W.cmdT = (W.cmdT || 0) - dt;
   if (W.cmdT <= 0) {
     W.cmdT = 1;
-    if (W.jaeng) for (const t of W.teamIds) jaengPlan(W, t);
+    if (W.jaeng) { for (const t of W.teamIds) jaengPlan(W, t); jshrineOrders(W); }
     else {
       warPhase(W);
       orders(W, 0);
@@ -2651,7 +2671,10 @@ function heroCap(what, n) {
   while (win.q.length && G.t - win.q[0][0] > CAP_WIN) win.sum -= win.q.shift()[1];
   // Over the whole window, so a single big blow is not taken for a rate.
   const span = CAP_WIN;
-  const target = CAP_OVER * (W.rates.rel || 1) * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]);
+  // (레이드: the blows' credit by the hero's 직업 효율 too, raidEff — the cap on its blows moved by it, its credit did not:
+  // the results showed the same contribution whatever the class, gear or play.)
+  const effK = W.raid && (what === 'dmg' || what === 'boss') ? W.capEff || 1 : 1;
+  const target = CAP_OVER * (W.rates.rel || 1) * Math.max(W.rates.role[what], 0.3 * W.rates.all[what]) * effK;
   const rate = win.sum / span;
   if (!(target > 0) || rate <= target) return n;
   // Past it, a little more for much more: at ten times the AI's rate, about 1.6 times its credit.
@@ -2716,7 +2739,7 @@ function kill(W, f, killer) {
       // 대장전 is scored in kills: a guild well ahead rises a little slower, one well behind a little
       // sooner (a lead fed itself — fewer foes up, more kills — to 180 : 90 either way).
       + (W.mode === 'commander' && !f.cmdr && !f.troop ? clamp((W.score[f.team] - W.score[1 - f.team]) / 12, -3, 3) : 0);
-  f.respawnAt = W.mode === 'commander' && f.cmdr ? 0 : G.t + respawnK;
+  f.respawnAt = W.mode === 'commander' && f.cmdr ? 0 : G.t + Math.max(3, respawnK - (f.team === 0 && !W.raid && !f.cmdr ? gk(W, 'rise') : 0));
   f.dest = null;
   f.target = null;
   W.ghosts.push({ b: f, tx: f.tx, ty: f.ty, x: f.x, y: f.y, t: G.t, until: f.respawnAt || G.t + 3 });
@@ -2814,6 +2837,7 @@ function heroDown() {
   if (W.jaeng) jaengPk(W, W.hero, by);
   W.hero.hitBy.clear();
   if ((W.raid || W.jaeng) && G.aggro === p) G.aggro = raidAggro();
+  if (W.raid && W.role === 'tank') rageDelay(G); // (the hero main tank down: as a raider tank's fall)
   W.feed.push({ t: G.t, a: by ? by.name : '?', at: by && by.team >= 1 ? by.team : 1, b: W.hero.name, bt: 0 });
   // 레이드: the hero gets up a few times only (raidRevives); then it lies till the raid is over
   // and the raiders fight on (the result, rewards and the way back to town as always).
@@ -2829,7 +2853,7 @@ function heroDown() {
     }
     W.revivesLeft--;
   }
-  W.heroBack = G.t + (W.jaeng ? jaengRise(W, 0, W.hero.stats.deaths) : W.raid ? 9 + Math.min(8, W.t / 45) : 7 + Math.min(6, W.t / 60));
+  W.heroBack = G.t + (W.jaeng ? jaengRise(W, 0, W.hero.stats.deaths) : W.raid ? 9 + Math.min(8, W.t / 45) : 7 + Math.min(6, W.t / 60)) - (W.raid ? 0 : gk(W, 'rise'));
   W.ghosts.push({ b: W.hero, tx: p.tx, ty: p.ty, x: p.x, y: p.y, t: G.t, until: W.heroBack });
   A.say(`쓰러졌습니다… ${Math.ceil(W.heroBack - G.t)}초 뒤 진영에서 다시 일어납니다.${W.raid && W.revivesLeft !== undefined ? ` (남은 부활 ${W.revivesLeft}회)` : ''}`, 'warn');
   A.audio().play('lose');
@@ -3013,7 +3037,7 @@ function deliver(W, c) {
   b.carry = null;
   credit(b, 'obj', 40);
   let what = '';
-  const dk = (W.rule && W.rule.deliverK) || 1;
+  const dk = ((W.rule && W.rule.deliverK) || 1) * (team === 0 ? 1 + gk(W, 'supply') : 1);
   if (W.mode === 'capture') { W.score[team] += Math.round(15 * dk); what = `거점 점수 +${Math.round(15 * dk)}`; }
   else if (W.mode === 'escort') { if (team === W.attacker) { W.cart.boost = G.t + 8 * dk; what = '수레 가속'; } else { W.cart.jam = G.t + 6 * dk; what = '수레 정지'; } }
   else if (W.mode === 'siege') {
@@ -3053,7 +3077,7 @@ function capture(W, dt) {
     if (!push) continue;
     const before = f.owner;
     // prog runs -1 (ours) .. 1 (theirs); a flag turns neutral at 0.
-    f.prog = clamp(f.prog - push * dt * FLAG_TURN, -1, 1);
+    f.prog = clamp(f.prog - push * dt * FLAG_TURN * (push > 0 ? 1 + 0.5 * gk(W, 'banner') : 1), -1, 1);
     if (f.prog <= -1 && f.owner !== 0) f.owner = 0;
     else if (f.prog >= 1 && f.owner !== 1) f.owner = 1;
     else if (Math.abs(f.prog) < 0.05 && f.owner !== -1 && Math.sign(-push) !== (f.owner === 0 ? -1 : 1)) f.owner = -1;
@@ -3111,9 +3135,14 @@ function escort(W, dt) {
     for (const b of W.alive[1 - att]) if (!b.gate && Math.hypot(b.tx - c.tx, b.ty - c.ty) <= 3) credit(b, 'obj', dt * 1.5);
   }
   cartPos(W);
+  // (the half's seconds when its furthest was reached: two carts held at the same spot — 75% : 75%, the 본당's steps — went
+  // to the first half's side; now to the one that got there sooner)
+  if (c.i > c.best[att] + 0.01) (c.bestAt = c.bestAt || [0, 0])[att] = (W.round === 1 ? W.def.time : W.def.half) - Math.max(0, W.left);
   c.best[att] = Math.max(c.best[att], c.i);
   // (the time each took to the end: two carts both at the 본당 went to the first half's side whatever the pace)
-  if (c.i >= W.path.length - 1 && !(c.endAt = c.endAt || [null, null])[att]) c.endAt[att] = W.def.half - Math.max(0, W.left);
+  // (엔드게임 2차: the first half's clock is the whole war's — W.left runs from time, not half — so its side's time came out
+  // negative, "-20초 : 105초", and the first half's side won every race to the 본당: now the seconds of its own half.)
+  if (c.i >= W.path.length - 1 && !(c.endAt = c.endAt || [null, null])[att]) c.endAt[att] = (W.round === 1 ? W.def.time : W.def.half) - Math.max(0, W.left);
   // Half time (or the end reached): the guilds change sides.
   const done = c.i >= W.path.length - 1;
   if (W.round === 1 && (W.left <= W.def.time - W.def.half || done)) {
@@ -4220,7 +4249,9 @@ const TACTICS = {
   regroup: { name: '후퇴', cd: 40, sec: 8, taken: 0.65, mend: 0.04, r: 14, tip: '내 주변 14칸 아군이 우리 쪽으로 물러나 8초 동안 받는 피해 −35% · 초당 체력 4% 회복' },
 };
 function tacOf(W) { return W.tac || (W.tac = { at: {}, focus: null, surge: null, regroup: null, log: [], uiT: 0 }); }
-function tacWait(W, kind) { const T = tacOf(W), at = T.at[kind]; return at === undefined ? 0 : Math.max(0, TACTICS[kind].cd - (A.G().t - at)); }
+function tacWait(W, kind) { const T = tacOf(W), at = T.at[kind]; return at === undefined ? 0 : Math.max(0, TACTICS[kind].cd * (1 - gk(W, 'tactic')) - (A.G().t - at)); }
+/** Our guild's 문파 기술 (league.js guildK, read at the war's start: W.gk). */
+function gk(W, id) { return (W.gk && W.gk[id]) || 0; }
 function foeKills(W) { return W.teams.reduce((a, t, i) => a + (i === 0 ? 0 : t.kills), 0); }
 /** The foe the hero would call: near it, its healer and the weakest and a 대장 first. */
 function tacPick(W) {
@@ -4323,7 +4354,7 @@ function tacK(W, src, t) {
   const T = W.tac, now = A.G().t;
   let k = 1;
   if (src.team === 0) {
-    if (T.focus && T.focus.e === t && now < T.focus.until) k *= TACTICS.focus.k;
+    if (T.focus && T.focus.e === t && now < T.focus.until) k *= TACTICS.focus.k + 0.5 * gk(W, 'tactic');
     if (T.surge && now < T.surge.until && T.surge.who.has(src)) k *= TACTICS.surge.k;
   }
   if (t.team === 0) {
@@ -5567,6 +5598,7 @@ function checkEnd(W) {
         const e = c.endAt || [];
         // both to the end: the quicker (it went to the first half's side whatever the pace)
         if (c.best[W.attacker] >= c.best[first] - 0.01 && e[W.attacker] != null && e[first] != null) { win = e[W.attacker] < e[first] ? W.attacker : first; why = `둘 다 본당 — 더 빨리 (${Math.round(e[0] ?? 0)}초 : ${Math.round(e[1] ?? 0)}초)`; }
+        else if (Math.abs(c.best[W.attacker] - c.best[first]) <= 0.01 && c.bestAt) { const b = c.bestAt; win = b[W.attacker] < b[first] ? W.attacker : first; why = `같은 곳까지 — 먼저 닿은 쪽 (${Math.round(b[0])}초 : ${Math.round(b[1])}초)`; }
         else { win = c.best[W.attacker] > c.best[first] ? W.attacker : first; why = '더 멀리 호위'; }
       }
     }
@@ -6114,6 +6146,7 @@ function updateRaid(dt) {
     tickBody(W, b, dt);
   }
   if (!G.dead) h.aliveT += dt;
+  if (!G.dead && W.boss && !W.boss.dying) W.capInt = (W.capInt || 0) + dt; // 직업 효율 (raidEff): the seconds of the boss fight
   if (afk()) W.afkT = (W.afkT || 0) + dt;
   // 공대: the time the hero was in the fight (moved in the last three seconds, or by the boss,
   // where its spells reach), for its tier. Standing back at the camp is not.
@@ -6374,12 +6407,13 @@ function raidScale(dmg, e = null) {
   const G = A.G(), W = G.war;
   if (!(dmg > 0)) return dmg;
   if (e && e.kind === 'boss') {
-    dmg = raidGuarded(W, raidScaleRaw(dmg));
+    dmg = raidGuarded(W, raidScaleRaw(dmg, true));
+    W.heroBoss = (W.heroBoss || 0) + dmg; // (the hero's blows on the boss as they land, for the balance runs)
     return dmg;
   }
   return raidScaleRaw(dmg);
 }
-function raidScaleRaw(dmg) {
+function raidScaleRaw(dmg, onBoss = false) {
   const G = A.G(), W = G.war;
   // 자리비움: a hero away from the controls (its spells still fire by themselves) barely scratches
   // the boss, so the raid is the player's to win: the raiders alone run out of time. At 0.15 an
@@ -6389,14 +6423,33 @@ function raidScaleRaw(dmg) {
   win.push([G.t, dmg]);
   W.rawSum = (W.rawSum || 0) + dmg;
   W.rawAll = (W.rawAll || 0) + dmg;
+  if (onBoss) W.rawBoss = (W.rawBoss || 0) + dmg;
   while (win.length && G.t - win[0][0] > 8) W.rawSum -= win.shift()[1];
   const span = Math.max(3, Math.min(8, G.t - win[0][0]));
   const rate = W.rawSum / span;
-  const target = raidHeroRate(W) * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1);
+  const target = raidHeroRate(W) * (1 + 0.03 * Math.max(0, G.player.lvl - W.startLvl)) * (W.role === 'dps' ? W.heroDmgK : 1) * raidEff(W);
   if (rate > target) return dmg * target / rate;
   // Below it (a caster's spells, which keep to their own reach, reached about 40% of a 도적's capped
   // blows at the boss and its raids ran out of time): lifted toward it, at most 1.6 times.
   return afk() ? dmg : dmg * Math.min(1.6, Math.sqrt(target / Math.max(rate, 1)));
+}
+/**
+ * 직업 효율 (엔드게임 2차, 2026-11-28): the cap above is the hero's 전투력 against the raid's, and its own blows were 24 to 81
+ * times it — 96~99% thrown away, so a class's knack, its gear past 전투력 and how it was played never showed in a raid.
+ * Now the cap is lifted or lowered by what the hero has dealt the boss so far in its own measure (W.Uh: its level and gear)
+ * a second of the boss fight (W.capInt: the seconds it stood alive with the boss up), against its role's middle (ref: the
+ * classes' middle on 신 용궁 탑 with the gear of its ground, raidbot — 딜러 25~314, the middle about 85), on a gentle log:
+ * half of it → about 0.86, twice → about 1.14, at most 0.78~1.3 (a 30% stronger class: about +5% of the cap). The boss only:
+ * blows on the servants (a 전사's sweep over twenty adds) said little of the raid. It comes in over the first 20 s of the fight;
+ * a hero away from the controls (its blows at 0.05) falls to the floor.
+ */
+const RAID_EFF = { ref: { dps: 85, tank: 300, healer: 30, support: 60 }, k: 0.2, lo: 0.78, hi: 1.3, warm: 20 };
+function raidEff(W) {
+  const tt = W.capInt || 0;
+  if (tt < 3 || !(W.rawBoss > 0)) return W.capEff || 1;
+  const rh = W.rawBoss / tt / (W.Uh || 1);
+  const e = clamp(1 + RAID_EFF.k * Math.log(rh / (RAID_EFF.ref[W.role] || RAID_EFF.ref.dps)), RAID_EFF.lo, RAID_EFF.hi);
+  return (W.capEff = 1 + (e - 1) * Math.min(1, tt / RAID_EFF.warm));
 }
 function raidCredit(e, dmg, killed) {
   const W = A.G().war, h = W.hero;
@@ -6417,6 +6470,13 @@ function raidDown(W, f, by) {
   if (G.aggro === f) G.aggro = raidAggro();
   if (W.boss && Math.random() < 0.35) A.bossSay(f.role === 'healer' && !G.saidHealer && G.stage.lines && G.stage.lines.killHealer ? (G.saidHealer = 'killHealer') : 'kill');
   if (f.role === 'tank' && W.boss) call(W, 'tankdown', 10, ['탱 누웠어요! 다른 탱 어그로 잡아요!', '메인탱 사망! 서브탱 도발!']);
+  if (f.role === 'tank' && W.raid) rageDelay(G);
+}
+/** A tank down while the boss rages: its next blast (or the one gathering, once) two seconds later. */
+function rageDelay(G) {
+  if (!G.enraged) return;
+  if (G.blast && !G.blast.delayed) { G.blast.delayed = true; G.blast.at += RAID_RAGE.tankDelay; G.blast.warn = (G.blast.warn || 1.6) + RAID_RAGE.tankDelay; }
+  else if (!G.blast) G.blastT = Math.max(G.blastT || 0, RAID_RAGE.tankDelay + 1);
 }
 
 /** The raid leader's word in the party chat, each kind not too often. */
@@ -6869,6 +6929,70 @@ function raidHeroCut() {
   if (W.jaeng) jaengHeroCut(W);
 }
 
+// ------------------------------------------------ 광폭화 광역기 (엔드게임 2차, 2026-11-28)
+// After 4:00 the boss's blast came every five seconds, uncut (the raiders no longer cut it enraged) and over everyone:
+// 17 raiders fell at once at 4:11 (raidbot, 신 용궁 탑) — a cliff, not pressure. Now enraged it comes every eight seconds
+// (every: of its phase's 15/12/10), 2.8 seconds' warning, and four rings of shelter lie on the floor about the boss
+// (반지름 2.4칸, the drawn ellipse is what counts): inside, a fifth of the blow; outside, the blow at 0.85. The raiders run to
+// the nearest by their own knack (b.dodge); the hero must walk in (or cut it with a stun). A tank's fall puts the next
+// blast off two seconds (the boss turns while another tank takes it up), once a blast.
+const RAID_RAGE = { every: 0.8, warn: 2.8, r: 2.4, inside: 0.2, outside: 0.85, tankDelay: 2 };
+function rageBlast(bl) {
+  const G = A.G(), W = G.war, boss = W && W.boss;
+  if (!W || !boss) return;
+  const spots = [];
+  for (const [ax, ay] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    let at = null;
+    for (let i = 0; i < 30 && !at; i++) {
+      const r = rnd(3.5, 5.5), a = Math.atan2(ay, ax) + rnd(-0.5, 0.5);
+      const tx = Math.round(boss.tx + Math.cos(a) * r), ty = Math.round(boss.ty + Math.sin(a) * r * 0.8);
+      if (open(W, tx, ty) && !spots.some(q => Math.abs(q[0] - tx) + Math.abs(q[1] - ty) < 4)) at = [tx, ty];
+    }
+    if (at) spots.push(at);
+  }
+  if (!spots.length) return;
+  bl.safe = spots;
+  W.rageBlasts = (W.rageBlasts || 0) + 1;
+  const near = m => spots.reduce((b, q) => (Math.hypot(q[0] - m.tx, q[1] - m.ty) < Math.hypot(b[0] - m.tx, b[1] - m.ty) ? q : b), spots[0]);
+  for (const m of W.alive[0]) {
+    if (m.hero || m.dead || Math.random() > Math.min(0.95, (m.dodge || 0.6) + 0.15)) continue;
+    const q = near(m);
+    m.taskGo = { at: snap(W, q[0] + pick([-1, 0, 0, 1]), q[1]), until: bl.at + 0.3 };
+  }
+  A.say(`${W.teams[1].name}이(가) 힘을 모읍니다! (광폭 광역기) — 바닥의 흰 원 안으로!`, 'warn');
+  A.banner('광폭 광역기! 흰 원 안으로 피하라');
+  call(W, 'rageBlast', 12, ['원 안으로!! 다 원으로 모여요!', '광역 온다 원 들어가요!', '흰 원! 흰 원!']);
+}
+/** The share of the enraged blast on one body: in a ring of shelter (as drawn: its ellipse) a fifth. */
+function rageBlastK(x, bl) {
+  const W = A.G().war;
+  const inside = bl.safe.some(([tx, ty]) => {
+    const dx = (x.x - (tx * TILE + TILE / 2)) / (RAID_RAGE.r * TILE), dy = (x.y - (ty * TILE + TILE / 2)) / (RAID_RAGE.r * TILE * 0.62);
+    return dx * dx + dy * dy <= 1;
+  });
+  if (W) { if (inside) W.rageSafe = (W.rageSafe || 0) + 1; else W.rageHit = (W.rageHit || 0) + 1; }
+  return inside ? RAID_RAGE.inside : RAID_RAGE.outside;
+}
+function drawRageRings(G, ctx) {
+  const bl = G.blast;
+  if (!bl || !bl.safe) return;
+  const k = Math.max(0, 1 - (bl.at - G.t) / (bl.warn || 1.6));
+  ctx.save();
+  ctx.lineWidth = 5;
+  for (const [tx, ty] of bl.safe) {
+    const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2, R = RAID_RAGE.r * TILE;
+    ctx.beginPath();
+    ctx.ellipse(x, y, R, R * 0.62, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,250,230,${(0.22 + 0.14 * k).toFixed(3)})`;
+    ctx.fill();
+    ctx.globalAlpha = 0.65 + 0.35 * Math.sin(G.t * 6);
+    ctx.strokeStyle = '#fff6d8';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
 /** A spot for a servant: about the boss (the lair before it comes), inside the arena. */
 function raidSpot(r0 = 4, r1 = 9) {
   const G = A.G(), W = G.war, c = W.boss ? [W.boss.tx, W.boss.ty] : W.lair;
@@ -6946,6 +7070,13 @@ export const JAENG_MAPS = {
   bosspk_sea: { id: 'bosspk_sea', name: '용궁 바닷속 성터', lair: [31, 22], camps: [[4, 28], [56, 22], [36, 45]], seals: [[30, 5], [8, 42], [50, 38]] },
   bosspk_sky: { id: 'bosspk_sky', name: '하늘 아래 집결지', lair: [45, 14], camps: [[9, 14], [80, 14], [45, 51]], seals: [[9, 46], [79, 47], [62, 14]] },
 };
+// 쟁 신단 (엔드게임 2차): side ways between two camps, 9+ tiles from every seal, camp and the boss's altar (on the walk grids):
+// 왜국 the north road between the first and third camps, the south field, the east's lower road; 용궁 the north hall, the
+// west's middle, the east's south; 하늘 아래 the east corridor, the west and east stairs down to the seals.
+const JSHRINE_SPOTS = { bosspk_jp: [[39, 5], [30, 38], [68, 29]], bosspk_sea: [[44, 7], [20, 30], [46, 30]], bosspk_sky: [[63, 28], [12, 30], [80, 31]] };
+// first: its first waking (after the seals have begun, before the boss); every: then; buff: its gift (the war's shrine kinds);
+// pts: its points to the guild that takes it (a seal held is 1 a second).
+const JSHRINE = { first: 50, every: 70, warn: 8, take: 5, r: 1.8, buff: 25, pts: 25 };
 const JAENG_GUILDS = [['청운', '#7cf08a'], ['흑월', '#ff7a6a'], ['백야', '#c88aff']];
 // gather: the count and the first orders; bossAt: the seals break; rage: 광폭화; time: it flees.
 // bossU: its life in the field's units (the design's 21000 left a boss that fled nine times in ten:
@@ -7022,7 +7153,7 @@ function jaengSetup() {
   const W = G.war = {
     def: { ...def, name: '쟁', title: G.stage.name.replace('쟁 · ', '') + ' 쟁탈전', time: JAENG.time },
     mode: 'bosspk', jaeng: true, teamIds: [0, 1, 2], role, side: 'atk', t: 0, left: JAENG.time, over: false,
-    score: [0, 0, 0], pts: [0, 1, 2].map(() => ({ boss: 0, last: 0, cut: 0, seal: 0, pk: 0, mob: 0 })), mobKills: [0, 0, 0],
+    score: [0, 0, 0], pts: [0, 1, 2].map(() => ({ boss: 0, last: 0, cut: 0, seal: 0, pk: 0, mob: 0, shrine: 0 })), mobKills: [0, 0, 0],
     bossDmg: [0, 0, 0], bossWin: [[], [], []], pkHeat: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], comeback: [1, 1, 1], sealN: [0, 0, 0], sealUntil: 0,
     feed: [], ghosts: [], crates: [], zones: [], bodies: [], squads: [], nextId: 1, flow: new Map(), sndT: 0, shoutT: 0, fxN: 0, round: 1, gateDown: false,
     map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, ext: mp.ext, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
@@ -7461,6 +7592,7 @@ function jaengTick(W, dt) {
       if (lost === 0) jaengCall(W, 0, 'sealLost', ['봉인 뺏겼어요ㅠ', `${s.name} 뺏김! 다시 가요`]);
     }
   }
+  jshrineTick(W, dt);
   W.tickT = (W.tickT || 0) + dt;
   if (W.tickT >= 1) {
     W.tickT -= 1;
@@ -7480,7 +7612,7 @@ function jaengTick(W, dt) {
   for (const t of W.teamIds) {
     W.pts[t].boss = Math.min(JAENG.pts.boss, W.bossDmg[t] / all * JAENG.pts.boss);
     const q = W.pts[t];
-    W.score[t] = q.boss + q.last + q.cut + q.seal + q.pk + q.mob;
+    W.score[t] = q.boss + q.last + q.cut + q.seal + q.pk + q.mob + (q.shrine || 0);
   }
 }
 
@@ -7498,6 +7630,83 @@ function jaengPk(W, f, by) {
 function jaengRise(W, team, deaths) {
   const G = A.G(), others = W.teamIds.filter(t => t !== team), mean = others.reduce((a, t) => a + W.score[t], 0) / others.length;
   return 10 + 2 * Math.min(5, deaths) + (G.enraged ? 10 : 0) + clamp((W.score[team] - mean) / 60, -3, 3);
+}
+
+// ------------------------------------------------ 쟁 신단 (엔드게임 2차, 2026-11-28)
+// The 「쟁」 had one middle aim, the seals (and the boss): a fourth now wakes on a side way between two camps every 70 seconds
+// from 0:50 (8 s warned in the chat, the banner, a white ◆ on the minimap and its ring blinking), the war's 신단 for three:
+// one guild alone in its ring takes it in five seconds (more of it faster, the hero ×1.4 — its 서포터 ×1.8; two guilds in it
+// hold it as it is; a guild that steps in on another's progress first wears it down), and the guild that takes it has
+// 25 points and its gift (투신·금강·청풍, the war's kinds) for 25 seconds. Each guild's commander sends the squad nearest it
+// (not the hero's, not those the hero's call holds) from its warning; the hero decides whether its own goes.
+function jshrineTick(W, dt) {
+  const G = A.G(), s = W.jshrine;
+  if (!s || W.over) return;
+  for (const t of W.teamIds) {
+    const rg = shrineOn(W, t, 'regen');
+    if (rg) for (const b of W.alive[t]) if (!b.hero && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * rg * dt);
+  }
+  const rg0 = shrineOn(W, 0, 'regen');
+  if (rg0 && !G.dead) G.player.hp = Math.min(G.player.maxHp, G.player.hp + G.player.maxHp * rg0 * dt * War.heroHealK());
+  if (s.state === 'wait' && W.t >= s.at - JSHRINE.warn) {
+    if (W.left < 30 || W.jphase === 'gather') return;
+    const pool = s.spots.filter(q => !(s.last && q[0] === s.last[0] && q[1] === s.last[1]));
+    [s.x, s.y] = pick(pool.length ? pool : s.spots);
+    s.kind = pick(Object.keys(SHRINE_KINDS));
+    s.state = 'soon';
+    s.prog = 0;
+    s.capT = -1;
+    const K = SHRINE_KINDS[s.kind];
+    A.say(`[쟁 신단] ${JSHRINE.warn}초 뒤 ${K.name}이 깨어납니다 — 차지한 문파는 ${JSHRINE.pts}점과 ${JSHRINE.buff}초 동안 ${K.desc} (지도의 ◆)`, 'sys');
+    A.banner(`쟁 신단 · ${K.name} · ${JSHRINE.warn}초 뒤`);
+  }
+  if (s.state === 'soon' && W.t >= s.at) { s.state = 'up'; moment(W, `${SHRINE_KINDS[s.kind].name} 깨어남`, -1, { kind: 'shrineUp' }); }
+  if (s.state !== 'up') return;
+  if (W.left < 5) { s.state = 'gone'; return; }
+  const n = W.teamIds.map(() => 0);
+  for (const t of W.teamIds) for (const b of W.alive[t]) if (Math.hypot(b.tx - s.x, b.ty - s.y) <= JSHRINE.r) n[t] += 1;
+  const here = W.teamIds.filter(t => n[t] > 0);
+  s.contest = here.length > 1;
+  if (s.contest) return;
+  if (!here.length) { s.prog *= Math.max(0, 1 - dt * 0.5); return; }
+  const t = here[0];
+  if (s.capT !== t) { s.prog -= dt * 0.5; if (s.prog <= 0) { s.prog = 0; s.capT = t; } return; }
+  const heroK = t === 0 && heroIn(W, s.x, s.y, JSHRINE.r) ? (W.role === 'support' ? 1.8 : 1.4) : 1;
+  s.prog += dt / JSHRINE.take * (1 + 0.15 * Math.min(4, n[t] - 1)) * heroK * (t === 0 ? 1 + gk(W, 'banner') : 1);
+  if (s.prog >= 1) jshrineTaken(W, t);
+}
+function jshrineTaken(W, team) {
+  const G = A.G(), s = W.jshrine, K = SHRINE_KINDS[s.kind], k = W.rule.shrineK || 1;
+  W.sbuff[team] = { kind: s.kind, until: G.t + JSHRINE.buff * k + (team === 0 ? gk(W, 'shrine') : 0), k };
+  W.pts[team].shrine = (W.pts[team].shrine || 0) + JSHRINE.pts;
+  s.state = 'wait';
+  s.last = [s.x, s.y];
+  s.n++;
+  s.at = W.t + s.every;
+  s.taken[team]++;
+  const heroThere = team === 0 && heroIn(W, s.x, s.y, JSHRINE.r + 0.5);
+  for (const b of W.alive[team]) if (Math.hypot(b.tx - s.x, b.ty - s.y) <= JSHRINE.r + 0.5) credit(b.hero ? W.hero : b, 'obj', 25);
+  W.feed.push({ t: G.t, a: W.teams[team].name, at: team, b: `${K.short} 신단 차지`, bt: -1, gold: true });
+  A.say(`${W.teams[team].name} 문파가 ${K.name}을 차지했습니다! (+${JSHRINE.pts}점 · ${Math.round(JSHRINE.buff * k)}초 ${K.desc})`, team === 0 ? 'sys' : 'warn');
+  if (team === 0) A.banner(`${K.name} 획득! +${JSHRINE.pts}점 · ${K.desc}`);
+  A.audio().play(team === 0 ? 'levelup' : 'click');
+  moment(W, `${W.teams[team].name} · ${K.short} 신단${heroThere ? ' (내가 차지)' : ''}`, team, { hero: heroThere, kind: 'shrine' });
+}
+/** Each guild's nearest free squad to the 쟁 신단 from its warning (not the hero's, not one the hero's call holds). */
+function jshrineOrders(W) {
+  const G = A.G(), s = W.jshrine;
+  if (!s || (s.state !== 'up' && s.state !== 'soon') || !W.plans) return;
+  for (const team of W.teamIds) {
+    const P = W.plans[team];
+    if (P && P.regroup) continue;
+    const T = W.teams[team], hc = team === 0 && W.heroCmd && W.heroCmd.until > G.t;
+    const held = hc ? [T.squads[1], T.squads[0]] : [];
+    const pool = T.squads.filter(q => q !== W.hero.squad && !held.includes(q) && livingOf(q).length >= 2 && !(q.order && q.order.kind === 'regroup'));
+    if (!pool.length) continue;
+    const at = q => squadCentre(W, q) || T.spawn;
+    pool.sort((a, b) => Math.hypot(at(a)[0] - s.x, at(a)[1] - s.y) - Math.hypot(at(b)[0] - s.x, at(b)[1] - s.y));
+    jaengSet(W, team, pool[0], s.x, s.y, 'jshrine', {}, team === 0 && s.state === 'soon' ? `${pool[0].name || '한 분대'} 신단 먹으러 가요!` : null);
+  }
 }
 
 /** The guilds' orders (B2: the plain plan; jaengPlan is the commander). */
@@ -7792,6 +8001,11 @@ function drawJaengGround(G, W, ctx) {
     ctx.restore();
   };
   for (const t of W.teams) ring(t.spawn[0], t.spawn[1], JAENG.campR, t.color, 0.5);
+  const js = W.jshrine;
+  if (js && (js.state === 'up' || js.state === 'soon')) {
+    const K = SHRINE_KINDS[js.kind];
+    ring(js.x, js.y, JSHRINE.r, js.state === 'soon' ? '#ffffff' : js.contest ? (Math.floor(G.t * 6) % 2 ? '#ffd040' : K.col) : K.col, js.state === 'soon' ? 0.4 + 0.3 * Math.sin(G.t * 8) : 0.85);
+  }
   const ringPic = A.pic('prop/war_sealring.png');
   for (const s of W.seals) {
     const col = s.owner >= 0 ? W.teams[s.owner].color : '#d8d8d8';
@@ -7875,7 +8089,10 @@ function jaengHud(G, W, ctx, cw, ch, u, d) {
   const seals = W.seals.map(s => (s.owner >= 0 ? ['●', '◆', '▲'][s.owner] : '◌') + s.name).join(' ');
   ctx.font = `${Math.round(10 * u)}px G9`;
   const lowY = W.boss ? ch - 10 * u : 32 * u;
-  hudText(`${ph} · 봉인석 ${seals}${W.comeback[0] > 1 ? ` · 역습 +${Math.round((W.comeback[0] - 1) * 100)}%` : ''}${W.heroCmd && W.heroCmd.until > G.t ? ` · 명령: ${W.heroCmd.label} ${Math.ceil(W.heroCmd.until - G.t)}초${jaengMorale(W) > 1 ? ` (사기 +${Math.round((JAENG.morale - 1) * 100)}%)` : ''}` : ''}`, cw / 2, lowY, '#ffd27a');
+  const js = W.jshrine, jb = W.sbuff && W.sbuff[0];
+  const jsl = js && js.state === 'soon' ? ` · ◆ 신단 ${Math.max(0, Math.ceil(js.at - W.t))}초 뒤` : js && js.state === 'up' ? ` · ◆ ${SHRINE_KINDS[js.kind].short} 신단${js.contest ? ' 다툼!' : js.capT >= 0 && js.prog > 0.02 ? ` ${js.capT === 0 ? '우리' : W.teams[js.capT].name} ${Math.round(js.prog * 100)}%` : ''}` : '';
+  const jbl = jb && jb.until > G.t ? ` · 우리 ${SHRINE_KINDS[jb.kind].short} ${Math.ceil(jb.until - G.t)}초` : '';
+  hudText(`${ph} · 봉인석 ${seals}${jsl}${jbl}${W.comeback[0] > 1 ? ` · 역습 +${Math.round((W.comeback[0] - 1) * 100)}%` : ''}${W.heroCmd && W.heroCmd.until > G.t ? ` · 명령: ${W.heroCmd.label} ${Math.ceil(W.heroCmd.until - G.t)}초${jaengMorale(W) > 1 ? ` (사기 +${Math.round((JAENG.morale - 1) * 100)}%)` : ''}` : ''}`, cw / 2, lowY, '#ffd27a');
   // What to do now, one line (the phase's objective and what it is worth): the seals before the
   // boss wakes, then the boss's share and the PK on the guild ahead.
   const goal = jaengGoal(W);
@@ -8180,6 +8397,7 @@ function drawRaidGround(G, W, ctx) {
   ctx.stroke();
   ctx.restore();
   drawTaskMarks(G, W, ctx);
+  drawRageRings(G, ctx);
 }
 
 /** Every war body drawn in the field's order: fighters as their class, units in 연's sheets. */
@@ -8714,7 +8932,7 @@ function warProps() {
   for (const c of W.crates) if (!c.by) out.push({ war: true, wprop: 'crate', x: c.x * TILE + TILE / 2, y: c.y * TILE + TILE - 6 });
   for (const z of W.zones) out.push({ war: true, wprop: 'post', z, x: z.x * TILE + TILE / 2, y: z.y * TILE + TILE - 8 });
   for (const g of W.ghosts) out.push({ war: true, wprop: 'ghost', g, x: g.x, y: g.y });
-  if (W.jaeng) jaengProps(W, out);
+  if (W.jaeng) { jaengProps(W, out); const js = W.jshrine; if (js && (js.state === 'up' || js.state === 'soon')) out.push({ war: true, wprop: 'shrine', s: js, x: js.x * TILE + TILE / 2, y: js.y * TILE + TILE - 4 }); }
   else endgameProps(W, out);
   return out;
 }
@@ -9160,6 +9378,7 @@ const SHRINE_KINDS = {
 const SHRINE_SPOTS = {
   cheong: [[30, 16], [46, 58], [12, 40], [64, 30]], baekho: [[37, 14], [37, 48]],
   jujak: [[8, 52], [46, 52], [10, 24], [44, 24], [10, 66], [44, 66], [8, 40], [46, 34]], hyeonmu: [[33, 29], [47, 29]], // (by the walls either side of the gate, where the 쪽문 sortie can contest it: out in the field only the siege took it, 4 : 0)
+  nanjeon: [[15, 12], [5, 10], [25, 10]], // (난투: the statue's dais — up its stairs — and the hall's side rooms)
 };
 function moment(W, text, team = 0, o = {}) {
   (W.moments = W.moments || []).push({ t: Math.round(W.t), text, team, hero: !!o.hero, big: !!o.big, kind: o.kind || '' });
@@ -9167,10 +9386,18 @@ function moment(W, text, team = 0, o = {}) {
 }
 function endgameSetup(W) {
   W.rule = warRule();
+  // 문파 기술 (league.js GUILD_SKILLS): our guild's, read once at the start.
+  const pr = A.progress();
+  W.gk = Object.fromEntries(GUILD_SKILLS.map(s => [s.id, guildK(pr, s.id)]));
   W.moments = [];
   W.sbuff = [null, null, null];
   W.cbK = [1, 1, 1];
-  if (W.jaeng) { A.say(`[이번 주 전장 규칙] ${W.rule.name} — ${W.rule.desc}`, 'sys'); return; }
+  if (W.jaeng) {
+    const sp = JSHRINE_SPOTS[W.def.id];
+    if (sp) W.jshrine = { state: 'wait', at: JSHRINE.first, every: W.rule.shrineEvery ? Math.round(JSHRINE.every * 0.7) : JSHRINE.every, n: 0, x: 0, y: 0, prog: 0, capT: -1, kind: null, taken: [0, 0, 0], spots: sp.map(([x, y]) => snap(W, x, y)) };
+    A.say(`[이번 주 전장 규칙] ${W.rule.name} — ${W.rule.desc}`, 'sys');
+    return;
+  }
   W.shrine = { state: 'wait', at: SHRINE.first, every: W.rule.shrineEvery || SHRINE.every, n: 0, x: 0, y: 0, prog: 0, kind: null, taken: [0, 0] };
   // 공성 병기: the commanders stand longer (not the 수성대장: the siege's own end).
   if (W.rule.cmdHpK && W.mode !== 'siege') for (const t of W.teams) { t.cmd.maxHp *= W.rule.cmdHpK; t.cmd.hp = t.cmd.maxHp; }
@@ -9253,12 +9480,12 @@ function shrineTick(W, dt) {
   const heroK = who === 0 && heroIn(W, s.x, s.y, SHRINE.r) ? (W.role === 'support' ? 1.8 : 1.4) : 1;
   const sgn = who === 0 ? -1 : 1;
   if (Math.sign(s.prog) === -sgn) s.prog = 0;
-  s.prog += sgn * dt / SHRINE.take * (1 + 0.15 * Math.min(4, n - 1)) * heroK;
+  s.prog += sgn * dt / SHRINE.take * (1 + 0.15 * Math.min(4, n - 1)) * heroK * (who === 0 ? 1 + gk(W, 'banner') : 1);
   if (Math.abs(s.prog) >= 1) shrineTaken(W, who);
 }
 function shrineTaken(W, team) {
   const G = A.G(), s = W.shrine, K = SHRINE_KINDS[s.kind], k = W.rule.shrineK || 1;
-  W.sbuff[team] = { kind: s.kind, until: G.t + SHRINE.buff * k, k };
+  W.sbuff[team] = { kind: s.kind, until: G.t + SHRINE.buff * k + (team === 0 ? gk(W, 'shrine') : 0), k };
   s.state = 'wait';
   s.last = [s.x, s.y];
   s.n++;
@@ -9302,7 +9529,7 @@ function ramTick(W, dt) {
   const G = A.G(), r = W.ram, att = W.attacker, def = 1 - att;
   if (W.gateDown) { r.state = 'done'; return; }
   if (r.state === 'wait' && W.t >= r.at && W.left > 20) {
-    r.state = 'up'; r.i = 0; r.hits = 0; r.beat = 0; r.maxHp = r.hp = 100 * (r.k > 1 ? 1.4 : 1); ramPos(W);
+    r.state = 'up'; r.i = 0; r.hits = 0; r.beat = 0; r.maxHp = r.hp = 100 * (r.k > 1 ? 1.4 : 1) * (att === 0 ? 1 + gk(W, 'ram') : 1); ramPos(W);
     A.say(att === 0 ? '[충차] 우리 충차 출격! 충차 곁(2칸)에 적보다 많이 서면 성문으로 굴러갑니다' : '[충차] 적 충차가 옵니다! 쪽문으로 나가 충차 곁에 서면 불태웁니다', att === 0 ? 'sys' : 'warn');
     A.banner(att === 0 ? '충차 출격 — 성문까지 호위!' : '적 충차 접근 — 나가서 불태워라!');
     moment(W, `${W.teams[att].name} 충차 출격`, att, { kind: 'ram' });
@@ -9317,7 +9544,7 @@ function ramTick(W, dt) {
   // close-in seldom came out to it, and a ram at the gate went unburnt to the end, 11~18 blows: balance runs)
   const atGate = r.i >= r.path.length - 3;
   const wall = atGate ? Math.min(3, W.alive[def].filter(b => !b.gate && !b.troop && !b.hero && b.kit && b.kit.range > 1 && Math.hypot(b.tx - r.tx, b.ty - r.ty) <= 7).length) : 0;
-  const burn = (Math.min(5, nd + heroDef) * 4 + wall * 1.5) * dt / (r.k > 1 ? 1.2 : 1);
+  const burn = (Math.min(5, nd + heroDef) * 4 + wall * 1.5) * dt / (r.k > 1 ? 1.2 : 1) * (def === 0 ? 1 + gk(W, 'ram') : 1);
   if (burn > 0) { r.hp -= burn; r.flash = 0.1; for (const b of W.alive[def]) if (!b.gate && Math.hypot(b.tx - r.tx, b.ty - r.ty) <= R) credit(b, 'obj', dt * 2); }
   if (r.hp <= 0) {
     r.state = 'wait'; r.at = W.t + Math.round(50 / r.k); r.i = 0; r.downs++; ramPos(W);
@@ -9350,6 +9577,7 @@ function ramTick(W, dt) {
     W.gate.flash = 0.15;
     if (Math.hypot(G.player.tx - r.tx, G.player.ty - r.ty) < 10) G.shake = Math.max(G.shake || 0, 0.15);
     A.audio().play('war_hit');
+    if (r.hits === 1) r.reached = (r.reached || 0) + 1; // (리그 주간 목표 '충차를 성문에 붙이기')
     if (r.hits === 1) { A.say(`충차가 성문을 들이받습니다! (4초마다 성문 −${(2 * r.k).toFixed(1)}%)`, att === 0 ? 'sys' : 'warn'); moment(W, '충차가 성문을 들이받음', att, { kind: 'ramGate' }); }
     if (W.gate.hp <= 0) gateBreak(W, null);
   }
@@ -9376,7 +9604,7 @@ function drawRam(W, b) {
   drawLabel(`충차 ${Math.ceil(r.hp / r.maxHp * 100)}%`, b.x, b.y + 12, W.attacker === 0 ? '#9ff08a' : '#ff9a8a', '10px G9');
 }
 function drawShrine(W, b) {
-  const G = A.G(), ctx = A.ctx, s = W.shrine, K = SHRINE_KINDS[s.kind];
+  const G = A.G(), ctx = A.ctx, s = b.s || W.shrine, K = SHRINE_KINDS[s.kind];
   const alt = A.pic('prop/war_lantern.png');
   const soon = s.state === 'soon', a = soon ? 0.5 + 0.25 * Math.sin(G.t * 8) : 1;
   ctx.globalAlpha = a;
@@ -9384,7 +9612,7 @@ function drawShrine(W, b) {
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center';
   drawLabel(soon ? `${K.name} · ${Math.max(0, Math.ceil(s.at - W.t))}초` : K.name, b.x, b.y + 14, K.col, 'bold 11px G11');
-  if (s.state === 'up' && Math.abs(s.prog) > 0.02) A.bar(b.x - 26, b.y - (alt && alt.width ? alt.height : 60) - 6, 52, 4, Math.abs(s.prog), s.prog < 0 ? '#3ad04a' : '#e8402a');
+  if (s.state === 'up' && Math.abs(s.prog) > 0.02) A.bar(b.x - 26, b.y - (alt && alt.width ? alt.height : 60) - 6, 52, 4, Math.abs(s.prog), b.s ? (s.capT >= 0 ? W.teams[s.capT].color : '#d8d8d8') : s.prog < 0 ? '#3ad04a' : '#e8402a');
 }
 /** The HUD's line for the shrine, the gifts held, the ram and the 역전의 기세 (under the command line). */
 function drawEndHud(G, W, ctx, cw, u, y) {
@@ -9406,7 +9634,7 @@ function endgameProps(W, out) {
   if (W.ram && W.ram.state === 'up') out.push({ war: true, wprop: 'ram', x: W.ram.x, y: W.ram.y + 4 });
 }
 function endgameMinimap(W, dot, d) {
-  const G = A.G(), s = W.shrine;
+  const G = A.G(), s = W.jaeng ? W.jshrine : W.shrine;
   if (s && (s.state === 'up' || s.state === 'soon')) dot(s.x, s.y, s.state === 'soon' || (s.contest && Math.floor(G.t * 4) % 2) ? '#ffffff' : SHRINE_KINDS[s.kind].col, 4.5 * d, 'diamond');
   if (W.ram && W.ram.state === 'up') dot(W.ram.tx, W.ram.ty, '#ffb040', 4 * d, 'diamond');
 }
@@ -9443,6 +9671,17 @@ function leagueAfter(W, o) {
   const lg = leagueApply(pr, { ...o, day, rule: W.rule ? W.rule.name : null, what: W.def.name || W.def.title });
   lg.paid = [];
   for (const i of lg.ups) { const rw = TIER_REWARD[i]; if (rw) { payReward(pr, rw, `리그 ${LEAGUE_TIERS[i].name}`); lg.paid.push([i, rw]); } }
+  // 문파 공훈 and the week's league goals (league.js): what this war counts for.
+  const won = o.place ? o.place === 1 : !!o.win;
+  lg.gh = guildEarn(pr, { won, delta: lg.delta, short: o.short });
+  const ours = W.jaeng ? 0 : (W.shrine && W.shrine.taken[0]) || 0;
+  lg.goals = leagueGoalBump(pr, {
+    shrine: ours, jshrine: W.jaeng && W.jshrine ? W.jshrine.taken[0] : 0,
+    ram: W.ram && W.attacker !== 0 ? W.ram.downs : 0, gate: W.ram && W.attacker === 0 ? W.ram.reached || 0 : 0,
+    nan: W.def.short && won ? 1 : 0, win: !W.jaeng && !W.def.short && won ? 1 : 0,
+    pts: Math.max(0, lg.delta), sgrade: o.tier === 'S' ? 1 : 0,
+  });
+  for (const g of lg.goals) A.say(`[리그 주간 목표] ${g.text} 달성! 의뢰판·대항전 게시판에서 받으세요 (${leagueGoalReward(g)})`, 'sys');
   A.saveProgress();
   if (lg.ups.length) A.say(`[문파 리그] ${LEAGUE_TIERS[lg.tAfter].name} 경지에 올랐습니다!`, 'sys');
   return lg;
@@ -9454,7 +9693,8 @@ function leagueHtml(lg) {
   const parts = lg.parts.map(([k, n]) => `${k} ${n >= 0 ? '+' : ''}${n}`).join(' · ');
   const ups = lg.paid.map(([i, rw]) => `<div class="wr-sub lg-up">경지 상승! <b style="color:${LEAGUE_TIERS[i].col}">${LEAGUE_TIERS[i].name}</b> — ${rewardText(rw)}</div>`).join('');
   return `<div class="wr-sub lg-line">문파 리그 <b style="color:${T.col}">${T.name}</b> ${lg.after}점 <b class="${lg.delta >= 0 ? 'lg-plus' : 'lg-minus'}">(${lg.delta >= 0 ? '+' : ''}${lg.delta})</b>${lg.streak >= 2 ? ` · ${lg.streak}연승` : ''}
-    <div class="lg-bar"><i style="width:${bar}%;background:${T.col}"></i></div><small>${parts}${nx ? ` · 다음 경지 ${nx.name}까지 ${nx.at - lg.after}점` : ' · 최고 경지'}</small></div>${ups}`;
+    <div class="lg-bar"><i style="width:${bar}%;background:${T.col}"></i></div><small>${parts}${nx ? ` · 다음 경지 ${nx.name}까지 ${nx.at - lg.after}점` : ' · 최고 경지'}${lg.gh ? ` · 문파 공훈 +${lg.gh}` : ''}</small></div>${ups}
+    ${(lg.goals || []).map(g => `<div class="wr-sub lg-up">주간 목표 달성! <b>${g.text}</b> — ${leagueGoalReward(g)} (게시판에서 받기)</div>`).join('')}`;
 }
 function momentsHtml(W) {
   const hs = highlights(W), rows = W.result && W.result.rows;
@@ -9474,6 +9714,25 @@ function leagueBoardHtml(pr) {
     <div class="lg-bar"><i style="width:${bar}%;background:${T.col}"></i></div></div>
     <div><b>이번 주 전장 규칙 · ${R.name}</b> — ${R.desc}${L.day !== day ? ' · <span class="lg-plus">오늘 첫 승 +25점</span>' : ''}</div>
     <small>${LEAGUE_TIERS.map((t, j) => `<span style="color:${j <= i ? t.col : '#8a7a68'}">${t.name}</span>`).join(' › ')} — 처음 오른 경지마다 보상, 시즌(4주) 끝에 최고 경지 보상</small>${pend}</div>`;
+}
+/** 문파 기술 (the growth tree) and this week's league goals, on the war board (folded unless opened or a goal is ready). */
+let guildOpen = false;
+function guildBoardHtml(pr) {
+  const g = guildOf(pr), w = leagueGoals(pr), ready = leagueGoalsReady(pr).length;
+  const spent = Object.values(g.sk).reduce((a, n) => a + n, 0);
+  const rows = GUILD_SKILLS.map(sk => {
+    const lv = g.sk[sk.id] || 0, c = guildCan(pr, sk.id), now = lv ? sk.desc(sk.per * lv) : '아직 배우지 않음', next = lv < GUILD_MAX ? sk.desc(sk.per * (lv + 1)) : '';
+    return `<div class="gt-sk${c.ok || lv ? '' : ' lock'}"><b>${sk.name}</b> <span class="gt-pip">${'●'.repeat(lv)}${'○'.repeat(GUILD_MAX - lv)}</span>${lv < GUILD_MAX ? `<button class="btn" data-gsk="${sk.id}"${c.ok ? '' : ' disabled'} title="${c.ok ? '' : c.why}">배우기 ${GUILD_COST[lv]}</button>` : ''}
+      <small>${now}${next ? ` → 다음: ${next}` : ''}${!c.ok && lv < GUILD_MAX ? ` · ${c.why}` : ''}</small></div>`;
+  }).join('');
+  const goals = w.list.map(leagueGoalDef).map(q => {
+    const have = Math.min(q.need, w.c[q.id] || 0), got = w.claimed.includes(q.id), can = !got && have >= q.need;
+    return `<div class="gt-goal${got ? ' done' : ''}">${q.text} <span class="lg-bar"><i style="width:${Math.round(have / q.need * 100)}%;background:#ffd040"></i></span> ${have}/${q.need} · ${leagueGoalReward(q)}${got ? ' ✓' : can ? ` <button class="btn" data-lgc="${q.id}">받기</button>` : ''}</div>`;
+  }).join('');
+  return `<details class="wb-guild"${guildOpen || ready ? ' open' : ''}><summary><b>문파 기술 · 리그 주간 목표</b> — 문파 공훈 ${g.gh}${ready ? ` · <span class="lg-plus">받을 목표 ${ready}</span>` : ''}</summary>
+    <div><b>이번 주 리그 목표</b> (월요일 갱신)</div>${goals}
+    <div style="margin-top:4px"><b>문파 기술</b> <small>공훈은 판마다(승 10 · 패 4 + 얻은 리그 점수의 1/5, 난투 ×0.7)와 주간 목표로 쌓이고 시즌이 바뀌어도 남습니다. 둘째 줄은 윗줄 3단계, 셋째 줄은 7단계부터.</small>${spent ? ' <button class="btn" id="gt-undo">초기화 (공훈 모두 돌려받기)</button>' : ''}</div>
+    <div class="gt-rows">${rows}</div></details>`;
 }
 function leagueClaim() {
   const pr = A.progress(), L = leagueOf(pr);

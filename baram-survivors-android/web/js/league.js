@@ -127,3 +127,122 @@ export function warRule(week = gwoeWeek()) {
   if (typeof window !== 'undefined' && window.__warRule) return WAR_RULES.find(r => r.id === window.__warRule) || WAR_RULES[0];
   return WAR_RULES[((week % WAR_RULES.length) + WAR_RULES.length) % WAR_RULES.length];
 }
+
+// ------------------------------------------------ 문파 성장 트리 (엔드게임 2차, 2026-11-28)
+// The league's 경지 is a ladder that falls back every season; this is what stays: 문파 공훈 (pr.guild.gh), earned by every war,
+// 난투 and 「쟁」 (more for a win and for the points it brought) and by the league's weekly goals, spent on six 문파 기술 of three
+// levels each, in three rows (a row opens once enough levels are learnt in the rows above). Only our guild has them, so each
+// is small. At the first numbers (shrine 4 s, rise 0.7 s, ram 8%, supply 10%, tactic 6%, banner 8% a level) all eighteen levels
+// took 청룡전 11 of 12 against 3 of 12 with none (a fighting bot; the 25 risen sooner and the 거점 turned faster); now
+// 3 of 6 against 4 of 6 (docs/9cha_rules.md, 엔드게임 2차). 초기화 gives everything back, so a build can be tried.
+// war.js reads them through guildK.
+export const GUILD_SKILLS = [
+  { id: 'shrine', row: 0, name: '신단 수호', per: 3, desc: n => `우리가 차지한 신단의 힘이 ${n}초 더 간다` },
+  { id: 'rise', row: 0, name: '회생술', per: 0.3, desc: n => `우리 문파가 쓰러진 뒤 ${n.toFixed(1)}초 빨리 일어난다 (영웅 포함, 쟁도)` },
+  { id: 'ram', row: 1, name: '공성 장인', per: 0.06, desc: n => `현무전: 우리 충차 체력 +${Math.round(n * 100)}% · 수성에서 적 충차를 ${Math.round(n * 100)}% 빨리 태운다` },
+  { id: 'supply', row: 1, name: '보급로', per: 0.06, desc: n => `우리가 나른 보급 상자의 효과 +${Math.round(n * 100)}%` },
+  { id: 'tactic', row: 2, name: '분대 전술', per: 0.05, desc: n => `전술 키(집중·총공격·후퇴) 대기 −${Math.round(n * 100)}% · 집중한 적에게 피해 +${Math.round(n * 50)}%p` },
+  { id: 'banner', row: 2, name: '문파 깃발', per: 0.06, desc: n => `신단·쟁 신단을 ${Math.round(n * 100)}%, 거점을 ${Math.round(n * 50)}% 빨리 차지한다` },
+];
+export const GUILD_MAX = 3;
+export const GUILD_COST = [20, 40, 70];
+export const GUILD_ROW_NEED = [0, 3, 7];
+export function guildOf(pr) {
+  const g = pr.guild || (pr.guild = { gh: 0, got: 0, sk: {} });
+  g.sk = g.sk || {};
+  return g;
+}
+export const guildLv = (pr, id) => (pr && pr.guild && pr.guild.sk && pr.guild.sk[id]) || 0;
+/** Whether the next level of a skill can be learnt: { ok, why, cost }. */
+export function guildCan(pr, id) {
+  const g = guildOf(pr), s = GUILD_SKILLS.find(x => x.id === id), lv = g.sk[id] || 0;
+  if (!s) return { ok: false, why: '없는 기술' };
+  if (lv >= GUILD_MAX) return { ok: false, why: '최고 단계', cost: 0 };
+  const cost = GUILD_COST[lv];
+  const need = GUILD_ROW_NEED[s.row], above = GUILD_SKILLS.filter(x => x.row < s.row).reduce((a, x) => a + (g.sk[x.id] || 0), 0);
+  if (above < need) return { ok: false, why: `윗줄 ${need}단계 필요 (${above}/${need})`, cost };
+  if (g.gh < cost) return { ok: false, why: `공훈 ${cost} 필요`, cost };
+  return { ok: true, cost };
+}
+export function guildBuy(pr, id) {
+  const c = guildCan(pr, id);
+  if (!c.ok) return false;
+  const g = guildOf(pr);
+  g.gh -= c.cost;
+  g.sk[id] = (g.sk[id] || 0) + 1;
+  return true;
+}
+/** Every level back as 공훈. */
+export function guildReset(pr) {
+  const g = guildOf(pr);
+  for (const lv of Object.values(g.sk)) for (let i = 0; i < lv; i++) g.gh += GUILD_COST[i];
+  g.sk = {};
+}
+/** The 공훈 a war brings: a win 10, a loss 4, and a fifth of the league points it gained (난투 ×0.7). */
+export function guildEarn(pr, o) {
+  const g = guildOf(pr);
+  let n = (o.won ? 10 : 4) + Math.max(0, Math.floor((o.delta || 0) / 5));
+  if (o.short) n = Math.round(n * 0.7);
+  g.gh += n;
+  g.got += n;
+  return n;
+}
+/** A skill's worth for war.js (its per × level); window.__guild ({id: lv}) overrides the save for tests. */
+export function guildK(pr, id) {
+  const ov = typeof window !== 'undefined' && window.__guild;
+  const lv = ov ? ov[id] || 0 : guildLv(pr, id);
+  const s = GUILD_SKILLS.find(x => x.id === id);
+  return s ? s.per * Math.min(GUILD_MAX, lv) : 0;
+}
+
+// ------------------------------------------------ 리그 주간 목표 (엔드게임 2차)
+// Four a week (the Monday week), the same four all week, always one of the 신단 ones; each pays 문파 공훈 and a little 전 or
+// 레이드주화, claimed at the 관원's 의뢰판 (game.js) or on the war board. war.js counts them at a war's end (goalsAfter).
+export const LEAGUE_GOALS = [
+  { id: 'shrine', text: '신단 5개 차지 (우리 문파, 대항전·난투)', need: 5, gh: 25, gold: 3000 },
+  { id: 'jshrine', text: '쟁 신단 3개 차지', need: 3, gh: 25, gold: 3000 },
+  { id: 'ram', text: '충차 3번 막기 (현무 수성에서 부수기)', need: 3, gh: 25, gold: 3000 },
+  { id: 'nan', text: '백호 난투 3승', need: 3, gh: 20, gold: 2500 },
+  { id: 'win', text: '대항전 5승', need: 5, gh: 30, coins: 20 },
+  { id: 'pts', text: '리그 점수 +150', need: 150, gh: 30, coins: 15 },
+  { id: 'gate', text: '충차를 성문에 2번 붙이기 (현무 공성)', need: 2, gh: 20, gold: 2500 },
+  { id: 'sgrade', text: '대항전·쟁 기여 S 3번', need: 3, gh: 25, coins: 15 },
+];
+export const leagueGoalDef = id => LEAGUE_GOALS.find(g => g.id === id);
+export function leagueGoals(pr, week = gwoeWeek()) {
+  let w = pr.lgoal;
+  if (w && w.week === week) return w;
+  const rest = LEAGUE_GOALS.filter(g => g.id !== 'shrine' && g.id !== 'jshrine');
+  const out = [week % 2 ? 'jshrine' : 'shrine'];
+  for (let i = 0; out.length < 4 && i < 20; i++) { const g = rest[((week * 3 + i * 2) % rest.length + rest.length) % rest.length]; if (!out.includes(g.id)) out.push(g.id); }
+  w = pr.lgoal = { week, list: out, c: {}, claimed: [] };
+  return w;
+}
+/** Counts into this week's goals (only the week's count); the goals just reached. */
+export function leagueGoalBump(pr, adds) {
+  const w = leagueGoals(pr), done = [];
+  for (const [id, n] of Object.entries(adds)) {
+    if (!(n > 0) || !w.list.includes(id)) continue;
+    const g = leagueGoalDef(id), was = w.c[id] || 0;
+    w.c[id] = was + n;
+    if (was < g.need && w.c[id] >= g.need) done.push(g);
+  }
+  return done;
+}
+export function leagueGoalsReady(pr) {
+  const w = leagueGoals(pr);
+  return w.list.map(leagueGoalDef).filter(g => !w.claimed.includes(g.id) && (w.c[g.id] || 0) >= g.need);
+}
+/** Claim one: its 공훈 into the tree, its 전·주화 into the purse. */
+export function leagueGoalClaim(pr, id) {
+  const w = leagueGoals(pr), g = leagueGoalDef(id);
+  if (!g || w.claimed.includes(id) || (w.c[id] || 0) < g.need) return null;
+  w.claimed.push(id);
+  const G = guildOf(pr);
+  G.gh += g.gh;
+  G.got += g.gh;
+  pr.gold = (pr.gold || 0) + (g.gold || 0);
+  pr.coins = (pr.coins || 0) + (g.coins || 0);
+  return g;
+}
+export const leagueGoalReward = g => [`문파 공훈 ${g.gh}`, g.gold ? `전 ${g.gold.toLocaleString()}` : '', g.coins ? `레이드주화 ${g.coins}` : ''].filter(Boolean).join(' · ');
