@@ -41,6 +41,8 @@ def grades(e):
 MAP = {
     'keys': {
         'hit': 'sfx_bat_hit_normal', 'crit': 'sfx_bat_critical', 'kill': 'sfx_unit_dead_grass1',
+        # 피격 (타격감 점검 2026-11-28): 연's blow sound, a little lower for the hero and its companions struck
+        'hurt': 'sfx_bat_hit_normal_2@0.85', 'mate_hurt': 'sfx_bat_hit_normal_2@0.95', 'war_hit': 'sfx_bat_hit_normal',
         'swing': 'sfx_bat_swing_normal_1', 'levelup': 'sfx_fx_levelup', 'pickup': 'sfx_ui_get_coin',
         'heal': 'fx_skill_heal_01', 'chest': 'SFX_UI_GlobalCloset_BoxOpen_1', 'boss': 'sfx_ui_tower_boss',
         'win': 'sfx_ui_muhan_win', 'lose': 'sfx_ui_muhan_defeat', 'revive': 'sfx_ui_resurrection_normal',
@@ -364,7 +366,7 @@ def main():
     used = set()
     for group in ('keys', 'skills'):
         for v in MAP[group].values():
-            used.update([v] if isinstance(v, str) else v)
+            used.update(x.split('@')[0] for x in ([v] if isinstance(v, str) else v))  # ('clip@rate': the clip, played at that rate)
     used.discard('-')
     missing = sorted(c for c in used if c not in clips)
     if missing:

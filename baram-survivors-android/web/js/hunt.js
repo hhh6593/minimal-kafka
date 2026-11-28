@@ -2126,6 +2126,83 @@ function drawMap(ctx, camX, camY) {
   }
 }
 
+// The walled ground's minimap (사용자 2026-11-28: 지형이 생긴 사냥터에 접었다 펼 수 있는 미니맵, 목표 위치와 연동). At the top right,
+// as 연's own (its pickup list stands under it): the ground's own picture small, the closed ground a shade darker, the
+// objective (goalSpot: a gold diamond, throbbing — the same place the edge arrow points to), the boss (violet), the
+// champions and lieutenants (orange), the monsters (small red), the screen's frame and the hero. 접기 · 작게 · 크게 and the
+// zoom are game.js's (mmFrame / mmChrome). Returns how far down it reaches (canvas px), for what stands under it.
+function minimap(ctx, cv) {
+  const G = A.G(), R = G.arena;
+  if (!R || (window.__dbgHunt && window.__dbgHunt.nomm)) return 0;
+  const m = R.map, d = cv.width / (A.boxOf(cv).width || cv.width), v = A.mmView('hunt');
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (v.mode === 'fold') { const b = A.mmFoldTab('hunt', cv.width - 8 * d, 4 * d, true); ctx.restore(); return b; }
+  const maxW = (v.mode === 'big' ? 300 : 116) * d, maxH = (v.mode === 'big' ? 230 : 92) * d, k = Math.min(maxW / m.w, maxH / m.h);
+  const w = m.w * k, h = m.h * k, r = { x: cv.width - w - 10 * d, y: 6 * d, w, h, d };
+  const p = G.player, T = A.mmFrame('hunt', r, m.w, m.h, p.x, p.y);
+  const bg = A.mmBackOf('hunt:' + R.id, m.w, m.h, (g, s) => {
+    let ok = true;
+    for (let cy = 0; cy * m.chunk < m.h; cy++)
+      for (let cx = 0; cx * m.chunk < m.w; cx++) {
+        const im = A.images[`yhunt/${R.id}_${cx}_${cy}.${m.ext || 'png'}`];
+        if (!im || !im.width) { ok = false; continue; }
+        g.drawImage(im, cx * m.chunk * s, cy * m.chunk * s, im.width * s, im.height * s);
+      }
+    g.fillStyle = 'rgba(0,0,0,0.4)';
+    const ts = A.TILE * s;
+    for (let y = 0; y < m.rows; y++) for (let x = 0; x < m.cols; x++) if (!R.walk[y * m.cols + x]) g.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5);
+    return ok;
+  });
+  A.mmBackDraw(T, bg);
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  const TL = A.TILE, X = tx => T.X((tx + 0.5) * TL), Y = ty => T.Y((ty + 0.5) * TL);
+  const dot = (px, py, col, s, diamond) => {
+    ctx.fillStyle = '#000';
+    if (diamond) {
+      ctx.beginPath(); ctx.moveTo(px, py - s - d); ctx.lineTo(px + s + d, py); ctx.lineTo(px, py + s + d); ctx.lineTo(px - s - d, py); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(px, py - s); ctx.lineTo(px + s, py); ctx.lineTo(px, py + s); ctx.lineTo(px - s, py); ctx.fill();
+      return;
+    }
+    ctx.fillRect(px - s / 2 - d * 0.5, py - s / 2 - d * 0.5, s + d, s + d);
+    ctx.fillStyle = col;
+    ctx.fillRect(px - s / 2, py - s / 2, s, s);
+  };
+  // (the crowd as small red points, the nearest 160 at most; the strong over them)
+  let n = 0;
+  const near = G.enemies.length > 160 ? G.enemies.slice().sort((a, b) => Math.abs(a.tx - p.tx) + Math.abs(a.ty - p.ty) - Math.abs(b.tx - p.tx) - Math.abs(b.ty - p.ty)) : G.enemies;
+  for (const e of near) {
+    if (e.kind || e.dying || e.ally || n++ > 160) continue;
+    ctx.fillStyle = '#d83a2a';
+    ctx.fillRect(T.X(e.x) - d, T.Y(e.y) - d, 2 * d, 2 * d);
+  }
+  for (const e of G.enemies) if (e.kind && e.kind !== 'boss' && e.kind !== 'minion' && !e.dying) dot(T.X(e.x), T.Y(e.y), e.flee || e.kind === 'treasure' ? '#ffe070' : '#ff9a2a', 3 * d);
+  const boss = G.enemies.find(e => e.kind === 'boss');
+  if (boss) dot(T.X(boss.x), T.Y(boss.y), '#e060ff', 5 * d, true);
+  // The objective, where the edge arrow points: a gold diamond, throbbing, and a ring round it in 크게.
+  const gs = goalSpot();
+  if (gs) {
+    const pulse = 1 + 0.25 * Math.sin(G.t * 6);
+    dot(X(gs[0]), Y(gs[1]), '#ffd84a', 4.5 * d * pulse, true);
+    if (v.mode === 'big') { ctx.strokeStyle = 'rgba(255,216,74,0.8)'; ctx.lineWidth = d; ctx.beginPath(); ctx.arc(X(gs[0]), Y(gs[1]), 9 * d * pulse, 0, Math.PI * 2); ctx.stroke(); }
+  }
+  const VW = A.VW(), VH = A.VH(), [cx0, cy0] = G.camAt || cam(p.x - VW / 2, p.y - 30 - VH / 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = d;
+  ctx.strokeRect(T.X(cx0), T.Y(cy0), VW * T.k, VH * T.k);
+  if (!G.dead && (Math.floor(performance.now() / 400) % 2 === 0 || v.mode === 'big')) dot(T.X(p.x), T.Y(p.y - 10), '#fff', 4 * d);
+  ctx.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  A.mmChrome(T, gs ? '◆ 목표' : '');
+  ctx.restore();
+  // (what stands under it keeps its place under the small one: the big one is laid over them while it is open)
+  return r.y + m.h * Math.min(116 * d / m.w, 92 * d / m.h) + 22 * d;
+}
+
 /** Monsters stuck in place five seconds (walled off): moved to an open tile near the hero. */
 function unstick() {
   const G = A.G(), R = G.arena;
@@ -2349,7 +2426,7 @@ export function initHunt(api) {
     start, note, on, clock, tough, xpK, spawn, kill, hurt, takeK, cleared, stops, cardBonus, stepK, clockText,
     hud(ctx, cv) { drawStorm(ctx, cv); hud(ctx, cv); hud2(ctx, cv); drawGoalHud(ctx, cv); drawWave(ctx, cv); },
     ground: drawGoal, move, hurtBy, GROUNDS, GROUPS, groundOf: ground,
-    open, cam, drawMap, flowDirs, reach, spawnTile, ambient, sweep, sweepKill, MODES, starTotal,
+    open, cam, drawMap, minimap, flowDirs, reach, spawnTile, ambient, sweep, sweepKill, MODES, starTotal,
     world, speedK, cdK, tryExecute, react, elemOf, dash, cancel, chainPower, hurtTaken, grade, trainTried, firstPicks,
     tick(dt) { tick(dt); },
     PACE, PATHS,

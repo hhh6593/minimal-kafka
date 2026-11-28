@@ -32,7 +32,10 @@ export const CLASSES = [
   { id: 'archer', name: '궁사', hero: '1002', hp: 155, mp: 100, speed: 74, armor: 2, start: 'a_shot', ult: 'a_ult',
     desc: '활을 쏘는 원거리 격수. 멀리서 화살로 꿰뚫고, 터뜨리고, 비처럼 쏟아붓는다.' },
   // 바람의나라 연's 무사 (Job_7): spear, figure, skills and sounds only from 연's resources.
-  { id: 'lancer', name: '무사', hero: '1001', hp: 160, dmgK: 1.25, mp: 80, speed: 70, armor: 2, start: 'l_moon', ult: 'l_ult',
+  // (무사 보강 2026-11-28, 사용자 "조금 보강": the weakest close-in fighter — 9차 best gear 0.8~1.7만 a second, half the 전사's,
+  // and felled at 위험도 V. hp 160 → 185, armor 2 → 3 as every other close-in class, dmgK 1.25 → 1.42; 이계의침식 cd 8 → 7,
+  // 차원개방's discs 15 → 18. Its nature kept: the spear's rows, the sweep, the dash. docs/9cha_rules.md 무사 보강.)
+  { id: 'lancer', name: '무사', hero: '1001', hp: 185, dmgK: 1.42, mp: 80, speed: 70, armor: 3, start: 'l_moon', ult: 'l_ult',
     desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
   // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
   { id: 'monk', name: '격투가', hero: '1001', hp: 210, dmgK: 2.1, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
@@ -1550,9 +1553,9 @@ const S9 = {
   //   아공간전개 (IMG94, PVP → 몬스터: 선 자리에 청룡 문양 영역과 결정 울타리 8초 — 아래 l_agong).
   // Pictures at the original's own size (o_l_*: 0.62 game pixels a capture pixel). 1320의 추정 그림(옛 o_l_sickle·erosion·dimension)은 뺌.
   l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'dim9', echo: undefined, fx: 'o_l_dimshard', fxCast: 'o_l_dimcast', fxLoop: undefined, loopSize: undefined,
-    fxHit: undefined, hit: 15, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
+    fxHit: undefined, hit: 18, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
     desc: '이계의 차원을 몸에 연다. 15초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터 둘에게 푸른 원반으로 거듭 날아들어 그 몬스터와 원반 안의 몬스터를 벤다' },
-  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 8, depth: 9,
+  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 7, depth: 9,
     width: undefined, ways: undefined, pulses: undefined, side: 36, sideV: 26, step: 0.06, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
     desc: '바라보는 쪽으로 이계에서 불러낸 기운을 아홉 칸 쏘아 보낸다. 지나는 자리마다 빛기둥이 솟고 검은 잔해가 세 줄로 남으며, 맞은 몬스터는 침식되어(받는 피해 증가) 옆으로 밀쳐진다' },
   l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 75, cd: 2.5, range: undefined,
