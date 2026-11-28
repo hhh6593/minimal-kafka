@@ -314,7 +314,7 @@ function injectUi() {
   #war-result .wr-medal span { position: absolute; left: 0; right: 0; top: 66px; color: #8cf08a; font-weight: bold; }
   #war-result .wr-tier { font: bold 18px G11, serif; color: #ffd040; }
   #war-result table, #war-sb table { border-collapse: collapse; margin: 6px auto; font: 11px G9, sans-serif; color: #e8dcc0; }
-  #war-result td, #war-result th, #war-sb td, #war-sb th { padding: 1px 6px; border-bottom: 1px solid #3a2c1c; text-align: right; }
+  #war-result td, #war-result th, #war-sb td, #war-sb th { padding: 1px 6px; border-bottom: 1px solid #3a2c1c; text-align: right; white-space: nowrap; }
   #war-result td:nth-child(2), #war-sb td:nth-child(2) { text-align: left; }
   #war-result tr.me td, #war-sb tr.me td { color: #ffd040; }
   #war-result .t0 td:first-child, #war-sb .t0 td:first-child { color: #7cf08a; } #war-result .t1 td:first-child, #war-sb .t1 td:first-child { color: #ff7a6a; }
@@ -359,6 +359,12 @@ function injectUi() {
   #war-tac { position: fixed; right: calc(env(safe-area-inset-right) + 4px); top: 44%; z-index: 30; display: flex; flex-direction: column; gap: 3px; }
   body.jaeng #war-tac { top: 34%; right: calc(env(safe-area-inset-right) + 62px); }
   #war-tac[hidden], body:not(.war) #war-tac { display: none; }
+  /* (UI 점검 2026-11-28) On a low phone the column stays above 현황·모여 (at 44% of 360px its 후퇴 sat on 모여);
+     over the result and the 현황 board the tactics and the 쟁 commands step aside (they stood over the medals). */
+  body:not(.jaeng) #war-tac { top: min(44%, calc(100% - 240px)); }
+  body.jaeng #war-tac, #jaeng-cmds { top: min(34%, calc(100% - 240px)); }
+  body:has(#war-result:not([hidden])) #war-tac, body:has(#war-result:not([hidden])) #jaeng-cmds,
+  body:has(#war-result:not([hidden])) #war-cmd { display: none; }
   #war-tac button { font: 700 11px G11, monospace; padding: 2px 5px; color: #f4e2c0; background: #301a0a; border: 2px solid rgb(230,120,60); min-width: 52px; }
   #war-tac button.cool { opacity: 0.45; }
   #war-tac button.on { background: #6a2a10; color: #ffe0a0; }
@@ -8623,7 +8629,9 @@ function drawWarProp(W, b) {
 // 미니맵 확대·이동 2026-11-28), and it folds away to a tab.
 function mmRect(W) {
   const cw = A.canvas.width, d = cw / (A.boxOf(A.canvas).width || cw), m = W.map, big = A.mmView('war').mode === 'big';
-  const maxW = (big ? 300 : 132) * d, maxH = (big ? 230 : 104) * d;
+  // (크게: its keys stay above the chat at the bottom left, on a low phone too)
+  const room = big ? A.mmRoom('left').floor - 64 * d - (A.MM_KEY_H + 10) * d : 0;
+  const maxW = (big ? 300 : 132) * d, maxH = big ? Math.max(80 * d, Math.min(230 * d, room)) : 104 * d;
   const k = Math.min(maxW / m.w, maxH / m.h);
   return { x: 8 * d, y: 64 * d, w: m.w * k, h: m.h * k, d };
 }
@@ -8782,10 +8790,17 @@ function hud() {
   const icon = img('ui_Icon_KillLog');
   // Under the 연속 처치 count (drawn at 64 / 860 of the width, top right), not across it.
   let y = Math.max(46 * u, 104 * cw / 860);
+  // (UI 점검 2026-11-28: lines that reach down to the 전술·쟁 지휘 keys at the right edge stand left of them, not under them)
+  const cb = A.boxOf(A.canvas), dpx = cw / (cb.width || cw);
+  let keyL = Infinity, keyT = Infinity;
+  for (const id of ['war-tac', 'jaeng-cmds']) {
+    const e = document.getElementById(id), r = e && A.boxOf(e);
+    if (r && r.width > 0) { keyL = Math.min(keyL, (r.left - cb.left) * dpx); keyT = Math.min(keyT, (r.top - cb.top) * dpx); }
+  }
   for (const f of W.feed.slice(-5)) {
     const a = Math.min(1, (6 - (G.t - f.t)) * 2);
     ctx.globalAlpha = a;
-    const x = cw - 8 * u;
+    const x = y + 4 * u > keyT ? Math.min(cw - 8 * u, keyL - 6 * dpx) : cw - 8 * u;
     hudText(f.b, x, y, f.gold ? '#ffd040' : f.bt < 0 ? '#ffd27a' : teamCol('name', f.bt));
     const wb = ctx.measureText(f.b).width;
     if (icon) ctx.drawImage(icon, x - wb - 16 * u, y - 10 * u, 12 * u, 12 * u);
@@ -8838,16 +8853,28 @@ function hud() {
       hudText(`목표`, ax, ay - 10 * u, '#ffd040');
     }
   }
+  // (UI 점검 2026-11-28: a middle line that would run under the minimap at the left moves right of it — the minimap is
+  // drawn over the HUD, and 자리비움's line was half hidden under it on a phone)
+  const midX = (t, y) => {
+    if (W.raid || A.mmView('war').mode === 'fold') return cw / 2;
+    const r = mmRect(W), wt = ctx.measureText(t).width;
+    if (y < r.y - 4 * u || y - 16 * u > r.y + r.h + (A.MM_KEY_H + 6) * r.d || cw / 2 - wt / 2 > r.x + r.w + 6 * r.d) return cw / 2;
+    return Math.max(cw / 2, Math.min(cw - 8 * u - wt / 2, r.x + r.w + 10 * r.d + wt / 2));
+  };
+  ctx.textAlign = 'center';
   if (afk()) {
     ctx.font = `${Math.round(12 * u)}px G11`;
-    hudText('자리비움 — 움직이지 않는 동안 기여가 거의 쌓이지 않습니다', cw / 2, ch / 2 - 56 * u, '#ff9a8a');
+    const t = '자리비움 — 움직이지 않는 동안 기여가 거의 쌓이지 않습니다', y = ch / 2 - 56 * u;
+    hudText(t, midX(t, y), y, '#ff9a8a');
   }
   if (G.dead && W.heroBack) {
     ctx.font = `${Math.round(14 * u)}px G11`;
-    hudText(`부활까지 ${Math.ceil(W.heroBack - G.t)}초`, cw / 2, ch / 2 - 40 * u, '#ff9a8a');
+    const t = `부활까지 ${Math.ceil(W.heroBack - G.t)}초`, y = ch / 2 - 40 * u;
+    hudText(t, midX(t, y), y, '#ff9a8a');
   } else if (G.dead && W.heroOut) {
     ctx.font = `${Math.round(13 * u)}px G11`;
-    hudText('부활 횟수 소진 · 공대원들이 싸움을 이어갑니다', cw / 2, ch / 2 - 40 * u, '#ff9a8a');
+    const t = '부활 횟수 소진 · 공대원들이 싸움을 이어갑니다', y = ch / 2 - 40 * u;
+    hudText(t, midX(t, y), y, '#ff9a8a');
   }
   if (W.hero.carry) {
     ctx.font = `${Math.round(11 * u)}px G11`;

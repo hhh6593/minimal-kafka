@@ -95,13 +95,17 @@
   #map-tabs button { padding: 2px 10px; font-weight: 700; color: #6a4a2a; background: #b08a58;
       border: 2px solid; border-color: #d8b47c #5a3212 #5a3212 #d8b47c; }
   #map-tabs button.on { color: #2a1606; background: #d8b070; border-color: #f0d49c #5a3212 #5a3212 #f0d49c; }
-  #map { position: relative; padding: 0; overflow: hidden; }
+  #map { position: relative; padding: 0; overflow: hidden; background: #1a0e06; }
+  /* (the picture is sized to fit by mapFit, its box exactly the picture's, so the pins' % fall on the picture; the map
+     frame hugs it instead of stretching to the tabs' width, and whatever is zoomed past its edge is cut at the frame) */
   #map img { display: block; height: calc(100vh - 52px); max-width: 56vw; object-fit: contain; }
+  .map-row { display: flex; gap: 4px; align-items: flex-end; min-height: 0; }
   /* 지도 확대·이동 (game.js mapZoomBind): the picture and its pins in one layer; the pins keep their size (--iz undoes the zoom). */
   #map:not(.raids) { touch-action: none; }
-  #map-in { position: relative; transform-origin: 0 0; }
-  .map-zoom { position: absolute; right: 4px; bottom: 4px; z-index: 4; display: flex; flex-direction: column; gap: 3px; }
-  .map-zoom button { min-width: 32px; height: 28px; padding: 0 5px; font: 700 13px/1 G9, monospace; color: #2a1606; background: #d8b070;
+  #map-in { position: relative; transform-origin: 0 0; width: max-content; }
+  /* The zoom keys stand beside the map, not on it: they never cover a pin. */
+  .map-zoom { flex: none; display: flex; flex-direction: column; gap: 4px; }
+  .map-zoom button { min-width: 36px; height: 34px; padding: 0 5px; font: 700 13px/1 G9, monospace; color: #2a1606; background: #d8b070;
       border: 2px solid; border-color: #f0d49c #5a3212 #5a3212 #f0d49c; opacity: .92; }
   .pin { position: absolute; transform: translate(-50%, -100%) scale(var(--iz, 1)); transform-origin: 50% 100%; padding: 0; background: none; border: 0;
       display: flex; flex-direction: column; align-items: center; }
@@ -813,12 +817,12 @@
       text-shadow: 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000, 1px 1px #000; }
   /* The 필살기's way (사냥 / 보스), switched with a tap beside the button. */
   #keys #dash-btn { width: 92px; height: 28px; }
-  body.yeon #keys > button#dash-btn { position: absolute; right: 0; bottom: calc(100% + 6px); width: 84px !important; height: 28px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
+  body.yeon #keys > button#dash-btn:not(#ult):not(#util-btn) { position: absolute; right: 0; bottom: calc(100% + 6px); width: 84px !important; height: 28px; padding: 0 !important; color: #fff; background: #000; border: 3px solid rgb(148,48,219); font: 700 11px G11, monospace; }
   body.yeon.hud-small #keys { grid-template-columns: 36px 36px; gap: 3px; }
   body.yeon.hud-small #keys > button:not(#ult):not(#util-btn) { height: 22px; font-size: 10px !important; line-height: 18px; }
   body.yeon.hud-small #ult { width: 44px; height: 44px; background-size: 28px 28px; font-size: 8px; }
   body.yeon.hud-small #keys > button#util-btn:not(#ult) { right: 50px; width: 34px !important; height: 34px; background-size: 22px 22px; font-size: 8px !important; }
-  body.yeon.hud-small #keys > button#dash-btn { width: 76px !important; height: 24px; font-size: 10px; }
+  body.yeon.hud-small #keys > button#dash-btn:not(#ult):not(#util-btn) { width: 76px !important; height: 24px; font-size: 10px; }
   #keys #dash-btn.ready { border-color: #ffd040 !important; }
   #keys #dash-btn.glow { box-shadow: 0 0 8px 3px #ffd040; }
   #over-stats .grade { font-size: 15px; }
@@ -864,6 +868,37 @@
   /* The carved-panel layout: the small keys one column as wide as the 보조 기술 / 필살기 under them
      (they were 52, 64 and a word wide, each flush right at its own width). */
   body:not(.yeon) #keys > button:not(#ult):not(#util-btn):not(#dash-btn) { width: 92px; height: 24px; }
+
+  /* ---- UI 점검 (2026-11-28): breaks, overflow and crowding found on 740×360 … 1024×768. ---- */
+  /* Korean lines break between words (not inside one, as 막는/다); a word too long for its box still breaks. */
+  body { word-break: keep-all; overflow-wrap: break-word; }
+  /* The picked ground's pin over its neighbours on a crowded map. */
+  .pin.on { z-index: 2; }
+  /* 장비: the totals and the 격 line under the list keep their height (they were squeezed under the keys). */
+  #equip-box > .caption, #equip-stats, #equip-gyeok, #equip-box > .row { flex: none; }
+  /* 조합 detail: a material's name and count on one line, where it comes from beside it (the count fell to a line of its own). */
+  .fd-mat > span { flex: none; white-space: nowrap; }
+  .fd-mat small { min-width: 0; }
+  /* The town's quick keys: a second column on a low screen instead of running down over 직업 선택. */
+  #town-quick { flex-wrap: wrap; align-content: flex-start; max-height: calc(100% - 34px - 44px); }
+  /* The menu, the level-up and the result windows: no taller than the screen, scrolling inside (the menu's caption went off the
+     top on a 360px phone, centred and cut at both ends). */
+  #pause-box, #lv-box, #over-box { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; flex-shrink: 1; min-height: 0; }
+  /* 동료 설정 over the town: the town's own name bar and keys no longer show through behind its title. */
+  #party-pick { background: rgba(10, 12, 20, 0.97); }
+  @media (max-height: 520px) and (max-width: 800px) and (min-width: 561px) { #classes .card small { font-size: 10px; } }
+  @media (max-height: 520px) and (min-width: 561px) {
+    /* the class cards: 필살기 and the record on one line each (기록 없/음, 금나와라,/뚝딱 made the cards uneven and cut the last row) */
+    #classes .card em, #classes .card small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    #classes .card small { letter-spacing: -0.5px; }
+    /* the title: the keys on one row and the two notes on one line, under 연's name in the picture rather than over it */
+    body.ytitle #title { gap: 4px 8px; padding-bottom: 2vh; }
+    body.ytitle #title .btn { min-width: 120px; padding: 4px 12px; }
+    body.ytitle #title #title-sound .vgroup .btn.snd { min-width: 104px; }
+    body.ytitle #title .note { flex: 1 1 40%; text-align: left; }
+    body.ytitle #title #version { text-align: right; }
+    body.ytitle #title #version::after { content: ' ·'; }
+  }
 </style>
 </head>
 <body>
@@ -892,7 +927,7 @@
   <div class="stage-wrap">
     <div class="map-col">
       <div id="map-tabs"><button data-map="list">목록</button><button data-map="gungnae">국내성</button><button data-map="world_1">대륙</button><button data-map="world_4">환상의 섬</button><button data-map="skybelow">하늘 아래</button><button data-map="hell">지옥</button><button data-map="raid">레이드</button></div>
-      <div id="map"></div>
+      <div class="map-row"><div id="map"></div><div class="map-zoom" id="map-zoom" hidden><button data-z="in" title="확대">+</button><button data-z="out" title="축소">-</button><button data-z="goal" title="고른 곳으로">◎</button><button data-z="fit" title="전체">전체</button></div></div>
     </div>
     <div class="info-col">
       <div id="stage-info"></div>

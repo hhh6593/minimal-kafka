@@ -2143,9 +2143,12 @@ function minimap(ctx, cv) {
   const m = R.map, d = cv.width / (A.boxOf(cv).width || cv.width), v = A.mmView('hunt');
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (v.mode === 'fold') { const b = A.mmFoldTab('hunt', cv.width - 8 * d, 4 * d, true); ctx.restore(); return b; }
-  const maxW = (v.mode === 'big' ? 300 : 116) * d, maxH = (v.mode === 'big' ? 230 : 92) * d, k = Math.min(maxW / m.w, maxH / m.h);
-  const w = m.w * k, h = m.h * k, r = { x: cv.width - w - 10 * d, y: 6 * d, w, h, d };
+  // (크게: no lower than the keys at the right — 질주·속도 — leave room for its own keys under it; clear of the 상태창 tab)
+  const room = A.mmRoom('right');
+  if (v.mode === 'fold') { const b = A.mmFoldTab('hunt', cv.width - 8 * d - room.pad, 4 * d, true); ctx.restore(); return b; }
+  const bigH = Math.max(80 * d, Math.min(230 * d, room.floor - 6 * d - (A.MM_KEY_H + 10) * d));
+  const maxW = (v.mode === 'big' ? 300 : 116) * d, maxH = v.mode === 'big' ? bigH : 92 * d, k = Math.min(maxW / m.w, maxH / m.h);
+  const w = m.w * k, h = m.h * k, r = { x: cv.width - w - 10 * d - room.pad, y: 6 * d, w, h, d };
   const p = G.player, T = A.mmFrame('hunt', r, m.w, m.h, p.x, p.y);
   const bg = A.mmBackOf('hunt:' + R.id, m.w, m.h, (g, s) => {
     let ok = true;
@@ -2206,7 +2209,7 @@ function minimap(ctx, cv) {
   A.mmChrome(T, gs ? '◆ 목표' : '');
   ctx.restore();
   // (what stands under it keeps its place under the small one: the big one is laid over them while it is open)
-  return r.y + m.h * Math.min(116 * d / m.w, 92 * d / m.h) + 22 * d;
+  return r.y + m.h * Math.min(116 * d / m.w, 92 * d / m.h) + (A.MM_KEY_H + 7) * d;
 }
 
 /** Monsters stuck in place five seconds (walled off): moved to an open tile near the hero. */

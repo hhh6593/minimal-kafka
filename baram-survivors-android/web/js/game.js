@@ -787,7 +787,8 @@ function drawProp(b, p) {
 /** A ground pattern for a terrain kind, drawn once per hunt. */
 function makeGround(kind) {
   // 연's own floor for the terrain, one game pixel per picture pixel.
-  const fp = `floor/${kind}.png`, has = (M.floor || []).includes(kind), tile = has ? pic(fp) : null;
+  // (M ?: a turn of the phone before the manifest is in)
+  const fp = `floor/${kind}.png`, has = ((M && M.floor) || []).includes(kind), tile = has ? pic(fp) : null;
   if (tile) return ctx.createPattern(tile, 'repeat');
   // (not in yet: the drawn ground stands in, and 연's floor takes its place as soon as it is)
   if (has && !makeGround.wait.has(kind)) {
@@ -1180,6 +1181,7 @@ function buildStages() {
   const map = $('#map');
   map.classList.toggle('gungnae', mapTab === 'gungnae');
   map.classList.toggle('raids', mapTab === 'raid');
+  $('#map-zoom').hidden = true;
   if (mapTab === 'list') {
     // Every ground as a card, in the order they are hunted: its boss, its level, and plainly
     // whether it is conquered, open to try, or closed (and what opens it).
@@ -1230,10 +1232,11 @@ function buildStages() {
   // 연's own map for the tab where the build has it (the 대륙, 환상의 섬); the old one else.
   const ym = M.ymap && M.ymap[mapTab];
   // (the picture and its pins in one layer that zooms and moves: mapZoomBind; the goal's line and the keys stay put)
-  map.innerHTML = `<div id="map-in">${ym ? `<img src="assets/ymap/${ym.file}" alt="">` : `<img src="assets/ui/${mapTab}.webp" alt="">`}</div>`
-    + '<div class="map-zoom"><button data-z="in" title="확대">+</button><button data-z="out" title="축소">-</button><button data-z="goal" title="고른 곳으로">◎</button><button data-z="fit" title="전체">전체</button></div>';
+  map.innerHTML = `<div id="map-in">${ym ? `<img src="assets/ymap/${ym.file}" alt="">` : `<img src="assets/ui/${mapTab}.webp" alt="">`}</div>`;
+  $('#map-zoom').hidden = false;
   const inner = $('#map-in');
-  inner.querySelector('img').onload = () => mapApply();
+  inner.querySelector('img').onload = () => { mapFit(); mapApply(); };
+  mapFit();
   map.classList.toggle('ymap', !!ym);
   // The goal: the first ground open and not yet conquered, named over the map wherever it is.
   const nextI = STAGES.findIndex((s, i) => unlocked(i) && !progress.cleared[s.id]);
@@ -1278,6 +1281,17 @@ function buildStages() {
 // out (-), to the ground picked (◎) and back to the whole (전체). Each map keeps its own zoom while the screen is open; the
 // pins keep their size (their own scale undoes the map's), and a drag is never taken for a tap on a pin.
 const MAP_ZMAX = 4;
+/** The picture as large as fits (the screen's height less the tabs, at most 56% of its width), at its own shape: its box
+ * is the picture, so the pins (placed in % of the box) stand on the picture and not on a letterbox beside it. */
+function mapFit() {
+  const img = $('#map-in img');
+  if (!img || !img.naturalWidth) return;
+  const k = Math.min((innerHeight - 52) / img.naturalHeight, innerWidth * 0.56 / img.naturalWidth);
+  img.style.width = Math.floor(img.naturalWidth * k) + 'px';
+  img.style.height = Math.floor(img.naturalHeight * k) + 'px';
+  img.style.maxWidth = 'none';
+}
+addEventListener('resize', () => { if (!$('#stages').hidden && $('#map-in')) { mapFit(); mapApply(); } });
 const mapZoom = {}; // tab -> { z, x, y } (x, y: the layer's offset in CSS px)
 function mapZ() { return mapZoom[mapTab] || (mapZoom[mapTab] = { z: 1, x: 0, y: 0 }); }
 function mapApply() {
@@ -1351,7 +1365,7 @@ function mapZoomBind() {
     const [x, y] = at(e);
     mapZoomAt(e.deltaY < 0 ? 1.25 : 0.8, x, y);
   }, { passive: false });
-  map.addEventListener('click', e => {
+  $('#map-zoom').addEventListener('click', e => {
     const b = e.target.closest('.map-zoom button');
     if (!b || off()) return;
     e.stopPropagation();
@@ -13236,31 +13250,50 @@ function mmChrome(T, label = '') {
   ctx.font = `${Math.round(9 * d)}px G9`;
   ctx.textAlign = 'center';
   const key = (x, y, w, txt, act) => {
-    const h = 15 * d;
+    const h = MM_KEY_H * d;
     ctx.fillStyle = 'rgba(16,10,4,0.82)';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = 'rgb(201,162,74)';
     ctx.lineWidth = d;
     ctx.strokeRect(x + 0.5 * d, y + 0.5 * d, w - d, h - d);
-    outline(txt, x + w / 2, y + h - 4 * d, '#f4e2b0');
+    outline(txt, x + w / 2, y + h - 5.5 * d, '#f4e2b0');
     keys.push({ x, y, w, h, act });
   };
   if (v.mode === 'big') {
     // (zoom shown at the corner while it is nearer than the whole)
     if (v.z > 1.01) { ctx.textAlign = 'right'; outline(`×${v.z.toFixed(1)}`, r.x + r.w - 2 * d, r.y + 10 * d, '#fff'); ctx.textAlign = 'center'; }
-    const w = 24 * d, g = 3 * d;
+    const w = 28 * d, g = 4 * d;
     let x = r.x;
-    for (const [t, a] of [['+', 'in'], ['-', 'out'], ['나', 'me'], ['작게', 'small']]) { key(x, r.y + r.h + 4 * d, t === '작게' ? 32 * d : w, t, a); x += (t === '작게' ? 32 * d : w) + g; }
+    for (const [t, a] of [['+', 'in'], ['-', 'out'], ['나', 'me'], ['작게', 'small']]) { key(x, r.y + r.h + 4 * d, t === '작게' ? 36 * d : w, t, a); x += (t === '작게' ? 36 * d : w) + g; }
   } else if (v.mode === 'small') {
-    key(r.x + r.w - 28 * d, r.y + r.h + 4 * d, 28 * d, '접기', 'fold');
-    if (label) { ctx.textAlign = 'left'; outline(label, r.x, r.y + r.h + 15 * d, '#f4e2b0'); }
+    key(r.x + r.w - 32 * d, r.y + r.h + 4 * d, 32 * d, '접기', 'fold');
+    if (label) { ctx.textAlign = 'left'; outline(label, r.x, r.y + r.h + 16 * d, '#f4e2b0'); }
   }
   ctx.restore();
   mmDrawn[id] = { T, keys, hit: v.mode === 'fold' ? null : { x: r.x - 4 * d, y: r.y - 4 * d, w: r.w + 8 * d, h: r.h + 8 * d }, at: performance.now() };
 }
+/**
+ * (UI 점검 2026-11-28) Where a minimap may reach on the canvas without running under the HUD's own keys: the top of the
+ * first of them below it on its side (the hunt's at the right: #keys with its 질주 over it; the war's at the left: the
+ * chat), in canvas px; and, at the right, how far in from the edge to stand clear of the 상태창 tab when it shows.
+ */
+const MM_KEY_H = 18;
+function mmRoom(side) {
+  const b = boxOf(canvas), d = canvas.width / (b.width || canvas.width);
+  let floor = b.height, pad = 0;
+  for (const s of side === 'right' ? ['#keys', '#dash-btn'] : ['#chat']) {
+    const e = $(s);
+    if (!e || e.hidden || !e.offsetParent) continue;
+    const r = boxOf(e);
+    if (r.height > 0) floor = Math.min(floor, r.top - b.top);
+  }
+  const u = side === 'right' && $('#unfold');
+  if (u && !u.hidden && u.offsetParent) pad = boxOf(u).width;
+  return { floor: floor * d, pad: pad * d, d };
+}
 /** Folded: only a tab, which opens it. */
 function mmFoldTab(id, x, y, right = false) {
-  const d = canvas.width / (boxOf(canvas).width || canvas.width), w = 40 * d, h = 15 * d, x0 = right ? x - w : x;
+  const d = canvas.width / (boxOf(canvas).width || canvas.width), w = 44 * d, h = MM_KEY_H * d, x0 = right ? x - w : x;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = 'rgba(16,10,4,0.82)';
@@ -13270,7 +13303,7 @@ function mmFoldTab(id, x, y, right = false) {
   ctx.strokeRect(x0 + 0.5 * d, y + 0.5 * d, w - d, h - d);
   ctx.font = `${Math.round(9 * d)}px G9`;
   ctx.textAlign = 'center';
-  outline('지도 ▼', x0 + w / 2, y + h - 4 * d, '#f4e2b0');
+  outline('지도 ▼', x0 + w / 2, y + h - 5.5 * d, '#f4e2b0');
   ctx.restore();
   mmDrawn[id] = { T: { id, v: mmView(id) }, keys: [{ x: x0, y, w, h, act: 'open' }], hit: null, at: performance.now() };
   return y + h;
@@ -20149,7 +20182,7 @@ const War = initWar({
   // definition and its picture at a 단 (the fighters' rotations, as the companions').
   combatPower: c => combatPower(c), heroShotPic: (cls, gear) => heroShotPic(cls, gear), heroBusy: () => heroLoading > 0, fxRoom: () => fxRoom(), tierDef: id => tierDef(id), memberFx: (id, sl) => memberFx(id, sl),
   castAs, skillSheets, plainLook,
-  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf,
+  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf, mmRoom, MM_KEY_H,
 });
 
 // 사냥 기믹 (hunt.js): the hunting grounds' own rules (design/hunt_overhaul.md).
@@ -20162,7 +20195,7 @@ const Hunt = initHunt({
   heroStatus, towards, step, relocate: (e, at) => { leave(e); place(e, at[0], at[1]); }, propsNear: () => G.seenProps || [],
   VW: () => VW, VH: () => VH, Z: () => Z, might, loadImage, drawGroundCached, mode: () => pickedMode, best: () => best, raidStart, applyBuild, xpFor, rollSpecial,
   saveProgress: () => saveJson('bs_progress', progress),
-  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf, boxOf,
+  mmView, mmFrame, mmBackDraw, mmChrome, mmFoldTab, mmBackOf, mmRoom, MM_KEY_H, boxOf,
 });
 
 // 코디 (costume.js): 연's costume items over the gear, chosen in town.
