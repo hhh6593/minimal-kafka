@@ -107,14 +107,17 @@ export const WARS = {
     posterns: [[29, 24], [29, 25], [50, 24], [50, 25]],
     cratesOut: [[22, 33], [58, 33], [10, 40], [70, 40]], cratesIn: [[22, 17], [58, 18]], scouts: [[8, 30], [72, 30]],
   },
-  // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) in the
-  // 백호성 court for three minutes, the camps drawn in to the court; first to 70 kill points (40 ended it at 1:00~1:50, 60 at 1:25~2:30), or the 진영대장 felled. Its pay and
-  // its league points are 0.6 / 0.7 of a war's (league.js leagueGain short).
+  // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) for three
+  // minutes; first to 70 kill points (40 ended it at 1:00~1:50, 60 at 1:25~2:30), or the 진영대장 felled. Its pay and its league
+  // points are 0.6 / 0.7 of a war's (league.js leagueGain short).
+  // (엔드게임 2차: its own field, tools/yeon_war.py 'nanjeon' — 연's 백호성 정전 마당, 32x36 tiles, the two camps either side of
+  // the stone yard, the 신단 on the 백호 statue's dais (up its stairs, a narrow way in) or in the hall's two side rooms; it was
+  // fought on the whole 74x52 castle with its camps drawn in.)
   nanjeon: {
-    id: 'nanjeon', map: 'baekho', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
-    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 70점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
-    time: 180, squads: 2, kills: 70, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
-    crates: [[37, 26], [37, 18]], scouts: [],
+    id: 'nanjeon', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
+    desc: '백호성 정전 마당에서 10 대 10으로 3분. 처치 점수 70점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 백호 석상의 단 위와 양쪽 곁방의 신단을 두고 다툰다.',
+    time: 180, squads: 2, kills: 70, spawns: [[4, 25], [26, 25]], cmds: [[3, 29], [27, 29]], mid: [15, 24],
+    crates: [[15, 19], [15, 30]], scouts: [],
   },
 };
 const GUILDS = [['청운', '#7cf08a'], ['흑월', '#ff7a6a']];
@@ -9348,6 +9351,7 @@ const SHRINE_KINDS = {
 const SHRINE_SPOTS = {
   cheong: [[30, 16], [46, 58], [12, 40], [64, 30]], baekho: [[37, 14], [37, 48]],
   jujak: [[8, 52], [46, 52], [10, 24], [44, 24], [10, 66], [44, 66], [8, 40], [46, 34]], hyeonmu: [[33, 29], [47, 29]], // (by the walls either side of the gate, where the 쪽문 sortie can contest it: out in the field only the siege took it, 4 : 0)
+  nanjeon: [[15, 12], [5, 10], [25, 10]], // (난투: the statue's dais — up its stairs — and the hall's side rooms)
 };
 function moment(W, text, team = 0, o = {}) {
   (W.moments = W.moments || []).push({ t: Math.round(W.t), text, team, hero: !!o.hero, big: !!o.big, kind: o.kind || '' });
