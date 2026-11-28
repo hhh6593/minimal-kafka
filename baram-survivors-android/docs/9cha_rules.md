@@ -1156,3 +1156,18 @@
    그리는 구조 변경이 다음 후보(겹치는 작업자와 조율 뒤).
 3. 전투 O(n²) 탐색(nearest·pickFoe·around)은 지금 몸 수(40~120)에선 1~2% — 레이드 상한이 오르면 공간 격자.
 4. 벽시계 측정은 부하 없는 기계(또는 실기기 `chrome://inspect` + 같은 bench.js 시나리오)에서 다시 잴 것.
+
+### 7. 제안 구현 (조정자 "제안도 구현", 2026-11-28) [해결 2026-11-28]
+1. **앱 파일 제공을 WebView 안에서**(MainActivity `shouldInterceptRequest` → LocalServer `intercept`): 게임 페이지의 GET은 소켓 없이 APK 자산을 스트림으로(`ACCESS_STREAMING`) 바로
+   돌려줌 — 요청마다 새 연결·스레드·파일 통째 byte[] 읽기가 없어짐. URL(http://127.0.0.1:47823)·출처·저장 기록은 그대로, Range 요청(미디어)과 네이티브 배경음은 전처럼 LocalServer.
+   androidx(WebViewAssetLoader)는 빌드에 없어 같은 일을 직접 함. `tools/repack_apk.sh $S/www_perf $S/imgs/oldbaram_images`(ANDROID_HOME=/opt/android-sdk)로 빌드·서명 확인
+   (서명 SHA-256 ca825ddf…1231 = `$S/baram-survivors-signing-key.jks`, APK는 확인 뒤 지움). 실기기·에뮬레이터가 없어 앱 안 로딩은 못 잼.
+   - 데스크톱 흉내(`$S/r_perf/srv.js`: close = 옛 LocalServer처럼 요청마다 연결 닫기 + 통째 읽기, stream = keep-alive + 스트림; `xfer.js` 효과 시트 150장 fetch 동시 6, 5회):
+     중앙값 377ms → 343ms(-9%, 루프백·같은 디스크라 차이가 작게 나옴 — 앱에서는 자바 스레드·소켓·통째 버퍼가 빠져 더 큼). 판 진입 전체(`loadt.js`)는 부하 때문에 ±수 초라 판정 불가.
+2. **onTrimMemory → `window.__appTrim(level)`**(RUNNING_LOW 이상·백그라운드): 2분 동안 비트맵·효과 예산 절반(`bmBudget`·`fxBudgetNow`), 2초 넘게 안 그린 비트맵 놓기,
+   효과 예산 다시 맞추기, 만든 글자 그림 비우기, 효과음 버퍼 40%까지(`audio.trim(k)`). 사냥 중 호출해도 판이 그대로 돎(에러 없음).
+3. **효과 예산 96 → 112MB**, 미리 불러오기 한도(`FX_ROOM`)는 옛 값(96MB의 3/5) 유지. 현무 60초 재로딩(`fxchurn.js`): 전 49·22장 → 후 40·14장 — 판마다 흔들려 뚜렷하진 않음.
+   원인 추적: 전투 시작 5초에 효과 89장을 놓는다 — `startRun`의 `fxWarm(runFxIds)`가 영웅 직업의 모든 승급 기술 시트를 올리고(전투 시작 147장), 예산을 넘은 것 중
+   안 그려진 것부터 놓았다가 나중에 다시 부름. 다음 단계: 전투에선 영웅의 지금 기술 묶음만 미리 올리기(war.js 작업자와 조율).
+4. **설정 '화면 효과(분위기·피격 가장자리)'**(일시정지 메뉴, 기본 켬, `settings.screenFx`): 끄면 사냥터 어둠·색·날씨 층(`Hunt.ambient`)과 피격 붉은 가장자리(`drawHurtEdge`)를 그리지 않음.
+   거해(지옥·체력 낮음) 쓰로틀 4 프레임 콜백 JS 중앙값 15.4 → 9.5ms(켬/끔 번갈아 8번).

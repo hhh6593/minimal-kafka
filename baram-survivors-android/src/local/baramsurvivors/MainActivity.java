@@ -1,7 +1,9 @@
 package local.baramsurvivors;
 
 import android.app.Activity;
+import android.content.ComponentCallbacks2;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -14,12 +16,14 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.Map;
 
 /** Full-screen, landscape WebView on the game served from the APK (see LocalServer). */
 public class MainActivity extends Activity {
@@ -102,6 +106,19 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 // The game never leaves its own page.
                 return !String.valueOf(request.getUrl()).startsWith(START_URL);
+            }
+
+            // (성능 점검 2 2026-11-28) The game's own files streamed from the APK here, without the loopback
+            // socket (LocalServer.intercept); a ranged request (media) and anything else goes on to the server.
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                LocalServer s = server;
+                Uri u = request.getUrl();
+                if (s == null || u == null || !"GET".equals(request.getMethod())) return null;
+                if (!"127.0.0.1".equals(u.getHost()) || u.getPort() != PORT) return null;
+                Map<String, String> h = request.getRequestHeaders();
+                if (h != null && (h.containsKey("Range") || h.containsKey("range"))) return null;
+                return s.intercept(u.getPath());
             }
 
             // The page's renderer died (on a phone, mostly out of memory). Without this the
@@ -205,6 +222,19 @@ public class MainActivity extends Activity {
             lastBack = now;
             Toast.makeText(this, "한 번 더 누르면 종료합니다", Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * (성능 점검 2 2026-11-28) The phone short of memory, or the app sent to the background: the page
+     * halves its picture and effect budgets for two minutes and lets go of what it is not drawing
+     * (game.js __appTrim) — before the system kills the renderer for it.
+     */
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (web != null && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            web.evaluateJavascript("window.__appTrim&&__appTrim(" + level + ")", null);
+        }
     }
 
     @Override

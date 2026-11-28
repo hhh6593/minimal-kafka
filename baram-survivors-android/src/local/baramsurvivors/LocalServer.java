@@ -2,9 +2,11 @@ package local.baramsurvivors;
 
 import android.content.res.AssetManager;
 import android.util.Log;
+import android.webkit.WebResourceResponse;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -122,6 +124,34 @@ final class LocalServer {
             return;
         }
         send(out, 200, "OK", typeOf(rel), body, head);
+    }
+
+    /**
+     * (성능 점검 2 2026-11-28) The page's own requests answered inside the WebView (MainActivity's
+     * shouldInterceptRequest), streamed from the APK: no socket, no thread, no whole file in memory
+     * first. A war's start asks for 130-150 effect sheets and dozens of map pieces, each once a new
+     * connection here. The URL (and so the page's origin and its saved records) stays the same;
+     * this server still answers what is not taken there (the native music player, ranges).
+     * Returns null for what it does not serve (the WebView then goes to the server).
+     */
+    WebResourceResponse intercept(String path) {
+        if (path == null || !path.startsWith("/") || path.contains("..")) return null;
+        String rel = path.substring(1);
+        if (rel.isEmpty() || rel.endsWith("/")) rel += "index.html";
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Cache-Control", "no-store");
+        String type = typeOf(rel);
+        int semi = type.indexOf(';');
+        String mime = semi < 0 ? type : type.substring(0, semi);
+        String enc = semi < 0 ? null : "utf-8";
+        try {
+            InputStream in = assets.open(ROOT + "/" + rel, AssetManager.ACCESS_STREAMING);
+            return new WebResourceResponse(mime, enc, 200, "OK", headers, in);
+        } catch (IOException e) {
+            // (missing, or a directory: as the server's 404)
+            return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers,
+                    new ByteArrayInputStream("Not in this build".getBytes(StandardCharsets.UTF_8)));
+        }
     }
 
     private byte[] read(String rel) {

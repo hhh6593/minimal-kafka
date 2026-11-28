@@ -134,12 +134,12 @@ export class Audio {
   }
 
   /** Past the budget: the least lately played let go, to three quarters of it. */
-  trim() {
+  trim(k = 0.75) {
     const old = Object.keys(this.buffers).sort((x, y) => this.buffers[x].used - this.buffers[y].used);
-    for (const k of old) {
-      if (this.bytes <= SFX_BUDGET * 0.75) break;
-      this.bytes -= this.buffers[k].bytes;
-      delete this.buffers[k];
+    for (const key of old) {
+      if (this.bytes <= SFX_BUDGET * k) break;
+      this.bytes -= this.buffers[key].bytes;
+      delete this.buffers[key];
     }
   }
 

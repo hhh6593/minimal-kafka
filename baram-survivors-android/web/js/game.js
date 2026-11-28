@@ -46,6 +46,11 @@ const BM_Q = new URLSearchParams(location.search);
 const BITMAP_BUDGET = BM_Q.has('bm') ? +BM_Q.get('bm') * 1e6 : 48e6, BITMAP_MAX = BM_Q.has('bmmax') ? +BM_Q.get('bmmax') * 1e6 : 16e6, BITMAP_RAW = BM_Q.has('bmraw');
 const rawDrawImage = ctx.drawImage;
 let bitmapClock = 0, bitmapBytes = 0;
+// (성능 점검 2 2026-11-28) The phone short of memory (MainActivity.onTrimMemory → window.__appTrim): for two minutes the
+// pictures' and effects' budgets are halved (bmBudget, fxBudget below), and what was not drawn lately is let go at once.
+let memLowUntil = 0;
+const memLow = () => performance.now() < memLowUntil;
+const bmBudget = () => (memLow() ? BITMAP_BUDGET / 2 : BITMAP_BUDGET);
 ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
   // A picture wholly off the canvas is not drawn (about half the draws of a crowded hunt: monsters,
   // shadows and props in the margin round the view). Exact: only a picture none of whose pixels
@@ -75,7 +80,7 @@ ctx.drawImage = function (im, a, b, c, d, e, f, g, h) {
           rec.wait = false;
           // (its picture let go meanwhile: picDrop, fxKeep)
           if (bitmapOf.get(im) !== rec) { x.close(); return; }
-          rec.bm = x; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps();
+          rec.bm = x; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > bmBudget()) trimBitmaps();
         }).catch(() => { rec.wait = false; });
         // Not drawn from its <img> meanwhile (a frame or two): that draw decoded the picture a second
         // time into the browser's own cache, where the copy stayed (unseen by the budget here) —
@@ -192,7 +197,7 @@ function bmWarm(im) {
     rec.wait = false;
     rec.p = null;
     if (bitmapOf.get(im) !== rec) { x.close(); return; }
-    rec.bm = x; rec.used = bitmapClock; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > BITMAP_BUDGET) trimBitmaps();
+    rec.bm = x; rec.used = bitmapClock; bitmapsLive.add(rec); bitmapBytes += bytes; if (bitmapBytes > bmBudget()) trimBitmaps();
   }).catch(() => { rec.wait = false; rec.p = null; });
   return rec.p;
 }
@@ -236,7 +241,7 @@ function trimBitmaps() {
   const old = [...bitmapsLive].sort((x, y) => x.used - y.used);
   for (const rec of old) {
     // (never one drawn this last second: it would be made again at once, and blink meanwhile)
-    if (bitmapBytes <= BITMAP_BUDGET * 0.75 || bitmapClock - rec.used < 1) break;
+    if (bitmapBytes <= bmBudget() * 0.75 || bitmapClock - rec.used < 1) break;
     dropBitmap(rec);
   }
 }
@@ -449,8 +454,12 @@ function fxLoad(src) {
 // one, nor one drawn these last seconds) and load again when next used. A hunt's own kit is 40 to
 // 60 MB; a long one with every 격 and proc going stays under this, and a war, which asks for every
 // class's spells at its start (245 MB), keeps what it draws.
-const FX_BUDGET = 96e6;
+// (성능 점검 2 2026-11-28: 96 → 112 MB — a siege held 91 MB of effects, at the budget, and let go and fetched again some
+// fifteen sheets in fifty seconds. What is loaded ahead stays under the old three fifths of 96 MB: FX_ROOM.)
+const FX_BUDGET = 112e6, FX_ROOM = 96e6 * 0.6;
+const fxBudgetNow = () => (memLow() ? FX_BUDGET / 2 : FX_BUDGET);
 function fxTrim() {
+  const FX_BUDGET = fxBudgetNow();
   let total = 0;
   const list = [];
   for (const path of fxPaths) {
@@ -475,7 +484,7 @@ function fxTrim() {
 function fxRoom() {
   let total = 0;
   for (const path of fxPaths) { const im = images[path]; if (im && im.width) total += im.width * im.height * 4; }
-  return total < FX_BUDGET * 0.6;
+  return total < Math.min(FX_ROOM, fxBudgetNow() * 0.6);
 }
 /** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
 function fxWarm(ids, wait = 0) {
@@ -19224,7 +19233,8 @@ function render(now) {
     ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
     ctx.restore();
   }
-  if (G.hunt) Hunt.ambient(ctx, canvas, camX, camY); // 사냥 기믹: light, colour, weather
+  // (설정 '화면 효과', 저사양: 끄면 분위기 층과 피격 가장자리를 그리지 않음 — 전체 화면 그림 한두 장씩, 성능 점검 2 2026-11-28)
+  if (G.hunt && settings.screenFx !== false) Hunt.ambient(ctx, canvas, camX, camY); // 사냥 기믹: light, colour, weather
   // A 필살기's blink of white over the whole screen.
   // (0.3 at most, fading as it goes: it was 0.75 for a third of a second over a whole screen)
   if (G.whiteAt !== undefined && G.t - G.whiteAt < 0.25 && !settings.calmFx) {
@@ -19242,7 +19252,7 @@ function render(now) {
     ctx.fillStyle = gr;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  drawHurtEdge(); // 피격 연출: the last blow's red edge, a slow red throb when low on life
+  if (settings.screenFx !== false) drawHurtEdge(); // 피격 연출: the last blow's red edge, a slow red throb when low on life
   // 절망 on the hero: the screen darkens round its edge, as the original's 절망 blinds.
   if (p.sts && heroStatusOn('despair')) {
     const gr = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.25,
@@ -19825,6 +19835,7 @@ function syncSettings() {
   $('#opt-pace').textContent = '사냥 방식: ' + (settings.legacyPace ? '옛 4분' : '토벌도');
   $('#opt-info').textContent = '전투 정보: ' + (settings.battleInfo !== false ? '켬' : '끔');
   $('#opt-calm').textContent = '번쩍임 줄이기: ' + (settings.calmFx ? '켬' : '끔');
+  $('#opt-screenfx').textContent = '화면 효과(분위기·피격 가장자리): ' + (settings.screenFx !== false ? '켬' : '끔');
   $('#opt-cam').textContent = '카메라 앞보기: ' + (settings.camLead ? '켬' : '끔');
   $('#opt-bar').textContent = '기술 창: ' + (settings.barSize === 'small' ? '작게' : '보통');
   if (document.body.classList.contains('hud-small') !== (settings.barSize === 'small')) {
@@ -20058,6 +20069,12 @@ $('#opt-info').onclick = () => {
 // softer white on the struck, the added-light 격 pictures dimmer.
 $('#opt-calm').onclick = () => {
   settings.calmFx = !settings.calmFx;
+  saveJson('bs_settings', settings);
+  syncSettings();
+};
+// 화면 효과 (on by default; 저사양: off): the hunting ground's light, colour and weather layer and the struck red edge.
+$('#opt-screenfx').onclick = () => {
+  settings.screenFx = settings.screenFx === false;
   saveJson('bs_settings', settings);
   syncSettings();
 };
@@ -20467,6 +20484,19 @@ $('#close-sounds').onclick = () => {
 };
 
 // Hooks for the Android app (MainActivity).
+// The phone short of memory (onTrimMemory, level ≥ RUNNING_LOW, or the app sent to the background): for two minutes the
+// budgets halved, and now the effect sheets and bitmaps not drawn these last seconds, the made texts and the oldest sounds let go.
+window.__appTrim = level => {
+  memLowUntil = performance.now() + 120000;
+  const before = { bitmaps: Math.round(bitmapBytes / 1e6) };
+  fxTrim();
+  for (const rec of [...bitmapsLive]) if (bitmapClock - rec.used > 2) dropBitmap(rec);
+  trimBitmaps();
+  textPics.clear();
+  textPicN = 0;
+  if (audio && audio.trim) audio.trim(0.4);
+  return { level, ...before, after: Math.round(bitmapBytes / 1e6) };
+};
 window.__appPause = on => {
   if (!audio) return;
   audio.halt(on);
