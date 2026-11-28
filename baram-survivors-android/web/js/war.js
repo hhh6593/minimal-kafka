@@ -108,12 +108,12 @@ export const WARS = {
     cratesOut: [[22, 33], [58, 33], [10, 40], [70, 40]], cratesIn: [[22, 17], [58, 18]], scouts: [[8, 30], [72, 30]],
   },
   // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) in the
-  // 백호성 court for three minutes, the camps drawn in to the court; first to 60 kill points (40 ended it at 1:00~1:50), or the 진영대장 felled. Its pay and
+  // 백호성 court for three minutes, the camps drawn in to the court; first to 70 kill points (40 ended it at 1:00~1:50, 60 at 1:25~2:30), or the 진영대장 felled. Its pay and
   // its league points are 0.6 / 0.7 of a war's (league.js leagueGain short).
   nanjeon: {
     id: 'nanjeon', map: 'baekho', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
-    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 60점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
-    time: 180, squads: 2, kills: 60, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
+    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 70점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
+    time: 180, squads: 2, kills: 70, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
     crates: [[37, 26], [37, 18]], scouts: [],
   },
 };
@@ -9397,7 +9397,7 @@ function endgameMinimap(W, dot, d) {
 // ------------------------------------------------ the results: 결정적 순간, MVP, the league
 /** The war's best moments for the results: the hero's own first, then the big ones, then ours; five at most, in time. */
 function highlights(W) {
-  const ms = W.moments || [];
+  const ms = (W.moments || []).filter(m => m.kind !== 'shrineUp'); // (a shrine waking is the clock's, not a moment of the war)
   const ordered = ms.filter(m => m.hero).concat(ms.filter(m => !m.hero && m.big), ms.filter(m => !m.hero && !m.big && m.team === 0), ms.filter(m => !m.hero && !m.big && m.team !== 0));
   const out = [];
   for (const m of ordered) if (!out.includes(m) && out.length < 5) out.push(m);
