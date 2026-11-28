@@ -6627,7 +6627,9 @@ function hurtEnemy(e, dmg, push = null) {
   // (손맛 예산: a heavy blow on a big one no longer stops the world; only the big moments do.)
   // A struck monster jerks back a little, away from the blow: each hit of a 오중공격 shows.
   const p = G.player;
-  e.kickAt = G.t;
+  // (a boss or its lieutenant, struck by a crowd of blows, jerked at the rate of the blows — a big shape shaking all the
+  // while: as its white blink, no more than three times a second, and half as far: the draw's kick)
+  if (!(e.kind === 'boss' || e.kind === 'mini') || G.t - (e.kickAt ?? -9) >= 0.34) e.kickAt = G.t;
   e.kickBig = false;
   e.kdx = push ? push[0] : Math.sign(e.tx - p.tx);
   e.kdy = push ? push[1] : (e.tx === p.tx ? Math.sign(e.ty - p.ty) : 0);
@@ -18180,8 +18182,9 @@ function render(now) {
     // Flung by a heavy technique: out half a tile at once, back over a quarter second.
     const kick = hard && b.kickBig ? (kt < 0.26 ? 22 * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
       : hard ? (kt < 0.16 ? 8 * (1 - kt / 0.16) : 0) : kt < 0.1 ? 4 : 0;
-    const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kick;
-    const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kick;
+    const kk = b.kind === 'boss' || b.kind === 'mini' ? kick * 0.5 : kick;
+    const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kk;
+    const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kk;
     // The treasure-bearer in gold, from a tinted copy made once.
     monsterTint = b.flee ? GOLD_TINT : G.stage.abyss ? (b.kind && b.kind !== 'minion' ? ABYSS_LEAD_TINT : ABYSS_TINT) : null;
     if (b.beast) drawBeast(b, 1, lx, ly, 0.62 * s);
