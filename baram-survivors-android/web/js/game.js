@@ -4966,6 +4966,8 @@ function stepHero(dx, dy, dt) {
     if (!through && (p.pushT < 0.5 || there.moving || there.kind === 'boss' || there.cmdr)) return;
     // (A war: not while fighters of its own side share the hero's tile — the heap would land on them.)
     if (G.war && crowd.has(key(p.tx, p.ty))) return;
+    // (Nor a foe swapped onto a tile shut to it: a 쪽문 the hero of the defence stood on let the attack walk into the castle.)
+    if (G.war && !G.war.raid && War.openTo && !War.openTo(there, p.tx, p.ty)) return;
     // Pushed long enough, the hero and the monsters on the tile trade places (the whole heap of
     // a crowded tile goes together): never the hero and a monster on one tile.
     const k = key(nx, ny), heap = crowd.get(k) || [];
@@ -7540,7 +7542,9 @@ function drawShocks() {
 function holdGround(tx, ty) {
   if (settings.dashMode === 'stay') return true;
   if (onRed(tx, ty)) return true;
-  if (!G.war || G.war.raid) return false;
+  if (!G.war) return false;
+  // 레이드: not off the arena's edge (a 돌진 at its rim carried the hero out of the field).
+  if (G.war.raid) return !War.open(tx, ty);
   // 대항전: never onto a wall, nor through one (the castle's walls, a cliff, the shut gate).
   if (!War.clear(G.player.tx, G.player.ty, tx, ty)) return true;
   const z = War.anchor();
