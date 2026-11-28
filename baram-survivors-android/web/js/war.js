@@ -108,12 +108,12 @@ export const WARS = {
     cratesOut: [[22, 33], [58, 33], [10, 40], [70, 40]], cratesIn: [[22, 17], [58, 18]], scouts: [[8, 30], [72, 30]],
   },
   // 백호 난투 (엔드게임 2026-11-28): a short war for a short sitting — ten a side (the hero's squad and two more) in the
-  // 백호성 court for three minutes, the camps drawn in to the court; first to 40 kills, or the 진영대장 felled. Its pay and
+  // 백호성 court for three minutes, the camps drawn in to the court; first to 60 kill points (40 ended it at 1:00~1:50), or the 진영대장 felled. Its pay and
   // its league points are 0.6 / 0.7 of a war's (league.js leagueGain short).
   nanjeon: {
     id: 'nanjeon', map: 'baekho', name: '백호 난투', mode: 'commander', title: '3분 난투', mat: 'sinsu_baekho', sinsu: '백호', art: 'ui_sinsu_castlebattle_02', pic: 'ui_img_sinsu_1', short: true,
-    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 40점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
-    time: 180, squads: 2, kills: 40, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
+    desc: '백호성 안뜰에서 10 대 10으로 3분. 처치 점수 60점을 먼저 따거나 적 진영대장을 쓰러뜨리면 승리. 신단 하나를 두고 다툰다.',
+    time: 180, squads: 2, kills: 60, spawns: [[18, 22], [56, 22]], cmds: [[12, 22], [62, 22]], mid: [37, 23],
     crates: [[37, 26], [37, 18]], scouts: [],
   },
 };
@@ -9296,7 +9296,11 @@ function ramTick(W, dt) {
   const na = att === 0 ? n0 : n1, nd = att === 0 ? n1 : n0;
   // Burnt by every defender beside it (the hero counts twice): 4% a second each, five at most.
   const heroDef = def === 0 && heroIn(W, r.tx, r.ty, R) ? 1 : 0;
-  const burn = Math.min(5, nd + heroDef) * 4 * dt / (r.k > 1 ? 1.2 : 1);
+  // (and the defence's archers and casters on the wall, once it is at the gate: 1.5% a second each, three at most — the
+  // close-in seldom came out to it, and a ram at the gate went unburnt to the end, 11~18 blows: balance runs)
+  const atGate = r.i >= r.path.length - 3;
+  const wall = atGate ? Math.min(3, W.alive[def].filter(b => !b.gate && !b.troop && !b.hero && b.kit && b.kit.range > 1 && Math.hypot(b.tx - r.tx, b.ty - r.ty) <= 7).length) : 0;
+  const burn = (Math.min(5, nd + heroDef) * 4 + wall * 1.5) * dt / (r.k > 1 ? 1.2 : 1);
   if (burn > 0) { r.hp -= burn; r.flash = 0.1; for (const b of W.alive[def]) if (!b.gate && Math.hypot(b.tx - r.tx, b.ty - r.ty) <= R) credit(b, 'obj', dt * 2); }
   if (r.hp <= 0) {
     r.state = 'wait'; r.at = W.t + Math.round(50 / r.k); r.i = 0; r.downs++; ramPos(W);
