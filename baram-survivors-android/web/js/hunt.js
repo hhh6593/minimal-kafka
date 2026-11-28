@@ -882,7 +882,10 @@ function hud(ctx, cv) {
     for (const k of PACE.minisAt.concat(PACE.champsAt)) ctx.fillRect(x + w * k, y, Math.max(1, s), h);
     ctx.font = `${Math.round(10 * s)}px G9`;
     ctx.textAlign = 'center';
-    A.outline(`토벌도 ${Math.floor(H.prog * 100)}%`, cv.width / 2, y + h + 11 * s, '#f0e0c0');
+    // (UI 점검 2026-11-28: the line above already says 토벌도 N% — under the bar, what comes next and at what share instead)
+    const nc = H.champsAt[0], nm = G.mini ? H.minisAt[0] : undefined;
+    const nx = nc !== undefined && (nm === undefined || nc <= nm) ? ['챔피언', nc] : nm !== undefined ? ['우두머리', nm] : ['보스', 1];
+    A.outline(`다음: ${nx[0]} ${Math.round(nx[1] * 100)}%`, cv.width / 2, y + h + 11 * s, '#f0e0c0');
   } else {
     // The boss's 그로기 bar, thin, under its life bar.
     const b = G.enemies.find(e => e.kind === 'boss');

@@ -1269,8 +1269,22 @@ function buildStages() {
       pickedStage = s;
       buildStages();
     };
+    b.dataset.i = i;
     inner.append(b);
   });
+  // (UI 점검 2026-11-28) On the crowded 대륙 at its whole size, only a few pins say their names — the one picked, the next
+  // goal and the open ones not yet taken nearest it; the rest name themselves once the map is zoomed (mapApply: .zoomed).
+  // Every pin keeps its badge and its tap.
+  map.classList.toggle('crowd', mapTab === 'world_1');
+  if (mapTab === 'world_1') {
+    const pins = [...inner.querySelectorAll('.pin:not(.town)')], P = e => [parseFloat(e.style.left), parseFloat(e.style.top)];
+    const on = pins.find(e => e.classList.contains('on')), goalPin = pins.find(e => +e.dataset.i === nextI);
+    const c = P(on || goalPin || pins[0] || { style: { left: '50', top: '50' } });
+    for (const e of [on, goalPin]) if (e) e.classList.add('named');
+    pins.filter(e => e.classList.contains('next') && !e.classList.contains('named'))
+      .map(e => [e, Math.hypot(P(e)[0] - c[0], P(e)[1] - c[1])]).sort((a, b) => a[1] - b[1])
+      .slice(0, 3).forEach(([e]) => e.classList.add('named'));
+  }
   mapApply();
   stageInfo();
 }
@@ -3386,7 +3400,8 @@ function buildEquip() {
   const box = $('#equip-rows');
   box.innerHTML = '';
   const now = combatPower(cls);
-  box.append(eqBar(cls));
+  const bar = eqBar(cls);
+  box.append(bar);
   // One tap to the strongest set, where something stronger lies in the bag.
   const better = ['weapon', 'armor', 'shield', 'helmet', 'cape'].some(k => bagPieces(cls, k).some(q => powerWith(cls, k, q[0], q[1]) > now));
   if (better) {
@@ -3400,11 +3415,12 @@ function buildEquip() {
   // A hero drawn in 연's own figure changes hair and face in the 코디 window (연's own 헤어·얼굴).
   if (M.yhero2 && M.yhero2[cls.id]) {
     const hb = document.createElement('button');
-    hb.className = 'btn wear-best'; // a row of its own across the grid
+    hb.className = 'eqb'; // in the bar's own line (it took a row of its own across the grid)
     hb.id = 'equip-hairface';
-    hb.textContent = '헤어·얼굴 바꾸기 (코디)';
+    hb.textContent = '헤어·얼굴 (코디)';
+    hb.title = '헤어·얼굴 바꾸기 (코디)';
     hb.onclick = () => openCoordi('hair');
-    box.append(hb);
+    bar.append(hb);
   }
   for (const [kind, label] of [['weapon', '무기'], ['armor', '갑옷'], ['shield', '방패'], ['helmet', '투구'], ['cape', '망토']]) {
     if (kind === 'shield' && !hasShield(cls.id)) continue; // 연's 궁사, 무사 ... carry none
@@ -3821,9 +3837,21 @@ function eqBar(cls) {
   const news = newPieces(cls);
   if (news.length) add(`신규 장비 확인 (${news.length})`, true, () => openPiecePop(...news[0]), 'eq-new', '새로 얻은 장비를 차례로 봅니다');
   add(P.sort === 'power' ? '정렬: 전투력순' : '정렬: 기본', false, () => { P.sort = P.sort === 'power' ? 'rank' : 'power'; saveJson('bs_settings', settings); buildEquip(); }, 'eq-sort');
-  for (const [f, label] of [['all', '전체'], ['up', '▲ 상위 장비'], ['new', 'NEW'], ['fav', '♥ 찜']]) {
-    add(label, P.filter === f, () => { P.filter = f; saveJson('bs_settings', settings); buildEquip(); }, 'eq-f-' + f);
+  // (UI 점검 2026-11-28) The four filters as one drop-down: with the 헤어·얼굴 key beside them the bar is one line, and a
+  // 360px phone shows more of the list under it (they took a line of their own, the 헤어·얼굴 key another).
+  const sel = document.createElement('select');
+  sel.className = 'eqb eqsel' + (P.filter && P.filter !== 'all' ? ' on' : '');
+  sel.id = 'eq-filter';
+  sel.title = '보기';
+  for (const [f, label] of [['all', '보기: 전체'], ['up', '▲ 상위 장비'], ['new', 'NEW'], ['fav', '♥ 찜']]) {
+    const o = document.createElement('option');
+    o.value = f;
+    o.textContent = label;
+    o.selected = (P.filter || 'all') === f;
+    sel.append(o);
   }
+  sel.onchange = () => { P.filter = sel.value; saveJson('bs_settings', settings); buildEquip(); };
+  bar.append(sel);
   add(`자동 착용 ${P.auto ? '켬' : '끔'}`, P.auto, () => { P.auto = !P.auto; saveJson('bs_settings', settings); buildEquip(); eqToast(P.auto ? '사냥 중 더 강한 장비를 얻으면 바로 장착합니다' : '자동 착용을 껐습니다'); }, 'eq-auto', '사냥 중 전투력이 오르는 장비를 얻으면 바로 장착합니다');
   return bar;
 }
