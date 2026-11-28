@@ -41,6 +41,7 @@ final class LocalServer {
         TYPES.put("png", "image/png");
         TYPES.put("webp", "image/webp");
         TYPES.put("gif", "image/gif");
+        TYPES.put("jpg", "image/jpeg");
         TYPES.put("woff2", "font/woff2");
         TYPES.put("wav", "audio/wav");
         TYPES.put("m4a", "audio/mp4");
