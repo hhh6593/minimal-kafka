@@ -202,6 +202,29 @@ function bmSrc(im) {
   if (rec && rec.bm) { rec.used = bitmapClock; return rec.bm; }
   return im;
 }
+/**
+ * (성능 점검 2026-11-28) A finished canvas of the game's own (a cache never drawn on again: a tint, the gates' swirl sheet) as
+ * an ImageBitmap once one is made, the canvas until then: a canvas drawn on the screen every frame was copied up to it each
+ * time, scaled and smoothed — the town's gates were a fifth of its frame. The same pixels. `free`: the canvas's own pixels
+ * let go once the bitmap is in (what it is drawn from is then the bitmap only).
+ */
+function cvBm(c, free = false) {
+  if (c.__bm) return c.__bm;
+  if (!c.__bmp && window.createImageBitmap && c.width && c.height) {
+    c.__bmp = createImageBitmap(c).then(b => {
+      if (c.__dead) { b.close(); return; }
+      c.__bm = b;
+      if (free) c.width = c.height = 0;
+    }).catch(() => {});
+  }
+  return c;
+}
+/** A cached canvas let go: its bitmap closed (cvBm). */
+function cvFree(c) {
+  if (!c) return;
+  c.__dead = true;
+  if (c.__bm) { c.__bm.close(); c.__bm = null; }
+}
 function dropBitmap(rec) {
   bitmapsLive.delete(rec);
   bitmapOf.delete(rec.im);
@@ -305,7 +328,11 @@ let fxWebp = null;
 // (Not here: the small ones every screen draws — item/, mon/, hud/, npc/, emote/, the title's art.)
 const PIC_LAZY = /^(icon|skillicon|yhero2|yhero|yunit|beast|prop|floor|ytown|gear|gicon|yitemicon|ycostume|yamb|ywar|yhunt|avatar)\//;
 const PIC_BITMAP = /^(fx|icon|skillicon|yhero2|yhero|yunit|beast|prop|floor|ytown|gear|gicon|yitemicon|ycostume|yamb|ywar|yhunt|avatar)\//;
+// (성능 점검 2026-11-28) The effect sheets' paths ever loaded (fxTrim, fxRoom: these, not the thousand pictures of
+// `images`, gone through at every effect loaded — a war loads hundreds in its first minute)
+const fxPaths = new Set();
 function loadImage(path) {
+  if (path.startsWith('fx/')) fxPaths.add(path);
   // An effect the build shrank to WebP (tools/webp_fx.py) keeps its .png key.
   const webp = path.startsWith('fx/') && fxWebp && fxWebp.has(path.slice(3, -4));
   const url = 'assets/' + (webp ? path.slice(0, -4) + '.webp' : path);
@@ -360,6 +387,8 @@ function picWarm(paths, wait = 0) {
 /** A picture let go: its bitmap closed, what was made from it (tints, white copies) forgotten. */
 function picForget(im) {
   if (!im) return;
+  const tm = tintCache.get(im);
+  if (tm) for (const c of tm.values()) cvFree(c);
   tintCache.delete(im);
   whiteCache.delete(im);
   shadowCache.delete(im);
@@ -424,8 +453,10 @@ const FX_BUDGET = 96e6;
 function fxTrim() {
   let total = 0;
   const list = [];
-  for (const [path, im] of Object.entries(images)) {
-    if (!path.startsWith('fx/') || !im || !im.width) continue;
+  for (const path of fxPaths) {
+    const im = images[path];
+    if (im === undefined) { fxPaths.delete(path); continue; }
+    if (!im || !im.width) continue;
     total += im.width * im.height * 4;
     if (!fxPinned.has(path.slice(3, -4))) list.push([path, im]);
   }
@@ -443,7 +474,7 @@ function fxTrim() {
  *  war holds what it draws rather than a budget's worth of what it might. */
 function fxRoom() {
   let total = 0;
-  for (const [path, im] of Object.entries(images)) if (path.startsWith('fx/') && im && im.width) total += im.width * im.height * 4;
+  for (const path of fxPaths) { const im = images[path]; if (im && im.width) total += im.width * im.height * 4; }
   return total < FX_BUDGET * 0.6;
 }
 /** Loads and decodes the sheets of these effect ids; settles when done, or after `wait` ms at most. */
@@ -1760,6 +1791,7 @@ function startRun(cls, stage, training = false) {
   // The screen before (the town, another run) is let go; this run's own pictures loaded.
   const pics = runPics(cls, stage);
   leaveScreen(cls, gear, [...pics, `yhunt/${stage.id}_`, 'prop/war_']);
+  for (const c of portalSprites.values()) cvFree(c);
   portalSprites.clear(); // (the town's gate swirls, 30 MB: made again when the town opens)
   if (!stage.war) War.release(true);
   picWarm(pics);
@@ -2931,10 +2963,13 @@ function dressedIcon(src, dz) {
 /** 태초의 무기's icon: the very weapon the hero wears (its 연 layer, standing, facing down) in its
  *  gold-white dress and light, cut to the weapon. Made once a class; null until the sheet is in. */
 const taechoIcons = {};
+// (성능 점검 2026-11-28) Set while the pieces are only counted (codexShare, the 의뢰 board): no icon is made — each class's
+// 태초 icon is cut from its weapon sheets, and counting in town loaded twenty of them (339 MB decoded) that stayed.
+let codexNoIcon = false;
 function taechoIcon(cls, sp) {
   // (an abyss weapon laid from the original's own picture takes the same way, in its dark dress)
   const ik = cls.id + (sp.taecho ? '' : ':abyss');
-  if (taechoIcons[ik]) return taechoIcons[ik];
+  if (taechoIcons[ik] || codexNoIcon) return taechoIcons[ik] || null;
   // The first four: old 바람's picture itself, in the same light (what the hero holds).
   const cn = sp.classic && sp.classic[cls.id];
   if (cn && M.gear && M.gear[cn]) {
@@ -13395,7 +13430,7 @@ function portalSprite(tint, size, upright) {
   c.fh = H;
   c.top = top;
   // (the sheet's tinted copy, 5 MB a colour, was only for this)
-  if (tint && tintCache.get(im0)) tintCache.get(im0).delete(tint);
+  if (tint && tintCache.get(im0)) { cvFree(tintCache.get(im0).get(tint)); tintCache.get(im0).delete(tint); }
   portalSprites.set(key, c);
   return c;
 }
@@ -13405,7 +13440,7 @@ function drawPortalFx(x, y, size, tint, now, upright) {
   const k = Math.floor(now * 12) % PORTAL_K;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.drawImage(c, (k % PORTAL_COLS) * c.fw, Math.floor(k / PORTAL_COLS) * c.fh, c.fw, c.fh, Math.round(x - size / 2), Math.round(y - c.top), size, c.fh / 2);
+  ctx.drawImage(cvBm(c, true), (k % PORTAL_COLS) * c.fw, Math.floor(k / PORTAL_COLS) * c.fh, c.fw, c.fh, Math.round(x - size / 2), Math.round(y - c.top), size, c.fh / 2);
   ctx.restore();
   return true;
 }
@@ -13900,18 +13935,27 @@ function mmFoldTab(id, x, y, right = false) {
   return y + h;
 }
 /** Kept maps' small pictures: made again (a second apart) until every piece was in. */
+// (성능 점검 2026-11-28) Drawn from an ImageBitmap of it once it is whole: a canvas of its own drawn on the screen's every
+// frame was copied up to the screen's canvas each time (on a GPU canvas a 1500 px upload a frame) — the 크게 minimap halved
+// the hunt's frame rate. The same pixels: the bitmap is a copy of the finished canvas.
 const mmBacks = new Map();
+function mmBackFree(o) {
+  if (o && o.bm) { o.bm.close(); o.bm = null; }
+}
 function mmBackOf(key, mw, mh, paint) {
   const o = mmBacks.get(key), now = performance.now();
-  if (o && (o.ok || now - o.at < 1000)) return o.c;
+  if (o && (o.ok || now - o.at < 1000)) return o.bm || o.c;
   const s = Math.min(0.45, 1500 / Math.max(mw, mh)), c = (o && o.c) || document.createElement('canvas');
+  mmBackFree(o);
   c.width = Math.max(1, Math.round(mw * s));
   c.height = Math.max(1, Math.round(mh * s));
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = true;
   const ok = paint(g, s) !== false;
-  if (mmBacks.size > 2 && !o) mmBacks.delete(mmBacks.keys().next().value);
-  mmBacks.set(key, { c, ok, at: now });
+  if (mmBacks.size > 2 && !o) { const k0 = mmBacks.keys().next().value; mmBackFree(mmBacks.get(k0)); mmBacks.delete(k0); }
+  const rec = { c, ok, at: now, bm: null };
+  mmBacks.set(key, rec);
+  if (ok && window.createImageBitmap) createImageBitmap(c).then(bm => { if (mmBacks.get(key) === rec) rec.bm = bm; else bm.close(); }).catch(() => {});
   return c;
 }
 // Touches on a minimap (canvas px): taken before the joystick sees them.
@@ -14546,7 +14590,10 @@ function specialsOwned() {
 function codexShare() {
   // Pieces found over all pieces there are, for every class.
   let have = 0, all = 0;
-  for (const c of CLASSES) { const items = codexItems(c); all += items.length; have += items.filter(x => x.owned).length; }
+  codexNoIcon = true;
+  try {
+    for (const c of CLASSES) { const items = codexItems(c); all += items.length; have += items.filter(x => x.owned).length; }
+  } finally { codexNoIcon = false; }
   return have / Math.max(1, all);
 }
 
@@ -17584,7 +17631,7 @@ function tinted(img, filter) {
     g.drawImage(bmSrc(img), 0, 0);
     byImg.set(filter, c);
   }
-  return c;
+  return cvBm(c, true);
 }
 const GOLD_TINT = 'sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.25)';
 let monsterTint = null;
@@ -20610,7 +20657,7 @@ window.__mem = () => {
   let frames = 0, frameMb = 0;
   for (const L of heroLooks.values()) { frames += L.frames.size; for (const v of L.frames.values()) frameMb += of(v); }
   let tintN = 0, tintMb = 0;
-  for (const m of tintCache.values()) for (const v of m.values()) { tintN++; tintMb += of(v); }
+  for (const m of tintCache.values()) for (const v of m.values()) { tintN++; tintMb += of(v.__bm || v); }
   return {
     img, imgN, imgMb: r1(Object.values(img).reduce((a, b) => a + b, 0)),
     bitmaps: [bitmapsLive.size, r1(bitmapBytes / 1048576)],
