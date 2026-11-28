@@ -5221,7 +5221,7 @@ const THREAT = { early: 1.25, earlyTo: 11, earlyEnd: 15, champ: 1.25, mini: 1.3,
 // settings.dangerOff, a step off the 맞춤) and the run says it.
 // Measured (bot runs, best 9차): 화탕지옥 82~94% → 위험도 V 5~47% (격투가 70, 도적 46~74); 아람 황무지 95% → IV 40%;
 // 타계 62% (98); 쥐굴·산적굴 VI~VII 63~68% (99); the abyss floors as they were (0: 32~65%).
-const DANGER = { par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 4, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
+const DANGER = { hi: { dmg: 1.25, elite: 1.05, hp: 1.2, healMax: 0.6 }, par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 4, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
 function dangerPar(stage) {
   const L = stage.level !== undefined ? stage.level : STAGES.indexOf(stage);
   return DANGER.par * (1 + 0.1 * L) * Math.sqrt(4.5 + 0.5 * L) * (stage.abyss ? DANGER.abyss : 1) * Math.sqrt(stage.ease || 1);
@@ -5235,7 +5235,11 @@ function dangerOf(cls, stage) {
   return { t, auto, par: Math.round(par), pow };
 }
 function dangerK(t) {
-  return { t, dmg: DANGER.dmg ** t, elite: DANGER.elite ** t, hp: DANGER.hp ** t, heal: Math.min(0.7, DANGER.heal * t), rew: 1 + DANGER.rew * t };
+  // VII~X (the steps past the 맞춤's cap, DANGER.max): each a gentler step (DANGER.hi) — at the old rate X was ×28.9 피해·×20 생명
+  // and the best gear died on 7 of 9 bot runs (매우 어렵지만 가능: docs 게임성 3차 2차 측정)
+  const lo = Math.min(t, DANGER.max), hi = Math.max(0, t - DANGER.max), H = DANGER.hi;
+  return { t, dmg: DANGER.dmg ** lo * H.dmg ** hi, elite: DANGER.elite ** lo * H.elite ** hi, hp: DANGER.hp ** lo * H.hp ** hi,
+    heal: Math.min(H.healMax, DANGER.heal * t), rew: 1 + DANGER.rew * t };
 }
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII'];
 
@@ -5745,6 +5749,11 @@ const PATTERN_NAMES = {
   collapse: '성벽 붕괴', phalanx: '병마용 진군', venom: '독 웅덩이', web: '거미줄', molt: '허물 벗기',
   heatwave: '열파', palm: '장풍', blades: '천검', tentacles: '촉수 내려치기', avalanche: '눈사태', roots: '뿌리 솟기',
   dive: '급강하', bagua: '팔괘진', rift: '마령 균열', mirror: '거울 궁',
+  // (2차, 사용자 "응 다 진행하자": the hells, 하늘 아래, the abyss, the first ground and the old sea·island·volcano)
+  flamewheel: '화륜 회전', icicles: '고드름 비', boulder: '바위 굴리기', pincers: '집게 조이기', zigzag: '갈지자 돌격',
+  pentagram: '오망성 저주', seeds: '씨앗 터뜨리기', lure: '유혹의 길', madrings: '광기의 고리', guillotine: '단두대',
+  scream: '비명 파동', veil: '장막 가르기', tombs: '묘비 솟기', drain: '피의 흡수', maiden: '철의 처녀', bonecage: '뼈 감옥',
+  ruin: '파멸의 파도', herd: '소 떼 질주', kick: '뒷발차기', current: '해류', coconut: '열매 떨구기', magma: '용암 줄기',
 };
 // The boss's own blows that share another's shape (by name only).
 const PATTERN_AS = { trample: 'charge', cloud: 'pounce', stomp: 'quake', flare: 'quake', thunder: 'sparks', drought: 'hunt', ward: 'safe', sweep: 'tide' };
@@ -6252,6 +6261,154 @@ const OWN_PATTERNS = (() => {
       }
       waves.push(() => crack);
       waves.push(() => crack.flatMap(([x, y]) => plusTiles(x, y, 1)).filter(([x, y]) => !crack.some(([u, v]) => u === x && v === y)));
+    },
+    // ---- 2차 (2026-11-28): the hells, 하늘 아래, the abyss, the first ground, the old sea·island·volcano
+    // 지귀 (화탕지옥): a wheel of fire turns about it — the quarter toward its mark, then the next, then the next (step into the spent one)
+    flamewheel(waves, b) {
+      const t0 = aim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx), turn = Math.random() < 0.5 ? 1 : -1;
+      const quarter = q => sq(b.tx, b.ty, 5, [], 0).filter(([x, y]) => { let d = Math.atan2(y - b.ty, x - b.tx) - (a0 + turn * q * Math.PI / 2); d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) <= Math.PI / 4 + 0.01; });
+      for (let q = 0; q < 3; q++) waves.push(() => quarter(q));
+    },
+    // 그슨새 (한빙지옥): icicles fall here and there about its mark (two in five tiles), twice, each where it stands then
+    icicles(waves, b) {
+      for (let i = 0; i < 2; i++) waves.push(() => { const t = aim(); return sq(t.tx, t.ty, 3).filter(() => Math.random() < 0.4).concat([[t.tx, t.ty]]); });
+    },
+    // 두억시니 (거해지옥): a boulder rolled at its mark (three wide, past it), then it bursts — shards out slantwise from where it stops
+    boulder(waves, b) {
+      const t0 = aim(), d = way(b, t0), L = Math.max(5, Math.min(11, dist(b, t0) + 3)), ex = b.tx + d[0] * L, ey = b.ty + d[1] * L;
+      waves.push(() => line(b.tx, b.ty, d, 1, L, [], 1));
+      waves.push(() => { const out = [[ex, ey]]; for (const [u, v] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let k = 1; k <= 4; k++) out.push([ex + u * k, ey + v * k]); return out; });
+    },
+    // 새우니 (철상지옥): two claws close in on its mark from either side along its way — four out, two out, then shut
+    pincers(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), cx = t0.tx, cy = t0.ty;
+      const pair = o => { const out = []; for (const s1 of o ? [o, -o] : [0]) line(cx + px * s1, cy + py * s1, d, -5, 5, out); return out; };
+      waves.push(() => pair(4));
+      waves.push(() => pair(2));
+      waves.push(() => pair(0).concat(pair(1)));
+    },
+    // 고원 기마대장 (조드의 고원): a zigzag charge at its mark, slanting left and right (two wide), it rides each leg
+    zigzag(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d);
+      let x = b.tx, y = b.ty;
+      for (let leg = 0; leg < 3; leg++) {
+        const s1 = leg % 2 ? -1 : 1;
+        waves.push(() => {
+          const out = [];
+          for (let k = 1; k <= 4; k++) for (const w of [0, 1]) out.push([x + d[0] * k + px * s1 * (k + w), y + d[1] * k + py * s1 * (k + w)]);
+          const nx = x + d[0] * 4 + px * s1 * 4, ny = y + d[1] * 4 + py * s1 * 4;
+          x = nx; y = ny;
+          return { tiles: out, fall: () => bossLeap(b, nx, ny, 0.25) };
+        });
+      }
+    },
+    // 고원 대주술사 (조드의 고원 북쪽): five marks of a star about its mark, then the star's lines drawn between them
+    pentagram(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, a0 = Math.random() * Math.PI * 2, P = [];
+      for (let i = 0; i < 5; i++) P.push([cx + Math.cos(a0 + i * 2 * Math.PI / 5) * 4, cy + Math.sin(a0 + i * 2 * Math.PI / 5) * 4]);
+      waves.push(() => P.flatMap(([x, y]) => sq(Math.round(x), Math.round(y), 1)));
+      waves.push(() => { const out = []; for (let i = 0; i < 5; i++) { const [x0, y0] = P[i], [x1, y1] = P[(i + 2) % 5], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2); for (let k = 0; k <= n; k++) out.push([Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n)]); } return out; });
+    },
+    // 유혹의 수목자 (산돌림 협곡): seeds dropped about its mark (one tile each), then each bursts into a cross two out
+    seeds(waves, b) {
+      const t0 = aim(), S = [[t0.tx, t0.ty]];
+      for (let i = 0; i < 5; i++) S.push([t0.tx + Math.floor(rand(-4, 5)), t0.ty + Math.floor(rand(-4, 5))]);
+      waves.push(() => S);
+      waves.push(() => S.flatMap(([x, y]) => plusTiles(x, y, 2)));
+    },
+    // 친절한 사리 (몰락의 숲): all about its mark red but one kind lane that leads to it — and then it bites all round itself
+    lure(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), along = ([x, y]) => (x - b.tx) * d[0] + (y - b.ty) * d[1], side = ([x, y]) => (x - b.tx) * px + (y - b.ty) * py;
+      const s0 = side([t0.tx, t0.ty]);
+      waves.push(() => sq(t0.tx, t0.ty, 4).filter(t => !(side(t) === s0 && along(t) >= 1) && !(t[0] === b.tx && t[1] === b.ty)));
+      waves.push(() => sq(b.tx, b.ty, 2, [], 0));
+    },
+    // 광기의 섬망 (구아람): hollow rings about its mark (their middles clear), then the middles
+    madrings(waves, b) {
+      const t0 = aim(), C = [[t0.tx, t0.ty]];
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + rand(-0.4, 0.4); C.push([Math.round(t0.tx + Math.cos(a) * 3.5), Math.round(t0.ty + Math.sin(a) * 3.5)]); }
+      waves.push(() => C.flatMap(([x, y]) => sq(x, y, 1, [], 0)));
+      waves.push(() => C);
+    },
+    // 처단하는 자 (하야평원): the blade comes down across its mark's row (three wide), then down its column
+    guillotine(waves, b) {
+      waves.push(() => { const t = aim(), out = []; for (let k = -8; k <= 8; k++) for (const o of [-1, 0, 1]) out.push([t.tx + k, t.ty + o]); return out; });
+      waves.push(() => { const t = aim(), out = []; for (let k = -8; k <= 8; k++) for (const o of [-1, 0, 1]) out.push([t.tx + o, t.ty + k]); return out; });
+    },
+    // 비명의 세암 (로비해변): its scream goes out in a cone toward its mark, near, then middle, then far
+    scream(waves, b) {
+      const t0 = aim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx);
+      const band = (r0, r1) => sq(b.tx, b.ty, r1).filter(([x, y]) => { const r = Math.hypot(x - b.tx, y - b.ty); let d = Math.atan2(y - b.ty, x - b.tx) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); return r >= r0 && r < r1 + 0.5 && Math.abs(d) <= Math.PI / 3; });
+      waves.push(() => band(1, 3));
+      waves.push(() => band(3.5, 6));
+      waves.push(() => band(6.5, 9));
+    },
+    // 장막의 가뮈 (아람 황무지): a veil drawn over one half about its mark, then the other half
+    veil(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, horiz = Math.random() < 0.5, s1 = Math.random() < 0.5 ? 1 : -1;
+      const half = side => sq(cx, cy, 4).filter(([x, y]) => (horiz ? (y - cy) * s1 : (x - cx) * s1) * side > 0 || ((horiz ? y - cy : x - cx) === 0 && side < 0));
+      waves.push(() => half(1));
+      waves.push(() => half(-1));
+    },
+    // 종막의 묘귀 (도성의 흔적): tombstones rise every other tile both ways, then those between, then the rest
+    tombs(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, par = ([x, y]) => [(x - cx + 40) % 2, (y - cy + 40) % 2];
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return !u && !v; }));
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return u && v; }));
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return u !== v; }));
+    },
+    // 핏빛 백작 (지하 묘지): a thread of blood from its mark to it (and a pool where it stood), then it drinks — all round itself
+    drain(waves, b) {
+      const t0 = aim();
+      waves.push(() => ray(b.tx, b.ty, Math.atan2(t0.ty - b.ty, t0.tx - b.tx), 1, Math.hypot(t0.tx - b.tx, t0.ty - b.ty), sq(t0.tx, t0.ty, 1)));
+      waves.push(() => sq(b.tx, b.ty, 3, [], 1));
+    },
+    // 고통의 처녀 (고통의 전당): the iron maiden's walls about its mark (a box), then its doors shut — the inside
+    maiden(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), cx = t0.tx, cy = t0.ty, inBox = (a, w) => { const out = []; for (let k = -a; k <= a; k++) for (let o = -w; o <= w; o++) out.push([cx + d[0] * k + px * o, cy + d[1] * k + py * o]); return out; };
+      const key = ([x, y]) => x + ',' + y, inner = new Set(inBox(2, 1).map(key));
+      waves.push(() => inBox(3, 2).filter(t => !inner.has(key(t))));
+      waves.push(() => inBox(2, 1));
+    },
+    // 공포의 군주 (혼돈의 성역): a cage of bone round its mark (the bars), then fire within it — out over the fallen bars
+    bonecage(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      waves.push(() => sq(cx, cy, 2, [], 1));
+      waves.push(() => sq(cx, cy, 1));
+    },
+    // 파괴의 군주 (세계석 요새): waves of ruin out along the four ways from it, three wide, two tiles a wave
+    ruin(waves, b) {
+      for (let i = 0; i < 3; i++) waves.push(() => { const out = []; for (const dd of DIRS) line(b.tx, b.ty, dd, 2 * i + 1, 2 * i + 2, out, 1); return out; });
+    },
+    // 소 왕 (비밀의 소 레벨): the herd runs across in rows about its mark (four rows), then four rows more
+    herd(waves, b) {
+      const t0 = aim(), rows = [-4, -3, -2, -1, 0, 1, 2, 3, 4].sort(() => Math.random() - 0.5), dir = Math.random() < 0.5;
+      const run = ys => { const out = []; for (const o of ys) for (let k = -9; k <= 9; k++) out.push(dir ? [t0.tx + k, t0.ty + o] : [t0.tx + o, t0.ty + k]); return out; };
+      waves.push(() => run(rows.slice(0, 4)));
+      waves.push(() => run(rows.slice(4, 8)));
+    },
+    // 사슴왕 (왕초보사냥터): a kick in front, then a kick behind (the first ground's boss: small and slow)
+    kick(waves, b) {
+      const t0 = aim(), d = way(b, t0);
+      waves.push(() => sq(b.tx + d[0] * 2, b.ty + d[1] * 2, 1));
+      waves.push(() => sq(b.tx - d[0] * 2, b.ty - d[1] * 2, 1));
+    },
+    // 바닷속: a current in slanting bands two wide about its mark, then the bands between
+    current(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, s1 = Math.random() < 0.5 ? 1 : -1;
+      const band = par => sq(cx, cy, 4).filter(([x, y]) => ((((x - cx) + s1 * (y - cy)) % 4 + 4) % 4 < 2) === par);
+      waves.push(() => band(true));
+      waves.push(() => band(false));
+    },
+    // 환상의 섬: fruit dropped where its mark stands and two more beside, three times
+    coconut(waves, b) {
+      for (let i = 0; i < 3; i++) waves.push(() => { const t = aim(), out = box(t.tx, t.ty, 2, 2); for (let j = 0; j < 2; j++) box(t.tx + Math.floor(rand(-4, 4)), t.ty + Math.floor(rand(-3, 3)), 2, 2, out); return out; });
+    },
+    // 환상의 섬 화산: magma up through the ground in three columns about its mark, then three rows
+    magma(waves, b) {
+      const t0 = aim(), pick = () => [-4, -3, -2, -1, 0, 1, 2, 3, 4].sort(() => Math.random() - 0.5).slice(0, 3);
+      waves.push(() => { const out = []; for (const o of pick()) for (let k = -5; k <= 5; k++) out.push([t0.tx + o, t0.ty + k]); return out; });
+      waves.push(() => { const t = aim(), out = []; for (const o of pick()) for (let k = -5; k <= 5; k++) out.push([t.tx + k, t.ty + o]); return out; });
     },
     // 왕궁의 요괴: its mark and its mark's mirror through the boss, then the two reflections across
     mirror(waves, b) {
@@ -13588,6 +13745,8 @@ function drawWayOut(pt, now) {
 // A tap on it goes 작게 ↔ 크게; the keys under it: in 크게 + · - · 나 (back on the hero, following) · 작게; in 작게 접기;
 // folded, its tab opens it. Each map's state is kept in the settings (settings.mm).
 const MM_ZMAX = 3;
+// (마을: its minimap picture is small — at ×3 it was a blur — so ×2 at most)
+const MM_ZMAX_OF = { town: 2 };
 const mmViews = {};
 const mmDrawn = {}; // id -> { T, keys, hit, at } (the minimap as last drawn: what a touch lands on)
 function mmView(id, mode = 'small') {
@@ -13729,7 +13888,7 @@ function mmZoom(T, f, px = null, py = null) {
   if (v.mode !== 'big') return;
   if (px === null) { px = r.x + r.w / 2; py = r.y + r.h / 2; }
   const wx = T.x0 + (px - r.x) / T.k, wy = T.y0 + (py - r.y) / T.k;
-  const z1 = Math.max(1, Math.min(MM_ZMAX, v.z * f)), k1 = r.w / (T.mw / z1);
+  const z1 = Math.max(1, Math.min(MM_ZMAX_OF[T.id] || MM_ZMAX, v.z * f)), k1 = r.w / (T.mw / z1);
   const x0 = wx - (px - r.x) / k1, y0 = wy - (py - r.y) / k1;
   v.z = z1;
   v.follow = z1 <= 1;
