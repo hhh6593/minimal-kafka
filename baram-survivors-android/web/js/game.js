@@ -609,7 +609,8 @@ async function boot() {
   // (not over the original's own 9차 picture, o_<id>: 해일강타 had 연's water storm before the original's wave)
   for (const id of Object.keys(SKILLS)) {
     const fx = 'k_' + id;
-    if (M.fx[fx] && !String(SKILLS[id].fx || '').startsWith('o_')) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
+    // (fxOwn: a 연 picture of its own named in data.js — 광폭기조사's whole Frenzy_Ray, its k_<id> the hit — kept)
+    if (M.fx[fx] && !String(SKILLS[id].fx || '').startsWith('o_') && !SKILLS[id].fxOwn) Object.assign(SKILLS[id], { fx, fxs: null, tint: null, fxk: 1, modern: null, yeon: true });
   }
   // 태초광명 격: 천자의분노's blow drawn additive (its dark strokes drop out), a gold-white light.
   if (M.fx.g_anger_son) M.fx.g_taecho_light = { ...M.fx.g_anger_son, src: M.fx.g_anger_son.src || 'g_anger_son', add: true };
