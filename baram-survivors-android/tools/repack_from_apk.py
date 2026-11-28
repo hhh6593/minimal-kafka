@@ -166,11 +166,14 @@ def main():
         os.makedirs(wdir, exist_ok=True)
         for war, v in wi.items():
             for n in os.listdir(wdir):
-                if n.startswith(war + "_") and n[len(war) + 1:-4].replace("_", "").isdigit():
+                if n.startswith(war + "_") and n.rsplit(".", 1)[0][len(war) + 1:].replace("_", "").isdigit():
                     os.remove(os.path.join(wdir, n))
             for n in os.listdir(wa):
                 if n.startswith(war + "_") and n.endswith(".png") and n[len(war) + 1:-4].replace("_", "").isdigit():
-                    shutil.copyfile(os.path.join(wa, n), os.path.join(wdir, n))
+                    # as webp (q 72), as the hunting grounds' above: the APK's size (war.js reads the ext)
+                    from PIL import Image
+                    Image.open(os.path.join(wa, n)).save(os.path.join(wdir, n[:-4] + ".webp"), "WEBP", quality=72, method=6)
+            v["ext"] = "webp"
             man.setdefault("ywar", {})[war] = v
         print(f"replaced {len(wi)} battlefields from ywar_add")
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))

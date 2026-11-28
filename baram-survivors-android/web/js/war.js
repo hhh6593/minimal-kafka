@@ -526,7 +526,7 @@ async function startWar(id, cls, role, opts = {}) {
   for (const [path, bm] of mapBms) if (!path.startsWith(`ywar/${id}_`)) { if (bm && bm.close) bm.close(); mapBms.delete(path); }
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
-      const p = `ywar/${id}_${cx}_${cy}.png`;
+      const p = `ywar/${id}_${cx}_${cy}.${map.ext || 'png'}`; // (ext: webp for the fields cut since, repack_from_apk.py)
       if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
   // The fighters' looks (aiLooks), kept for the session: a later war's frames are made already (see warmLooks).
@@ -578,7 +578,7 @@ function setup() {
   const W = G.war = {
     def, mode: def.mode, role, side, t: 0, left: def.time, over: false, score: [0, 0], feed: [], ghosts: [], crates: [], zones: [],
     bodies: [], squads: [], nextId: 1, flow: new Map(), sndT: 0, shoutT: 0, fxN: 0, round: 1, gateDown: false,
-    map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
+    map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, ext: mp.ext, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
     heroDmgK: 1, roleK: 1, thinkIdx: 0, lastCmd: [0, 0], cmdSaid: 0, events: [],
     // Counters for the tests (__warState().diag): whom the enemy's blows fall on, whom the
     // healers mend, how long the guild's fighters stand about their camp.
@@ -6808,7 +6808,7 @@ async function startJaeng(cls, role, opts = {}) {
   for (const [path, bm] of mapBms) if (!path.startsWith(`ywar/${def.id}_`)) { if (bm && bm.close) bm.close(); mapBms.delete(path); }
   for (let cy = 0; cy * map.chunk < map.h; cy++)
     for (let cx = 0; cx * map.chunk < map.w; cx++) {
-      const p = `ywar/${def.id}_${cx}_${cy}.png`;
+      const p = `ywar/${def.id}_${cx}_${cy}.${map.ext || 'png'}`;
       if (!mapBms.has(p)) loads.push(sheetBitmap(p).then(bm => { if (bm) mapBms.set(p, bm); }));
     }
   for (const n of ['war_sealstone1', 'war_sealstone2', 'war_sealstone3', 'war_sealring', 'war_bossmark', 'war_bossaltar', 'war_totem', 'war_totem_r', 'war_brazier'])
@@ -6835,7 +6835,7 @@ function jaengSetup() {
     score: [0, 0, 0], pts: [0, 1, 2].map(() => ({ boss: 0, last: 0, cut: 0, seal: 0, pk: 0, mob: 0 })), mobKills: [0, 0, 0],
     bossDmg: [0, 0, 0], bossWin: [[], [], []], pkHeat: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], comeback: [1, 1, 1], sealN: [0, 0, 0], sealUntil: 0,
     feed: [], ghosts: [], crates: [], zones: [], bodies: [], squads: [], nextId: 1, flow: new Map(), sndT: 0, shoutT: 0, fxN: 0, round: 1, gateDown: false,
-    map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
+    map: { cols: mp.cols, rows: mp.rows, w: mp.w, h: mp.h, chunk: mp.chunk, ext: mp.ext, walk: Uint8Array.from(mp.walk.join(''), c => (c === '.' ? 1 : 0)) },
     heroDmgK: 1, roleK: 1, thinkIdx: 0, lastCmd: [0, 0, 0], cmdSaid: 0, events: [], danger: new Map(), dangerSig: '', calls: {},
     stat: { markHits: 0, dodges: 0, cuts: 0, heroCuts: 0, deaths: 0, revives: 0 }, jphase: 'gather', week: jaeng.wk, raidId: jaeng.raid.id, practice: jaeng.practice,
     diag: { atk: { hero: 0, tank: 0, other: 0 }, heal: { tank: 0, hero: 0, other: 0 }, campIdle: 0, stuck: {}, friendly: 0, mobHits: [0, 0, 0], pkKills: 0, check: 0, vulture: 0, regroup: 0, orders: {} },
@@ -7872,7 +7872,7 @@ function drawMap(camX, camY) {
     let ok = true;
     for (let cy = Math.max(0, Math.floor(y0 / c)); cy * c < Math.min(m.h, y0 + h); cy++)
       for (let cx = Math.max(0, Math.floor(x0 / c)); cx * c < Math.min(m.w, x0 + w); cx++) {
-        const path = `ywar/${W.def.id}_${cx}_${cy}.png`, im = mapBms.get(path) || A.images[path];
+        const path = `ywar/${W.def.id}_${cx}_${cy}.${m.ext || 'png'}`, im = mapBms.get(path) || A.images[path];
         if (!im || !im.width) { ok = false; continue; }
         const sx = Math.max(0, Math.floor(x0 - cx * c)), sy = Math.max(0, Math.floor(y0 - cy * c));
         const sw = Math.min(im.width - sx, Math.ceil(x0 + w - cx * c - sx) + 1), sh = Math.min(im.height - sy, Math.ceil(y0 + h - cy * c - sy) + 1);
@@ -8592,7 +8592,7 @@ function mmBack(W, r) {
   let ok = true;
   for (let cy = 0; cy * m.chunk < m.h; cy++)
     for (let cx = 0; cx * m.chunk < m.w; cx++) {
-      const path = `ywar/${W.def.id}_${cx}_${cy}.png`, im = mapBms.get(path) || A.images[path];
+      const path = `ywar/${W.def.id}_${cx}_${cy}.${m.ext || 'png'}`, im = mapBms.get(path) || A.images[path];
       if (!im || !im.width) { ok = false; continue; }
       g.drawImage(im, cx * m.chunk * s, cy * m.chunk * s, im.width * s, im.height * s);
     }
