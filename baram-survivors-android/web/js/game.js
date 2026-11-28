@@ -16310,6 +16310,8 @@ for (const t of ['pointerup', 'pointercancel']) {
     if (e.pointerId !== joy.id) return;
     // In town, a short tap on someone is talking to them, wherever the hero stands.
     if (t === 'pointerup' && T && !G && !$('#town').hidden && Math.hypot(joy.x - joy.ox, joy.y - joy.oy) < 12) tapTown(e);
+    // 대항전·「쟁」: a tap on the field's minimap (war.js) makes it larger or smaller.
+    if (t === 'pointerup' && G && G.war && Math.hypot(joy.x - joy.ox, joy.y - joy.oy) < 12) { const r = canvas.getBoundingClientRect(); War.mmTap((e.clientX - r.left) * (canvas.width / r.width), (e.clientY - r.top) * (canvas.height / r.height)); }
     joy.id = null;
   });
 }

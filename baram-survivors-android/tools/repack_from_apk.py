@@ -157,6 +157,22 @@ def main():
             ci["items"][iid] = [it["kind"], it["name"], it.get("grade", 1), it.get("set") or "", it.get("whole", 0), 1 if os.path.isfile(ic) else 0]
         json.dump(ci, open(cip, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         print(f"merged {len(ad['items'])} looks from ycostume_add")
+    # The battlefields cut again since that APK (GEAR_DIR/ywar_add/: tools/yeon_war.py's ywar/ output — the wider fields
+    # of 2026-11-28): each war's chunks and its index entry (size, walk grid) over the old.
+    wa = os.path.join(gear, "ywar_add")
+    if os.path.isfile(os.path.join(wa, "index.json")):
+        wi = json.load(open(os.path.join(wa, "index.json"), encoding="utf-8"))
+        wdir = os.path.join(assets, "ywar")
+        os.makedirs(wdir, exist_ok=True)
+        for war, v in wi.items():
+            for n in os.listdir(wdir):
+                if n.startswith(war + "_") and n[len(war) + 1:-4].replace("_", "").isdigit():
+                    os.remove(os.path.join(wdir, n))
+            for n in os.listdir(wa):
+                if n.startswith(war + "_") and n.endswith(".png") and n[len(war) + 1:-4].replace("_", "").isdigit():
+                    shutil.copyfile(os.path.join(wa, n), os.path.join(wdir, n))
+            man.setdefault("ywar", {})[war] = v
+        print(f"replaced {len(wi)} battlefields from ywar_add")
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
 
