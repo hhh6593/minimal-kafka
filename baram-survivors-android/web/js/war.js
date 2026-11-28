@@ -6524,7 +6524,7 @@ function rageDelay(G) {
 // gathering is broken, its next pattern and blast wait, it takes ×`take`; then the gauge is full again and `grow` times as
 // long. Left alone `idle` s the gauge creeps back (`regen` of it a second). 광폭화 의식: `ritual` s before its rage the boss
 // gathers it (banner, the gauge's own line) and the gauge wears ×`ritualK`; emptied then, the rage comes `delay` s later.
-const RAID_GRO = { max: 100, grow: 1.6, sec: 6, take: 1.5, hero: 4, perSec: 6, gap: 1.0, ai: 10, task: 25, dmgK: 0.5, idle: 8, regen: 2, ritual: 15, ritualK: 1.6, delay: 30 };
+const RAID_GRO = { max: 100, grow: 2, sec: 6, take: 1.5, hero: 3, perSec: 5, gap: 1.0, ai: 10, task: 25, dmgK: 0.5, idle: 8, regen: 2, ritual: 15, ritualK: 1.6, delay: 30 };
 /** The boss's gauge (on the boss itself: a floor's guardian of 신 용궁 탑 has its own). */
 function groOf(e) {
   return e.rg || (e.rg = { v: RAID_GRO.max, max: RAID_GRO.max, until: 0, n: 0, hero: 0, last: -99, heroT: -99 });
@@ -7243,7 +7243,7 @@ function raidBossHp() {
   return W.U * RAID_BOSS_U * (W.crowdK || 1);
 }
 // (3~4 minutes now, 5 at most: at 23500 the raids of an active hero fell at 4:50~6:40.)
-const RAID_BOSS_U = 12800; // with the hero's larger share (heroK): the raiders alone no longer finish an easy raid in time (at 21500 they did at 7:19 now and then)
+const RAID_BOSS_U = 13000; // with the hero's larger share (heroK): the raiders alone no longer finish an easy raid in time (at 21500 they did at 7:19 now and then)
 
 /** The raid's end (game.js showResults): the tier, the coins and gold by it, the spotlight. */
 function raidEnd(win, title) {
