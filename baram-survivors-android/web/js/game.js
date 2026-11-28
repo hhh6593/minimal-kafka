@@ -1,7 +1,7 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
   CHAMPIONS_AT, FX, ELEMENTS, PROMOS, PROMO_NAMES, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
-  skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS,
+  skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS, CLASS_FEEL,
 } from './data.js';
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT, GYEOK_SIZE, GYEOK_SIZE_MAX } from './gyeok.js';
@@ -2731,6 +2731,8 @@ function tally(e, d) {
   if (G.allyHitting) { t.ally = (t.ally || 0) + d; return; }
   t.all += d;
   if (G.procHitting) t.proc = (t.proc || 0) + d; // (a 격's own share, for the tests)
+  if (G.venomBursting) t.venom = (t.venom || 0) + d; // (묵혈독's bursts, for the tests)
+  if (window.__byTally) { const by = t.by || (t.by = {}), k = G.venomBursting ? 'venom' : G.procHitting ? 'proc' : G.castId || '-'; by[k] = (by[k] || 0) + d; }
   if (e.kind === 'boss' || e.kind === 'mini') t.big += d;
 }
 
@@ -6989,6 +6991,13 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (G.hunt && !G.dead && !(G.player.inv > 0)) { Hunt.hurtTaken(dmg); Hunt.hurtBy(from); } // 사냥 기믹: 받은 피해, 정예 속성
   const p = G.player;
   if (G.buffs.guard > G.t || p.inv > 0) return;
+  // 회피 (data.js CLASSES evade, 도적 손질 2026-11-28): the quick one steps out of a monster's blow now and then — not a
+  // red floor's, not a war's fighter
+  if (G.cls.evade && from && from.m && !from.war && !pierce && Math.random() < G.cls.evade) {
+    p.inv = 0.12;
+    if (G.t - (p.evadeShown || -9) > 0.5) { p.evadeShown = G.t; floatText(p.x, p.y - 64, '회피', '#d8d0ff'); }
+    return;
+  }
   // 방어: a share of each blow, not a flat amount (taken off flat, a good shield turned every
   // monster's bite into 1): 10 cuts a third, 20 half, never more than 70%.
   // A raid boss's blows are measured on the hero's life and go through armor.
@@ -7252,12 +7261,15 @@ function hurtEnemy(e, dmg, push = null) {
   // The hero's own blow (not a party member's, a summon's, or a 격's own) may loose a 격.
   if (!G.allyHitting && !G.procHitting) gyeokProc('hit', e);
   // A 치명타 shakes the screen a little (손맛 예산: no longer stops the world).
+  // (직업별 손맛, data.js CLASS_FEEL: a heavy class's 치명타 shakes harder, and on a big one close in stops the world a blink)
   if (crit && !G.stage.raid && G.t - (G.critShakeAt ?? -9) > 0.4) {
+    const cf = G.allyHitting || G.procHitting ? FEEL_PLAIN : clsFeel();
     G.critShakeAt = G.t;
-    G.shake = Math.max(G.shake, 0.08);
+    G.shake = Math.max(G.shake, settings.calmFx ? Math.min(0.08, cf.crit) : cf.crit);
+    if (cf.stop && e.kind && e.kind !== 'treasure' && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2) hitStop(cf.stop, 'heavy');
   }
   if (e.hp <= 0) killEnemy(e);
-  else audio.play('hit');
+  else audio.play('hit', 'hit', 1, G.allyHitting || G.war ? 1 : clsFeel().rate); // (직업별 손맛: a heavy class's thud, a light one's tick)
   return dmg;
 }
 
@@ -7294,6 +7306,12 @@ function allyStrike(e, dmg, shown) {
 //           Lancer_F_02_Hit, Monk_ConsecutivePunch, Fighter_BodyCheck_Hit_Up, Reaper_WindSlash_Hit3)
 //   hit   — a small flash on each monster struck (Fighter_BodyCheck_Hit_Up, 0026_Break_Hit, ...)
 // Budgeted: a crowd of thirty struck at once shows a handful, not thirty.
+/** This class's weight of a blow (data.js CLASS_FEEL): the jolt, the thud, the shake, the stop; out of a war's or a raid's
+ *  crowd as it was (the blows there are many hands'). */
+const FEEL_PLAIN = { kick: 4, kickT: 0.1, fling: 0, rate: 1, crit: 0.08, stop: 0 };
+function clsFeel() {
+  return (G && G.cls && CLASS_FEEL[G.cls.id]) || FEEL_PLAIN;
+}
 const MELEE_LOOK = {
   warrior: { slash: 'h_ml_slash', ss: 0.95, hit: 'h_ml_burst', hs: 0.34, turn: true },
   rogue: { slash: 'h_ml_cross', ss: 0.42, hit: 'h_ml_spark', hs: 0.8 },
@@ -7765,7 +7783,9 @@ function killEnemy(e) {
   // brings, three times in ten, one of the 수리검 skills ready at once (at most once in three seconds)
   const jg = SKILLS.r_jugeum && SKILLS.r_jugeum.proc9;
   if (jg && G.cls.id === 'rogue' && !G.allyHitting && (promoOf('rogue') >= 9 || G.training) && G.t >= (G.jugeumAt || 0) && Math.random() < jg.chance) {
-    const ready = G.skills.filter(s => jg.ids.includes(s.id) && s.timer > 0.3);
+    // (도적 손질 2026-11-28: 묵마수리검'쇄 brought back while its eight kunai still stood laid set over set — five at
+    // once at 3 s a kill, half the 도적's whole damage, 9차 best gear 8~17만 a second: its kunai must be down first)
+    const ready = G.skills.filter(s => jg.ids.includes(s.id) && s.timer > 0.3 && !(s.id === 'r_chainstar' && G.t < (G.swaeUntil || 0)));
     if (ready.length) {
       ready[Math.floor(Math.random() * ready.length)].timer = 0.05;
       G.jugeumAt = G.t + jg.cd;
@@ -8496,7 +8516,9 @@ function inCastFx(fn) {
   try { return fn(); } finally { FXC--; }
 }
 function cast(skill, st) {
-  return inCastFx(() => castNow(skill, st));
+  // (G.castId: whose blows these are, for the tests' share by skill — tally, later)
+  const c0 = G.castId; G.castId = skill.id;
+  try { return inCastFx(() => castNow(skill, st)); } finally { G.castId = c0; }
 }
 function castNow(skill, st) {
   const def = SKILLS[skill.id];
@@ -8552,7 +8574,8 @@ function castNow(skill, st) {
     const end = to || { x: e.x, y: e.y - 20 };
     const q = from || (pj && pj.sky ? { x: end.x - TILE * pj.sky * 0.3 * Math.sign(e.x - G.player.x || 1), y: end.y - TILE * pj.sky } : { x: G.player.x, y: G.player.y - 26 });
     const dx = end.x - q.x, dy = end.y - q.y;
-    const fl = projFly(pj, Math.hypot(dx, dy)) || Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
+    // (직업별 손맛: a 궁사's arrow crisper in flight than a 도사's charm — data.js CLASS_FEEL fly)
+    const fl = (projFly(pj, Math.hypot(dx, dy)) || Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600)) * (SH ? 1 : clsFeel().fly || 1);
     const rot = Math.atan2(dy, dx) + Math.PI / 2, path = projPath(pj, to ? null : e);
     // (def.shotTiles: a thrown thing longer than a body — 무형투창's spear, 사용자 2026-11-23: 표창 같다 — drawn that
     // many tiles long, its own length, not the 1.4 of a shot)
@@ -11066,6 +11089,7 @@ const TIER_KINDS = {
     const cx = p.x, cy = p.y - 20, inRing = e => Math.hypot(e.x - cx, e.y - 20 - cy) <= R;
     if (!G.enemies.some(e => tkFoe(e) && Math.hypot(e.x - cx, e.y - 20 - cy) <= R + 24)) return 0.3;
     const run = G, n = def.n || 8, dur = def.dur || 5, alpha = settings.calmFx ? 0.75 : 1;
+    G.swaeUntil = G.t + 0.2 + dur; // (죽음의희열 waits for these to fall)
     const spots = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2, x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
@@ -12012,17 +12036,33 @@ function venomBurst(e) {
   const v = e.venom9;
   if (!v || v.until < G.t) return;
   e.venom9 = null;
+  // (도적 손질 2026-11-28: a foe felled by a burst bursts in its turn — the infected crowd went off a ring at a time
+  // across the field. Two rings at most: one felled by a burst's burst no longer bursts.)
+  const gen = G.venomBursting ? (G.venomGen || 0) + 1 : 0;
+  if (gen > VENOM_GENS) return;
   // (묵혈독's own flame, o_r_mukdok, at the original's own size; 이펙트=판정: what stands in the flame drawn — the ellipse in
   // its picture's box, measured from the sheet — is struck)
   const f = M.fx.o_r_mukdok;
   if (!f) {
     if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 10, { scale: 0.9, anchor: 'bottom' });
-    later(0.05, () => { G.venomBursting = true; for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); G.venomBursting = false; });
+    later(0.05, () => venomStrike(around(e.tx, e.ty, 1).filter(o => o !== e), v.burst, gen));
     return;
   }
   if (fxBudget('venom9', 3)) addFx('o_r_mukdok', e.x, e.y - 10, { anchor: 'bottom' });
   const k = f.k || 1, hx = f.w * k / 2, hy = f.h * k / 2, cx = e.x + (f.w / 2 - f.ax) * k, cy = e.y - 10 + (f.h / 2 - f.ay) * k;
-  later(0.05, () => { G.venomBursting = true; for (const o of G.enemies.slice()) if (o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1) hurtEnemy(o, v.burst); G.venomBursting = false; });
+  later(0.05, () => venomStrike(G.enemies.filter(o => o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1), v.burst, gen));
+}
+const VENOM_GENS = 1; // the bursts of foes felled by a cast's blows, and of those their bursts fell; no further
+const VENOM_GAP = 0.3; // one burst's blow on a foe in that many seconds (overlapping flames in a heap: one, not five)
+function venomStrike(foes, dmg, gen) {
+  const b0 = G.venomBursting, g0 = G.venomGen;
+  G.venomBursting = true; G.venomGen = gen;
+  for (const o of foes) {
+    if (G.t - (o.venomHitAt ?? -9) < VENOM_GAP) continue;
+    o.venomHitAt = G.t;
+    hurtEnemy(o, dmg);
+  }
+  G.venomBursting = b0; G.venomGen = g0;
 }
 
 /** A companion's view of a 차수별 기술: the plain kind it casts it as (def.ck), or the skill as it is. */
@@ -12908,6 +12948,7 @@ function later(delay, fn) {
   if (SH) { const ctx = SH, f0 = fn; fn = () => inShadow(ctx, f0); }
   // (a step of a skill's cast draws as the cast does: FXC, 보이는 범위 = 맞는 범위)
   if (FXC) { const f1 = fn; fn = () => inCastFx(f1); }
+  if (G && G.castId) { const cid = G.castId, f2 = fn; fn = () => { const c0 = G.castId; G.castId = cid; try { f2(); } finally { G.castId = c0; } }; }
   timers.push({ at: G.t + delay, fn, run: SH ? SH.real : G });
 }
 
@@ -16520,12 +16561,16 @@ const AREA_KINDS = new Set(['screen', 'nova', 'cleave', 'aura', 'line', 'spell4'
 // A class's signature spell (its identity: the 도적's 투명, which opens every 암습): offered more
 // often, and the 자동 선택 takes it.
 const SIGNATURE = { rogue: 'r_stealth' };
+// (도적 손질 2026-11-28: the 도적's strikes are dashes — 비영승보·백호검무·이기어검·은형참절도·멸화의검 are kind 'blink' with blows of
+// their own — and the 자동 선택 took them for a caster's step (3): a 도적 went into 하월·사휘도 on 뇌진주 alone, 70 a second, and fell
+// in a minute. A 도적's striking dash is an attack.)
+const cardAttack = d => !SUPPORT_KINDS.has(d.kind) || (d.kind === 'blink' && d.dmg > 0 && G.cls.id === 'rogue');
 function cardScore(o) {
   const p = G.player, low = p.hp < p.maxHp * 0.45;
-  const attacks = G.skills.filter(s => !SUPPORT_KINDS.has(SKILLS[s.id].kind)).length;
+  const attacks = G.skills.filter(s => cardAttack(SKILLS[s.id])).length;
   const kept = ((progress.builds || {})[G.cls.id] || { skills: [] }).skills.map(x => x[0]);
   if (o.type === 'skill') {
-    const d = SKILLS[o.id], attack = !SUPPORT_KINDS.has(d.kind);
+    const d = SKILLS[o.id], attack = cardAttack(d);
     let v;
     if (o.from) return (attack ? 14 : 9) + (d.promo || 0) - (SKILLS[o.from].promo || 0) + (kept.includes(o.id) ? 3 : 0);
     if (o.lv > 1) {
@@ -18724,8 +18769,10 @@ function render(now) {
     // A close-in fighter's blows knock harder: further, and easing back (연's struck jolt).
     const kt = b.kickAt !== undefined ? G.t - b.kickAt : 9, hard = MELEE_LOOK[G.cls.id] && !G.war;
     // Flung by a heavy technique: out half a tile at once, back over a quarter second.
-    const kick = hard && b.kickBig ? (kt < 0.26 ? 22 * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
-      : hard ? (kt < 0.16 ? 8 * (1 - kt / 0.16) : 0) : kt < 0.1 ? 4 : 0;
+    // (직업별 손맛, data.js CLASS_FEEL: a 도깨비's club throws them further and slower back than a 도적's quick cuts)
+    const cf = G.war ? FEEL_PLAIN : clsFeel(), fl = cf.fling || 22, kT = cf.kickT || 0.16;
+    const kick = hard && b.kickBig ? (kt < 0.26 ? fl * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
+      : hard ? (kt < kT ? cf.kick * (1 - kt / kT) : 0) : kt < kT ? cf.kick * (1 - kt / kT) : 0;
     const kk = b.kind === 'boss' || b.kind === 'mini' ? kick * 0.5 : kick;
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kk;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kk;
