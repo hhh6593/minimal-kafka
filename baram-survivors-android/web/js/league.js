@@ -259,7 +259,7 @@ export const RAID_AFFIXES = [
   { id: 'fury', name: '분노', desc: '보스의 장판·탄·광역기가 25% 빨리 온다', paceK: 0.8, rew: 0.3 },
   { id: 'surge', name: '쇄도', desc: '보스가 부르는 쫄이 1.6배, 부를 때마다 챔피언 하나가 함께 온다', addK: 1.6, champ: 1, rew: 0.2 },
   { id: 'element', name: '원소', desc: '10초마다 공대원 발밑에 원소 장판(3×3칸)이 깔려 6초 동안 초당 체력 6%를 태운다 — 칸 밖으로', pool: { every: 10, life: 6, k: 0.06, n: 3 }, rew: 0.2 },
-  { id: 'bond', name: '결속', desc: '2칸 안에 공대원 3명 이상과 함께 서면 주는 피해 +12%·받는 피해 −15%, 아무도 없으면 받는 피해 +20%', bond: { r: 2, n: 3, dmg: 1.12, taken: 0.85, alone: 1.2 }, rew: 0.15 },
+  { id: 'bond', name: '결속', desc: '2칸 안에 공대원 3명 이상과 함께 서면 주는 피해 +6%·받는 피해 −10%, 아무도 없으면 받는 피해 +20%', bond: { r: 2, n: 3, dmg: 1.06, taken: 0.9, alone: 1.2 }, rew: 0.15 },
   { id: 'iron', name: '철갑', desc: '보스가 받는 피해 −20% — 대신 무력화 게이지가 1.3배 빨리 깎이고, 무력화되면 받는 피해 +100%', bossTaken: 0.8, groK: 1.3, groTake: 2, rew: 0.25 },
 ];
 /** The week's raid affix (window.__raidAffix: an id, or 'none' for none — tests). */
