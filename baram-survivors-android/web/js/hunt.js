@@ -66,21 +66,22 @@ const CHOICES = [
 // The boss's own blows on a hunting ground (the raid patterns' names), by ground; by its group
 // when the ground has none of its own (design §4.5).
 // 2026-11-28 (사용자 승인: 보스마다 고유 패턴 하나씩 — ring·hunt·charge가 겹침): every boss before the hells has a blow
-// of its own besides its two (game.js OWN_PATTERNS, its name and nature); the hells and after keep theirs (docs: 남은 것).
+// of its own besides its two (game.js OWN_PATTERNS, its name and nature); then (2차) the hells, 하늘 아래, the abyss, 사슴왕 and the old
+// 바닷속·환상의 섬·화산 too — every hunting ground's boss now has one.
 const BOSS_PATTERNS = {
-  novice: ['charge'], rabbit: ['pounce', 'hop'], rat: ['stampede', 'charge', 'burrow'], snake: ['breath', 'rain', 'slither'], bigsnake: ['whirl', 'breath', 'coil'],
+  novice: ['charge', 'kick'], rabbit: ['pounce', 'hop'], rat: ['stampede', 'charge', 'burrow'], snake: ['breath', 'rain', 'slither'], bigsnake: ['whirl', 'breath', 'coil'],
   deer: ['charge', 'trample', 'antlers'], pig: ['charge', 'quake', 'roll'], bear: ['claw', 'stomp', 'maul'], bearman: ['claw', 'stomp', 'totem'], fox: ['clones', 'hunt', 'tails'],
   mantis: ['xslash', 'claw', 'scythe'], skull: ['hunt', 'ring', 'graves'], haunt: ['hunt', 'safe', 'phantoms'], goblin: ['quake', 'sparks'], bandit: ['iai', 'charge', 'net'],
-  japan: ['iai', 'xslash', 'volley'], steppe: ['charge', 'stampede', 'arrows'], zud: ['charge', 'stampede'], zud2: ['hunt', 'ring'], hwagwa: ['staff', 'clones', 'cloud'],
+  japan: ['iai', 'xslash', 'volley'], steppe: ['charge', 'stampede', 'arrows'], zud: ['charge', 'stampede', 'zigzag'], zud2: ['hunt', 'ring', 'pentagram'], hwagwa: ['staff', 'clones', 'cloud'],
   kirin: ['thunder', 'meteor'], wolf: ['pounce', 'claw', 'frenzy'], greatwall: ['quake', 'stomp', 'collapse'], qin: ['seal', 'pillars', 'phalanx'], baekdu: ['pounce', 'trample', 'avalanche'],
   baekdu2: ['whirl', 'ring', 'roots'], baekdu3: ['meteor', 'breath', 'dive'], baekdu4: ['tide', 'whirl', 'bagua'],
-  sea: ['whirl', 'tide'], palace: ['sweep', 'tide', 'trident'], deepsea: ['whirl', 'ring', 'tentacles'], reef: ['hunt', 'rain', 'anchor'], wreck: ['charge', 'ring', 'broadside'],
-  island: ['rain', 'claw'], gogyun: ['rain', 'claw', 'venom'], volcano: ['lava', 'pillars', 'flare'], spidercave: ['pounce', 'ring', 'web'], gareung: ['hunt', 'seal', 'molt'], pokyeom: ['flare', 'charge', 'heatwave'],
+  sea: ['whirl', 'tide', 'current'], palace: ['sweep', 'tide', 'trident'], deepsea: ['whirl', 'ring', 'tentacles'], reef: ['hunt', 'rain', 'anchor'], wreck: ['charge', 'ring', 'broadside'],
+  island: ['rain', 'claw', 'coconut'], gogyun: ['rain', 'claw', 'venom'], volcano: ['lava', 'pillars', 'flare', 'magma'], spidercave: ['pounce', 'ring', 'web'], gareung: ['hunt', 'seal', 'molt'], pokyeom: ['flare', 'charge', 'heatwave'],
   yogoe: ['hunt', 'clones', 'gates'], royal: ['safe', 'ring', 'mirror'], murim: ['xslash', 'stomp', 'palm'], musin: ['iai', 'xslash', 'blades'], tagye: ['seal', 'sweep', 'rift'],
-  hwatang: ['lava', 'pillars'], hanbing: ['breath', 'ring'], geohae: ['quake', 'stomp'], cheolsang: ['pillars', 'seal'],
-  sandolim: ['charge', 'quake'], fallforest: ['hunt', 'whirl'], jagwi: ['rain', 'drought'], oldaram: ['seal', 'sweep'], haya: ['breath', 'flare'],
-  lobi: ['tide', 'whirl'], aram: ['sweep', 'ring'], ancient: ['seal', 'xslash'],
-  abyss: ['hunt', 'ring'], abyss2: ['hunt', 'rain'], abyss3: ['pillars', 'seal'], abyss4: ['quake', 'meteor'], cow: ['stampede', 'charge'],
+  hwatang: ['lava', 'pillars', 'flamewheel'], hanbing: ['breath', 'ring', 'icicles'], geohae: ['quake', 'stomp', 'boulder'], cheolsang: ['pillars', 'seal', 'pincers'],
+  sandolim: ['charge', 'quake', 'seeds'], fallforest: ['hunt', 'whirl', 'lure'], jagwi: ['rain', 'drought'], oldaram: ['seal', 'sweep', 'madrings'], haya: ['breath', 'flare', 'guillotine'],
+  lobi: ['tide', 'whirl', 'scream'], aram: ['sweep', 'ring', 'veil'], ancient: ['seal', 'xslash', 'tombs'],
+  abyss: ['hunt', 'ring', 'drain'], abyss2: ['hunt', 'rain', 'maiden'], abyss3: ['pillars', 'seal', 'bonecage'], abyss4: ['quake', 'meteor', 'ruin'], cow: ['stampede', 'charge', 'herd'],
   // 2026-11-28: each its own blow (game.js raidPattern) — 은월토's 월광 반달, 모래 악어's 모래 소용돌이
   haewol: ['crescent', 'pounce'], sahwido: ['sinkhole', 'charge'],
 };
@@ -733,8 +734,8 @@ function kill(e) {
     if (Math.hypot(e.x - cx, e.y - cy) <= S.r * A.TILE) {
       R.c = G.t - R.lastT <= S.gap ? R.c + 1 : 1;
       R.lastT = G.t;
-      if (R.c >= S.need) {
-        A.floatText(cx, cy - 60, `${S.need}연쇄!`, '#ffd84a', true);
+      if (R.c >= R.need) {
+        A.floatText(cx, cy - 60, `${R.need}연쇄!`, '#ffd84a', true);
         if (g.step + 1 < g.n) streakRing(g, spotNear(5, 8));
         else g.ring = null;
         goalStep();
@@ -1401,7 +1402,7 @@ export const GOAL_TUNE = {
   //   연속 점령 (relay) — small rings one after another (r tiles): stood in `stand` s each (out of it, it drains `drain` times
   //     as fast); each burns `fuse` s, then goes out and is lit again elsewhere.
   elite: { far: [8, 12], hp: 2.2, scale: 1.3, wake: 5 },
-  streak: { r: 2.6, need: 14, gap: 2.5, pack: 12, refill: 5, every: 1.5, cap: 32 },
+  streak: { r: 2.6, need: 14, gap: 2.5, pack: 12, refill: 5, every: 1.5, cap: 32, kExp: 0.8, kMax: 3, hpExp: 0.8 },
   relay: { r: 1.4, stand: 1.4, drain: 2, fuse: 18, near: [5, 8] },
   gold: 0.6, // a chest's worth of gold as coins, × the ground's level + 4
 };
@@ -1444,7 +1445,9 @@ function eliteSpawn(g, i) {
 }
 /** 연쇄 처치: the ring at `at`, its pack in it. */
 function streakRing(g, at) {
-  g.ring = { at, c: 0, lastT: -9, fedT: 0, fed: 0 };
+  // (강한 빌드: the chain asked longer, the ring's pack more and tougher, by the hero's power over the ground's par — streakK)
+  const m = streakK();
+  g.ring = { at, c: 0, lastT: -9, fedT: 0, fed: 0, m, need: Math.round(GOAL_TUNE.streak.need * m), cap: Math.round(GOAL_TUNE.streak.cap * m) };
   streakFeed(g, GOAL_TUNE.streak.pack);
 }
 function streakFeed(g, n) {
@@ -1455,8 +1458,15 @@ function streakFeed(g, n) {
     const s = [x0 + Math.round((Math.random() * 2 - 1) * rr), y0 + Math.round((Math.random() * 2 - 1) * rr)];
     if (!A.free(s[0], s[1]) || (G.arena && !open(s[0], s[1]))) continue;
     const e = A.addEnemy(A.pickMonster(), null, null, 0, s);
-    if (e) { e.stun = Math.max(e.stun || 0, 0.6); n--; }
+    if (e) { e.stun = Math.max(e.stun || 0, 0.6); e.hp = e.maxHp = e.maxHp * g.ring.m ** GOAL_TUNE.streak.hpExp; n--; }
   }
+}
+/** 연쇄 처치's weight: the hero's power over the ground's par (game.js dangerOf: G.danger.pow / par), 1 for a hero at or under
+ *  it (as before), up to streak.kMax — a strong build cleared it in 2~12 s (best9), now 20~40 s. */
+function streakK() {
+  const d = A.G().danger, S = GOAL_TUNE.streak;
+  const gap = d && d.par ? d.pow / d.par : 1;
+  return Math.max(1, Math.min(S.kMax, Math.pow(gap, S.kExp)));
 }
 /** 연속 점령: the next small ring, lit for `fuse` s. */
 function relayRing(g, at) {
@@ -1652,7 +1662,7 @@ function goalTick(dt) {
     if (R.c && t - R.lastT > S.gap) { R.c = 0; A.floatText(cx, cy - 60, '연쇄 끊김', '#ff9a6a', true); }
     // the pack kept up while the hero is at the ring (not past `cap` of a ring's: the field does not swell)
     const inRingN = G.enemies.filter(e => !e.kind && e.hp > 0 && Math.hypot(e.x - cx, e.y - cy) <= Rp).length;
-    if (inRingN < S.refill && t - R.fedT > S.every && R.fed < S.cap && inRing(R.at, S.r + 2)) streakFeed(g, S.refill);
+    if (inRingN < S.refill && t - R.fedT > S.every && R.fed < R.cap && inRing(R.at, S.r + 2)) streakFeed(g, S.refill);
   } else if (g.kind === 'relay' && g.items[0]) {
     const Q = GOAL_TUNE.relay, it = g.items[0];
     it.inside = inRing(it.at, Q.r);
@@ -1985,10 +1995,10 @@ function drawGoal(ctx) {
     ctx.fillStyle = live ? 'rgba(255,170,60,0.16)' : 'rgba(255,170,60,0.07)';
     ctx.beginPath(); ctx.arc(x, y, Rr, 0, Math.PI * 2); ctx.fill();
     ring(x, y, Rr, 1, 'rgba(255,255,255,0.25)');
-    ring(x, y, Rr, live ? R.c / S.need : 0, '#ffb43a');
+    ring(x, y, Rr, live ? R.c / R.need : 0, '#ffb43a');
     if (live) ring(x, y, Rr - 6, 1 - (G.t - R.lastT) / S.gap, 'rgba(255,90,40,0.8)');
     ctx.font = 'bold 11px G9'; ctx.textAlign = 'center';
-    A.outline(`연쇄 ${live ? R.c : 0}/${S.need}`, x, y - 78, live ? '#ffd27a' : '#c0a070');
+    A.outline(`연쇄 ${live ? R.c : 0}/${R.need}`, x, y - 78, live ? '#ffd27a' : '#c0a070');
   }
   if (g.kind === 'relay') {
     for (const l of g.lit || []) { const [x, y] = at(...l); pic(g.prop, x, y); }

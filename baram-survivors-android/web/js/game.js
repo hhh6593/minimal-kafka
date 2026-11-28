@@ -1,7 +1,7 @@
 import {
   CLASSES, SKILLS, PASSIVES, STAGES, MAX_SKILLS, MAX_PASSIVES, MAX_SKILL_LEVEL, MAX_PASSIVE_LEVEL, BOSS_AT, MINI_AT,
   CHAMPIONS_AT, FX, ELEMENTS, PROMOS, PROMO_NAMES, RAIDS, YEON_FX, RAID_BOSS_AT, RAID_LIMIT, GWOE_BEASTS, gwoeWeek, BRANCHES, PROMO_BONUS,
-  skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS,
+  skillStats, skillName, levelText, isMend, MEND_FX, ULT_TIERS, ULT_BANDS, SKILL_ALIAS, CLASS_FEEL,
 } from './data.js';
 import { Audio } from './audio.js';
 import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK, ABYSS_TINT as GY_ABYSS_TINT, GYEOK_SIZE, GYEOK_SIZE_MAX } from './gyeok.js';
@@ -2731,6 +2731,8 @@ function tally(e, d) {
   if (G.allyHitting) { t.ally = (t.ally || 0) + d; return; }
   t.all += d;
   if (G.procHitting) t.proc = (t.proc || 0) + d; // (a 격's own share, for the tests)
+  if (G.venomBursting) t.venom = (t.venom || 0) + d; // (묵혈독's bursts, for the tests)
+  if (window.__byTally) { const by = t.by || (t.by = {}), k = G.venomBursting ? 'venom' : G.procHitting ? 'proc' : G.castId || '-'; by[k] = (by[k] || 0) + d; }
   if (e.kind === 'boss' || e.kind === 'mini') t.big += d;
 }
 
@@ -5223,7 +5225,7 @@ const THREAT = { early: 1.25, earlyTo: 11, earlyEnd: 15, champ: 1.25, mini: 1.3,
 // settings.dangerOff, a step off the 맞춤) and the run says it.
 // Measured (bot runs, best 9차): 화탕지옥 82~94% → 위험도 V 5~47% (격투가 70, 도적 46~74); 아람 황무지 95% → IV 40%;
 // 타계 62% (98); 쥐굴·산적굴 VI~VII 63~68% (99); the abyss floors as they were (0: 32~65%).
-const DANGER = { par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 4, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
+const DANGER = { hi: { dmg: 1.25, elite: 1.05, hp: 1.2, healMax: 0.6 }, par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 4, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
 function dangerPar(stage) {
   const L = stage.level !== undefined ? stage.level : STAGES.indexOf(stage);
   return DANGER.par * (1 + 0.1 * L) * Math.sqrt(4.5 + 0.5 * L) * (stage.abyss ? DANGER.abyss : 1) * Math.sqrt(stage.ease || 1);
@@ -5237,7 +5239,11 @@ function dangerOf(cls, stage) {
   return { t, auto, par: Math.round(par), pow };
 }
 function dangerK(t) {
-  return { t, dmg: DANGER.dmg ** t, elite: DANGER.elite ** t, hp: DANGER.hp ** t, heal: Math.min(0.7, DANGER.heal * t), rew: 1 + DANGER.rew * t };
+  // VII~X (the steps past the 맞춤's cap, DANGER.max): each a gentler step (DANGER.hi) — at the old rate X was ×28.9 피해·×20 생명
+  // and the best gear died on 7 of 9 bot runs (매우 어렵지만 가능: docs 게임성 3차 2차 측정)
+  const lo = Math.min(t, DANGER.max), hi = Math.max(0, t - DANGER.max), H = DANGER.hi;
+  return { t, dmg: DANGER.dmg ** lo * H.dmg ** hi, elite: DANGER.elite ** lo * H.elite ** hi, hp: DANGER.hp ** lo * H.hp ** hi,
+    heal: Math.min(H.healMax, DANGER.heal * t), rew: 1 + DANGER.rew * t };
 }
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII'];
 
@@ -5747,6 +5753,11 @@ const PATTERN_NAMES = {
   collapse: '성벽 붕괴', phalanx: '병마용 진군', venom: '독 웅덩이', web: '거미줄', molt: '허물 벗기',
   heatwave: '열파', palm: '장풍', blades: '천검', tentacles: '촉수 내려치기', avalanche: '눈사태', roots: '뿌리 솟기',
   dive: '급강하', bagua: '팔괘진', rift: '마령 균열', mirror: '거울 궁',
+  // (2차, 사용자 "응 다 진행하자": the hells, 하늘 아래, the abyss, the first ground and the old sea·island·volcano)
+  flamewheel: '화륜 회전', icicles: '고드름 비', boulder: '바위 굴리기', pincers: '집게 조이기', zigzag: '갈지자 돌격',
+  pentagram: '오망성 저주', seeds: '씨앗 터뜨리기', lure: '유혹의 길', madrings: '광기의 고리', guillotine: '단두대',
+  scream: '비명 파동', veil: '장막 가르기', tombs: '묘비 솟기', drain: '피의 흡수', maiden: '철의 처녀', bonecage: '뼈 감옥',
+  ruin: '파멸의 파도', herd: '소 떼 질주', kick: '뒷발차기', current: '해류', coconut: '열매 떨구기', magma: '용암 줄기',
 };
 // The boss's own blows that share another's shape (by name only).
 const PATTERN_AS = { trample: 'charge', cloud: 'pounce', stomp: 'quake', flare: 'quake', thunder: 'sparks', drought: 'hunt', ward: 'safe', sweep: 'tide' };
@@ -6254,6 +6265,154 @@ const OWN_PATTERNS = (() => {
       }
       waves.push(() => crack);
       waves.push(() => crack.flatMap(([x, y]) => plusTiles(x, y, 1)).filter(([x, y]) => !crack.some(([u, v]) => u === x && v === y)));
+    },
+    // ---- 2차 (2026-11-28): the hells, 하늘 아래, the abyss, the first ground, the old sea·island·volcano
+    // 지귀 (화탕지옥): a wheel of fire turns about it — the quarter toward its mark, then the next, then the next (step into the spent one)
+    flamewheel(waves, b) {
+      const t0 = aim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx), turn = Math.random() < 0.5 ? 1 : -1;
+      const quarter = q => sq(b.tx, b.ty, 5, [], 0).filter(([x, y]) => { let d = Math.atan2(y - b.ty, x - b.tx) - (a0 + turn * q * Math.PI / 2); d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) <= Math.PI / 4 + 0.01; });
+      for (let q = 0; q < 3; q++) waves.push(() => quarter(q));
+    },
+    // 그슨새 (한빙지옥): icicles fall here and there about its mark (two in five tiles), twice, each where it stands then
+    icicles(waves, b) {
+      for (let i = 0; i < 2; i++) waves.push(() => { const t = aim(); return sq(t.tx, t.ty, 3).filter(() => Math.random() < 0.4).concat([[t.tx, t.ty]]); });
+    },
+    // 두억시니 (거해지옥): a boulder rolled at its mark (three wide, past it), then it bursts — shards out slantwise from where it stops
+    boulder(waves, b) {
+      const t0 = aim(), d = way(b, t0), L = Math.max(5, Math.min(11, dist(b, t0) + 3)), ex = b.tx + d[0] * L, ey = b.ty + d[1] * L;
+      waves.push(() => line(b.tx, b.ty, d, 1, L, [], 1));
+      waves.push(() => { const out = [[ex, ey]]; for (const [u, v] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let k = 1; k <= 4; k++) out.push([ex + u * k, ey + v * k]); return out; });
+    },
+    // 새우니 (철상지옥): two claws close in on its mark from either side along its way — four out, two out, then shut
+    pincers(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), cx = t0.tx, cy = t0.ty;
+      const pair = o => { const out = []; for (const s1 of o ? [o, -o] : [0]) line(cx + px * s1, cy + py * s1, d, -5, 5, out); return out; };
+      waves.push(() => pair(4));
+      waves.push(() => pair(2));
+      waves.push(() => pair(0).concat(pair(1)));
+    },
+    // 고원 기마대장 (조드의 고원): a zigzag charge at its mark, slanting left and right (two wide), it rides each leg
+    zigzag(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d);
+      let x = b.tx, y = b.ty;
+      for (let leg = 0; leg < 3; leg++) {
+        const s1 = leg % 2 ? -1 : 1;
+        waves.push(() => {
+          const out = [];
+          for (let k = 1; k <= 4; k++) for (const w of [0, 1]) out.push([x + d[0] * k + px * s1 * (k + w), y + d[1] * k + py * s1 * (k + w)]);
+          const nx = x + d[0] * 4 + px * s1 * 4, ny = y + d[1] * 4 + py * s1 * 4;
+          x = nx; y = ny;
+          return { tiles: out, fall: () => bossLeap(b, nx, ny, 0.25) };
+        });
+      }
+    },
+    // 고원 대주술사 (조드의 고원 북쪽): five marks of a star about its mark, then the star's lines drawn between them
+    pentagram(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, a0 = Math.random() * Math.PI * 2, P = [];
+      for (let i = 0; i < 5; i++) P.push([cx + Math.cos(a0 + i * 2 * Math.PI / 5) * 4, cy + Math.sin(a0 + i * 2 * Math.PI / 5) * 4]);
+      waves.push(() => P.flatMap(([x, y]) => sq(Math.round(x), Math.round(y), 1)));
+      waves.push(() => { const out = []; for (let i = 0; i < 5; i++) { const [x0, y0] = P[i], [x1, y1] = P[(i + 2) % 5], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2); for (let k = 0; k <= n; k++) out.push([Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n)]); } return out; });
+    },
+    // 유혹의 수목자 (산돌림 협곡): seeds dropped about its mark (one tile each), then each bursts into a cross two out
+    seeds(waves, b) {
+      const t0 = aim(), S = [[t0.tx, t0.ty]];
+      for (let i = 0; i < 5; i++) S.push([t0.tx + Math.floor(rand(-4, 5)), t0.ty + Math.floor(rand(-4, 5))]);
+      waves.push(() => S);
+      waves.push(() => S.flatMap(([x, y]) => plusTiles(x, y, 2)));
+    },
+    // 친절한 사리 (몰락의 숲): all about its mark red but one kind lane that leads to it — and then it bites all round itself
+    lure(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), along = ([x, y]) => (x - b.tx) * d[0] + (y - b.ty) * d[1], side = ([x, y]) => (x - b.tx) * px + (y - b.ty) * py;
+      const s0 = side([t0.tx, t0.ty]);
+      waves.push(() => sq(t0.tx, t0.ty, 4).filter(t => !(side(t) === s0 && along(t) >= 1) && !(t[0] === b.tx && t[1] === b.ty)));
+      waves.push(() => sq(b.tx, b.ty, 2, [], 0));
+    },
+    // 광기의 섬망 (구아람): hollow rings about its mark (their middles clear), then the middles
+    madrings(waves, b) {
+      const t0 = aim(), C = [[t0.tx, t0.ty]];
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + rand(-0.4, 0.4); C.push([Math.round(t0.tx + Math.cos(a) * 3.5), Math.round(t0.ty + Math.sin(a) * 3.5)]); }
+      waves.push(() => C.flatMap(([x, y]) => sq(x, y, 1, [], 0)));
+      waves.push(() => C);
+    },
+    // 처단하는 자 (하야평원): the blade comes down across its mark's row (three wide), then down its column
+    guillotine(waves, b) {
+      waves.push(() => { const t = aim(), out = []; for (let k = -8; k <= 8; k++) for (const o of [-1, 0, 1]) out.push([t.tx + k, t.ty + o]); return out; });
+      waves.push(() => { const t = aim(), out = []; for (let k = -8; k <= 8; k++) for (const o of [-1, 0, 1]) out.push([t.tx + o, t.ty + k]); return out; });
+    },
+    // 비명의 세암 (로비해변): its scream goes out in a cone toward its mark, near, then middle, then far
+    scream(waves, b) {
+      const t0 = aim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx);
+      const band = (r0, r1) => sq(b.tx, b.ty, r1).filter(([x, y]) => { const r = Math.hypot(x - b.tx, y - b.ty); let d = Math.atan2(y - b.ty, x - b.tx) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); return r >= r0 && r < r1 + 0.5 && Math.abs(d) <= Math.PI / 3; });
+      waves.push(() => band(1, 3));
+      waves.push(() => band(3.5, 6));
+      waves.push(() => band(6.5, 9));
+    },
+    // 장막의 가뮈 (아람 황무지): a veil drawn over one half about its mark, then the other half
+    veil(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, horiz = Math.random() < 0.5, s1 = Math.random() < 0.5 ? 1 : -1;
+      const half = side => sq(cx, cy, 4).filter(([x, y]) => (horiz ? (y - cy) * s1 : (x - cx) * s1) * side > 0 || ((horiz ? y - cy : x - cx) === 0 && side < 0));
+      waves.push(() => half(1));
+      waves.push(() => half(-1));
+    },
+    // 종막의 묘귀 (도성의 흔적): tombstones rise every other tile both ways, then those between, then the rest
+    tombs(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, par = ([x, y]) => [(x - cx + 40) % 2, (y - cy + 40) % 2];
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return !u && !v; }));
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return u && v; }));
+      waves.push(() => sq(cx, cy, 4).filter(t => { const [u, v] = par(t); return u !== v; }));
+    },
+    // 핏빛 백작 (지하 묘지): a thread of blood from its mark to it (and a pool where it stood), then it drinks — all round itself
+    drain(waves, b) {
+      const t0 = aim();
+      waves.push(() => ray(b.tx, b.ty, Math.atan2(t0.ty - b.ty, t0.tx - b.tx), 1, Math.hypot(t0.tx - b.tx, t0.ty - b.ty), sq(t0.tx, t0.ty, 1)));
+      waves.push(() => sq(b.tx, b.ty, 3, [], 1));
+    },
+    // 고통의 처녀 (고통의 전당): the iron maiden's walls about its mark (a box), then its doors shut — the inside
+    maiden(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), cx = t0.tx, cy = t0.ty, inBox = (a, w) => { const out = []; for (let k = -a; k <= a; k++) for (let o = -w; o <= w; o++) out.push([cx + d[0] * k + px * o, cy + d[1] * k + py * o]); return out; };
+      const key = ([x, y]) => x + ',' + y, inner = new Set(inBox(2, 1).map(key));
+      waves.push(() => inBox(3, 2).filter(t => !inner.has(key(t))));
+      waves.push(() => inBox(2, 1));
+    },
+    // 공포의 군주 (혼돈의 성역): a cage of bone round its mark (the bars), then fire within it — out over the fallen bars
+    bonecage(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      waves.push(() => sq(cx, cy, 2, [], 1));
+      waves.push(() => sq(cx, cy, 1));
+    },
+    // 파괴의 군주 (세계석 요새): waves of ruin out along the four ways from it, three wide, two tiles a wave
+    ruin(waves, b) {
+      for (let i = 0; i < 3; i++) waves.push(() => { const out = []; for (const dd of DIRS) line(b.tx, b.ty, dd, 2 * i + 1, 2 * i + 2, out, 1); return out; });
+    },
+    // 소 왕 (비밀의 소 레벨): the herd runs across in rows about its mark (four rows), then four rows more
+    herd(waves, b) {
+      const t0 = aim(), rows = [-4, -3, -2, -1, 0, 1, 2, 3, 4].sort(() => Math.random() - 0.5), dir = Math.random() < 0.5;
+      const run = ys => { const out = []; for (const o of ys) for (let k = -9; k <= 9; k++) out.push(dir ? [t0.tx + k, t0.ty + o] : [t0.tx + o, t0.ty + k]); return out; };
+      waves.push(() => run(rows.slice(0, 4)));
+      waves.push(() => run(rows.slice(4, 8)));
+    },
+    // 사슴왕 (왕초보사냥터): a kick in front, then a kick behind (the first ground's boss: small and slow)
+    kick(waves, b) {
+      const t0 = aim(), d = way(b, t0);
+      waves.push(() => sq(b.tx + d[0] * 2, b.ty + d[1] * 2, 1));
+      waves.push(() => sq(b.tx - d[0] * 2, b.ty - d[1] * 2, 1));
+    },
+    // 바닷속: a current in slanting bands two wide about its mark, then the bands between
+    current(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, s1 = Math.random() < 0.5 ? 1 : -1;
+      const band = par => sq(cx, cy, 4).filter(([x, y]) => ((((x - cx) + s1 * (y - cy)) % 4 + 4) % 4 < 2) === par);
+      waves.push(() => band(true));
+      waves.push(() => band(false));
+    },
+    // 환상의 섬: fruit dropped where its mark stands and two more beside, three times
+    coconut(waves, b) {
+      for (let i = 0; i < 3; i++) waves.push(() => { const t = aim(), out = box(t.tx, t.ty, 2, 2); for (let j = 0; j < 2; j++) box(t.tx + Math.floor(rand(-4, 4)), t.ty + Math.floor(rand(-3, 3)), 2, 2, out); return out; });
+    },
+    // 환상의 섬 화산: magma up through the ground in three columns about its mark, then three rows
+    magma(waves, b) {
+      const t0 = aim(), pick = () => [-4, -3, -2, -1, 0, 1, 2, 3, 4].sort(() => Math.random() - 0.5).slice(0, 3);
+      waves.push(() => { const out = []; for (const o of pick()) for (let k = -5; k <= 5; k++) out.push([t0.tx + o, t0.ty + k]); return out; });
+      waves.push(() => { const t = aim(), out = []; for (const o of pick()) for (let k = -5; k <= 5; k++) out.push([t.tx + k, t.ty + o]); return out; });
     },
     // 왕궁의 요괴: its mark and its mark's mirror through the boss, then the two reflections across
     mirror(waves, b) {
@@ -6991,6 +7150,13 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (G.hunt && !G.dead && !(G.player.inv > 0)) { Hunt.hurtTaken(dmg); Hunt.hurtBy(from); } // 사냥 기믹: 받은 피해, 정예 속성
   const p = G.player;
   if (G.buffs.guard > G.t || p.inv > 0) return;
+  // 회피 (data.js CLASSES evade, 도적 손질 2026-11-28): the quick one steps out of a monster's blow now and then — not a
+  // red floor's, not a war's fighter
+  if (G.cls.evade && from && from.m && !from.war && !pierce && Math.random() < G.cls.evade) {
+    p.inv = 0.12;
+    if (G.t - (p.evadeShown || -9) > 0.5) { p.evadeShown = G.t; floatText(p.x, p.y - 64, '회피', '#d8d0ff'); }
+    return;
+  }
   // 방어: a share of each blow, not a flat amount (taken off flat, a good shield turned every
   // monster's bite into 1): 10 cuts a third, 20 half, never more than 70%.
   // A raid boss's blows are measured on the hero's life and go through armor.
@@ -7254,12 +7420,15 @@ function hurtEnemy(e, dmg, push = null) {
   // The hero's own blow (not a party member's, a summon's, or a 격's own) may loose a 격.
   if (!G.allyHitting && !G.procHitting) gyeokProc('hit', e);
   // A 치명타 shakes the screen a little (손맛 예산: no longer stops the world).
+  // (직업별 손맛, data.js CLASS_FEEL: a heavy class's 치명타 shakes harder, and on a big one close in stops the world a blink)
   if (crit && !G.stage.raid && G.t - (G.critShakeAt ?? -9) > 0.4) {
+    const cf = G.allyHitting || G.procHitting ? FEEL_PLAIN : clsFeel();
     G.critShakeAt = G.t;
-    G.shake = Math.max(G.shake, 0.08);
+    G.shake = Math.max(G.shake, settings.calmFx ? Math.min(0.08, cf.crit) : cf.crit);
+    if (cf.stop && e.kind && e.kind !== 'treasure' && Math.max(Math.abs(e.tx - p.tx), Math.abs(e.ty - p.ty)) <= 2) hitStop(cf.stop, 'heavy');
   }
   if (e.hp <= 0) killEnemy(e);
-  else audio.play('hit');
+  else audio.play('hit', 'hit', 1, G.allyHitting || G.war ? 1 : clsFeel().rate); // (직업별 손맛: a heavy class's thud, a light one's tick)
   return dmg;
 }
 
@@ -7296,6 +7465,12 @@ function allyStrike(e, dmg, shown) {
 //           Lancer_F_02_Hit, Monk_ConsecutivePunch, Fighter_BodyCheck_Hit_Up, Reaper_WindSlash_Hit3)
 //   hit   — a small flash on each monster struck (Fighter_BodyCheck_Hit_Up, 0026_Break_Hit, ...)
 // Budgeted: a crowd of thirty struck at once shows a handful, not thirty.
+/** This class's weight of a blow (data.js CLASS_FEEL): the jolt, the thud, the shake, the stop; out of a war's or a raid's
+ *  crowd as it was (the blows there are many hands'). */
+const FEEL_PLAIN = { kick: 4, kickT: 0.1, fling: 0, rate: 1, crit: 0.08, stop: 0 };
+function clsFeel() {
+  return (G && G.cls && CLASS_FEEL[G.cls.id]) || FEEL_PLAIN;
+}
 const MELEE_LOOK = {
   warrior: { slash: 'h_ml_slash', ss: 0.95, hit: 'h_ml_burst', hs: 0.34, turn: true },
   rogue: { slash: 'h_ml_cross', ss: 0.42, hit: 'h_ml_spark', hs: 0.8 },
@@ -7769,7 +7944,9 @@ function killEnemy(e) {
   // brings, three times in ten, one of the 수리검 skills ready at once (at most once in three seconds)
   const jg = SKILLS.r_jugeum && SKILLS.r_jugeum.proc9;
   if (jg && G.cls.id === 'rogue' && !G.allyHitting && (promoOf('rogue') >= 9 || G.training) && G.t >= (G.jugeumAt || 0) && Math.random() < jg.chance) {
-    const ready = G.skills.filter(s => jg.ids.includes(s.id) && s.timer > 0.3);
+    // (도적 손질 2026-11-28: 묵마수리검'쇄 brought back while its eight kunai still stood laid set over set — five at
+    // once at 3 s a kill, half the 도적's whole damage, 9차 best gear 8~17만 a second: its kunai must be down first)
+    const ready = G.skills.filter(s => jg.ids.includes(s.id) && s.timer > 0.3 && !(s.id === 'r_chainstar' && G.t < (G.swaeUntil || 0)));
     if (ready.length) {
       ready[Math.floor(Math.random() * ready.length)].timer = 0.05;
       G.jugeumAt = G.t + jg.cd;
@@ -8500,7 +8677,9 @@ function inCastFx(fn) {
   try { return fn(); } finally { FXC--; }
 }
 function cast(skill, st) {
-  return inCastFx(() => castNow(skill, st));
+  // (G.castId: whose blows these are, for the tests' share by skill — tally, later)
+  const c0 = G.castId; G.castId = skill.id;
+  try { return inCastFx(() => castNow(skill, st)); } finally { G.castId = c0; }
 }
 function castNow(skill, st) {
   const def = SKILLS[skill.id];
@@ -8556,7 +8735,8 @@ function castNow(skill, st) {
     const end = to || { x: e.x, y: e.y - 20 };
     const q = from || (pj && pj.sky ? { x: end.x - TILE * pj.sky * 0.3 * Math.sign(e.x - G.player.x || 1), y: end.y - TILE * pj.sky } : { x: G.player.x, y: G.player.y - 26 });
     const dx = end.x - q.x, dy = end.y - q.y;
-    const fl = projFly(pj, Math.hypot(dx, dy)) || Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600);
+    // (직업별 손맛: a 궁사's arrow crisper in flight than a 도사's charm — data.js CLASS_FEEL fly)
+    const fl = (projFly(pj, Math.hypot(dx, dy)) || Math.min(0.22, 0.08 + Math.hypot(dx, dy) / 1600)) * (SH ? 1 : clsFeel().fly || 1);
     const rot = Math.atan2(dy, dx) + Math.PI / 2, path = projPath(pj, to ? null : e);
     // (def.shotTiles: a thrown thing longer than a body — 무형투창's spear, 사용자 2026-11-23: 표창 같다 — drawn that
     // many tiles long, its own length, not the 1.4 of a shot)
@@ -11070,6 +11250,7 @@ const TIER_KINDS = {
     const cx = p.x, cy = p.y - 20, inRing = e => Math.hypot(e.x - cx, e.y - 20 - cy) <= R;
     if (!G.enemies.some(e => tkFoe(e) && Math.hypot(e.x - cx, e.y - 20 - cy) <= R + 24)) return 0.3;
     const run = G, n = def.n || 8, dur = def.dur || 5, alpha = settings.calmFx ? 0.75 : 1;
+    G.swaeUntil = G.t + 0.2 + dur; // (죽음의희열 waits for these to fall)
     const spots = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2, x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
@@ -12016,17 +12197,33 @@ function venomBurst(e) {
   const v = e.venom9;
   if (!v || v.until < G.t) return;
   e.venom9 = null;
+  // (도적 손질 2026-11-28: a foe felled by a burst bursts in its turn — the infected crowd went off a ring at a time
+  // across the field. Two rings at most: one felled by a burst's burst no longer bursts.)
+  const gen = G.venomBursting ? (G.venomGen || 0) + 1 : 0;
+  if (gen > VENOM_GENS) return;
   // (묵혈독's own flame, o_r_mukdok, at the original's own size; 이펙트=판정: what stands in the flame drawn — the ellipse in
   // its picture's box, measured from the sheet — is struck)
   const f = M.fx.o_r_mukdok;
   if (!f) {
     if (fxBudget('venom9', 3)) addFx('g_poison_purple', e.x, e.y - 10, { scale: 0.9, anchor: 'bottom' });
-    later(0.05, () => { G.venomBursting = true; for (const o of around(e.tx, e.ty, 1)) if (o !== e) hurtEnemy(o, v.burst); G.venomBursting = false; });
+    later(0.05, () => venomStrike(around(e.tx, e.ty, 1).filter(o => o !== e), v.burst, gen));
     return;
   }
   if (fxBudget('venom9', 3)) addFx('o_r_mukdok', e.x, e.y - 10, { anchor: 'bottom' });
   const k = f.k || 1, hx = f.w * k / 2, hy = f.h * k / 2, cx = e.x + (f.w / 2 - f.ax) * k, cy = e.y - 10 + (f.h / 2 - f.ay) * k;
-  later(0.05, () => { G.venomBursting = true; for (const o of G.enemies.slice()) if (o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1) hurtEnemy(o, v.burst); G.venomBursting = false; });
+  later(0.05, () => venomStrike(G.enemies.filter(o => o !== e && tkFoe(o) && ((o.x - cx) / hx) ** 2 + ((o.y - 20 - cy) / hy) ** 2 <= 1), v.burst, gen));
+}
+const VENOM_GENS = 1; // the bursts of foes felled by a cast's blows, and of those their bursts fell; no further
+const VENOM_GAP = 0.3; // one burst's blow on a foe in that many seconds (overlapping flames in a heap: one, not five)
+function venomStrike(foes, dmg, gen) {
+  const b0 = G.venomBursting, g0 = G.venomGen;
+  G.venomBursting = true; G.venomGen = gen;
+  for (const o of foes) {
+    if (G.t - (o.venomHitAt ?? -9) < VENOM_GAP) continue;
+    o.venomHitAt = G.t;
+    hurtEnemy(o, dmg);
+  }
+  G.venomBursting = b0; G.venomGen = g0;
 }
 
 /** A companion's view of a 차수별 기술: the plain kind it casts it as (def.ck), or the skill as it is. */
@@ -12912,6 +13109,7 @@ function later(delay, fn) {
   if (SH) { const ctx = SH, f0 = fn; fn = () => inShadow(ctx, f0); }
   // (a step of a skill's cast draws as the cast does: FXC, 보이는 범위 = 맞는 범위)
   if (FXC) { const f1 = fn; fn = () => inCastFx(f1); }
+  if (G && G.castId) { const cid = G.castId, f2 = fn; fn = () => { const c0 = G.castId; G.castId = cid; try { f2(); } finally { G.castId = c0; } }; }
   timers.push({ at: G.t + delay, fn, run: SH ? SH.real : G });
 }
 
@@ -13592,6 +13790,8 @@ function drawWayOut(pt, now) {
 // A tap on it goes 작게 ↔ 크게; the keys under it: in 크게 + · - · 나 (back on the hero, following) · 작게; in 작게 접기;
 // folded, its tab opens it. Each map's state is kept in the settings (settings.mm).
 const MM_ZMAX = 3;
+// (마을: its minimap picture is small — at ×3 it was a blur — so ×2 at most)
+const MM_ZMAX_OF = { town: 2 };
 const mmViews = {};
 const mmDrawn = {}; // id -> { T, keys, hit, at } (the minimap as last drawn: what a touch lands on)
 function mmView(id, mode = 'small') {
@@ -13733,7 +13933,7 @@ function mmZoom(T, f, px = null, py = null) {
   if (v.mode !== 'big') return;
   if (px === null) { px = r.x + r.w / 2; py = r.y + r.h / 2; }
   const wx = T.x0 + (px - r.x) / T.k, wy = T.y0 + (py - r.y) / T.k;
-  const z1 = Math.max(1, Math.min(MM_ZMAX, v.z * f)), k1 = r.w / (T.mw / z1);
+  const z1 = Math.max(1, Math.min(MM_ZMAX_OF[T.id] || MM_ZMAX, v.z * f)), k1 = r.w / (T.mw / z1);
   const x0 = wx - (px - r.x) / k1, y0 = wy - (py - r.y) / k1;
   v.z = z1;
   v.follow = z1 <= 1;
@@ -16524,12 +16724,16 @@ const AREA_KINDS = new Set(['screen', 'nova', 'cleave', 'aura', 'line', 'spell4'
 // A class's signature spell (its identity: the 도적's 투명, which opens every 암습): offered more
 // often, and the 자동 선택 takes it.
 const SIGNATURE = { rogue: 'r_stealth' };
+// (도적 손질 2026-11-28: the 도적's strikes are dashes — 비영승보·백호검무·이기어검·은형참절도·멸화의검 are kind 'blink' with blows of
+// their own — and the 자동 선택 took them for a caster's step (3): a 도적 went into 하월·사휘도 on 뇌진주 alone, 70 a second, and fell
+// in a minute. A 도적's striking dash is an attack.)
+const cardAttack = d => !SUPPORT_KINDS.has(d.kind) || (d.kind === 'blink' && d.dmg > 0 && G.cls.id === 'rogue');
 function cardScore(o) {
   const p = G.player, low = p.hp < p.maxHp * 0.45;
-  const attacks = G.skills.filter(s => !SUPPORT_KINDS.has(SKILLS[s.id].kind)).length;
+  const attacks = G.skills.filter(s => cardAttack(SKILLS[s.id])).length;
   const kept = ((progress.builds || {})[G.cls.id] || { skills: [] }).skills.map(x => x[0]);
   if (o.type === 'skill') {
-    const d = SKILLS[o.id], attack = !SUPPORT_KINDS.has(d.kind);
+    const d = SKILLS[o.id], attack = cardAttack(d);
     let v;
     if (o.from) return (attack ? 14 : 9) + (d.promo || 0) - (SKILLS[o.from].promo || 0) + (kept.includes(o.id) ? 3 : 0);
     if (o.lv > 1) {
@@ -18728,8 +18932,10 @@ function render(now) {
     // A close-in fighter's blows knock harder: further, and easing back (연's struck jolt).
     const kt = b.kickAt !== undefined ? G.t - b.kickAt : 9, hard = MELEE_LOOK[G.cls.id] && !G.war;
     // Flung by a heavy technique: out half a tile at once, back over a quarter second.
-    const kick = hard && b.kickBig ? (kt < 0.26 ? 22 * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
-      : hard ? (kt < 0.16 ? 8 * (1 - kt / 0.16) : 0) : kt < 0.1 ? 4 : 0;
+    // (직업별 손맛, data.js CLASS_FEEL: a 도깨비's club throws them further and slower back than a 도적's quick cuts)
+    const cf = G.war ? FEEL_PLAIN : clsFeel(), fl = cf.fling || 22, kT = cf.kickT || 0.16;
+    const kick = hard && b.kickBig ? (kt < 0.26 ? fl * Math.min(1, kt / 0.04) * (1 - Math.max(0, kt - 0.04) / 0.22) : 0)
+      : hard ? (kt < kT ? cf.kick * (1 - kt / kT) : 0) : kt < kT ? cf.kick * (1 - kt / kT) : 0;
     const kk = b.kind === 'boss' || b.kind === 'mini' ? kick * 0.5 : kick;
     const lx = (b.lunge > 0 ? Math.sign(p.x - b.x) * 3 : 0) + (b.kdx || 0) * kk;
     const ly = (b.lunge > 0 ? Math.sign(p.y - b.y) * 3 : 0) + (b.kdy || 0) * kk;
