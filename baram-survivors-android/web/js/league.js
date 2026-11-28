@@ -132,16 +132,17 @@ export function warRule(week = gwoeWeek()) {
 // The league's 경지 is a ladder that falls back every season; this is what stays: 문파 공훈 (pr.guild.gh), earned by every war,
 // 난투 and 「쟁」 (more for a win and for the points it brought) and by the league's weekly goals, spent on six 문파 기술 of three
 // levels each, in three rows (a row opens once enough levels are learnt in the rows above). Only our guild has them, so each
-// is small: all eighteen levels against none won 3 of 9 → 5 of 9 (a fighting bot, 청룡·현무 수성·난투) at the first numbers
-// (shrine 4 s, rise 0.7 s, ram 8%, supply 10%, tactic 6%, banner 8% a level), so a quarter less (docs/9cha_rules.md);
-// 초기화 gives everything back, so a build can be tried. war.js reads them through guildK.
+// is small. At the first numbers (shrine 4 s, rise 0.7 s, ram 8%, supply 10%, tactic 6%, banner 8% a level) all eighteen levels
+// took 청룡전 11 of 12 against 3 of 12 with none (a fighting bot; the 25 risen sooner and the 거점 turned faster); now
+// 3 of 6 against 4 of 6 (docs/9cha_rules.md, 엔드게임 2차). 초기화 gives everything back, so a build can be tried.
+// war.js reads them through guildK.
 export const GUILD_SKILLS = [
   { id: 'shrine', row: 0, name: '신단 수호', per: 3, desc: n => `우리가 차지한 신단의 힘이 ${n}초 더 간다` },
-  { id: 'rise', row: 0, name: '회생술', per: 0.5, desc: n => `우리 문파가 쓰러진 뒤 ${n.toFixed(1)}초 빨리 일어난다 (영웅 포함, 쟁도)` },
+  { id: 'rise', row: 0, name: '회생술', per: 0.3, desc: n => `우리 문파가 쓰러진 뒤 ${n.toFixed(1)}초 빨리 일어난다 (영웅 포함, 쟁도)` },
   { id: 'ram', row: 1, name: '공성 장인', per: 0.06, desc: n => `현무전: 우리 충차 체력 +${Math.round(n * 100)}% · 수성에서 적 충차를 ${Math.round(n * 100)}% 빨리 태운다` },
-  { id: 'supply', row: 1, name: '보급로', per: 0.08, desc: n => `우리가 나른 보급 상자의 효과 +${Math.round(n * 100)}%` },
+  { id: 'supply', row: 1, name: '보급로', per: 0.06, desc: n => `우리가 나른 보급 상자의 효과 +${Math.round(n * 100)}%` },
   { id: 'tactic', row: 2, name: '분대 전술', per: 0.05, desc: n => `전술 키(집중·총공격·후퇴) 대기 −${Math.round(n * 100)}% · 집중한 적에게 피해 +${Math.round(n * 50)}%p` },
-  { id: 'banner', row: 2, name: '문파 깃발', per: 0.06, desc: n => `신단·거점·쟁 신단을 ${Math.round(n * 100)}% 빨리 차지한다` },
+  { id: 'banner', row: 2, name: '문파 깃발', per: 0.06, desc: n => `신단·쟁 신단을 ${Math.round(n * 100)}%, 거점을 ${Math.round(n * 50)}% 빨리 차지한다` },
 ];
 export const GUILD_MAX = 3;
 export const GUILD_COST = [20, 40, 70];

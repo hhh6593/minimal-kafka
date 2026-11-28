@@ -3065,7 +3065,7 @@ function capture(W, dt) {
     if (!push) continue;
     const before = f.owner;
     // prog runs -1 (ours) .. 1 (theirs); a flag turns neutral at 0.
-    f.prog = clamp(f.prog - push * dt * FLAG_TURN * (push > 0 ? 1 + gk(W, 'banner') : 1), -1, 1);
+    f.prog = clamp(f.prog - push * dt * FLAG_TURN * (push > 0 ? 1 + 0.5 * gk(W, 'banner') : 1), -1, 1);
     if (f.prog <= -1 && f.owner !== 0) f.owner = 0;
     else if (f.prog >= 1 && f.owner !== 1) f.owner = 1;
     else if (Math.abs(f.prog) < 0.05 && f.owner !== -1 && Math.sign(-push) !== (f.owner === 0 ? -1 : 1)) f.owner = -1;
@@ -6961,12 +6961,12 @@ function drawRageRings(G, ctx) {
   if (!bl || !bl.safe) return;
   const k = Math.max(0, 1 - (bl.at - G.t) / (bl.warn || 1.6));
   ctx.save();
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 5;
   for (const [tx, ty] of bl.safe) {
     const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2, R = RAID_RAGE.r * TILE;
     ctx.beginPath();
     ctx.ellipse(x, y, R, R * 0.62, 0, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,250,230,${(0.16 + 0.1 * k).toFixed(3)})`;
+    ctx.fillStyle = `rgba(255,250,230,${(0.22 + 0.14 * k).toFixed(3)})`;
     ctx.fill();
     ctx.globalAlpha = 0.65 + 0.35 * Math.sin(G.t * 6);
     ctx.strokeStyle = '#fff6d8';
