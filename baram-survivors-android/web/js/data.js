@@ -1659,6 +1659,12 @@ Object.assign(SKILLS.m_frost, { frac: 0.35, dropMax: 40 }); // (그 흰 눈구�
 // 연 궁사 그림(Skill_Effect_Acher_ReinForceArrowTornado_Hit → k_a_chasearrow, 쓰이지 않던 프리팹)으로. 한 칸에 몸 하나 크기(1.4×1.3칸),
 // 화살이 꽂히는 0.76초(10번째 그림)에 그 칸의 몬스터가 맞음 — game.js line rowFx. 돌진은 그대로.
 Object.assign(SKILLS.a_chase, { rowFx: 'k_a_chasearrow', rowHit: 0.76 });
+// 광폭기조사 (사용자 2026-11-28, 공식 미리보기 GIF 4_gwangpokgijosa = 연 Skill_Effect_Warlock_Frenzy_Ray = k_x_md_ray_beam, 겹침 1.0):
+// 연 설명 "대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아낸다" — 하늘에서 보랏빛 줄기가 대상에 내리꽂히고 가시 고리가 둘레로 퍼진다.
+// 우리 게임은 이 그림을 일곱 칸 줄 위에 1.3칸 폭으로 눌러 펴 그렸다(보라 기둥이 줄을 따라 누움). → 대상 둘레(5×5, 고리 지름과 같음)를 치는
+// strike로, 그림은 그 칸 위에 원래 모양 그대로(고리가 맞는 칸), 맞은 몸마다 연의 적중 그림(k_md_ray). 고리가 터지는 0.2초(4번째 그림)에 맞음.
+Object.assign(SKILLS.md_ray, { kind: 'strike', fx: 'k_x_md_ray_beam', fxOwn: true, yeon: true, fxHit: 'k_md_ray', range: 7, radius: 2, count: 1, hitAt: 0.2, depth: undefined, dmg: 24,
+  desc: '대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아부어 대상과 그 둘레 두 칸의 몬스터를 친다' });
 Object.assign(SKILLS.m_shift, { kind: 'spell', range: 5, count: 1, desc: '마기를 실은 푸른 불꽃을 바라보는 쪽 몬스터에게 순식간에 꽂는다' });
 // 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
 Object.assign(SKILLS.r_formless, { kind: 'cleave', depth: 2, max: 4 });
