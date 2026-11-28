@@ -1111,6 +1111,7 @@ export const War = {
   raidEnd: (win, title) => raidEnd(win, title),
   raidShow: () => showResult(A.G().war),
   raidRoles: cls => rolesFor(cls),
+  raidRoleOf: cls => raidRoleOf(cls),
   ROLES,
 };
 
@@ -3128,7 +3129,9 @@ function escort(W, dt) {
 // 3:30~4:25 before, once not at all; 215 gives back the gate's old time.)
 // (215 → 240, 2026-11-28 대규모 전투 맵 확장: the siege's squads now come to the gate as one (분대 이동) and fall back to gather
 // rather than feed (재집결): the gate fell at its floor, 3:30, and the defence that only fought lost 4 of 4 — balance runs.)
-const GATE_SEC = 240;
+// (240 → 300, 엔드게임 2026-11-28: the 충차 and the shrines' gifts came on top of the guild's blows — the gate fell at 2:50~3:20
+// and the defence that fought lost 2 of 2; the guild's own blows alone now take five minutes, the ram and the 화약 make the rest.)
+const GATE_SEC = 300;
 function siege(W, dt) {
   // The commander of the defence can be reached only once the gate is down.
   const def = 1 - W.attacker, c = W.teams[def].cmd;
@@ -5956,6 +5959,17 @@ const RAID = { cols: 64, rows: 46, camp: [32, 37], lair: [32, 16], heroU: 8.0, h
 /** The hero's blows a second in a raid (its unit at its 전투력, see RAID.heroU). */
 const raidHeroRate = W => W.U * RAID.heroU * (W.heroPw || 1);
 /** How many times the hero gets up in a raid of this rung (멧돼지왕 2 … 아이라바타 18). */
+/**
+ * The raid role of a class (settings.raidRoles, by class). One choice for every class (settings.raidRole) carried a 전사's
+ * 탱커 over to the 무사 and the 차사 that never chose it: a light tank at the boss, down at once, the raid after it
+ * (엔드게임 점검 2026-11-28). The old single choice still counts for a class whose own roles hold it.
+ */
+function raidRoleOf(cls) {
+  const set = A.settings(), own = set.raidRoles && set.raidRoles[cls.id];
+  if (ROLES[own]) return own;
+  if (ROLES[set.raidRole] && rolesFor(cls).includes(set.raidRole) && (set.raidRole !== 'tank' || cls.id === 'warrior')) return set.raidRole;
+  return cls.id === 'poet' ? 'healer' : cls.id === 'warrior' ? 'tank' : 'dps';
+}
 export function raidRevives(level) {
   return level <= 7 ? 5 : level <= 13 ? 4 : 3;
 }
@@ -5965,7 +5979,7 @@ const dk = (x, y) => (x + 1000) * 10000 + (y + 1000);
 function raidSetup() {
   const G = A.G(), st = G.stage, p = G.player, set = A.settings();
   const roles = rolesFor(G.cls);
-  const role = ROLES[set.raidRole] ? set.raidRole : G.cls.id === 'poet' ? 'healer' : G.cls.id === 'warrior' ? 'tank' : 'dps';
+  const role = raidRoleOf(G.cls);
   const { cols, rows } = RAID;
   const W = G.war = {
     raid: true, def: { id: st.id, name: st.name, title: st.title || '레이드' }, mode: 'raid', role, side: 'atk', t: 0, left: A.RAID_LIMIT, over: false,
@@ -9113,7 +9127,7 @@ function hudText(t, x, y, color) {
 //   whoever holds its ring 4 s alone gets its gift for 30 s (투신 +15% blows, 금강 −15% taken, 청풍 +20% pace and mending).
 //   The hero's choice: the shrine (its presence tips it) or the objective — the shrine is never where the main fight is.
 // - 충차 (현무전): the siege's ram rolls from the attack's camp to the gate when the attack outnumbers the defence round it
-//   and strikes the gate every 4 s (2.5%); every defender beside it burns it (the hero counts twice) — the defence must
+//   and strikes the gate every 4 s (2%); every defender beside it burns it (the hero counts twice) — the defence must
 //   sortie by the 쪽문, the attack must escort it.
 // - 주간 전장 규칙 (league.js WAR_RULES), the war's moments (the results' 결정적 순간, and the measurements), MVP of each side,
 //   the 문파 리그 on the board and the results.
@@ -9309,13 +9323,13 @@ function ramTick(W, dt) {
   if (r.beat >= 4) {
     r.beat = 0;
     r.hits++;
-    const d = W.gate.maxHp * 0.025 * r.k;
+    const d = W.gate.maxHp * 0.02 * r.k;
     W.gate.hp -= d;
     r.gateDmg += d / W.gate.maxHp;
     W.gate.flash = 0.15;
     if (Math.hypot(G.player.tx - r.tx, G.player.ty - r.ty) < 10) G.shake = Math.max(G.shake || 0, 0.15);
     A.audio().play('war_hit');
-    if (r.hits === 1) { A.say(`충차가 성문을 들이받습니다! (4초마다 성문 −${(2.5 * r.k).toFixed(1)}%)`, att === 0 ? 'sys' : 'warn'); moment(W, '충차가 성문을 들이받음', att, { kind: 'ramGate' }); }
+    if (r.hits === 1) { A.say(`충차가 성문을 들이받습니다! (4초마다 성문 −${(2 * r.k).toFixed(1)}%)`, att === 0 ? 'sys' : 'warn'); moment(W, '충차가 성문을 들이받음', att, { kind: 'ramGate' }); }
     if (W.gate.hp <= 0) gateBreak(W, null);
   }
 }

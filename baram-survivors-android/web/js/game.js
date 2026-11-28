@@ -1534,7 +1534,7 @@ function raidInfo(r) {
   const party = CLASSES.filter(c => c !== chosenClass && best[c.id] && best[c.id].lvl >= 8).map(c => `${c.name} Lv ${best[c.id].lvl}`);
   const rec = best[chosenClass.id], start = raidStart(rec, chosenClass.id);
   const roles = War.raidRoles(chosenClass);
-  const role = War.ROLES[settings.raidRole] ? settings.raidRole : chosenClass.id === 'poet' ? 'healer' : chosenClass.id === 'warrior' ? 'tank' : 'dps';
+  const role = War.raidRoleOf(chosenClass);
   const tower = r.floors ? `${r.floors.length}층 탑 · 문지기 ${r.floors.filter(f => f.boss).map(f => f.boss.name).join('·')} → ` : ''; // 신 용궁 탑
   $('#stage-info').innerHTML = `<h3>${r.name}</h3><div class="lv">${tower}보스 ${r.boss.name} · ${RAID_BOSS_AT}초에${r.floors ? ' 1층 문지기' : ''} 등장 · ${RAID_LIMIT / 60}분 안에</div>
     <p>${r.intro}. 바닥이 붉게 깜빡이는 칸은 곧 내리친다: 한 칸씩 걸어 피하라.</p>
@@ -1549,7 +1549,7 @@ function raidInfo(r) {
     }).join(' · ')}</div>
     <div class="state">${raidOpen(r) ? '25인 공격대 레이드' : raidLock(r)}</div>`;
   $('#stage-info').querySelectorAll('[data-rrole]').forEach(b => {
-    b.onclick = () => { settings.raidRole = b.dataset.rrole; saveJson('bs_settings', settings); raidInfo(r); };
+    b.onclick = () => { (settings.raidRoles = settings.raidRoles || {})[chosenClass.id] = b.dataset.rrole; saveJson('bs_settings', settings); raidInfo(r); };
   });
   // How the hero starts: its recorded build, or picking cards as on a hunting ground.
   const sw = document.createElement('button');
