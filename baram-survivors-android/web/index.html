@@ -97,7 +97,13 @@
   #map-tabs button.on { color: #2a1606; background: #d8b070; border-color: #f0d49c #5a3212 #5a3212 #f0d49c; }
   #map { position: relative; padding: 0; overflow: hidden; }
   #map img { display: block; height: calc(100vh - 52px); max-width: 56vw; object-fit: contain; }
-  .pin { position: absolute; transform: translate(-50%, -100%); padding: 0; background: none; border: 0;
+  /* 지도 확대·이동 (game.js mapZoomBind): the picture and its pins in one layer; the pins keep their size (--iz undoes the zoom). */
+  #map:not(.raids) { touch-action: none; }
+  #map-in { position: relative; transform-origin: 0 0; }
+  .map-zoom { position: absolute; right: 4px; bottom: 4px; z-index: 4; display: flex; flex-direction: column; gap: 3px; }
+  .map-zoom button { min-width: 32px; height: 28px; padding: 0 5px; font: 700 13px/1 G9, monospace; color: #2a1606; background: #d8b070;
+      border: 2px solid; border-color: #f0d49c #5a3212 #5a3212 #f0d49c; opacity: .92; }
+  .pin { position: absolute; transform: translate(-50%, -100%) scale(var(--iz, 1)); transform-origin: 50% 100%; padding: 0; background: none; border: 0;
       display: flex; flex-direction: column; align-items: center; }
   .pin span { padding: 0 3px; font: 10px/13px G9, monospace; white-space: nowrap; color: var(--text);
       background: rgba(13, 7, 3, .82); border: 1px solid var(--mid); }

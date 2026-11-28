@@ -112,6 +112,7 @@ export function specialName(sp, cls) {
 // (Before: 15 / 13.5 at ★1 with no top: 아이라바타's bow at ★5 struck ×3.29, over the 용무기 제십.)
 // Armour, shields, helmets and capes: 15 / 17 (아이라바타's plain armour is 14 already).
 export const SPECIAL_RANK = { weapon: { cap: 14.5, top: 16 }, other: { cap: 15, top: 17 }, powerEdge: 3 };
+export const LATE_SPECIAL = { from: 16, under: 2 };
 function specialCaps(sp) {
   const c = SPECIAL_RANK[sp.kind === 'weapon' ? 'weapon' : 'other'];
   const cut = sp.kind === 'weapon' && (sp.opts || [sp.opt && sp.opt.id]).includes('power') ? SPECIAL_RANK.powerEdge : 0;
@@ -131,6 +132,10 @@ export function specialPower(sp, cls) {
   if (!sp.raid && t >= 0 && !plainList(cls, sp.kind).includes(t) && !raidOwner(cls, sp.kind, t)) t = rankBase(sp, cls);
   let base = gearPower(cls, sp.kind, t);
   if (!sp.raid && raidOwner(cls, sp.kind, t)) base = Math.min(base, Math.max(gearPower(cls, sp.kind, rankBase(sp, cls)), raidPowAt(sp.rank)));
+  // 무기 드랍처 점검 (2026-11-28): past the grounds' own line (L16 up: 지옥 앞, 지옥·하늘 아래, 심연) every ground's special
+  // counted the line's last piece (파천비창 6 → 7.5), under the raids of its level by 5~7 ranks: twenty-two grounds whose
+  // finds nobody wore. There a ground's special counts LATE_SPECIAL under the strongest raid of its level (L19~26: 12 → 13~13.5).
+  if (!sp.raid && sp.rank >= LATE_SPECIAL.from) base = Math.max(base, raidPowAt(sp.rank) - LATE_SPECIAL.under);
   return Math.min(specialCaps(sp).cap, base + 1 + (sp.gyeok || sp.ward ? 0.5 : 0));
 }
 /** The set power of the strongest raid of a level or below (0 below the first). */
@@ -384,6 +389,14 @@ export const CRAFTS = [
     look: { warrior: '비늘남자갑주', rogue: '황혼의갑주', mage: '용왕의용포', poet: '여명의치마', archer: '황혼의갑주', lancer: '감시자남자경갑', monk: '혈귀혼남자대련복', magus: '금고급현복', celestial: '파수꾼천의', dokkaebi: '혈귀혼귀의', reaper: '해태 흑의' }, pow: 14, opt: 'life',
     mats: { sinsu_hyeonmu: 8, scale: 20, scroll: 2 }, gold: 30000, sinsu: true },
 ];
+// 무기 드랍처 점검 (2026-11-28): the legendary sets were made of materials the first raids give (금린 from 산군 L3 and
+// 도깨비대장 L5, 순수의 강철 from 흑술사 L9, 영혼석 from 해골굴 L8), so a 화첨창 (11.5) or 백일신창 (12.5) could be had at
+// L3~9, where the grounds' weapons are 2~5 and the raids' 3~8 — every step after it was no step. Each set now opens
+// where its weapon is a notch over the raid of the level (needs: as the 심판의낫's): 고대마령 at 흑술사 (L9, raid 8 → 10),
+// 금린 at 제천대성 (L13, 10 → 11.5), 무신(순수의 강철) and 백제 금동장 at 태염무신 (L14, 11 → 12.5), 브리트라한 at 브리트라
+// (L16, 12 → 13.5; it was 13.5 at L9 out of the 고대마령 at ★5). Pieces made already keep.
+const LEGEND_GATE = { cr_maryeong_: 'raid_sorcerer', cr_gold_: 'raid_wukong', cr_steel_: 'raid_musin', cr_baekje_weapon3: 'raid_musin', cr_brit_: 'raid_brit' };
+for (const c of CRAFTS) for (const [pre, at] of Object.entries(LEGEND_GATE)) if (c.id.startsWith(pre) && !c.needs) c.needs = at;
 for (const c of CRAFTS) {
   const sp = { id: c.id, src: 'craft', srcName: '대장장이 조합', raid: false, craft: c, kind: c.kind, opt: OPT(c.opt), rank: 0,
     gyeok: CRAFT_GYEOK[c.id] || null, base: c.base, dress: c.dress, worn: c.worn, wornBack: c.wornBack };
