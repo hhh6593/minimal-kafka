@@ -8,6 +8,7 @@ import { GYEOK, STATUS, gyeokText, dragonGyeok, DRAGON_CORE, SINSU, SOURCE_GYEOK
 import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM, YEON_VARIANTS } from './yeon_sounds.js';
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
+import { leagueGoals, leagueGoalDef, leagueGoalsReady, leagueGoalClaim, leagueGoalReward, guildOf } from './league.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
 import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, perilCostume, perilCostumes, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair, dropDyed, releaseCostume } from './costume.js';
 import {
@@ -5700,18 +5701,26 @@ function bossBrain(b, dt, o) {
   G.blastT = (G.blastT === undefined ? 12 : G.blastT) - dt;
   if (G.blastT <= 0 && !G.blast) {
     // 공대: enraged, its blasts come twice as often (and the raiders no longer cut them).
-    G.blastT = [15, 12, 10][G.phase] * (RW && G.enraged ? 0.5 : 1);
-    G.blast = { at: G.t + 1.6 };
+    // (레이드 광폭화: no longer every five seconds with no way out — 17 raiders at a time fell; see War.rageBlast:
+    // every eight, three seconds' warning and rings of shelter on the floor.)
+    const rage = G.enraged && G.war && G.war.raid;
+    G.blastT = [15, 12, 10][G.phase] * (rage ? War.RAGE.every : RW && G.enraged ? 0.5 : 1);
+    G.blast = { at: G.t + (rage ? War.RAGE.warn : 1.6), warn: rage ? War.RAGE.warn : 1.6 };
     b.bubble = { text: '모두 쓸어 주마!', t: G.t };
-    say(`${G.boss.name}이(가) 힘을 모읍니다! (광역기)`, 'warn');
-    banner('광역기 준비! 마비로 끊어라');
+    if (rage) War.rageBlast(G.blast);
+    else {
+      say(`${G.boss.name}이(가) 힘을 모읍니다! (광역기)`, 'warn');
+      banner('광역기 준비! 마비로 끊어라');
+    }
   }
   if (G.blast && G.t >= G.blast.at) {
+    const bl = G.blast;
     G.blast = null;
     G.shake = Math.max(G.shake, 0.35);
     audio.play('boss');
     for (const x of bodies()) {
-      const k = 0.26 * raidK() * (G.enraged ? 1.3 : 1);
+      const k = 0.26 * raidK() * (G.enraged ? 1.3 : 1) * (bl.safe ? War.rageBlastK(x, bl) : 1);
+      if (!(k > 0)) continue;
       if (!RW || (Math.abs(x.x - p.x) < VW / 2 && Math.abs(x.y - p.y) < VH / 2 && fxBudget('blast', 8))) addFx(G.stage.fx, x.x, x.y - 20, { scale: 0.6 });
       if (x === p) hurtPlayer(p.maxHp * k, b, true); else hurtMember(x, x.maxHp * k, b);
     }
@@ -14689,6 +14698,7 @@ function claimable() {
   for (const q of dailyQuests()) if (!progress.daily.claimed.includes(q.id) && dailyHave(q) >= q.need) n++;
   for (const q of weeklyQuests()) if (!progress.weekly.claimed.includes(q.id) && dailyHave(q) >= q.need) n++;
   if (progress.weekly.list.every(q => progress.weekly.claimed.includes(q.id)) && !progress.weekly.chest) n++;
+  if (progress.war) n += leagueGoalsReady(progress).length; // 리그 주간 목표 (league.js), once the 대항전 has been played
   for (const q of QUESTS) if (!done[q.id] && q.have(s) >= q.need) n++;
   return n;
 }
@@ -14744,6 +14754,17 @@ function openQuests() {
     payReward(chest, '주간 상자');
     banner('주간 상자를 열었습니다!');
   }, all && !W.chest ? 'ready chest' : 'chest');
+  // 리그 주간 목표 (league.js LEAGUE_GOALS): the 대항전·쟁's own four a week, paid in 문파 공훈 (the war board's 문파 기술).
+  if (progress.war) {
+    const LG = leagueGoals(progress);
+    head(`문파 리그 주간 목표 ${LG.claimed.length}/${LG.list.length} · 문파 공훈 ${guildOf(progress).gh} (대항전 게시판의 문파 기술)`);
+    for (const q of LG.list.map(leagueGoalDef)) {
+      const have = Math.min(q.need, LG.c[q.id] || 0), got = LG.claimed.includes(q.id);
+      row(q.text, `${bar(have, q.need)} · ${leagueGoalReward(q)}`, got ? '완료' : '받기', !got && have >= q.need, () => {
+        leagueGoalClaim(progress, q.id);
+      }, !got && have >= q.need ? 'ready' : '');
+    }
+  }
   head('의뢰 · 칭호');
   // Ready ones first, then the nearest to done; those claimed last.
   const order = QUESTS.map(q => ({ q, have: Math.min(q.need, q.have(s)), got: !!done[q.id] }))
@@ -18879,7 +18900,7 @@ function render(now) {
 
   // A boss gathering its 광역기: the whole floor flashes red under the bodies, as 연's boss rooms do.
   if (G.blast && G.t < G.blast.at) {
-    const k = 1 - (G.blast.at - G.t) / 1.6;
+    const k = Math.max(0, 1 - (G.blast.at - G.t) / (G.blast.warn || 1.6));
     ctx.fillStyle = `rgba(210, 30, 25, ${(0.22 + 0.2 * k) * (settings.calmFx ? 0.9 : 0.85 + 0.15 * Math.sin(G.t * 7.5))})`;
     ctx.fillRect(camX, camY, VW, VH);
   }
