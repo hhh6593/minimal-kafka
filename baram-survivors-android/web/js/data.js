@@ -18,8 +18,11 @@
 export const CLASSES = [
   { id: 'warrior', name: '전사', hero: '1001', hp: 180, dmgK: 1.6, mp: 60, speed: 66, armor: 3, start: 'w_slash', ult: 'w_ult',
     desc: '체력과 방어가 높은 격수. 연속 공격으로 가까운 적을 베어 낸다.' },
-  { id: 'rogue', name: '도적', hero: '1002', hp: 130, dmgK: 1.5, mp: 80, speed: 80, armor: 1, start: 'r_blink', ult: 'r_ult',
-    desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다.' },
+  // (도적 손질 2026-11-28: the weakest early — with 사냥터 장비 felled in a minute at 하월·사휘도, 요괴굴 — hp 130 → 160, armor 1 → 2,
+  // evade 0.18 (game.js hurtPlayer: about one monster's blow in six missed);
+  // its 9차 runaway was 묵마수리검'쇄's kunai laid set over set (game.js swae9·죽음의희열) — docs/9cha_rules.md 직업 손맛·도적·무사)
+  { id: 'rogue', name: '도적', hero: '1002', hp: 160, dmgK: 1.5, mp: 80, speed: 80, armor: 2, evade: 0.18, start: 'r_blink', ult: 'r_ult',
+    desc: '빠른 격수. 적의 뒤로 파고들어 베고, 투명해져 숨는다. 몬스터의 공격을 가끔 피한다.' },
   // dmgK 1.4: the 주술사's first weapon used to count as 태염무신's 11등급 (×2.32, avatar.js WRITTEN),
   // and its 왕초보 balance was set on that; at its true 0등급 bot clears of 왕초보 fell from 3/3 to
   // 1/5 (smart.js bot), 5/6 at 1.4. (도적·도사 kept theirs: 도사 3/4, and the 도적's losses
@@ -35,7 +38,10 @@ export const CLASSES = [
   // (무사 보강 2026-11-28, 사용자 "조금 보강": the weakest close-in fighter — 9차 best gear 0.8~1.7만 a second, half the 전사's,
   // and felled at 위험도 V. hp 160 → 185, armor 2 → 3 as every other close-in class, dmgK 1.25 → 1.42; 이계의침식 cd 8 → 7,
   // 차원개방's discs 15 → 18. Its nature kept: the spear's rows, the sweep, the dash. docs/9cha_rules.md 무사 보강.)
-  { id: 'lancer', name: '무사', hero: '1001', hp: 185, dmgK: 1.42, mp: 80, speed: 70, armor: 3, start: 'l_moon', ult: 'l_ult',
+  // (무사 2차 보강 2026-11-28, 사용자 "무사 수치도 개선": still the lowest close-in at 9차 — best gear 1.9~2.0만 a second against
+  // 2.4~3.1만 for the 격투가·전사·차사·도깨비, its life the lowest of them (19~39%): hp 185 → 200, dmgK 1.42 → 1.65;
+  // 극청룡참 75 → 90 and cd 2.5 → 2.2, 이계의침식 80 → 96 and cd 7 → 6, 차원개방's discs 18 → 22. Its pictures and what they strike as they were.)
+  { id: 'lancer', name: '무사', hero: '1001', hp: 200, dmgK: 1.65, mp: 80, speed: 70, armor: 3, start: 'l_moon', ult: 'l_ult',
     desc: '창을 다루는 근접 격수. 일렬로 꿰찌르고, 넓게 휘두르고, 돌진하며 쓸어 낸다.' },
   // 바람의나라 연's 격투가 (Job_5): fists, figure, skills and sounds only from 연's resources.
   { id: 'monk', name: '격투가', hero: '1001', hp: 210, dmgK: 2.1, mp: 70, speed: 76, armor: 3, start: 'mk_bung', ult: 'mk_ult',
@@ -53,6 +59,26 @@ export const CLASSES = [
   { id: 'reaper', name: '차사', hero: '1002', hp: 180, dmgK: 1.6, mp: 90, speed: 74, armor: 3, start: 'rp_cut', ult: 'rp_ult',
     desc: '저승의 백도를 든 근접 격수. 베고 파고들며, 영혼의 화살과 업화로 넓게 거둔다.' },
 ];
+
+// 직업별 손맛 (2026-11-28, 사용자 "직업마다 조작감을 따로: 근접은 묵직하게, 원거리는 경쾌하게"): the same pictures and sounds,
+// weighed per class (game.js clsFeel). kick: how far (px) a plain monster jolts back from an ordinary blow, back over
+// `kickT` s; fling: a heavy technique's throw (px); rate: the blow sound's speed (below 1 deeper and longer — a big
+// thud; above 1 a quick tick); crit: the screen's shake on a 치명타; stop: a 치명타 on a champion, lieutenant or boss
+// close in stops the world that long (hunts only, inside the 손맛 예산 HITSTOP); fly: a flung shot's flight time
+// (below 1 quicker — a crisp arrow); shot: the blow sound of a shot's landing, its own speed.
+export const CLASS_FEEL = {
+  warrior: { kick: 10, kickT: 0.18, fling: 26, rate: 0.86, crit: 0.14, stop: 0.04 },
+  lancer: { kick: 11, kickT: 0.18, fling: 28, rate: 0.9, crit: 0.12, stop: 0.035 },
+  monk: { kick: 9, kickT: 0.14, fling: 24, rate: 0.94, crit: 0.12, stop: 0.035 },
+  dokkaebi: { kick: 12, kickT: 0.2, fling: 30, rate: 0.8, crit: 0.16, stop: 0.045 },
+  rogue: { kick: 5, kickT: 0.1, fling: 16, rate: 1.14, crit: 0.06, stop: 0 },
+  reaper: { kick: 7, kickT: 0.13, fling: 20, rate: 1.05, crit: 0.09, stop: 0.025 },
+  celestial: { kick: 6, kickT: 0.12, fling: 18, rate: 1, crit: 0.08, stop: 0 },
+  archer: { kick: 3, kickT: 0.08, rate: 1.2, crit: 0.05, stop: 0, fly: 0.7 },
+  mage: { kick: 4, kickT: 0.1, rate: 1.1, crit: 0.07, stop: 0, fly: 0.9 },
+  magus: { kick: 4, kickT: 0.1, rate: 1.12, crit: 0.06, stop: 0, fly: 0.85 },
+  poet: { kick: 3, kickT: 0.1, rate: 1.16, crit: 0.05, stop: 0, fly: 0.9 },
+};
 
 // Spell tiers: a skill's name grows with its level, the way Baram's spells come in grades.
 const FIRE = ['화염주', '화염주', '화영열주', '화영열주', '화열참주', '화열참주', '진 화열참주', '극진 화열참주'];
@@ -107,8 +133,9 @@ export const SKILLS = {
     desc: '체력 30%와 마력을 모두 바쳐, 앞쪽 네 칸(폭 세 칸)의 적을 최대 체력에 비례한 일격으로 벤다' },
 
   // 도적 — 일반: 비영승보, 뇌진주(신수마법), 투명, 흡성대법, 분신, 필살검무
-  r_blink: { cls: 'rogue', req: 1, name: '비영승보', kind: 'blink', fx: null, dmg: 12, cd: 1.2, range: 4, count: 1,
-    desc: '바라보는 쪽 네 칸 안의 몬스터 등 뒤로 순식간에 옮겨 가며 벤다' },
+  // (도적 손질 2026-11-28: the 도적's first blow, one cut of 12 every 1.2 s, cleared a crowd at a fifth of a 전사's 이중공격 — two cuts)
+  r_blink: { cls: 'rogue', req: 1, name: '비영승보', kind: 'blink', fx: null, dmg: 13, cd: 1.2, range: 4, count: 2,
+    desc: '바라보는 쪽 네 칸 안의 몬스터 등 뒤로 순식간에 옮겨 가며 두 번 벤다' },
   r_bolt: { elem: 'thunder', fxs: ['31', '31', '38', '38', '46', '46', '48', '89'], cls: 'rogue', req: 1, name: '뇌진주', kind: 'spell', fx: '31',
     dmg: 12, cd: 1.8, range: 6, count: 1, names: tier('뇌진주'), up: 'r_storm', desc: '신수마법. 몬스터에게 번개를 떨어뜨린다' },
   r_stealth: { cls: 'rogue', req: 6, name: '투명', kind: 'buff', buff: 'stealth', fx: '36', cd: 10, duration: 5,
@@ -118,7 +145,7 @@ export const SKILLS = {
   r_clone: { cls: 'rogue', req: 12, name: '분신', kind: 'buff', buff: 'power', fx: '33', cd: 14, duration: 4, power: 1,
     desc: '분신을 만들어 잠시 공격력이 두 배가 된다' },
   // 1차 승급
-  r_dance: { promo: 1, cls: 'rogue', req: 6, name: '백호검무', kind: 'blink', fx: '52', dmg: 8, cd: 1.6, range: 5, count: 3,
+  r_dance: { promo: 1, cls: 'rogue', req: 6, name: '백호검무', kind: 'blink', fx: '52', dmg: 10, cd: 1.6, range: 5, count: 3,
     desc: '바라보는 쪽의 몬스터에게 날아들어 세 번 벤다' },
   // 2차 승급
   r_flysword: { promo: 2, cls: 'rogue', req: 10, name: '이기어검', kind: 'blink', fx: '53', dmg: 13, cd: 1.8, range: 5, count: 2,
@@ -905,7 +932,7 @@ const TIER_SKILLS = {
     desc: '몬스터에서 몬스터로 번개처럼 옮겨 다니며 넷을 차례로 베고 잠시 멈춘다' },
   r_hyeoldok: { promo: 8, cls: 'rogue', req: 30, name: '혈독주입', kind: 'zone', fx: 'g_poison_purple', fx2: 'y_hyeoldok', dmg: 26, cd: 6, radius: 2, duration: 4, tick: 0.5, k: 0.3, at: 'self', dot: 'venom', ck: 'strike',
     desc: '발밑에 피의 독을 퍼뜨린다. 4초 동안 독에 닿은 몬스터는 거듭 피해를 입고 맹독에 걸린다' },
-  r_tudo: { promo: 9, cls: 'rogue', req: 33, name: '투도멸진', kind: 'mark', fx: 'g_curse_zod', fx2: 'k_r_amsal', dmg: 42, cd: 4.5, range: 5, count: 6, radius: 1, delay: 2, weak: 0.25, ck: 'strike',
+  r_tudo: { promo: 9, cls: 'rogue', req: 33, name: '투도멸진', kind: 'mark', fx: 'g_curse_zod', fx2: 'k_r_amsal', dmg: 36, cd: 4.5, range: 5, count: 6, radius: 1, delay: 2, weak: 0.25, ck: 'strike',
     desc: '몬스터 여섯의 약점을 드러내 2초 동안 받는 피해를 25% 늘린 뒤, 약점이 한꺼번에 터진다' },
   // 주술사
   m_chain: { promo: 6, cls: 'mage', req: 24, name: '사슬벼락', kind: 'chain', fx: 'k_p_noejeon', dmg: 26, cd: 2.4, range: 7, count: 5, jump: 3, decay: 0.82, stun: 0.4, ck: 'spell',
@@ -1443,11 +1470,13 @@ const S9 = {
   //     jugeum9; IMG15에는 따로 그림이 없고 묵마수리검'쇄가 다시 나갈 뿐이라 그림 없음).
   // Pictures at the original's own size (o_r_*: 0.62 game pixels a capture pixel).
   r_mukdok: { promo: 9, cls: 'rogue', req: 33, name: '묵혈독바르기', kind: 'coat9', fx: 'o_r_mukdok', fxCast: undefined, fx2: undefined, fxHit: undefined,
-    hit: 30, cd: 10, duration: 10, charges: 5, infect: 7, taken: 0.15, burst: 1.2, every: undefined, shots: undefined, range: 2, power: undefined, curse: undefined, buff: undefined,
+    // (도적 손질 2026-11-28: bursts two rings deep at most, one burst's blow on a foe in 0.3 s — game.js venomBurst·venomStrike; burst 1.2 → 1.0)
+    hit: 30, cd: 10, duration: 10, charges: 5, infect: 7, taken: 0.15, burst: 1.0, every: undefined, shots: undefined, range: 2, power: undefined, curse: undefined, buff: undefined,
     ck: 'buff', pre: 'r_budong', branch: 2,
     desc: '무기에 묵혈독을 바른다. 다음 공격 기술 다섯 번이 친 몬스터는 7초 동안 묵혈독에 감염되어 받는 피해가 15% 늘고, 감염된 채 쓰러지면 그 자리에 묵혈독 불꽃이 터져 불꽃이 덮는 몬스터(둘레 한 칸 남짓)를 친다' },
   r_chainstar: { promo: 9, cls: 'rogue', req: 33, name: "묵마수리검'쇄", kind: 'swae9', fx: 'o_r_swaestar', fxFly: 'o_r_swaefly', fxEnd: 'o_r_swaeend', fxCast: undefined, fx2: undefined,
-    dmg: 60, cd: 15, n: 8, ring: 159, dur: 5, tick: 0.5, k: 0.4, shots: 3, shotLen: 1.8, endK: 0.8, reach: 3, radius: undefined, ck: 'nova', pre: 'r_shuriken', branch: 1,
+    // (도적 손질 2026-11-28: half the 도적's whole damage at 9차 best gear came from the standing kunai's streaks — k 0.4 → 0.25, 3 → 2 a tick)
+    dmg: 60, cd: 15, n: 8, ring: 159, dur: 5, tick: 0.5, k: 0.25, shots: 2, shotLen: 1.8, endK: 0.8, reach: 3, radius: undefined, ck: 'nova', pre: 'r_shuriken', branch: 1,
     desc: '몸 주변 여덟 방향으로 수리검을 던져 지나는 길의 몬스터를 벤다. 세 칸 남짓 밖에 꽂힌 수리검 여덟은 5초 동안 그 자리에 머물며 가까운 몬스터를 향해 거듭 날아가 꿰뚫고, 끝에 흰 섬광과 함께 터진다' },
   r_bloodslash: { promo: 9, cls: 'rogue', req: 33, name: '묵혈파광참', kind: 'zan9', fx: 'o_r_zan', fx2: undefined, fxHit: undefined, dmg: 160, cd: 15, range: 4,
     side: 118, back: 95, half: 59, splash: 0.6, curse: 5, radius: undefined, dash: undefined, ck: 'blink', pre: 'r_chamgan', branch: 0,
@@ -1553,12 +1582,12 @@ const S9 = {
   //   아공간전개 (IMG94, PVP → 몬스터: 선 자리에 청룡 문양 영역과 결정 울타리 8초 — 아래 l_agong).
   // Pictures at the original's own size (o_l_*: 0.62 game pixels a capture pixel). 1320의 추정 그림(옛 o_l_sickle·erosion·dimension)은 뺌.
   l_dimension: { promo: 9, cls: 'lancer', req: 33, name: '차원개방', kind: 'dim9', echo: undefined, fx: 'o_l_dimshard', fxCast: 'o_l_dimcast', fxLoop: undefined, loopSize: undefined,
-    fxHit: undefined, hit: 18, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
+    fxHit: undefined, hit: 22, cd: 25, duration: 15, every: 0.75, shots: 2, splash: undefined, range: 3, reach: [34, 24], power: undefined, buff: undefined, ck: 'nova', pre: 'l_union', branch: 2,
     desc: '이계의 차원을 몸에 연다. 15초 동안 열린 차원에서 이계의낫 파편이 생겨나 곁의 몬스터 둘에게 푸른 원반으로 거듭 날아들어 그 몬스터와 원반 안의 몬스터를 벤다' },
-  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 80, cd: 7, depth: 9,
+  l_erosion: { promo: 9, cls: 'lancer', req: 33, name: '이계의침식', kind: 'erode9', fx: 'o_l_ero', fxCast: undefined, trail: undefined, fxHit: undefined, dmg: 96, cd: 6, depth: 9,
     width: undefined, ways: undefined, pulses: undefined, side: 36, sideV: 26, step: 0.06, curse: 4, ck: 'line', pre: 'l_formless', branch: 1,
     desc: '바라보는 쪽으로 이계에서 불러낸 기운을 아홉 칸 쏘아 보낸다. 지나는 자리마다 빛기둥이 솟고 검은 잔해가 세 줄로 남으며, 맞은 몬스터는 침식되어(받는 피해 증가) 옆으로 밀쳐진다' },
-  l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 75, cd: 2.5, range: undefined,
+  l_cheongryong: { promo: 9, cls: 'lancer', req: 33, name: '극청룡참', kind: 'cheong9', fx: 'o_l_cheong', fxShot: undefined, fxHit: undefined, dmg: 90, cd: 2.2, range: undefined,
     radius: undefined, splash: undefined, shot: undefined, again: undefined, depth: 2, half: 1, cut: [-34, 82, 57], ck: 'cleave', pre: 'l_annihil', branch: 0,
     desc: '청룡의 힘을 빌려 바라보는 쪽 앞을 푸른 초승달로 크게 베어 낸다. 초승달이 덮는 앞 한 칸, 폭 세 칸과 양옆의 몬스터가 모두 베인다' },
   // 격투가 ← 흑화랑 9차 (재작업: 원작 2662 장면 그대로 — scratchpad plan9/spec/monk.md). 시전 3 + 패시브 1 + 필살기:
