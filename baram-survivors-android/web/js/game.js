@@ -9,7 +9,7 @@ import { YEON_SOUNDS, YEON_BGM, YEON_STAGE_BGM, YEON_RAID_BGM, YEON_VARIANTS } f
 import { initWar } from './war.js';
 import { initHunt } from './hunt.js';
 import { BOOTS, BOOT, KYEONGGONG, bootsState, bootsPct, moveBonus, bootsForRank } from './boots.js';
-import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair, dropDyed, releaseCostume } from './costume.js';
+import { initCostume, bindCoordi, openCoordi, wornCostume, costumeVariants, costumeVersion, costumeBonus, dropCostume, perilCostume, perilCostumes, frameBox, drawLayers, dyeImage, loadCostumes, updateCosPet, drawCosPet, costumeItems, unlockMusinHair, dropDyed, releaseCostume } from './costume.js';
 import {
   SPECIALS, SPECIAL, OPTIONS, KIND_NAME, specialBase, specialName, specialPower, tierSources, raidOf,
   MATS, craftRecipe, STAR_MAX, starCost, CRAFTS, starMats, matCount, DRAGON_MAX, dragonName, craftPicture,
@@ -1198,7 +1198,7 @@ function buildStages() {
       // The boss's picture where the build has one, else the ground's strongest monster.
       const face = monsterById[boss.id] ? boss.id : (pool[pool.length - 1] || {}).id;
       b.innerHTML = `<img src="${monFace(face)}" alt=""><div><b>${s.name} <small>Lv ${s.lv}</small></b>`
-        + `<span class="st ${done ? 'done' : open ? 'open' : 'shut'}">${done ? '정복' : open ? '도전 가능' : '잠김'}</span>`
+        + `<span class="st ${done ? 'done' : open ? 'open' : 'shut'}">${done ? '정복' : open ? '도전 가능' : '잠김'}${(perilSave().best[s.id] || 0) ? ` · 위험도 ${ROMAN[perilSave().best[s.id]]}` : ''}</span>`
         + `<span>${open ? s.intro : lockReason(i)}</span></div>`;
       b.onclick = () => { pickedStage = s; buildStages(); };
       map.append(b);
@@ -1437,6 +1437,8 @@ function dangerRow(s) {
   box.innerHTML = `<small>위험도 <b>${ROMAN[d.t]}</b>${d.t === d.auto ? ' (맞춤)' : ` (맞춤 ${ROMAN[d.auto]})`}`
     + (d.t ? ` · 피해 ×${k.dmg.toFixed(1)}(정예 ×${(k.dmg * k.elite).toFixed(1)}) 생명 ×${k.hp.toFixed(1)} 회복 −${Math.round(k.heal * 100)}% · 보상 +${Math.round((k.rew - 1) * 100)}%` : '') + '</small>';
   box.title = `전투력 ${d.pow.toLocaleString()} / 이 사냥터 기준 ${d.par.toLocaleString()}: 기준을 넘는 만큼 몬스터가 세지고 보상(돈·재료·스페셜)이 늘어납니다.`;
+  // 위험도 VII~X 전용 보상 (PERIL): the ground's record and the next first conquest
+  box.innerHTML += `<small class="peril" style="flex-basis:100%;order:9;color:#8a2a10">${perilLine(s)}${perilMarks() ? ` · 위험의 각인 ${perilMarks()}` : ''}</small>`;
   for (const [txt, f] of [['−', o => o - 1], ['맞춤', () => 0], ['+', o => o + 1]]) {
     const b = document.createElement('button');
     b.className = 'pact' + (txt === '맞춤' && d.t === d.auto ? ' on' : '');
@@ -4788,6 +4790,7 @@ function might() {
   // 치유의반향 (도사 9차 패시브, data.js p_banhyang.full9): at full health the blows are stronger.
   const f9 = G.cls.id === 'poet' && SKILLS.p_banhyang && SKILLS.p_banhyang.full9;
   if (f9 && G.player.hp >= G.player.maxHp * f9.at && promoOf('poet') >= 9) k *= 1 + f9.k;
+  if (G.danger && G.danger.t > 0) k *= perilMarkK().dmg; // 위험의 각인 (PERIL.mark): a 위험도 hunt only
   return k;
 }
 
@@ -5218,7 +5221,7 @@ const THREAT = { early: 1.25, earlyTo: 11, earlyEnd: 15, champ: 1.25, mini: 1.3,
 // settings.dangerOff, a step off the 맞춤) and the run says it.
 // Measured (bot runs, best 9차): 화탕지옥 82~94% → 위험도 V 5~47% (격투가 70, 도적 46~74); 아람 황무지 95% → IV 40%;
 // 타계 62% (98); 쥐굴·산적굴 VI~VII 63~68% (99); the abyss floors as they were (0: 32~65%).
-const DANGER = { par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 3, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
+const DANGER = { par: 2100, abyss: 3, free: 1, blow: 0.3, step: 1.25, max: 6, top: 10, up: 4, dmg: 1.4, elite: 1.1, hp: 1.35, heal: 0.1, rew: 0.1 }; // (hunt.js: 2nd affix +8%p a step, from II at once; IV+ two packs a beat; boss blows −3% a step)
 function dangerPar(stage) {
   const L = stage.level !== undefined ? stage.level : STAGES.indexOf(stage);
   return DANGER.par * (1 + 0.1 * L) * Math.sqrt(4.5 + 0.5 * L) * (stage.abyss ? DANGER.abyss : 1) * Math.sqrt(stage.ease || 1);
@@ -5235,6 +5238,93 @@ function dangerK(t) {
   return { t, dmg: DANGER.dmg ** t, elite: DANGER.elite ** t, hp: DANGER.hp ** t, heal: Math.min(0.7, DANGER.heal * t), rew: 1 + DANGER.rew * t };
 }
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII'];
+
+// ---- 위험도 VII~X 전용 보상 (2026-11-28, 사용자 승인: 최고 장비 뒤의 반복 동기) ----
+// (DANGER.up 3 → 4: 맞춤 VI의 영웅이 X까지 고를 수 있게 — 전엔 맞춤 상한 VI + 3 = IX가 끝이라 X에 닿지 못했다.)
+// 기록 (progress.peril.best): each hunting ground's highest 위험도 conquered, every class together — on the ground's card,
+//   the list's card, the results and the 관원's 위험도 도감.
+// 첫 정복 (progress.peril.paid): the first conquest of a ground at VII, VIII, IX and X — each step once a ground, every step
+//   newly reached paid (VII 겁화·은나무, VIII 주화, IX 흑룡의 코디, X 환영두로의 코디: costume.js PERIL_SETS, sold nowhere).
+//   Only the plain materials (겁화의 파편·은나무 파편, never short: 2. 파밍) and 레이드주화 — none of the final gear's
+//   bottlenecks (조화의 정수·고문서·회한옥·성물·여의주·심연 고유), so the 심연 ÷4 and the final weapon's grade stand.
+// 코디: every conquest at VII and up, PERIL.drop × (t − 6) of a 위험도 전용 piece besides.
+// 위험의 각인 (속성): each ground conquered at VIII or more marks the hunter: in a 위험도 hunt only (dangerNow — never a raid,
+//   war, 수련장, the abyss's 0), 피해 +1% and 받는 피해 −0.5% a mark, PERIL.mark.max marks at most.
+const PERIL = {
+  from: 7,
+  first: {
+    7: { gold: 1500, mats: { kalpa: 4, silver1: 4 } },
+    8: { gold: 2500, coins: 10, mats: { kalpa: 6 } },
+    9: { gold: 4000, coins: 15, cos: 9 },
+    10: { gold: 6000, coins: 25, cos: 10 },
+  },
+  drop: 0.05,
+  mark: { at: 8, dmg: 0.01, guard: 0.005, max: 20 },
+};
+function perilSave() {
+  return progress.peril = Object.assign({ best: {}, paid: {} }, progress.peril);
+}
+/** 위험의 각인: the grounds conquered at PERIL.mark.at or more (at most max). */
+function perilMarks() {
+  const b = perilSave().best;
+  return Math.min(PERIL.mark.max, Object.values(b).filter(t => t >= PERIL.mark.at).length);
+}
+/** A reward of a first conquest at step t, as a line (its gold by the ground's level). */
+function perilReward(t, L) {
+  const r = PERIL.first[t];
+  return r && { ...r, gold: Math.round(r.gold * (1 + 0.05 * L)) };
+}
+function perilText(t, L) {
+  const r = perilReward(t, L);
+  if (!r) return '';
+  const set = { 9: '흑룡의 코디', 10: '환영두로의 코디' }[t];
+  return rewardText({ ...r, cos: 0 }) + (set ? ` · ${set} 1` : '');
+}
+/** A hunting ground conquered at its 위험도: the record, the first conquests' rewards, the 전용 코디 now and then.
+ *  Lines for the results (G.perilGot). */
+function perilClear() {
+  const d = G.danger, t = d && d.t || 0;
+  if (!G.hunt || G.stage.raid || !t) return;
+  const P = perilSave(), id = G.stage.id, L = G.stage.level !== undefined ? G.stage.level : STAGES.indexOf(G.stage);
+  const was = P.best[id] || 0, marks0 = perilMarks(), got = G.perilGot = [];
+  if (t > was) {
+    P.best[id] = t;
+    if (was) got.push(`위험도 기록 ${ROMAN[was]} → ${ROMAN[t]}`);
+    else got.push(`위험도 기록 ${ROMAN[t]}`);
+  }
+  for (let s = Math.max(PERIL.from, (P.paid[id] || 0) + 1); s <= t; s++) {
+    const r = perilReward(s, L);
+    if (!r) continue;
+    P.paid[id] = s;
+    const cos = r.cos ? perilCostume(r.cos, `위험도 ${ROMAN[s]} 첫 정복`, true) : null;
+    payReward({ ...r, cos: 0 }, `${G.stage.name} 위험도 ${ROMAN[s]} 첫 정복`);
+    got.push(`위험도 ${ROMAN[s]} 첫 정복 · ${rewardText({ ...r, cos: 0 })}${cos ? ` · [${cos}]` : r.cos ? ' · (전용 코디를 모두 모아 주화 40)' : ''}`);
+    if (r.cos && !cos) progress.coins = (progress.coins || 0) + 40;
+    later(2 + 1.2 * (s - PERIL.from), () => banner(`위험도 ${ROMAN[s]} 첫 정복!`));
+  }
+  if (t >= PERIL.from && Math.random() < PERIL.drop * (t - 6)) {
+    const cos = perilCostume(t, `위험도 ${ROMAN[t]} 정복`);
+    if (cos) got.push(`위험도 전용 코디 · [${cos}]`);
+  }
+  const marks = perilMarks();
+  if (marks > marks0) got.push(`위험의 각인 ${marks}개 (위험도 사냥터에서 피해 +${Math.round(marks * PERIL.mark.dmg * 100)}% · 받는 피해 −${(marks * PERIL.mark.guard * 100).toFixed(1)}%)`);
+  if (got.length) say(`${G.stage.name} 위험도 ${ROMAN[t]} 정복: ${got.join(' / ')}`, 'sys');
+}
+/** 위험의 각인 on the hunt now: { dmg, guard } multipliers (1 outside a 위험도 hunt). */
+function perilMarkK() {
+  if (!dangerNow()) return { dmg: 1, guard: 1 };
+  const n = G.perilN !== undefined ? G.perilN : (G.perilN = perilMarks());
+  return { dmg: 1 + n * PERIL.mark.dmg, guard: 1 - n * PERIL.mark.guard };
+}
+/** The ground's card: the record and what the next first conquest gives. */
+function perilLine(s) {
+  const P = perilSave(), b = P.best[s.id] || 0, paid = P.paid[s.id] || 0, L = s.level !== undefined ? s.level : STAGES.indexOf(s);
+  const next = Math.max(PERIL.from, paid + 1);
+  const parts = [b ? `기록 <b>${ROMAN[b]}</b> 정복` : '위험도 기록 없음'];
+  if (next <= DANGER.top) parts.push(`${ROMAN[next]} 첫 정복: ${perilText(next, L)}`);
+  else parts.push('X까지 모두 정복');
+  return parts.join(' · ');
+}
 /** The hunt's own 위험도 (G.danger), or none. */
 function dangerNow() {
   return G && G.danger && G.danger.t > 0 && !G.war && !G.stage.raid && !G.training ? G.danger : null;
@@ -5647,6 +5737,14 @@ const PATTERN_NAMES = {
   xslash: '십자 검기', iai: '발도 일섬',
   // 2026-11-28: 하월's 은월토, 사휘도's 모래 악어, 신 용궁 탑's 악마불가살
   crescent: '월광 반달', sinkhole: '모래 소용돌이', spines: '산호 가시밭', devour: '쇠 삼키기',
+  // 2026-11-28 (사용자 승인: 보스마다 고유 패턴 하나씩) — the hunting grounds' bosses before the hells, each its own
+  hop: '깡충 연타', burrow: '쥐구멍 터뜨리기', coil: '똬리 휘감기', slither: '꼬리 후려치기', antlers: '뿔 들이받기',
+  roll: '진흙 구르기', maul: '앞발 내려찍기', totem: '토템 내려찍기', tails: '아홉 꼬리', scythe: '낫질 줄무늬',
+  graves: '무덤 솟기', phantoms: '유령 돌격', net: '산적 그물', volley: '조총 일제 사격', arrows: '화살비 빗금',
+  frenzy: '광란의 할퀴기', gates: '요괴 문', trident: '삼지창 찌르기', anchor: '닻 내리꽂기', broadside: '일제 포격',
+  collapse: '성벽 붕괴', phalanx: '병마용 진군', venom: '독 웅덩이', web: '거미줄', molt: '허물 벗기',
+  heatwave: '열파', palm: '장풍', blades: '천검', tentacles: '촉수 내려치기', avalanche: '눈사태', roots: '뿌리 솟기',
+  dive: '급강하', bagua: '팔괘진', rift: '마령 균열', mirror: '거울 궁',
 };
 // The boss's own blows that share another's shape (by name only).
 const PATTERN_AS = { trample: 'charge', cloud: 'pounce', stomp: 'quake', flare: 'quake', thunder: 'sparks', drought: 'hunt', ward: 'safe', sweep: 'tide' };
@@ -5891,6 +5989,9 @@ function raidPattern(b, kind, follow = false) {
       return tiles;
     });
     waves.push(() => sq(b.tx, b.ty, 3, [], 0));
+  } else if (OWN_PATTERNS[base]) {
+    // 보스마다 고유 패턴 (OWN_PATTERNS below): each wave its tiles, worked out when it is laid (the red is the blow)
+    OWN_PATTERNS[base](waves, b);
   } else {
     waves.push(() => commonTiles(b, 'cross', raidAim()));
   }
@@ -5908,6 +6009,258 @@ function raidPattern(b, kind, follow = false) {
     if (waves.length > 1) G.raidT = Math.max(G.raidT, [4, 3.2, 2.4][G.phase] * (G.enraged ? 0.7 : 1) * 0.6);
   });
 }
+
+// ---- 보스마다 고유 패턴 (2026-11-28, 사용자 승인) ----
+// Each hunting ground's boss before the hells (hunt.js BOSS_PATTERNS) has one blow no other boss has, in its own nature.
+// As every blow here: the red tiles are the blow (raidMark: the tiles drawn are the tiles that strike, the warning as long
+// as the deepest red needs at the slowest pace — redDepth), each wave laid when the one before falls, so there is always
+// a way out: a gap, the side, or the tiles that have just fallen. f(waves, b, h): waves.push(() => tiles | {tiles, fall}).
+// (Measured: r_fun3/pat — each wave's picture, and the hero struck on the red and not off it: patcheck.js.)
+const OWN_PATTERNS = (() => {
+  const aim = () => raidAim();
+  const way = (b, t) => wayTo(b, t); // [dx, dy], the four ways
+  const perp = ([dx, dy]) => [dy, dx];
+  const line = (x, y, [dx, dy], from, to, out = [], w = 0) => {
+    const [px, py] = perp([dx, dy]);
+    for (let k = from; k <= to; k++) for (let o = -w; o <= w; o++) out.push([x + dx * k + px * o, y + dy * k + py * o]);
+    return out;
+  };
+  const box = (cx, cy, w, h, out = []) => { for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) out.push([cx + x, cy + y]); return out; };
+  const dist = (b, t) => Math.max(Math.abs(t.tx - b.tx), Math.abs(t.ty - b.ty));
+  // (raidPattern's own: a square of r about (cx, cy) past `hole`, and a line out at an angle from r0 to r1)
+  const sq = (cx, cy, r, out = [], hole = -1) => {
+    for (let x = -r; x <= r; x++) for (let y = -r; y <= r; y++) if (Math.max(Math.abs(x), Math.abs(y)) > hole) out.push([cx + x, cy + y]);
+    return out;
+  };
+  const ray = (cx, cy, a, r0, r1, out = []) => {
+    for (let s = r0; s <= r1; s += 0.5) out.push([Math.round(cx + Math.cos(a) * s), Math.round(cy + Math.sin(a) * s)]);
+    return out;
+  };
+  return {
+    // 토끼 대왕: three springs in a row, each onto where its mark stands then
+    hop(waves, b) {
+      for (let i = 0; i < 3; i++) waves.push(() => { const t = aim(), cx = t.tx, cy = t.ty; return { tiles: plusTiles(cx, cy, 1).concat([[cx + 1, cy + 1], [cx - 1, cy - 1], [cx + 1, cy - 1], [cx - 1, cy + 1]]), fall: () => bossLeap(b, cx, cy, 0.2) }; });
+    },
+    // 서생원: a crooked tunnel dug toward its mark (one wide), then it bursts out at three points along it
+    burrow(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), L = Math.max(5, Math.min(11, dist(b, t0) + 2)), path = [];
+      for (let k = 1; k <= L; k++) { const o = (Math.floor(k / 2) % 2 ? 1 : -1); path.push([b.tx + d[0] * k + px * o, b.ty + d[1] * k + py * o]); }
+      waves.push(() => path);
+      waves.push(() => [Math.floor(L / 3), Math.floor(2 * L / 3), L - 1].flatMap(i => sq(path[i][0], path[i][1], 1)));
+    },
+    // 이무기: a spiral of its body wound out from it (arms two tiles apart: the tile between them is clear), inner half, then outer
+    coil(waves, b) {
+      const a0 = Math.random() * Math.PI * 2, sgn = Math.random() < 0.5 ? 1 : -1, arm = th => {
+        const out = [];
+        for (let a = th[0]; a <= th[1]; a += 0.08) { const r = 1.2 + a / Math.PI; out.push([Math.round(b.tx + Math.cos(a0 + sgn * a) * r), Math.round(b.ty + Math.sin(a0 + sgn * a) * r)]); }
+        return out;
+      };
+      waves.push(() => arm([0, 2 * Math.PI]));
+      waves.push(() => arm([2 * Math.PI, 4.2 * Math.PI]));
+    },
+    // 왕구렁이: its tail lashed in a wave toward its mark, then the other way of the wave (the troughs clear each time)
+    slither(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d);
+      const lash = ph0 => { const out = []; for (let k = 1; k <= 11; k++) { const o = Math.round(2 * Math.sin(k * 0.75 + ph0)); out.push([b.tx + d[0] * k + px * o, b.ty + d[1] * k + py * o], [b.tx + d[0] * k + px * (o + Math.sign(o || 1)), b.ty + d[1] * k + py * (o + Math.sign(o || 1))]); } return out; };
+      waves.push(() => lash(0));
+      waves.push(() => lash(Math.PI));
+    },
+    // 광록지수: its antlers lowered — the two tines out on either side of its mark, then the charge down the middle
+    antlers(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d);
+      waves.push(() => { const out = []; for (let k = 1; k <= 7; k++) { const o = 1 + Math.floor(k * 0.6); out.push([b.tx + d[0] * k + px * o, b.ty + d[1] * k + py * o], [b.tx + d[0] * k - px * o, b.ty + d[1] * k - py * o]); } return out; });
+      waves.push(() => ({ tiles: line(b.tx, b.ty, d, 1, 8, [], 1), fall: () => bossLeap(b, b.tx + d[0] * 6, b.ty + d[1] * 6, 0.3) }));
+    },
+    // 홍돼지: it rolls in the mud toward its mark's row, then turns and rolls along it (three wide, it goes with each)
+    roll(waves, b) {
+      const t0 = aim(), d = way(b, t0), along = d[0] ? t0.tx - b.tx : t0.ty - b.ty, k0 = Math.max(2, Math.abs(along));
+      const cx = b.tx + d[0] * k0, cy = b.ty + d[1] * k0, [px, py] = perp(d), off = d[0] ? t0.ty - cy : t0.tx - cx, s2 = Math.sign(off) || (Math.random() < 0.5 ? 1 : -1);
+      const d2 = [px * s2, py * s2];
+      waves.push(() => ({ tiles: line(b.tx, b.ty, d, 1, k0, [], 1), fall: () => bossLeap(b, cx, cy, 0.3) }));
+      waves.push(() => ({ tiles: line(cx, cy, d2, 1, 7, [], 1), fall: () => bossLeap(b, cx + d2[0] * 6, cy + d2[1] * 6, 0.3) }));
+    },
+    // 진웅: a paw either side of its mark, then both together on it, the long way of its line
+    maul(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), cx = t0.tx, cy = t0.ty;
+      waves.push(() => sq(cx + px * 2, cy + py * 2, 1).concat(sq(cx - px * 2, cy - py * 2, 1)));
+      waves.push(() => line(cx, cy, d, -2, 2, [], 1));
+    },
+    // 곰인 족장: four totems driven in round its mark, then the cross between them
+    totem(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      waves.push(() => [[3, 3], [-4, 3], [3, -4], [-4, -4]].flatMap(([x, y]) => box(cx + x, cy + y, 2, 2)));
+      waves.push(() => plusTiles(cx, cy, 4).concat(sq(cx, cy, 1)));
+    },
+    // 구미호: nine tails fanned toward its mark: every other one, then the rest
+    tails(waves, b) {
+      const t0 = aim(), a0 = Math.atan2(t0.ty - b.ty, t0.tx - b.tx), fan = i => { const out = []; for (let j = i; j < 9; j += 2) ray(b.tx, b.ty, a0 + (j - 4) * 0.3, 2, 8, out); return out; };
+      waves.push(() => fan(0));
+      waves.push(() => fan(1));
+    },
+    // 사마귀 장수: its scythes rake the ground in rows about its mark — every other row, then the others
+    scythe(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, horiz = Math.random() < 0.5, odd = Math.random() < 0.5 ? 0 : 1;
+      const rows = par => sq(cx, cy, 4).filter(([x, y]) => (((horiz ? y - cy : x - cx) & 1) === par));
+      waves.push(() => rows(odd));
+      waves.push(() => rows(1 - odd));
+    },
+    // 해골왕: graves burst up in a lattice about its mark (the corners between them clear), then the lattice a step over
+    graves(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, lat = o => { const out = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) out.push(...plusTiles(cx + 3 * i + o, cy + 3 * j + o, 1)); return out; };
+      waves.push(() => lat(0));
+      waves.push(() => lat(1));
+    },
+    // 수호유령전사: three phantoms ride across in rows three apart through its mark, then three down the columns
+    phantoms(waves, b) {
+      waves.push(() => { const t = aim(), out = []; for (const o of [-3, 0, 3]) for (let k = -12; k <= 12; k++) out.push([t.tx + k, t.ty + o]); return out; });
+      waves.push(() => { const t = aim(), out = []; for (const o of [-3, 0, 3]) for (let k = -12; k <= 12; k++) out.push([t.tx + o, t.ty + k]); return out; });
+    },
+    // 선비대군장: a net thrown over its mark (cords every third tile: the holes between clear), then the holes
+    net(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, cord = ([x, y]) => ((x - cx + 30) % 3 === 0 || (y - cy + 30) % 3 === 0);
+      waves.push(() => sq(cx, cy, 4).filter(cord));
+      waves.push(() => sq(cx, cy, 4).filter(t => !cord(t)));
+    },
+    // 에주겐: a line of muskets — three shots down its way two apart, then the two between and the outer ones
+    volley(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), shots = os => { const out = []; for (const o of os) line(b.tx + px * o, b.ty + py * o, d, 1, 12, out); return out; };
+      waves.push(() => shots([-2, 0, 2]));
+      waves.push(() => shots([-3, -1, 1, 3]));
+    },
+    // 초원의 주인: arrows in slanting sheets about its mark — one slant, then the other
+    arrows(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, r = Math.floor(Math.random() * 3);
+      waves.push(() => sq(cx, cy, 4).filter(([x, y]) => ((x - cx) + (y - cy) + 30 + r) % 3 === 0));
+      waves.push(() => sq(cx, cy, 4).filter(([x, y]) => ((x - cx) - (y - cy) + 30 + r) % 3 === 0));
+    },
+    // 만월늑대인간: four claw rakes in quick turn at its mark, slanting one way and the other
+    frenzy(waves, b) {
+      for (let i = 0; i < 4; i++) waves.push(() => {
+        const t = aim(), s1 = i % 2 ? 1 : -1, out = [];
+        for (const o of [-2, 0, 2]) for (let k = -3; k <= 3; k++) out.push([t.tx + k + (s1 > 0 ? o : 0), t.ty + s1 * k + (s1 > 0 ? 0 : o)]);
+        return out;
+      });
+    },
+    // 요괴왕: four gates open round its mark, then each looses a beam through it
+    gates(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, C = [[4, 4], [-4, 4], [4, -4], [-4, -4]];
+      waves.push(() => C.flatMap(([x, y]) => sq(cx + x, cy + y, 1)));
+      waves.push(() => { const out = []; for (const [x, y] of C) for (let k = 0; k <= 4; k++) out.push([cx + Math.sign(x) * k, cy + Math.sign(y) * k]); return out; });
+    },
+    // 용궁 장수: a long thrust of the trident down its way, then the three prongs spread across its tip
+    trident(waves, b) {
+      const t0 = aim(), d = way(b, t0), L = Math.max(5, Math.min(10, dist(b, t0) + 1)), [px, py] = perp(d), tx = b.tx + d[0] * L, ty = b.ty + d[1] * L;
+      waves.push(() => line(b.tx, b.ty, d, 1, L + 1));
+      waves.push(() => { const out = line(tx, ty, [px, py], -3, 3); for (const o of [-3, 0, 3]) line(tx + px * o, ty + py * o, d, 1, 2, out); return out; });
+    },
+    // 저주의해골: an anchor driven down on its mark (5×5), then its chain swept round where it fell
+    anchor(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      waves.push(() => sq(cx, cy, 2));
+      waves.push(() => sq(cx, cy, 4, [], 2));
+    },
+    // 원혼의비: a broadside — shot after shot across its way, every other row out from it, then the rows between
+    broadside(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), rows = ks => { const out = []; for (const k of ks) line(b.tx + d[0] * k, b.ty + d[1] * k, [px, py], -5, 5, out); return out; };
+      waves.push(() => rows([2, 4, 6, 8]));
+      waves.push(() => rows([3, 5, 7, 9]));
+    },
+    // 장성의혼령: the wall falls across its way through its mark (two thick), then the two walls three either side of it
+    collapse(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), k0 = Math.max(2, dist(b, t0));
+      const wall = k => line(b.tx + d[0] * k, b.ty + d[1] * k, [px, py], -6, 6, line(b.tx + d[0] * (k + 1), b.ty + d[1] * (k + 1), [px, py], -6, 6));
+      waves.push(() => wall(k0));
+      waves.push(() => wall(k0 - 3).concat(wall(k0 + 3)));
+    },
+    // 귀갑병: the clay ranks march in from beyond its mark toward the boss, two rows at a time — step back over them
+    phalanx(waves, b) {
+      const t0 = aim(), d = way(b, t0), [px, py] = perp(d), k0 = Math.max(8, dist(b, t0) + 3);
+      for (let i = 0; i < 4; i++) waves.push(() => { const out = []; for (const k of [k0 - 2 * i, k0 - 2 * i - 1]) if (k > 0) line(b.tx + d[0] * k, b.ty + d[1] * k, [px, py], -5, 5, out); return out; });
+    },
+    // 고균도 저주의 추장: four pools of venom about its mark, then each spreads a tile round (the pool itself spent)
+    venom(waves, b) {
+      const t0 = aim(), P = [[t0.tx, t0.ty]];
+      for (let i = 0; i < 3; i++) { const a = Math.random() * Math.PI * 2; P.push([Math.round(t0.tx + Math.cos(a) * 4), Math.round(t0.ty + Math.sin(a) * 4)]); }
+      waves.push(() => P.flatMap(([x, y]) => box(x, y, 2, 2)));
+      waves.push(() => P.flatMap(([x, y]) => sq(x, y, 2).filter(([u, v]) => !(u >= x && u <= x + 1 && v >= y && v <= y + 1) && Math.max(Math.abs(u - x - 0.5), Math.abs(v - y - 0.5)) <= 1.6)));
+    },
+    // 진여왕지주: threads shot out from its mark eight ways, then the web's rings across them
+    web(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      waves.push(() => { const out = [[cx, cy]]; for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let k = 1; k <= 4; k++) out.push([cx + x * k, cy + y * k]); return out; });
+      waves.push(() => sq(cx, cy, 2, [], 1).concat(sq(cx, cy, 4, [], 3), [[cx, cy]]));
+    },
+    // 가릉도 독사여왕: it sheds its skin where it lies (5×5) and is gone onto its mark, the new skin's ring about it
+    molt(waves, b) {
+      waves.push(() => { const t = aim(), x = b.tx, y = b.ty; return { tiles: sq(x, y, 2), fall: () => bossLeap(b, t.tx + Math.sign(t.tx - x) * 2, t.ty + Math.sign(t.ty - y) * 2, 0.3) }; });
+      waves.push(() => sq(b.tx, b.ty, 3, [], 1));
+    },
+    // 폭염도 독사여왕: the heat comes in in diamonds to its mark — the outer, the middle, the heart
+    heatwave(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, dia = (r0, r1) => sq(cx, cy, r1).filter(([x, y]) => { const m = Math.abs(x - cx) + Math.abs(y - cy); return m >= r0 && m <= r1; });
+      waves.push(() => dia(4, 5));
+      waves.push(() => dia(2, 3));
+      waves.push(() => dia(0, 1));
+    },
+    // 무림 고수: a palm blast straight down its way (three wide), then two at the slants either side
+    palm(waves, b) {
+      const t0 = aim(), d = way(b, t0), a0 = Math.atan2(d[1], d[0]);
+      waves.push(() => line(b.tx, b.ty, d, 1, 10, [], 1));
+      waves.push(() => ray(b.tx, b.ty, a0 + Math.PI / 4, 1, 9, ray(b.tx, b.ty, a0 - Math.PI / 4, 1, 9)));
+    },
+    // 무신: a thousand blades fall about its mark in slanting bands, a third of the ground at a time
+    blades(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty, s1 = Math.random() < 0.5 ? 1 : -1;
+      for (let r = 0; r < 3; r++) waves.push(() => sq(cx, cy, 3).filter(([x, y]) => (((x - cx) + s1 * (y - cy)) % 3 + 3) % 3 === r));
+    },
+    // 대왕오징어: its tentacles slam out the four ways, then the four slants
+    tentacles(waves, b) {
+      const st = a => { const out = []; for (let i = 0; i < 4; i++) ray(b.tx, b.ty, a + i * Math.PI / 2, 1.5, 8, out); return out; };
+      const a0 = Math.random() < 0.5 ? 0 : Math.PI / 4;
+      waves.push(() => st(a0));
+      waves.push(() => st(a0 + Math.PI / 4));
+      if (G.phase >= 2) waves.push(() => st(a0));
+    },
+    // 설담비: snow slides down from the north over its mark, two rows a wave with a row between
+    avalanche(waves, b) {
+      const t0 = aim(), cx = t0.tx, cy = t0.ty;
+      for (const o of [-4, -1, 2]) waves.push(() => { const out = []; for (const y of [o, o + 1]) for (let x = -7; x <= 7; x++) out.push([cx + x, cy + y]); return out; });
+    },
+    // 백두 요괴목: roots burst under its mark and under each about it, then creep out slantwise
+    roots(waves, b) {
+      const t0 = aim(), at = [[t0.tx, t0.ty], ...partyBodies().filter(x => x !== t0 && !x.down && !x.dead && Math.hypot(x.tx - b.tx, x.ty - b.ty) < 10).slice(0, 2).map(x => [x.tx, x.ty])];
+      waves.push(() => at.flatMap(([x, y]) => plusTiles(x, y, 2)));
+      waves.push(() => at.flatMap(([x, y]) => { const out = []; for (const [u, v] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let k = 1; k <= 4; k++) out.push([x + u * k, y + v * k]); return out; }));
+    },
+    // 기룡: it dives slantwise through its mark (three wide), lands beyond, and its wings beat the ground about it
+    dive(waves, b) {
+      const t0 = aim(), sx = Math.sign(t0.tx - b.tx) || 1, sy = Math.sign(t0.ty - b.ty) || 1, cx = t0.tx, cy = t0.ty;
+      waves.push(() => { const out = []; for (let k = -6; k <= 6; k++) for (let w = -1; w <= 1; w++) out.push([cx + sx * k + w, cy + sy * k]); return { tiles: out, fall: () => bossLeap(b, cx + sx * 5, cy + sy * 5, 0.3) }; });
+      waves.push(() => sq(b.tx, b.ty, 2, [], 0));
+    },
+    // 백두선인: the eight trigrams set round it (four out), then the ring between them and it
+    bagua(waves, b) {
+      waves.push(() => { const out = []; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; out.push(...box(Math.round(b.tx + Math.cos(a) * 4.5) - 1, Math.round(b.ty + Math.sin(a) * 4.5) - 1, 2, 2)); } return out; });
+      waves.push(() => sq(b.tx, b.ty, 3, [], 1));
+    },
+    // 고대마령: the ground cracks two ways from its mark, then the crack splits wide (three)
+    rift(waves, b) {
+      const t0 = aim(), crack = [[t0.tx, t0.ty]];
+      for (const s0 of [1, -1]) {
+        let x = t0.tx, y = t0.ty, horiz = Math.random() < 0.5;
+        for (let k = 0; k < 7; k++) { if (Math.random() < 0.35) horiz = !horiz; if (horiz) x += s0; else y += s0; crack.push([x, y]); }
+      }
+      waves.push(() => crack);
+      waves.push(() => crack.flatMap(([x, y]) => plusTiles(x, y, 1)).filter(([x, y]) => !crack.some(([u, v]) => u === x && v === y)));
+    },
+    // 왕궁의 요괴: its mark and its mark's mirror through the boss, then the two reflections across
+    mirror(waves, b) {
+      const t0 = aim(), dx = t0.tx - b.tx, dy = t0.ty - b.ty;
+      waves.push(() => sq(t0.tx, t0.ty, 1).concat(sq(b.tx - dx, b.ty - dy, 1)));
+      waves.push(() => sq(b.tx - dx, b.ty + dy, 1).concat(sq(b.tx + dx, b.ty - dy, 1)));
+    },
+  };
+})();
 
 /** The common blows' tiles, at its mark p. */
 function commonTiles(b, kind, p) {
@@ -6644,7 +6997,7 @@ function hurtPlayer(dmg, from = null, pierce = false) {
   if (G.war && (G.war.raid || G.stage.jaeng) && (pierce || (from && from.kind === 'boss'))) dmg *= War.raidHeroHurt();
   let taken = Math.max(1, dmg * Math.max(0.3, 20 / (20 + ac)));
   // 위험도: no blow of a monster past DANGER.blow of the hero's life (a strong one's bite ×20 felled at a stroke, no warning)
-  if (from && from.m && dangerNow()) taken = Math.min(taken, p.maxHp * DANGER.blow);
+  if (from && from.m && dangerNow()) taken = Math.min(taken, p.maxHp * DANGER.blow) * perilMarkK().guard; // (위험의 각인)
   if (G.buffs.shield > G.t) taken = Math.max(1, taken / 2);
   // 절망 on the attacker weakens its blow; 저주 on the hero lets more through; 현무의 철옹's ward.
   if (from && from.st && from.st.despair && from.st.despair.until > G.t) taken *= 0.7;
@@ -6717,7 +7070,9 @@ function heroStruck(taken, from) {
   p.hdy = d ? dy / d : 0;
   G.hurtEdge = { t: G.t, a: Math.min(STRUCK.edge[2], STRUCK.edge[0] + STRUCK.edge[1] * k) };
   if (k >= STRUCK.heavy && !settings.calmFx) G.shake = Math.max(G.shake, 0.12);
-  audio.play('hurt');
+  // 영웅 강타음: a blow of STRUCK.heavy of its life or more sounds 연's monster critical (sfx_bat_critical_mon, yeon_sounds.js
+  // hurt_big) in place of the plain one; the plain where the build has not that clip.
+  audio.play(k >= STRUCK.heavy && audio.fileOf('hurt_big') ? 'hurt_big' : 'hurt');
 }
 /** The screen's red edge: the last blow's, fading, and the slow throb of a hero low on life. */
 function drawHurtEdge() {
@@ -7637,6 +7992,7 @@ function clearStage() {
     }
     // From the grounds past 타계 (Lv 18 and up) the rarer looks, as from the raids.
     if (Math.random() < 0.15) dropCostume(G.level >= 18 ? [1, 2] : [0, 1, 2], '보스의 보물');
+    perilClear(); // 위험도 VII~X 전용 보상
   }
   saveJson('bs_progress', progress);
   record();
@@ -13380,8 +13736,12 @@ function mmZoom(T, f, px = null, py = null) {
   v.cx = (x0 + T.mw / z1 / 2) / T.mw;
   v.cy = (y0 + T.mh / z1 / 2) / T.mh;
 }
+/** The minimaps are looked at: a hunt or a war under way, or the town (마을 미니맵). */
+function mmLive() {
+  return G ? !G.over : !!(T && !$('#town').hidden);
+}
 function mmDown(e) {
-  if (!G || G.over) return false;
+  if (!mmLive()) return false;
   const [x, y] = mmCanvasAt(e), h = mmHitAt(x, y);
   if (!h) return false;
   mmTouch.set(e.pointerId, { id: h.m.T.id, key: h.key, p0: [x, y], p: [x, y], moved: false });
@@ -13436,7 +13796,7 @@ function mmUp(e) {
   return true;
 }
 canvas.addEventListener('wheel', e => {
-  if (!G) return;
+  if (!mmLive()) return;
   const [x, y] = mmCanvasAt(e), h = mmHitAt(x, y);
   if (!h || h.key || h.m.T.v.mode !== 'big') return;
   e.preventDefault();
@@ -13445,15 +13805,15 @@ canvas.addEventListener('wheel', e => {
 window.__mm = id => { const v = mmViews[id], m = mmDrawn[id]; return v && { mode: v.mode, z: +v.z.toFixed(2), follow: v.follow, cx: +v.cx.toFixed(3), cy: +v.cy.toFixed(3), r: m && m.T.r ? { x: Math.round(m.T.r.x), y: Math.round(m.T.r.y), w: Math.round(m.T.r.w), h: Math.round(m.T.r.h) } : null, keys: m ? m.keys.map(k => ({ act: k.act, x: Math.round(k.x + k.w / 2), y: Math.round(k.y + k.h / 2) })) : [] }; };
 
 // 연's minimap at the top right: the area small, the hero, its people and the ways out on it.
-// A tap on it makes it larger or smaller.
-let townMapBig = false;
+// (마을 미니맵 확대·이동 2026-11-28: the hunting ground's and the war's way — 접힘 · 작게 · 크게, and in 크게 pinch, drag,
+// the wheel and the keys + · - · 나 · 작게: mmView('town'), its touches taken by mmDown before the joystick.)
 function townMinimapRect() {
   const a = townArea();
   if (!a || !a.mm) return null;
-  const cr = boxOf(canvas), d = canvas.width / cr.width;
-  // Small by default (about a sixth of the screen's width at most); a tap shows it large.
-  let k = (townMapBig ? 1.3 : 0.55) * d;
-  const cap = canvas.width * (townMapBig ? 0.42 : 0.17);
+  const cr = boxOf(canvas), d = canvas.width / cr.width, big = mmView('town').mode === 'big';
+  // Small by default (about a sixth of the screen's width at most); 크게 the larger.
+  let k = (big ? 1.3 : 0.55) * d;
+  const cap = canvas.width * (big ? 0.42 : 0.17);
   if (a.mm[0] * k > cap) k = cap / a.mm[0];
   const w = a.mm[0] * k, h = a.mm[1] * k;
   return { x: canvas.width - w - 10 * d, y: 34 * d, w, h, d };
@@ -13461,25 +13821,22 @@ function townMinimapRect() {
 function drawTownMinimap() {
   const a = townArea(), r = townMinimapRect(), im = a && pic(`ytown/mm_${T.area}.png`);
   if (!r || !im || !im.width) return;
-  const yt = M.ui.ytown, { x, y, w, h, d } = r, sx = w / a.w, sy = h / a.h;
+  const v = mmView('town'), d = r.d;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(x - 3 * d, y - 3 * d, w + 6 * d, h + 6 * d);
-  ctx.strokeStyle = 'rgb(201,162,74)';
-  ctx.lineWidth = d;
-  ctx.strokeRect(x - 2.5 * d, y - 2.5 * d, w + 5 * d, h + 5 * d);
-  ctx.globalAlpha = 0.85;
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(im, x, y, w, h);
-  ctx.globalAlpha = 1;
+  if (v.mode === 'fold') { mmFoldTab('town', canvas.width - 8 * d, 34 * d, true); ctx.restore(); return; }
+  const yt = M.ui.ytown, big = v.mode === 'big', F = mmFrame('town', r, a.w, a.h, T.x, T.y);
+  mmBackDraw(F, im, 0.85);
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
   const dot = (px, py, color, size, label) => {
-    const X = x + px * sx, Y = y + py * sy;
+    const X = F.X(px), Y = F.Y(py);
     ctx.fillStyle = '#000';
     ctx.fillRect(X - size / 2 - d, Y - size / 2 - d, size + 2 * d, size + 2 * d);
     ctx.fillStyle = color;
     ctx.fillRect(X - size / 2, Y - size / 2, size, size);
-    if (label && townMapBig) {
+    if (label && big) {
       ctx.font = `${Math.round(8 * d)}px G7`;
       ctx.textAlign = 'center';
       outline(label, X, Y - size, '#fff');
@@ -13490,11 +13847,18 @@ function drawTownMinimap() {
     for (const dr of yt.doors) dot(dr.x, dr.y, '#7ad0ff', 3 * d, dr.label);
   } else if (yt.exits[T.area]) dot(yt.exits[T.area].x, yt.exits[T.area].y, '#7ad0ff', 3 * d, '장터');
   for (const n of T.folk) dot(n.x, n.y, '#ffe070', 3 * d, n.label);
-  if (Math.floor(performance.now() / 400) % 2 === 0 || townMapBig) dot(T.x, T.y, '#ff3a2a', 4 * d, null);
-  ctx.font = `${Math.round(9 * d)}px G9`;
-  ctx.textAlign = 'center';
+  // (the screen's window on the area, as the hunting ground's minimap shows it)
+  if (T.camX !== undefined) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = d;
+    ctx.strokeRect(F.X(T.camX), F.Y(T.camY), VW * F.k, VH * F.k);
+  }
+  if (Math.floor(performance.now() / 400) % 2 === 0 || big) dot(T.x, T.y, '#ff3a2a', 4 * d, null);
+  ctx.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   const names = { market: '국내성 장터', smithy: '대장간', armor: '갑옷점', jumak: '주막' };
-  outline(names[T.area] || '국내성', x + w / 2, y + h + 11 * d, '#f4e2b0');
+  mmChrome(F, names[T.area] || '국내성');
   ctx.restore();
 }
 
@@ -14048,8 +14412,13 @@ const QUESTS = [
   // 「쟁」 (war.js): first of the three guilds ten times, the boss's last blow ten times.
   { id: 'q_jaeng_won', title: '패왕', text: '쟁에서 문파 1위 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).won || 0 },
   { id: 'q_jaeng_last', title: '막타 장인', text: '쟁에서 보스 막타 10번', gold: 5000, coins: 50, need: 10, have: () => (progress.bosspk || {}).last || 0 },
+  // 위험도 VII~X (PERIL): the record's grounds, every class together
+  { id: 'q_peril7', title: '위험을 즐기는 자', text: '위험도 VII 이상으로 사냥터 5곳 정복', gold: 5000, coins: 30, need: 5, have: () => perilCount(7) },
+  { id: 'q_peril10', title: '한계 너머', text: '위험도 X로 사냥터 정복', gold: 8000, coins: 50, need: 1, have: () => perilCount(10) },
+  { id: 'q_peril10b', title: '절대 위험', text: '위험도 X로 사냥터 10곳 정복', gold: 20000, coins: 100, need: 10, have: () => perilCount(10) },
 ];
 function costumeOwned() { return Object.keys(((progress.costume || {}).own) || {}).length; }
+function perilCount(t) { return Object.values(perilSave().best).filter(x => x >= t).length; }
 
 /** Today's three 의뢰: drawn from the grounds already open, the same all day. The third turns over
  *  among a few kinds (any ground, a raid, an A grade, a 대항전) so the board is not the same each day. */
@@ -14177,6 +14546,16 @@ function openQuests() {
       done[q.id] = true;
       payReward(q, `의뢰 「${q.title}」`);
     }, !got && have >= q.need ? 'ready' : '');
+  }
+  // 위험도 도감 (PERIL): each ground's highest 위험도 conquered, the marks and the sets only it gives
+  const P = perilSave(), rec = STAGES.filter(st => P.best[st.id]).sort((a, b) => P.best[b.id] - P.best[a.id]);
+  const cs = perilCostumes();
+  head(`위험도 기록 · ${rec.length}곳 (VII 이상 ${perilCount(7)} · X ${perilCount(10)}) · 위험의 각인 ${perilMarks()}`);
+  row('위험도 전용 코디', cs.map(c => `${c.set} ${c.own}/${c.all} (${ROMAN[c.from]} 이상)`).join(' · ') + ' — 상점·뽑기에 없음', '-', false, () => {});
+  if (!rec.length) row('기록이 없습니다', '사냥터 카드의 위험도 +로 높여 정복하면 기록되고, VII~X의 첫 정복마다 보상이 있습니다', '-', false, () => {});
+  for (const st of rec.slice(0, 40)) {
+    const b = P.best[st.id];
+    row(`${st.name} · 위험도 ${ROMAN[b]}`, perilLine(st), b >= 10 ? '완료' : `${ROMAN[Math.max(PERIL.from, b + 1)]}에 도전`, false, () => {}, b >= 10 ? 'ready' : '');
   }
   head('칭호 고르기');
   const titles = QUESTS.filter(q => done[q.id]).map(q => q.title);
@@ -16336,6 +16715,8 @@ function resultsHTML(style, huntGold) {
       + (style.stars ? ` · 숙련 <span class="r-star">${'★'.repeat(style.stars)}${'☆'.repeat(Math.max(0, 3 - style.stars))}</span>${style.newStar ? ' <em>새 ★</em>' : ''}` : '') + '</div>');
   }
   // The rare finds first, in gold (스페셜, 고유, 코디).
+  // 위험도 VII~X 전용 보상: the record and the first conquests (perilClear)
+  if (G.perilGot && G.perilGot.length) out.push(`<div class="r-special r-peril">${G.perilGot.map(x => `<span>${x}</span>`).join('')}</div>`);
   const rare = (G.gained || []).filter(x => x.startsWith('★') || x.startsWith('['));
   if (rare.length) out.push(`<div class="r-special">${[...new Set(rare)].map(x => `<span>${x.startsWith('★') ? x : '★' + x}</span>`).join('')}</div>`);
   const gains = [];
@@ -16864,16 +17245,6 @@ for (const t of ['pointerup', 'pointercancel']) {
 function tapTown(e) {
   if (T.camX === undefined) return;
   const r = canvas.getBoundingClientRect();
-  // A tap on the minimap makes it larger or smaller.
-  const mr = M.ui.ytown && townMinimapRect();
-  if (mr) {
-    const cx = (e.clientX - r.left) * (canvas.width / r.width), cy = (e.clientY - r.top) * (canvas.height / r.height);
-    if (cx > mr.x - 6 * mr.d && cx < mr.x + mr.w + 6 * mr.d && cy > mr.y - 6 * mr.d && cy < mr.y + mr.h + 16 * mr.d) {
-      townMapBig = !townMapBig;
-      audio && audio.play('click');
-      return;
-    }
-  }
   const wx = T.camX + (e.clientX - r.left) * (canvas.width / r.width) / Z;
   const wy = T.camY + (e.clientY - r.top) * (canvas.height / r.height) / Z;
   const hit = T.folk.map(n => [n, Math.abs(n.x - wx) + Math.abs(n.y - 22 - wy) * 0.7])

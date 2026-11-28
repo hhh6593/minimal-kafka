@@ -57,6 +57,11 @@ for (const [s, name, raids, gate] of [['cheong', '청룡', ['raid_varuna'], '바
   for (const [g, gn] of [['m', '남'], ['f', '여']]) MUSIN_HAIR.push({ id: `musin_${s}_${g}`, name: `${name}무신의헤어(${gn})`, raids, gate });
 }
 const MUSIN_ORDER = Object.fromEntries(MUSIN_HAIR.map((h, i) => [h.id, i]));
+// 위험도 전용 코디 (2026-11-28, 최고 장비 뒤의 반복 동기): two of 연's own 전설 sets — 흑룡의 (and its pet 여의주 흑룡) and
+// 환영두로의 — never sold, pulled or dropped by anything else: only a hunting ground conquered at 위험도 `from` and up
+// (game.js PERIL: the first conquest of a ground at IX / X gives one for sure, every conquest at VII+ a chance).
+export const PERIL_SETS = [{ set: '흑룡의', from: 7, pets: ['p4006001'] }, { set: '환영두로의', from: 10, pets: [] }];
+const ROMAN_C = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 // 염색약 (hair dye): the original's 염색약 colours. Each is bought once (전, the rarest with
 // 레이드주화) and then owned for good (progress.costume.dyes, shared by every class): the hero's hair
@@ -241,6 +246,7 @@ export function loadCostumes() {
       if (classes.length) items[h.id] = { id: h.id, kind: 'hair', name: h.name, grade: 4, set: '사신수 무신', whole: false, musin: h, icon: `yhero2/sinsu/${h.id}_icon.png`, classes };
     }
     for (const id of Object.keys(items)) if (!items[id].classes.length) delete items[id];
+    for (const ps of PERIL_SETS) for (const it of Object.values(items)) if ((it.set === ps.set && it.kind !== 'pet') || ps.pets.includes(it.id)) it.peril = ps.from;
     D = { items };
     // A save whose raids were won before these hairs came gets them now.
     unlockMusinHair('사신수 레이드 승리');
@@ -317,7 +323,7 @@ export function giveCostume(id) {
 /** Not owned yet, at random, of the grades given; null when none is left. */
 export function randomCostume(grades = [0, 1, 2, 3]) {
   const items = costumeItems(), own = state().own;
-  const left = Object.keys(items).filter(id => !own[id] && !isFree(items[id]) && !items[id].musin && grades.includes(items[id].grade));
+  const left = Object.keys(items).filter(id => !own[id] && !isFree(items[id]) && !items[id].musin && !items[id].peril && grades.includes(items[id].grade));
   return left.length ? left[Math.floor(Math.random() * left.length)] : null;
 }
 
@@ -331,6 +337,29 @@ export function dropCostume(tiers, from) {
   const it = costumeItems()[id];
   A.say(`${from}: ${it.kind === 'pet' ? '환수' : '코디'} [${it.name}]을(를) 얻었습니다! (마을 코디에서 착용)`, 'sys');
   return it.name;
+}
+
+/** 위험도 전용 코디: one not owned yet of the sets open at 위험도 t (the highest set's first when `top`), given;
+ *  its name, or null when none is left. */
+export function perilCostume(t, from, top = false) {
+  if (!D) return null;
+  const items = costumeItems(), own = state().own;
+  let left = Object.keys(items).filter(id => items[id].peril && items[id].peril <= t && !own[id]);
+  if (top && left.length) { const hi = Math.max(...left.map(id => items[id].peril)); left = left.filter(id => items[id].peril === hi); }
+  if (!left.length) return null;
+  const id = left[Math.floor(Math.random() * left.length)];
+  if (!giveCostume(id)) return null;
+  const it = items[id];
+  A.say(`${from}: 위험도 전용 ${it.kind === 'pet' ? '환수' : '코디'} [${it.name}]을(를) 얻었습니다! (마을 코디에서 착용)`, 'sys');
+  return it.name;
+}
+/** 위험도 전용 코디: how many of each set are owned, of how many ({set, from, own, all}). */
+export function perilCostumes() {
+  const items = costumeItems(), own = state().own;
+  return PERIL_SETS.map(ps => {
+    const ids = Object.keys(items).filter(id => items[id].peril === ps.from && (items[id].set === ps.set || ps.pets.includes(id)));
+    return { set: ps.set, from: ps.from, all: ids.length, own: ids.filter(id => own[id]).length };
+  });
 }
 
 // An AI fighter's 코디 (war.js aiLook): 연's own pieces worn in the field, more and finer the higher
@@ -348,7 +377,7 @@ export function aiCostume(clsId, step) {
   const items = costumeItems();
   const list = (kind, grades) => {
     const key = clsId + kind + grades.join();
-    if (!aiLists.has(key)) aiLists.set(key, Object.keys(items).filter(id => items[id].kind === kind && grades.includes(items[id].grade) && items[id].classes.includes(clsId)));
+    if (!aiLists.has(key)) aiLists.set(key, Object.keys(items).filter(id => items[id].kind === kind && grades.includes(items[id].grade) && items[id].classes.includes(clsId) && !items[id].peril));
     return aiLists.get(key);
   };
   const any = ids => (ids.length ? ids[Math.floor(Math.random() * ids.length)] : null);
@@ -594,7 +623,7 @@ function shop() {
   const s = state(), items = costumeItems(), slot = Math.floor(Date.now() / SHOP_MS);
   if (!s.shop || s.shop.slot !== slot || !s.shop.ids.every(id => items[id])) {
     // Mostly 희귀 and 영웅 (the grades not for sale at all times), some of the others.
-    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id] && !isFree(items[id]) && !items[id].musin);
+    const pool = Object.keys(items).filter(id => items[id].grade < 4 && !s.own[id] && !isFree(items[id]) && !items[id].musin && !items[id].peril);
     const ids = [];
     for (let i = 0; i < SHOP_N * 6 && ids.length < SHOP_N && pool.length; i++) {
       const id = pool[Math.floor(Math.random() * pool.length)], g = items[id].grade;
@@ -861,6 +890,7 @@ function repaint(cls) {
 function howToGet(it, inShop) {
   const g = GRADES[it.grade];
   if (it.musin) return `${it.musin.gate} 승리 시 획득(남·여, 모든 직업 공용)`;
+  if (it.peril) return `위험도 ${ROMAN_C[it.peril]} 이상으로 사냥터를 정복할 때만 획득(그 위험도의 첫 정복은 확정) — 상점·뽑기에는 없음`;
   if (it.grade <= 1) return `${A.won(g.gold)}에 구매`;
   if (it.grade <= 3) return inShop ? `상점 진열 중: 레이드주화 ${g.coins}개` : '상점 진열(6시간마다 바뀜)·뽑기·레이드·대항전·보스에서 얻습니다';
   return '뽑기, 레이드·대항전 승리, 보스의 보물에서만 획득';

@@ -65,16 +65,18 @@ const CHOICES = [
 
 // The boss's own blows on a hunting ground (the raid patterns' names), by ground; by its group
 // when the ground has none of its own (design §4.5).
+// 2026-11-28 (사용자 승인: 보스마다 고유 패턴 하나씩 — ring·hunt·charge가 겹침): every boss before the hells has a blow
+// of its own besides its two (game.js OWN_PATTERNS, its name and nature); the hells and after keep theirs (docs: 남은 것).
 const BOSS_PATTERNS = {
-  novice: ['charge'], rabbit: ['pounce'], rat: ['stampede', 'charge'], snake: ['breath', 'rain'], bigsnake: ['whirl', 'breath'],
-  deer: ['charge', 'trample'], pig: ['charge', 'quake'], bear: ['claw', 'stomp'], bearman: ['claw', 'stomp'], fox: ['clones', 'hunt'],
-  mantis: ['xslash', 'claw'], skull: ['hunt', 'ring'], haunt: ['hunt', 'safe'], goblin: ['quake', 'sparks'], bandit: ['iai', 'charge'],
-  japan: ['iai', 'xslash'], steppe: ['charge', 'stampede'], zud: ['charge', 'stampede'], zud2: ['hunt', 'ring'], hwagwa: ['staff', 'clones', 'cloud'],
-  kirin: ['thunder', 'meteor'], wolf: ['pounce', 'claw'], greatwall: ['quake', 'stomp'], qin: ['seal', 'pillars'], baekdu: ['pounce', 'trample'],
-  baekdu2: ['whirl', 'ring'], baekdu3: ['meteor', 'breath'], baekdu4: ['tide', 'whirl'],
-  sea: ['whirl', 'tide'], palace: ['sweep', 'tide'], deepsea: ['whirl', 'ring'], reef: ['hunt', 'rain'], wreck: ['charge', 'ring'],
-  island: ['rain', 'claw'], gogyun: ['rain', 'claw'], volcano: ['lava', 'pillars', 'flare'], spidercave: ['pounce', 'ring'], gareung: ['hunt', 'seal'], pokyeom: ['flare', 'charge'],
-  yogoe: ['hunt', 'clones'], royal: ['safe', 'ring'], murim: ['xslash', 'stomp'], musin: ['iai', 'xslash'], tagye: ['seal', 'sweep'],
+  novice: ['charge'], rabbit: ['pounce', 'hop'], rat: ['stampede', 'charge', 'burrow'], snake: ['breath', 'rain', 'slither'], bigsnake: ['whirl', 'breath', 'coil'],
+  deer: ['charge', 'trample', 'antlers'], pig: ['charge', 'quake', 'roll'], bear: ['claw', 'stomp', 'maul'], bearman: ['claw', 'stomp', 'totem'], fox: ['clones', 'hunt', 'tails'],
+  mantis: ['xslash', 'claw', 'scythe'], skull: ['hunt', 'ring', 'graves'], haunt: ['hunt', 'safe', 'phantoms'], goblin: ['quake', 'sparks'], bandit: ['iai', 'charge', 'net'],
+  japan: ['iai', 'xslash', 'volley'], steppe: ['charge', 'stampede', 'arrows'], zud: ['charge', 'stampede'], zud2: ['hunt', 'ring'], hwagwa: ['staff', 'clones', 'cloud'],
+  kirin: ['thunder', 'meteor'], wolf: ['pounce', 'claw', 'frenzy'], greatwall: ['quake', 'stomp', 'collapse'], qin: ['seal', 'pillars', 'phalanx'], baekdu: ['pounce', 'trample', 'avalanche'],
+  baekdu2: ['whirl', 'ring', 'roots'], baekdu3: ['meteor', 'breath', 'dive'], baekdu4: ['tide', 'whirl', 'bagua'],
+  sea: ['whirl', 'tide'], palace: ['sweep', 'tide', 'trident'], deepsea: ['whirl', 'ring', 'tentacles'], reef: ['hunt', 'rain', 'anchor'], wreck: ['charge', 'ring', 'broadside'],
+  island: ['rain', 'claw'], gogyun: ['rain', 'claw', 'venom'], volcano: ['lava', 'pillars', 'flare'], spidercave: ['pounce', 'ring', 'web'], gareung: ['hunt', 'seal', 'molt'], pokyeom: ['flare', 'charge', 'heatwave'],
+  yogoe: ['hunt', 'clones', 'gates'], royal: ['safe', 'ring', 'mirror'], murim: ['xslash', 'stomp', 'palm'], musin: ['iai', 'xslash', 'blades'], tagye: ['seal', 'sweep', 'rift'],
   hwatang: ['lava', 'pillars'], hanbing: ['breath', 'ring'], geohae: ['quake', 'stomp'], cheolsang: ['pillars', 'seal'],
   sandolim: ['charge', 'quake'], fallforest: ['hunt', 'whirl'], jagwi: ['rain', 'drought'], oldaram: ['seal', 'sweep'], haya: ['breath', 'flare'],
   lobi: ['tide', 'whirl'], aram: ['sweep', 'ring'], ancient: ['seal', 'xslash'],
@@ -724,6 +726,21 @@ function kill(e) {
   if (e.field) fieldDeath(e);
   const g = H.goal;
   if (g && !g.over && g.kind === 'destroy' && e.goal === 'nest') goalStep(`${g.label.split(' ')[0]} 하나를 부쉈습니다!`);
+  if (g && !g.over && g.kind === 'elite' && e.goal === 'elite') goalStep(`${e.name}을(를) 쓰러뜨렸습니다!`);
+  if (g && !g.over && g.kind === 'streak' && g.ring && !e.goal && !e.kind) {
+    // (judged where it stood: the ring drawn round the spot)
+    const S = GOAL_TUNE.streak, R = g.ring, [cx, cy] = ringAt(R.at);
+    if (Math.hypot(e.x - cx, e.y - cy) <= S.r * A.TILE) {
+      R.c = G.t - R.lastT <= S.gap ? R.c + 1 : 1;
+      R.lastT = G.t;
+      if (R.c >= S.need) {
+        A.floatText(cx, cy - 60, `${S.need}연쇄!`, '#ffd84a', true);
+        if (g.step + 1 < g.n) streakRing(g, spotNear(5, 8));
+        else g.ring = null;
+        goalStep();
+      }
+    }
+  }
   if (g && !g.over && g.kind === 'purify' && g.items[0] && !e.goal) {
     const it = g.items[0], [cx, cy] = ringAt(it.at);
     if (Math.hypot(e.x - cx, e.y - cy) <= GOAL_TUNE.cap.r * A.TILE && (it.kc || 0) < GOAL_TUNE.cap.killMax) {
@@ -1269,21 +1286,21 @@ export const GROUNDS = {
   deer: G_('cave', ['defend', 70, '성황당 토템 지키기', 'war_totem'], ['stampede'], ['swift']),
   pig: G_('cave', ['collect', 5, '도토리 자루 줍기', 'field_barrel'], [], ['splitting']),
   bear: G_('cave', ['chase', 3, '이름 붙은 호랑이 사냥'], [], ['swift']),
-  bearman: G_('cave', ['destroy', 3, '곰인 토템 부수기', 'war_totem'], [], ['swift']),
+  bearman: G_('cave', ['elite', 3, '곰인 전사 셋 사냥'], [], ['swift']),
   fox: G_('cave', ['chase', 3, '불구미호 분신 쫓기'], [], ['cursed']),
   mantis: G_('cave', ['destroy', 4, '사마귀 알 부수기', 'war_rocks'], [], ['swift']),
   skull: G_('cave', ['purify', 3, '비석 정화', 'war_seal'], [], ['shaman']),
-  haunt: G_('house', ['purify', 4, '등롱 밝히기', 'house_lantern'], [], ['cursed']),
+  haunt: G_('house', ['relay', 4, '등롱 잇달아 밝히기', 'house_lantern'], [], ['cursed']),
   goblin: G_('cave', ['collect', 4, '도깨비 보물 줍기', 'jar2'], ['sparks'], ['swift']),
   bandit: G_('cave', ['escort', 26, '빼앗긴 짐수레 되찾기', 'war_cart'], [], ['swift']),
-  japan: G_('plain', ['destroy', 3, '왜군 진영 깃발 부수기', 'war_gate'], ['cannon'], ['swift']),
+  japan: G_('plain', ['elite', 3, '왜장 셋 사냥'], ['cannon'], ['swift']),
   steppe: G_('plain', ['drive', 3, '사냥대회: 몰이 셋'], ['stampede'], ['swift']),
   zud: G_('plain', ['drive', 3, '사냥대회: 기마 몰이'], ['stampede'], ['swift']),
-  zud2: G_('plain', ['destroy', 3, '주술 토템 부수기', 'war_totem'], ['stampede'], ['shaman']),
+  zud2: G_('plain', ['elite', 3, '고원 주술사 셋 사냥'], ['stampede'], ['shaman']),
   hwagwa: G_('plain', ['chase', 3, '원숭이 장수 추격'], [], ['swift']),
   kirin: G_('plain', ['purify', 3, '하늘 제단 정화', 'war_altar'], ['sparks'], ['warding']),
   wolf: G_('plain', ['survive', 45, '만월: 등불 곁에서 버티기', 'cave_torch', 'moon'], [], ['vampiric', 'swift']),
-  greatwall: G_('plain', ['destroy', 3, '혼령석 부수기', 'war_rocks'], ['rockfall'], ['warding']),
+  greatwall: G_('plain', ['relay', 4, '갱도 횃불 잇기', 'cave_torch'], ['rockfall'], ['warding']),
   qin: G_('plain', ['defend', 70, '봉인진 지키기', 'war_seal'], ['pillars'], ['warding']),
   baekdu: G_('snow', ['chase', 3, '설담비 추격'], ['stampede'], ['swift']),
   baekdu2: G_('snow', ['destroy', 3, '요괴거목 베기', 'war_totem'], [], ['warding']),
@@ -1292,12 +1309,12 @@ export const GROUNDS = {
   sea: G_('sea', ['collect', 5, '진주 줍기', 'sea_shells'], ['tide'], ['frozen']),
   palace: G_('sea', ['escort', 24, '거북 사신 호위', 'war_cart2'], ['tide'], ['warding']),
   deepsea: G_('sea', ['destroy', 3, '대왕오징어 촉수 끊기', 'sea_kelp2'], [], ['frozen']),
-  reef: G_('sea', ['purify', 3, '해골 제단 정화', 'war_altar'], ['tide'], ['shaman']),
+  reef: G_('sea', ['streak', 3, '해골 선원 연쇄 처치'], ['tide'], ['shaman']),
   wreck: G_('sea', ['survive', 50, '포격 속 갑판 버티기', null, 'cannon'], ['cannon'], ['swift']),
   island: G_('isle', ['collect', 4, '인성초 뿌리 줍기', 'island_plant'], ['bog'], ['frozen']),
   gogyun: G_('isle', ['collect', 4, '인성초 뿌리 줍기', 'island_plant'], ['bog'], ['frozen']),
   volcano: G_('isle', ['survive', 50, '차오르는 용암 버티기', null, 'lava'], ['eruption'], ['burning']),
-  spidercave: G_('isle', ['destroy', 3, '지주 알집 부수기', 'war_rocks'], [], ['frozen']),
+  spidercave: G_('isle', ['streak', 3, '새끼 거미 떼 연쇄 처치'], [], ['frozen']),
   gareung: G_('isle', ['collect', 3, '유물 운반', 'war_lock'], [], ['cursed']),
   pokyeom: G_('isle', ['defend', 70, '절벽 위 봉화 지키기', 'war_brazier'], ['rockfall'], ['burning']),
   yogoe: G_('house', ['destroy', 3, '요괴 문 부수기', 'war_door'], [], ['shaman']),
@@ -1305,19 +1322,19 @@ export const GROUNDS = {
   murim: G_('house', ['duel', 3, '대련: 사범 셋'], [], []),
   musin: G_('house', ['floors', 3, '탑 오르기'], [], ['swift', 'warding', 'burning']),
   tagye: G_('house', ['purify', 4, '마령 구멍 봉인', 'war_seal'], [], ['shaman', 'cursed']),
-  hwatang: G_('hell', ['purify', 4, '업화로 정화', 'war_brazier'], ['eruption'], ['burning']),
+  hwatang: G_('hell', ['streak', 3, '업화 속 연쇄 처치'], ['eruption'], ['burning']),
   hanbing: G_('hell', ['survive', 50, '화로 곁에서 버티기', 'war_brazier', 'warm'], ['icefall'], ['frozen']),
   geohae: G_('hell', ['destroy', 3, '거해 둥지 부수기', 'war_rocks'], ['quake'], ['warding']),
   cheolsang: G_('hell', ['purify', 5, '다섯 돌 밝히기', 'war_seal'], ['pillars'], ['warding']),
   sandolim: G_('sky', ['escort', 28, '협곡 전진', 'war_cart'], ['rockfall'], ['swift']),
   fallforest: G_('sky', ['defend', 70, '귀장승 지키기', 'war_totem'], [], ['cursed']),
   jagwi: G_('sky', ['survive', 50, '번지는 늪 버티기', null, 'bog'], ['bog'], ['vampiric']),
-  oldaram: G_('sky', ['destroy', 3, '귀병문 부수기', 'war_door'], [], ['shaman']),
+  oldaram: G_('sky', ['streak', 3, '귀병 연쇄 처치'], [], ['shaman']),
   haya: G_('sky', ['survive', 50, '번지는 불길 버티기', null, 'fire'], ['eruption'], ['burning', 'swift']),
   lobi: G_('sky', ['chase', 3, '파도뱀 추격'], ['tide'], ['frozen']),
   aram: G_('sky', ['survive', 50, '모래폭풍 버티기', null, 'storm'], [], ['swift']),
   ancient: G_('sky', ['purify', 3, '성문 점령', 'war_gate'], [], ['warding']),
-  abyss: G_('abyss', ['purify', 5, '무덤 횃불 밝히기', 'cave_torch'], [], ['cursed']),
+  abyss: G_('abyss', ['relay', 5, '무덤 횃불 잇기', 'cave_torch'], [], ['cursed']),
   abyss2: G_('abyss', ['chase', 3, '울부짖는 달걀귀신 추격'], [], ['cursed']),
   abyss3: G_('abyss', ['purify', 3, '봉인 셋 깨기', 'war_seal'], ['pillars'], ['shaman']),
   abyss4: G_('abyss', ['destroy', 3, '세계석 조각 부수기', 'war_rocks'], ['quake'], ['warding']),
@@ -1375,7 +1392,17 @@ function spotNear(r0, r1) {
 export const GOAL_TUNE = {
   cap: { r: 2.2, fill: 4.5, foe: 0.15, foeMax: 4, kill: 0.015, killMax: 0.4, hold: 3, decay: 30 },
   pick: 1.1, escortR: 3, hold: 40,
-  limit: { collect: 50, purify: 70, destroy: 70, chase: 60, duel: 110, floors: 120, drive: 80 }, fast: 0.6,
+  limit: { collect: 50, purify: 70, destroy: 70, chase: 60, duel: 110, floors: 120, drive: 80, elite: 70, streak: 75, relay: 75 }, fast: 0.6,
+  // 2026-11-28 (사용자 승인: 파괴 14·점령 12로 반복) — three kinds more:
+  //   정예 사냥 (elite) — n named champions far apart (far tiles off, a ring under each = its body), each holding its ground
+  //     till the hero comes within `wake` tiles (hunted, not coming); each felled a step.
+  //   연쇄 처치 (streak) — a ring of r tiles with a pack in it: `need` kills inside it, each within `gap` s of the last
+  //     (the chain shown on the ring; it breaks past gap), a step; the ring moves on. Kills judged where the monster stood.
+  //   연속 점령 (relay) — small rings one after another (r tiles): stood in `stand` s each (out of it, it drains `drain` times
+  //     as fast); each burns `fuse` s, then goes out and is lit again elsewhere.
+  elite: { far: [8, 12], hp: 2.2, scale: 1.3, wake: 5 },
+  streak: { r: 2.6, need: 14, gap: 2.5, pack: 12, refill: 5, every: 1.5, cap: 32 },
+  relay: { r: 1.4, stand: 1.4, drain: 2, fuse: 18, near: [5, 8] },
   gold: 0.6, // a chest's worth of gold as coins, × the ground's level + 4
 };
 
@@ -1400,6 +1427,40 @@ function goalStart() {
   else if (k === 'duel') g.next = G.t + 1;
   else if (k === 'floors') g.next = G.t + 1;
   else if (k === 'drive') g.next = G.t + 2;
+  else if (k === 'elite') for (let i = 0; i < g.n; i++) eliteSpawn(g, i);
+  else if (k === 'streak') streakRing(g, spotNear(4, 7));
+  else if (k === 'relay') relayRing(g, spotNear(...GOAL_TUNE.relay.near));
+}
+
+/** 정예 사냥: one named champion of the ground's, far off, its own affix. */
+function eliteSpawn(g, i) {
+  const G = A.G(), E = GOAL_TUNE.elite, aff = ground().elite[i % ground().elite.length] || 'swift';
+  const e = A.addEnemy(A.pickMonster(true), 'champ', { name: g.label.replace(/ ?셋 사냥$/, '').replace(/^고원 /, '') + ` ${i + 1}`, scale: E.scale }, ++G.packs,
+    spotNear(E.far[0] + i, E.far[1] + i));
+  if (!e) return;
+  affix(e, aff);
+  e.goal = 'elite';
+  e.hp = e.maxHp = e.maxHp * E.hp;
+}
+/** 연쇄 처치: the ring at `at`, its pack in it. */
+function streakRing(g, at) {
+  g.ring = { at, c: 0, lastT: -9, fedT: 0, fed: 0 };
+  streakFeed(g, GOAL_TUNE.streak.pack);
+}
+function streakFeed(g, n) {
+  const G = A.G(), S = GOAL_TUNE.streak, [x0, y0] = g.ring.at, rr = Math.floor(S.r - 0.4);
+  g.ring.fedT = G.t;
+  g.ring.fed += n;
+  for (let i = 0; i < n * 3 && n > 0; i++) {
+    const s = [x0 + Math.round((Math.random() * 2 - 1) * rr), y0 + Math.round((Math.random() * 2 - 1) * rr)];
+    if (!A.free(s[0], s[1]) || (G.arena && !open(s[0], s[1]))) continue;
+    const e = A.addEnemy(A.pickMonster(), null, null, 0, s);
+    if (e) { e.stun = Math.max(e.stun || 0, 0.6); n--; }
+  }
+}
+/** 연속 점령: the next small ring, lit for `fuse` s. */
+function relayRing(g, at) {
+  g.items = [{ at, fill: 0, fuse: A.G().t + GOAL_TUNE.relay.fuse }];
 }
 
 /** A step of the objective done: the gauge, and a beat on it. */
@@ -1586,6 +1647,26 @@ function goalTick(dt) {
       A.banner(`무신의 탑 ${g.step + 1}층`);
     }
     if (g.wave && !G.enemies.some(e => e.pack === g.wave)) { g.wave = 0; g.next = t + 2; goalStep(); }
+  } else if (g.kind === 'streak' && g.ring) {
+    const S = GOAL_TUNE.streak, R = g.ring, [cx, cy] = ringAt(R.at), Rp = S.r * A.TILE;
+    if (R.c && t - R.lastT > S.gap) { R.c = 0; A.floatText(cx, cy - 60, '연쇄 끊김', '#ff9a6a', true); }
+    // the pack kept up while the hero is at the ring (not past `cap` of a ring's: the field does not swell)
+    const inRingN = G.enemies.filter(e => !e.kind && e.hp > 0 && Math.hypot(e.x - cx, e.y - cy) <= Rp).length;
+    if (inRingN < S.refill && t - R.fedT > S.every && R.fed < S.cap && inRing(R.at, S.r + 2)) streakFeed(g, S.refill);
+  } else if (g.kind === 'relay' && g.items[0]) {
+    const Q = GOAL_TUNE.relay, it = g.items[0];
+    it.inside = inRing(it.at, Q.r);
+    it.fill = it.inside ? Math.min(1, it.fill + dt / Q.stand) : Math.max(0, it.fill - dt * Q.drain / Q.stand / 4);
+    if (it.fill >= 1) {
+      (g.lit = g.lit || []).push(it.at);
+      g.items = [];
+      if (g.step + 1 < g.n) relayRing(g, spotNear(...Q.near));
+      goalStep();
+    } else if (t >= it.fuse) {
+      const [x, y] = ringAt(it.at);
+      A.floatText(x, y - 60, '꺼졌다!', '#ff9a6a', true);
+      relayRing(g, spotNear(...Q.near));
+    }
   } else if (g.kind === 'drive') {
     if (!g.line && t >= g.next && g.step < g.n) {
       g.line = A.huntEvent('march') || -1;
@@ -1785,6 +1866,8 @@ function affixDeath(e) {
 function move(e) {
   const G = A.G();
   if (e.goal === 'nest') return true; // still
+  // 정예 사냥: each holds its ground till the hero comes within `wake` tiles (it is hunted, it does not come)
+  if (e.goal === 'elite' && Math.abs(e.tx - G.player.tx) + Math.abs(e.ty - G.player.ty) > GOAL_TUNE.elite.wake) return true;
   if (e.hunt && e.hunt.to) {
     const [tx, ty] = e.hunt.to;
     if (Math.abs(e.tx - tx) + Math.abs(e.ty - ty) <= 1) return true; // at the totem: it gnaws (goalTick)
@@ -1819,6 +1902,12 @@ function goalSpot() {
   if (g.kind === 'defend') return g.items[0] && g.items[0].at;
   if (g.kind === 'escort') return [Math.floor(g.cart.x), Math.floor(g.cart.y)];
   if (g.kind === 'chase') { const e = g.target; return e && [e.tx, e.ty]; }
+  if (g.kind === 'elite') {
+    const p = G.player, es = G.enemies.filter(o => o.goal === 'elite' && o.hp > 0).sort((a, b) => Math.hypot(a.tx - p.tx, a.ty - p.ty) - Math.hypot(b.tx - p.tx, b.ty - p.ty));
+    return es[0] ? [es[0].tx, es[0].ty] : null;
+  }
+  if (g.kind === 'streak') return g.ring && g.ring.at;
+  if (g.kind === 'relay') return g.items[0] && g.items[0].at;
   if (g.kind === 'survive' && g.items.length) { const p = G.player; const it = g.items.slice().sort((a, b) => Math.hypot(a.at[0] - p.tx, a.at[1] - p.ty) - Math.hypot(b.at[0] - p.tx, b.at[1] - p.ty))[0]; return it.at; }
   return null;
 }
@@ -1883,6 +1972,37 @@ function drawGoal(ctx) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 21, y + 4, 42, 5);
     ctx.fillStyle = c.hp > 0.5 ? '#6ad04a' : '#e05a3a'; ctx.fillRect(x - 20, y + 5, 40 * Math.max(0, c.hp), 3);
     ring(x, y, GOAL_TUNE.escortR * T, 1, c.moving ? 'rgba(120,220,120,0.35)' : 'rgba(255,255,255,0.15)');
+  }
+  if (g.kind === 'elite' && !g.over) for (const e of G.enemies) if (e.goal === 'elite' && e.hp > 0) {
+    // the champion itself is the mark: a red ring at its feet, its name over it
+    const y = e.y + 2;
+    ring(e.x, y, T * 0.7, 1, 'rgba(255,110,60,0.85)');
+  }
+  if (g.kind === 'streak' && g.ring && !g.over) {
+    // the ring is the judgement (a kill counts where the monster stood in it); the chain round its edge, and how long
+    // before it breaks (the inner arc)
+    const S = GOAL_TUNE.streak, R = g.ring, [x, y] = at(...R.at), Rr = S.r * T, live = R.c && G.t - R.lastT <= S.gap;
+    ctx.fillStyle = live ? 'rgba(255,170,60,0.16)' : 'rgba(255,170,60,0.07)';
+    ctx.beginPath(); ctx.arc(x, y, Rr, 0, Math.PI * 2); ctx.fill();
+    ring(x, y, Rr, 1, 'rgba(255,255,255,0.25)');
+    ring(x, y, Rr, live ? R.c / S.need : 0, '#ffb43a');
+    if (live) ring(x, y, Rr - 6, 1 - (G.t - R.lastT) / S.gap, 'rgba(255,90,40,0.8)');
+    ctx.font = 'bold 11px G9'; ctx.textAlign = 'center';
+    A.outline(`연쇄 ${live ? R.c : 0}/${S.need}`, x, y - 78, live ? '#ffd27a' : '#c0a070');
+  }
+  if (g.kind === 'relay') {
+    for (const l of g.lit || []) { const [x, y] = at(...l); pic(g.prop, x, y); }
+    for (const it of g.over ? [] : g.items) {
+      const Q = GOAL_TUNE.relay, [x, y] = at(...it.at), R = Q.r * T, left = Math.max(0, it.fuse - G.t);
+      ctx.fillStyle = it.inside ? 'rgba(150,255,170,0.18)' : 'rgba(150,255,170,0.07)';
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      ring(x, y, R, 1, 'rgba(255,255,255,0.25)');
+      ring(x, y, R, it.fill, '#8ef0a0');
+      ring(x, y, R + 5, left / Q.fuse, left < 4 ? 'rgba(255,90,40,0.85)' : 'rgba(255,220,120,0.6)');
+      pic(g.prop, x, y, 0.6);
+      ctx.font = 'bold 11px G9'; ctx.textAlign = 'center';
+      A.outline(`${Math.ceil(left)}초`, x, y - 78, left < 4 ? '#ff9a6a' : '#d8ffd8');
+    }
   }
   // Nests: their prop over the monster's place.
   for (const e of G.enemies) if (e.goal === 'nest' && e.hunt) pic(e.hunt.prop, e.x, e.y + 4);

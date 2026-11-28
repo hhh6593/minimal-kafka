@@ -177,6 +177,7 @@ def main():
             man.setdefault("ywar", {})[war] = v
         print(f"replaced {len(wi)} battlefields from ywar_add")
     yzone_add(gear, assets, man)
+    ysfx_add(gear, assets, man)
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
     # The sheets put in here as png (today's 9차, 격 HD) shrunk as the build does (tools/webp_fx.py): the APK past the
@@ -262,6 +263,27 @@ def yzone_add(gear, assets, man):
                             "-ac", "1", "-ar", "22050", "-q:a", "1", "-c:a", "libvorbis", dst], check=True)
             if key not in keys:
                 man["audio"]["bgm"].append({"key": key, "file": "audio/bgm/" + key + ".ogg"})
+
+
+def ysfx_add(gear, assets, man):
+    """연's sounds the game uses since that APK (GEAR_DIR/ysfx_add/sfx/<clip>.wav: tools/yeon_sounds.py --add — 2026-11-28
+    sfx_bat_critical_mon, the hero struck hard): as OGG, as prepare_assets.py makes the sounds (-q:a 3), under their clip
+    name (yeon_sounds.js names them)."""
+    sd = os.path.join(gear, "ysfx_add", "sfx")
+    if not os.path.isdir(sd):
+        return
+    import subprocess
+    os.makedirs(os.path.join(assets, "audio", "sfx"), exist_ok=True)
+    n = 0
+    for f in sorted(os.listdir(sd)):
+        if not f.lower().endswith(".wav"):
+            continue
+        key = f[:-4]
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", os.path.join(sd, f), "-q:a", "3", "-c:a", "libvorbis",
+                        os.path.join(assets, "audio", "sfx", key + ".ogg")], check=True)
+        man["audio"]["sfx"][key] = "audio/sfx/" + key + ".ogg"
+        n += 1
+    print(f"{n} 연 sounds from ysfx_add")
 
 
 if __name__ == "__main__":
