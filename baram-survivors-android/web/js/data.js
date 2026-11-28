@@ -65,7 +65,8 @@ export const CLASSES = [
 // `kickT` s; fling: a heavy technique's throw (px); rate: the blow sound's speed (below 1 deeper and longer — a big
 // thud; above 1 a quick tick); crit: the screen's shake on a 치명타; stop: a 치명타 on a champion, lieutenant or boss
 // close in stops the world that long (hunts only, inside the 손맛 예산 HITSTOP); fly: a flung shot's flight time
-// (below 1 quicker — a crisp arrow); shot: the blow sound of a shot's landing, its own speed.
+// (below 1 quicker — a crisp arrow). 이동 사격 (2026-11-28): runCd — while the hero walks, its skills come round that much sooner;
+// runSpeed — for 0.6 s after a cast, it walks that much quicker (shooting on the run, not stopping to shoot).
 export const CLASS_FEEL = {
   warrior: { kick: 10, kickT: 0.18, fling: 26, rate: 0.86, crit: 0.14, stop: 0.04 },
   lancer: { kick: 11, kickT: 0.18, fling: 28, rate: 0.9, crit: 0.12, stop: 0.035 },
@@ -74,7 +75,7 @@ export const CLASS_FEEL = {
   rogue: { kick: 5, kickT: 0.1, fling: 16, rate: 1.14, crit: 0.06, stop: 0 },
   reaper: { kick: 7, kickT: 0.13, fling: 20, rate: 1.05, crit: 0.09, stop: 0.025 },
   celestial: { kick: 6, kickT: 0.12, fling: 18, rate: 1, crit: 0.08, stop: 0 },
-  archer: { kick: 3, kickT: 0.08, rate: 1.2, crit: 0.05, stop: 0, fly: 0.7 },
+  archer: { kick: 3, kickT: 0.08, rate: 1.2, crit: 0.05, stop: 0, fly: 0.7, runCd: 0.12, runSpeed: 0.06 },
   mage: { kick: 4, kickT: 0.1, rate: 1.1, crit: 0.07, stop: 0, fly: 0.9 },
   magus: { kick: 4, kickT: 0.1, rate: 1.12, crit: 0.06, stop: 0, fly: 0.85 },
   poet: { kick: 3, kickT: 0.1, rate: 1.16, crit: 0.05, stop: 0, fly: 0.9 },

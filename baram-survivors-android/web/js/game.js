@@ -5016,7 +5016,8 @@ function heroSpeed() {
   return (TILE / 0.24) * (p.speed / 70) * (1 + 0.08 * G.passives.speed) * (1 + 0.1 * opt('speed')) * heroMove().k
     * (G.buffs.g_speed > G.t ? 1 + (G.buffs.g_speedK || 0) : 1) * held
     * (G.buffs.swift > G.t ? 1 + PROCS.swift.k : 1) * (G.buffs.chosang > G.t ? 1 + UTIL.chosang.speed : 1)
-    * (G.hunt ? Hunt.speedK() : 1); // 사냥 기믹: 기세 1단
+    * (G.hunt ? Hunt.speedK() : 1) // 사냥 기믹: 기세 1단
+    * (!G.war && clsFeel().runSpeed && G.t - (G.lastCastT ?? -9) < 0.6 ? 1 + clsFeel().runSpeed : 1); // (이동 사격: data.js CLASS_FEEL runSpeed)
 }
 
 /**
@@ -5084,9 +5085,11 @@ function update(dt) {
     const stalk = G.ambush;
     const opener = stalk && G.t >= stalk.at + AMBUSH.stalk && G.t < stalk.at + AMBUSH.stalk + AMBUSH.grace ? ambushOpener() : null;
     const sit = castSituation();
+    const rc = !G.war && clsFeel().runCd, runCdK = rc && G.player.stepping ? 1 + rc : 1;
     for (const s of G.skills) {
       // 마기지체: every spell turns 1.6 times as fast for a while.
-      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste')) * (G.hunt ? Hunt.cdK() : 1); // 사냥 기믹: 기세 2단
+      s.timer -= dt * (G.buffs.haste > G.t ? 1.6 : 1) * (1 + 0.08 * opt('haste')) * (G.hunt ? Hunt.cdK() : 1) // 사냥 기믹: 기세 2단
+        * (runCdK || 1); // (직업별 손맛 이동 사격: data.js CLASS_FEEL runCd)
       // A spell in the 기술 연계 waits, ready, for the others of the chain.
       if (chain.includes(s) && !stalk) {
         s.timer = Math.max(0, s.timer);
@@ -16483,6 +16486,8 @@ function evolve() {
 }
 
 /** Three cards, as D2 Survivors deals them. */
+/** The first card's wide blow for a class whose 1차 attacks all strike one foe (the best of these its 승급 opens). */
+const FIRST_AREA = { rogue: ['r_suhyo', 'r_jiok'] };
 function drawCards() {
   const lvl = G.player.lvl, mine = id => SKILLS[id].cls === G.cls.id || SKILLS[id].cls === 'all';
   const have = id => G.skills.some(x => x.id === id || x.from === id || x.from2 === id);
@@ -16495,7 +16500,11 @@ function drawCards() {
       .map(([id]) => ({ type: 'skill', id, lv: 1 }));
     const known = mastered(G.cls.id).filter(id => SKILLS[id].req > 1 && SKILLS[id].kind !== 'heal')
       .sort(() => Math.random() - 0.5).slice(0, 1).map(id => ({ type: 'skill', id, lv: 1, mastered: true }));
-    const deal = known.concat(first).slice(0, 3);
+    // (도적 손질 2차 2026-11-28: the 도적's first card held 비영승보·뇌진주 only, both on one foe; a run that took 뇌진주 went into
+    // 하월 on it and fell in a minute — its widest blow of a 승급 it has won comes in the first card too)
+    const area = (FIRST_AREA[G.cls.id] || []).filter(id => SKILLS[id] && promoOf(G.cls.id) >= (SKILLS[id].promo || 0) && !known.some(k => k.id === id))
+      .slice(0, 1).map(id => ({ type: 'skill', id, lv: 1 }));
+    const deal = known.concat(area, first).slice(0, 3);
     // 사냥 기믹 (P1-10): on a ground conquered before, the 수련장's preset first.
     const fit = id => SKILLS[id] && mine(id) && !SKILLS[id].evolved && SKILLS[id].kind !== 'ult' && SKILLS[id].kind !== 'heal' && (SKILLS[id].req === 1 || mastered(G.cls.id).includes(id));
     return Hunt.firstPicks(G.cls.id, fit, deal) || deal;
