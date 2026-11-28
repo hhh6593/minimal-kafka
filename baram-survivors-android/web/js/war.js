@@ -899,27 +899,34 @@ function snap(W, x, y) {
 }
 
 /** Steps from every open tile to (x, y): a breadth-first field, kept for reuse. */
+let flowQ = new Int32Array(0);
 function flowTo(W, x, y, team) {
   const key = x + ',' + y + ',' + (W.gate && (!W.gateDown || W.postern) ? (team === W.gate.team ? 'g' : 'n') + (W.gateDown ? 'd' : '') : '');
   let f = W.flow.get(key);
   if (f) return f;
   const { cols, rows } = W.map, n = cols * rows;
   f = new Int16Array(n).fill(-1);
-  const q = new Int32Array(n);
+  // (성능 점검 2026-11-28: open() inlined and the four ways unrolled, in DIR4's order, the queue kept — the same field;
+  // a siege's fields were a twentieth of its frame)
+  if (flowQ.length < n) flowQ = new Int32Array(n);
+  const q = flowQ, walk = W.map.walk, post = W.postern, g = W.gate, shut = !!(g && !W.gateDown), mine = !!(g && team === g.team);
+  const pass = (nx, ny) => {
+    const ni = ny * cols + nx;
+    if (post && post.has(ni)) return mine;
+    if (!walk[ni]) return false;
+    return !(shut && nx >= g.x0 && nx <= g.x1 && ny >= g.y0 && ny <= g.y1);
+  };
   let h = 0, t = 0;
   if (!open(W, x, y, team)) [x, y] = snap(W, x, y);
   f[y * cols + x] = 0;
   q[t++] = y * cols + x;
   while (h < t) {
     const c = q[h++], cx = c % cols, cy = (c - cx) / cols, dv = f[c] + 1;
-    for (const [dx, dy] of DIR4) {
-      const nx = cx + dx, ny = cy + dy;
-      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
-      const ni = ny * cols + nx;
-      if (f[ni] >= 0 || !open(W, nx, ny, team)) continue;
-      f[ni] = dv;
-      q[t++] = ni;
-    }
+    // DIR4: [0, 1], [-1, 0], [1, 0], [0, -1]
+    if (cy + 1 < rows && f[c + cols] < 0 && pass(cx, cy + 1)) { f[c + cols] = dv; q[t++] = c + cols; }
+    if (cx > 0 && f[c - 1] < 0 && pass(cx - 1, cy)) { f[c - 1] = dv; q[t++] = c - 1; }
+    if (cx + 1 < cols && f[c + 1] < 0 && pass(cx + 1, cy)) { f[c + 1] = dv; q[t++] = c + 1; }
+    if (cy > 0 && f[c - cols] < 0 && pass(cx, cy - 1)) { f[c - cols] = dv; q[t++] = c - cols; }
   }
   if (W.flow.size > 96) W.flow.delete(W.flow.keys().next().value);
   W.flow.set(key, f);
@@ -1306,18 +1313,23 @@ function walk(W, b) {
 }
 
 /** The tile nearest (x, y) that body b can walk to from where it stands (by its side's open tiles), or null. */
+let rnF = new Int16Array(0), rnQ = new Int32Array(0);
 function reachNear(W, b, x, y) {
   // (kept for the body while its destination and the gate stand as they were: no new field a step)
   x = clamp(Math.round(x), 0, W.map.cols - 1); y = clamp(Math.round(y), 0, W.map.rows - 1);
   const key = x + ',' + y + ',' + (W.gateDown ? 1 : 0);
   if (b.rnKey === key) return b.rnAt;
-  const { cols, rows } = W.map, n = cols * rows, f = new Int16Array(n).fill(-1), q = new Int32Array(n);
+  // (성능 점검 2026-11-28: the field and the queue kept between calls — two new arrays of the map's size for every body
+  // whose destination moved were most of a siege's garbage — the field filled afresh each time, the same search)
+  const { cols, rows } = W.map, n = cols * rows;
+  if (rnF.length !== n) { rnF = new Int16Array(n); rnQ = new Int32Array(n); }
+  const f = rnF.fill(-1), q = rnQ;
   let h = 0, t = 0;
   f[b.ty * cols + b.tx] = 0; q[t++] = b.ty * cols + b.tx;
   while (h < t) {
     const c = q[h++], cx = c % cols, cy = (c - cx) / cols;
-    for (const [dx, dy] of DIR4) {
-      const nx = cx + dx, ny = cy + dy;
+    for (let k = 0; k < 4; k++) {
+      const nx = cx + DIR4[k][0], ny = cy + DIR4[k][1];
       if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
       const ni = ny * cols + nx;
       if (f[ni] >= 0 || !open(W, nx, ny, b.team)) continue;
@@ -5188,6 +5200,12 @@ function finalOrders(W, team, set, squads) {
   });
 }
 
+/** How many of list stand within r tiles (steps across and down) of who, who and gates aside. */
+function around(who, list, r) {
+  let n = 0;
+  for (let i = 0; i < list.length; i++) { const o = list[i]; if (o !== who && !o.gate && Math.abs(o.tx - who.tx) + Math.abs(o.ty - who.ty) <= r) n++; }
+  return n;
+}
 /**
  * A fighter's own play, by its style, when it is not following the hero or carrying: true when
  * it acted (its target and its way chosen). Hunters roam for the strong and the lone, divers for
@@ -5198,7 +5216,6 @@ function soloThink(W, b, order) {
   const G = A.G(), st = b.style;
   if (!st || st === 'obj' || order.kind === 'follow' || W.phase === 'final' || (W.jaeng && order.kind !== 'pk')) return false;
   const foes = foesOf(W, b.team), mates = W.alive[b.team];
-  const around = (who, list, r) => { let n = 0; for (const o of list) if (o !== who && !o.gate && Math.abs(o.tx - who.tx) + Math.abs(o.ty - who.ty) <= r) n++; return n; };
   // The cautious: outnumbered near, back to the nearest group of friends.
   if (st === 'cautious') {
     const nf = around(b, foes, 5), nm = around(b, mates, 5);
