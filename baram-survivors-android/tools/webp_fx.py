@@ -50,7 +50,8 @@ def main():
         after += os.path.getsize(dst)
         os.remove(src)
         done.append(name[:-4])
-    man['fxWebp'] = done
+    # (with those already shrunk: run over a www that had some, it must not forget them — 2026-11-28 404s)
+    man['fxWebp'] = sorted(set(man.get('fxWebp', [])) | set(done))
     json.dump(man, open(man_path, 'w'), ensure_ascii=False, separators=(',', ':'))
     print(f'fx webp {len(done)}: {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB')
 

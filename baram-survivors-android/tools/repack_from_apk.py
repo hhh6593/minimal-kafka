@@ -179,6 +179,10 @@ def main():
     yzone_add(gear, assets, man)
     json.dump(man, open(mpath, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(f"replaced {len(old_o)} old 9차 sheets with {len(m['fx'])}")
+    # The sheets put in here as png (today's 9차, 격 HD) shrunk as the build does (tools/webp_fx.py): the APK past the
+    # 400MB that can be sent otherwise (2026-11-28).
+    import subprocess
+    subprocess.run([sys.executable, os.path.join(HERE, "webp_fx.py"), assets], check=True)
 
 
 def yzone_add(gear, assets, man):
