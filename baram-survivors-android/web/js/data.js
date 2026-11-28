@@ -1663,7 +1663,7 @@ Object.assign(SKILLS.a_chase, { rowFx: 'k_a_chasearrow', rowHit: 0.76 });
 // 연 설명 "대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아낸다" — 하늘에서 보랏빛 줄기가 대상에 내리꽂히고 가시 고리가 둘레로 퍼진다.
 // 우리 게임은 이 그림을 일곱 칸 줄 위에 1.3칸 폭으로 눌러 펴 그렸다(보라 기둥이 줄을 따라 누움). → 대상 둘레(5×5, 고리 지름과 같음)를 치는
 // strike로, 그림은 그 칸 위에 원래 모양 그대로(고리가 맞는 칸), 맞은 몸마다 연의 적중 그림(k_md_ray). 고리가 터지는 0.2초(4번째 그림)에 맞음.
-Object.assign(SKILLS.md_ray, { kind: 'strike', fx: 'k_x_md_ray_beam', fxOwn: true, yeon: true, fxHit: 'k_md_ray', range: 7, radius: 2, count: 1, hitAt: 0.2, depth: undefined, dmg: 24,
+Object.assign(SKILLS.md_ray, { kind: 'strike', fx: 'k_x_md_ray_beam', fxOwn: true, yeon: true, fxHit: 'k_md_ray', range: 7, radius: 2, count: 1, hitAt: 0.2, depth: undefined, dmg: 24, oneCast: true,
   desc: '대상 범위를 중심으로 매우 강력한 광폭기 줄기를 쏟아부어 대상과 그 둘레 두 칸의 몬스터를 친다' });
 Object.assign(SKILLS.m_shift, { kind: 'spell', range: 5, count: 1, desc: '마기를 실은 푸른 불꽃을 바라보는 쪽 몬스터에게 순식간에 꽂는다' });
 // 무형검: 근접기인데 네 칸을 날아가는 검기였다 → 앞쪽 베기. 혼마염: 맞은 몬스터마다 크게 뜨던 저주 해골(k_m_curse)을 뺀다
@@ -2429,7 +2429,7 @@ export function skillStats(id, level, p) {
     // A grown spell reaches as far as 8단 does, but strikes as a 5단 would: its own power is in
     // its shape (a triangle, the whole screen), not in a number grown four times over.
     // +15% a 단 (8단 is 2.7 times 1단).
-    dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power),
+    dmg: (s.dmg || 0) * Math.pow(1.15, s0.evolved ? 4 : l) * (1 + 0.1 * p.power) * (s.oneCast ? 1 + 0.25 * ((level >= 4) + (level >= 7)) : 1),
     // A spell striking many (s.aoe, 스킬 2차 개편) quickens less with its 단 (3% a step, not 7%):
     // its weight is in the blow, not in its pace.
     cd: s.cd * Math.pow(s.aoe ? 0.97 : 0.93, l) * Math.pow(0.92, p.haste),
@@ -2439,7 +2439,9 @@ export function skillStats(id, level, p) {
     // (one more tile only at 8단, and none for a spell that already lays several areas at once — 투도멸진's
     // marks, a rain of bursts: grown each at 4단 and 8단 they covered the screen, 사용자: 터무니없이 큼)
     radius: !s.radius ? 0 : s.radius + radiusGrow(s, level) + Math.floor(p.area / 3),
-    count: (s.count || 1) + (level >= 4) + (level >= 7),
+    // (s.oneCast: one blow as 연's own, however high its 단 — 광폭기조사, 사용자 2026-11-28: three rings at once
+    // looked wrong. What the extra targets would have brought goes to the one blow instead, a quarter each.)
+    count: (s.count || 1) + (s.oneCast ? 0 : (level >= 4) + (level >= 7)),
     duration: (s.duration || 0) * (1 + 0.1 * l),
     heal: (s.heal || 0) * (1 + 0.45 * l),
   };
